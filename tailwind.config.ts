@@ -14,6 +14,10 @@ const config: Config = {
           gold: "#b9904a",
           mist: "#f6f3ee",
           line: "#ded6c8",
+          pearl: "#fffaf1",
+          forest: "#1f4a3d",
+          ruby: "#8d2f2f",
+          steel: "#35506b",
         },
       },
       fontFamily: {

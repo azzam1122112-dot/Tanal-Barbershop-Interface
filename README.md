@@ -1,6 +1,6 @@
 # TANAL Loyalty
 
-نظام ولاء وتشغيل لصالون حلاقة رجالي، مبني كـ Next.js Web/PWA بواجهة عربية RTL، ولوحة مدير منفصلة عن تطبيق الحلاق.
+نظام ولاء وتشغيل لصالون حلاقة رجالي، مبني كـ Next.js Web/PWA بواجهة عربية RTL، ولوحة مدير منفصلة عن واجهة تنال للحلاقة الرجالية.
 
 ## المتطلبات
 
@@ -242,7 +242,7 @@ dropdb -h localhost -p 55432 -U tanal_user tanal_loyalty_fresh_check
 
 ## روابط الصفحات الأساسية
 
-- تطبيق الحلاق: `/barber/login`
+- واجهة تنال للحلاقة الرجالية: `/barber/login`
 - دخول المدير: `/dashboard/login`
 - الداشبورد: `/dashboard`
 - التقارير: `/dashboard/reports`

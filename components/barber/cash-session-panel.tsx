@@ -51,45 +51,56 @@ export function CashSessionPanel({ initialSession }: { initialSession: CashSessi
 
   if (!cashSession) {
     return (
-      <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-4 shadow-sm">
-        <p className="text-sm font-bold text-amber-800">لا توجد جلسة صندوق مفتوحة</p>
-        <p className="mt-2 text-sm text-amber-800">افتح جلسة صندوق قبل تسجيل الزيارات.</p>
-        {message ? <p className="mt-3 text-sm text-amber-900">{message}</p> : null}
+      <div className="mt-5 overflow-hidden rounded-[1.5rem] border border-amber-200 bg-[linear-gradient(135deg,#fffaf1_0%,#fff4d6_100%)] shadow-lg shadow-amber-900/5">
+        <div className="border-b border-amber-200/70 px-4 py-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-black text-amber-900">لا توجد جلسة صندوق مفتوحة</p>
+              <p className="mt-1 text-sm leading-6 text-amber-800">افتح جلسة صندوق قبل البحث وتسجيل الزيارات.</p>
+            </div>
+            <span className="h-3 w-3 rounded-full bg-amber-500 shadow-[0_0_0_6px_rgba(245,158,11,0.15)]" />
+          </div>
+        </div>
+        <div className="p-4">
+          {message ? <p className="mb-3 rounded-2xl bg-white/70 px-3 py-2 text-sm font-semibold text-amber-900">{message}</p> : null}
         <button
           onClick={openSession}
           disabled={loading}
-          className="mt-4 w-full rounded-md bg-salon-ink px-4 py-3 font-bold text-white disabled:opacity-60"
+            className="h-14 w-full rounded-2xl bg-salon-ink px-4 font-black text-white shadow-lg shadow-salon-ink/20 transition active:scale-[0.98] disabled:opacity-60"
         >
           {loading ? "جاري فتح الجلسة..." : "فتح جلسة صندوق"}
         </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="mt-5 rounded-lg border border-green-200 bg-green-50 p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
+    <div className="mt-5 overflow-hidden rounded-[1.5rem] border border-emerald-200 bg-white shadow-lg shadow-emerald-950/5">
+      <div className="bg-[linear-gradient(135deg,#1f4a3d_0%,#17130f_100%)] p-4 text-white">
+        <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-bold text-green-800">جلسة الصندوق مفتوحة</p>
-          <p className="mt-1 text-xs text-green-800">بدأت: {new Date(cashSession.openedAt).toLocaleString("ar-SA")}</p>
+            <p className="text-sm font-black text-salon-gold">جلسة الصندوق مفتوحة</p>
+            <p className="mt-1 text-xs font-semibold text-white/75">بدأت: {new Date(cashSession.openedAt).toLocaleString("ar-SA")}</p>
         </div>
-        <span className="rounded-md bg-white px-2 py-1 text-xs font-bold text-green-700">{cashSession.visitsCount} زيارة</span>
+          <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-black text-white">{cashSession.visitsCount} زيارة</span>
+        </div>
       </div>
-      <div className="mt-4 grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 gap-2 p-4">
         <MiniStat label="كاش الجلسة" value={formatMoney(cashSession.cashTotal)} />
         <MiniStat label="شبكة الجلسة" value={formatMoney(cashSession.networkTotal)} />
         <MiniStat label="الصافي" value={formatMoney(cashSession.netTotal)} />
       </div>
-      {message ? <p className="mt-3 text-sm text-green-900">{message}</p> : null}
+      {message ? <p className="mx-4 mb-4 rounded-2xl bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900">{message}</p> : null}
     </div>
   );
 }
 
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md bg-white p-2 text-center">
-      <p className="text-[11px] text-salon-charcoal">{label}</p>
-      <p className="mt-1 text-sm font-bold">{value}</p>
+    <div className="rounded-2xl border border-salon-line bg-salon-pearl p-3 text-center">
+      <p className="text-[11px] font-semibold text-salon-charcoal/75">{label}</p>
+      <p className="mt-1 text-sm font-black">{value}</p>
     </div>
   );
 }

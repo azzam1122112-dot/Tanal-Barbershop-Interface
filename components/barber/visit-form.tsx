@@ -116,35 +116,50 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
   const displayDiscount = selectedReward?.discountAmount ?? selectedCampaign?.discountAmount ?? 0;
   const displayNetAmount = preview ? Math.max(0, preview.grossAmount - displayDiscount) : 0;
   const displayExpectedPoints = Math.floor(displayNetAmount);
+  const selectedServicesTotal = services
+    .filter((service) => selectedServices.includes(service.id))
+    .reduce((total, service) => total + service.defaultPrice, 0);
+  const canPreview = selectedServices.length > 0 && Number(grossAmount) > 0 && !loadingPreview;
 
   return (
     <form onSubmit={submitPreview} className="space-y-4">
-      <div className="rounded-lg border border-salon-line bg-white p-4 shadow-sm">
-        <h2 className="text-lg font-bold">الخدمات</h2>
-        <div className="mt-3 grid gap-2">
+      <div className="rounded-[1.5rem] border border-salon-line bg-white p-4 shadow-lg shadow-salon-ink/5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-black">الخدمات</h2>
+            <p className="mt-1 text-xs font-semibold text-salon-charcoal/70">اختر خدمة واحدة أو أكثر</p>
+          </div>
+          <span className="rounded-full bg-salon-mist px-3 py-1 text-xs font-black text-salon-charcoal">{selectedServices.length} مختارة</span>
+        </div>
+        <div className="mt-4 grid gap-2">
           {services.map((service) => (
             <label
               key={service.id}
-              className={`flex min-h-16 items-center justify-between rounded-lg border px-3 py-3 ${
-                selectedServices.includes(service.id) ? "border-salon-gold bg-salon-gold/15" : "border-salon-line bg-white"
+              className={`flex min-h-16 items-center justify-between rounded-2xl border px-3 py-3 transition active:scale-[0.99] ${
+                selectedServices.includes(service.id) ? "border-salon-gold bg-salon-gold/15 shadow-md shadow-salon-gold/10" : "border-salon-line bg-salon-pearl"
               }`}
             >
-              <span className="font-bold">
+              <span className="flex items-center gap-3 font-black">
                 <input
                   type="checkbox"
                   checked={selectedServices.includes(service.id)}
                   onChange={() => toggleService(service.id)}
-                  className="ml-2"
+                  className="h-5 w-5 accent-salon-gold"
                 />
                 {service.name}
               </span>
-              <span className="font-bold">{service.defaultPrice} ريال</span>
+              <span className="rounded-full bg-white px-3 py-1 text-sm font-black text-salon-forest">{service.defaultPrice} ريال</span>
             </label>
           ))}
         </div>
+        {selectedServices.length > 0 ? (
+          <div className="mt-3 rounded-2xl bg-salon-ink px-4 py-3 text-sm font-bold text-white">
+            مجموع الأسعار الافتراضية: <span className="text-salon-gold">{selectedServicesTotal} ريال</span>
+          </div>
+        ) : null}
       </div>
 
-      <div className="rounded-lg border border-salon-line bg-white p-4 shadow-sm">
+      <div className="rounded-[1.5rem] border border-salon-line bg-white p-4 shadow-lg shadow-salon-ink/5">
         <label className="block text-sm font-bold">
           المبلغ قبل الخصم
           <input
@@ -159,7 +174,7 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
             min={0.01}
             step="0.01"
             placeholder="0"
-            className="mt-2 h-16 w-full rounded-md border border-salon-line px-3 text-center text-3xl font-bold outline-none focus:border-salon-gold"
+            className="mt-2 h-20 w-full rounded-3xl border border-salon-line bg-salon-pearl px-3 text-center text-4xl font-black outline-none transition focus:border-salon-gold focus:ring-4 focus:ring-salon-gold/15"
           />
         </label>
         <div className="mt-4 grid grid-cols-2 gap-2">
@@ -170,7 +185,7 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
               setPreview(null);
               setSelectedDiscount("NONE");
             }}
-            className={`h-14 rounded-md border px-3 text-lg font-bold ${paymentMethod === "CASH" ? "border-salon-gold bg-salon-gold text-salon-ink" : "border-salon-line bg-white"}`}
+            className={`h-14 rounded-2xl border px-3 text-lg font-black transition active:scale-[0.98] ${paymentMethod === "CASH" ? "border-salon-gold bg-salon-gold text-salon-ink shadow-lg shadow-salon-gold/20" : "border-salon-line bg-salon-pearl"}`}
           >
             كاش
           </button>
@@ -181,74 +196,115 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
               setPreview(null);
               setSelectedDiscount("NONE");
             }}
-            className={`h-14 rounded-md border px-3 text-lg font-bold ${paymentMethod === "NETWORK" ? "border-salon-gold bg-salon-gold text-salon-ink" : "border-salon-line bg-white"}`}
+            className={`h-14 rounded-2xl border px-3 text-lg font-black transition active:scale-[0.98] ${paymentMethod === "NETWORK" ? "border-salon-gold bg-salon-gold text-salon-ink shadow-lg shadow-salon-gold/20" : "border-salon-line bg-salon-pearl"}`}
           >
             شبكة
           </button>
         </div>
       </div>
 
-      {message ? <p className="rounded-md bg-white px-3 py-3 text-sm text-salon-charcoal">{message}</p> : null}
+      {message ? <p className="rounded-2xl border border-salon-line bg-white px-4 py-3 text-sm font-bold text-salon-charcoal shadow-sm">{message}</p> : null}
 
-      <button disabled={loadingPreview} className="h-14 w-full rounded-md bg-salon-ink px-4 text-lg font-bold text-white disabled:opacity-60">
+      <button disabled={!canPreview} className="h-14 w-full rounded-2xl bg-salon-ink px-4 text-lg font-black text-white shadow-lg shadow-salon-ink/20 transition active:scale-[0.98] disabled:opacity-50">
         {loadingPreview ? "جاري المعاينة..." : "معاينة العملية"}
       </button>
 
       {preview ? (
-        <div className="rounded-lg border border-salon-line bg-white p-4 shadow-sm">
-          <h2 className="text-lg font-bold">ملخص العملية</h2>
-          <div className="mt-3 rounded-lg bg-salon-ink p-4 text-center text-white">
-            <p className="text-sm text-white/70">المطلوب تحصيله</p>
-            <p className="mt-1 text-4xl font-bold text-salon-gold">{displayNetAmount} ريال</p>
-            <p className="mt-1 text-sm text-white/70">النقاط المتوقعة: {displayExpectedPoints}</p>
+        <div className="overflow-hidden rounded-[1.75rem] border border-salon-line bg-white shadow-2xl shadow-salon-ink/10">
+          <div className="bg-[linear-gradient(135deg,#17130f_0%,#1f4a3d_100%)] p-5 text-white">
+            <p className="text-sm font-bold text-white/60">المطلوب تحصيله</p>
+            <p className="mt-1 text-5xl font-black text-salon-gold">{displayNetAmount} ريال</p>
+            <p className="mt-2 text-sm font-semibold text-white/70">النقاط المتوقعة: {displayExpectedPoints}</p>
           </div>
-          <div className="mt-3 rounded-md bg-salon-mist p-3">
-            <p className="text-sm font-bold">رصيد النقاط: {preview.pointsBalance}</p>
-            <label className="mt-3 block text-sm font-semibold">
-              الخصومات المتاحة
-              <select
-                value={selectedDiscount}
-                onChange={(event) => setSelectedDiscount(event.target.value)}
-                className="mt-2 h-12 w-full rounded-md border border-salon-line bg-white px-3 outline-none focus:border-salon-gold"
-              >
-                <option value="NONE">بدون خصم</option>
+          <div className="p-4">
+            <div className="rounded-2xl border border-salon-line bg-salon-pearl p-3">
+              <p className="text-sm font-black">الخصومات المتاحة</p>
+              <p className="mt-1 text-xs font-semibold text-salon-charcoal/70">رصيد النقاط: {preview.pointsBalance}</p>
+              <div className="mt-3 grid gap-2">
+                <DiscountButton
+                  selected={selectedDiscount === "NONE"}
+                  title="بدون خصم"
+                  subtitle="تحصيل كامل المبلغ"
+                  onClick={() => setSelectedDiscount("NONE")}
+                />
                 {preview.availableRewards.map((reward) => (
-                  <option key={reward.id} value={`REWARD:${reward.id}`}>
-                    {reward.label}
-                  </option>
+                  <DiscountButton
+                    key={reward.id}
+                    selected={selectedDiscount === `REWARD:${reward.id}`}
+                    title={reward.label}
+                    subtitle={`استخدام ${reward.pointsRequired} نقطة`}
+                    onClick={() => setSelectedDiscount(`REWARD:${reward.id}`)}
+                  />
                 ))}
                 {preview.availableCampaigns.map((campaign) => (
-                  <option key={campaign.id} value={`CAMPAIGN:${campaign.id}`}>
-                    {campaign.label}
-                  </option>
+                  <DiscountButton
+                    key={campaign.id}
+                    selected={selectedDiscount === `CAMPAIGN:${campaign.id}`}
+                    title={campaign.label}
+                    subtitle={campaign.description ?? campaign.name}
+                    onClick={() => setSelectedDiscount(`CAMPAIGN:${campaign.id}`)}
+                  />
                 ))}
-              </select>
-            </label>
-            {preview.availableRewards.length === 0 && preview.availableCampaigns.length === 0 ? (
-              <p className="mt-2 text-xs text-salon-charcoal">لا توجد خصومات متاحة لهذه الزيارة</p>
-            ) : null}
-            {selectedCampaign ? <p className="mt-2 text-xs text-salon-charcoal">{selectedCampaign.description ?? selectedCampaign.name}</p> : null}
+              </div>
+              {preview.availableRewards.length === 0 && preview.availableCampaigns.length === 0 ? (
+                <p className="mt-3 rounded-2xl bg-white px-3 py-2 text-xs font-semibold text-salon-charcoal">لا توجد خصومات متاحة لهذه الزيارة</p>
+              ) : null}
+            </div>
+            <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
+              <SummaryCell label="العميل" value={preview.customer.name} />
+              <SummaryCell label="الحلاق" value={preview.barber.name} />
+              <SummaryCell label="قبل الخصم" value={`${preview.grossAmount} ريال`} />
+              <SummaryCell label="الخصم" value={`${displayDiscount} ريال`} />
+              <SummaryCell label="المطلوب" value={`${displayNetAmount} ريال`} strong />
+              <SummaryCell label="النقاط المستخدمة" value={`${selectedReward?.pointsRequired ?? 0}`} />
+              <SummaryCell label="النقاط المتوقعة" value={`${displayExpectedPoints}`} />
+            </dl>
+            <p className="mt-3 rounded-2xl bg-salon-mist px-3 py-3 text-sm font-semibold text-salon-charcoal">{preview.services.map((service) => service.name).join("، ")}</p>
+            <button
+              type="button"
+              onClick={confirmVisit}
+              disabled={loadingConfirm}
+              className="mt-4 h-14 w-full rounded-2xl bg-salon-gold px-4 text-lg font-black text-salon-ink shadow-lg shadow-salon-gold/25 transition active:scale-[0.98] disabled:opacity-60"
+            >
+              {loadingConfirm ? "جاري الحفظ..." : "تأكيد وإغلاق"}
+            </button>
           </div>
-          <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
-            <div><dt className="text-salon-charcoal">العميل</dt><dd className="font-bold">{preview.customer.name}</dd></div>
-            <div><dt className="text-salon-charcoal">الحلاق</dt><dd className="font-bold">{preview.barber.name}</dd></div>
-            <div><dt className="text-salon-charcoal">قبل الخصم</dt><dd className="font-bold">{preview.grossAmount} ريال</dd></div>
-            <div><dt className="text-salon-charcoal">الخصم</dt><dd className="font-bold">{displayDiscount} ريال</dd></div>
-            <div><dt className="text-salon-charcoal">المطلوب</dt><dd className="font-bold">{displayNetAmount} ريال</dd></div>
-            <div><dt className="text-salon-charcoal">النقاط المستخدمة</dt><dd className="font-bold">{selectedReward?.pointsRequired ?? 0}</dd></div>
-            <div><dt className="text-salon-charcoal">النقاط المتوقعة</dt><dd className="font-bold">{displayExpectedPoints}</dd></div>
-          </dl>
-          <p className="mt-3 text-sm text-salon-charcoal">{preview.services.map((service) => service.name).join("، ")}</p>
-          <button
-            type="button"
-            onClick={confirmVisit}
-            disabled={loadingConfirm}
-            className="mt-4 h-14 w-full rounded-md bg-salon-gold px-4 text-lg font-bold text-salon-ink disabled:opacity-60"
-          >
-            {loadingConfirm ? "جاري الحفظ..." : "تأكيد وإغلاق"}
-          </button>
         </div>
       ) : null}
     </form>
+  );
+}
+
+function DiscountButton({
+  selected,
+  title,
+  subtitle,
+  onClick,
+}: {
+  selected: boolean;
+  title: string;
+  subtitle: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`min-h-16 rounded-2xl border px-3 py-3 text-right transition active:scale-[0.99] ${
+        selected ? "border-salon-gold bg-salon-gold/15 shadow-md shadow-salon-gold/10" : "border-salon-line bg-white"
+      }`}
+    >
+      <span className="block text-sm font-black">{title}</span>
+      <span className="mt-1 block text-xs font-semibold text-salon-charcoal/70">{subtitle}</span>
+    </button>
+  );
+}
+
+function SummaryCell({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div className="rounded-2xl border border-salon-line bg-salon-pearl p-3">
+      <dt className="text-xs font-bold text-salon-charcoal/65">{label}</dt>
+      <dd className={`mt-1 break-words text-sm ${strong ? "font-black text-salon-forest" : "font-black"}`}>{value}</dd>
+    </div>
   );
 }

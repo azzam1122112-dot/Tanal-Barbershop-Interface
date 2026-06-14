@@ -22,3 +22,16 @@ body {
   background: #f6f3ee;
   color: #17130f;
 }
+
+::selection {
+  background: #b9904a;
+  color: #17130f;
+}
+
+button,
+a,
+input,
+textarea,
+select {
+  -webkit-tap-highlight-color: transparent;
+}

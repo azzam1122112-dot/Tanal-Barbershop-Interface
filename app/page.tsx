@@ -16,7 +16,7 @@ export default function HomePage() {
         </div>
         <div className="grid gap-3 text-sm text-salon-charcoal sm:grid-cols-2">
           <div className="rounded-lg border border-salon-line bg-white p-4">
-            تطبيق الحلاق سيكون Mobile-first وبصلاحيات منفصلة.
+            واجهة تنال للحلاقة الرجالية ستكون Mobile-first وبصلاحيات منفصلة.
           </div>
           <div className="rounded-lg border border-salon-line bg-white p-4">
             لوحة المدير ستكون Desktop-first مع دعم RTL كامل.
