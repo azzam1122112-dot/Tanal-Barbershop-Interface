@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 
 type VisitRow = {
   id: string;
@@ -18,7 +19,7 @@ type ActionResponse = {
 };
 
 export function VisitAdminActions({ visit }: { visit: VisitRow }) {
-  const [message, setMessage] = useState("");
+  const [toast, setToast] = useState<ToastState | null>(null);
   const [loading, setLoading] = useState("");
 
   async function submit(event: FormEvent<HTMLFormElement>, action: "cancel" | "payment" | "amount") {
@@ -26,7 +27,7 @@ export function VisitAdminActions({ visit }: { visit: VisitRow }) {
     if (action === "cancel" && !window.confirm("هل تريد إلغاء هذه الزيارة؟ سيتم عكس أثرها المالي والنقاطي.")) {
       return;
     }
-    setMessage("");
+    setToast(null);
     setLoading(action);
     const form = new FormData(event.currentTarget);
     const reason = String(form.get("reason") ?? "");
@@ -52,12 +53,12 @@ export function VisitAdminActions({ visit }: { visit: VisitRow }) {
     const data = (await response.json().catch(() => ({}))) as ActionResponse;
 
     if (response.ok) {
-      setMessage("تم تنفيذ التصحيح");
-      window.location.reload();
+      setToast({ message: "تم تنفيذ التصحيح، سيتم تحديث السجل الآن", tone: "success" });
+      window.setTimeout(() => window.location.reload(), 650);
       return;
     }
 
-    setMessage(data.message ?? "تعذر تنفيذ العملية");
+    setToast({ message: data.message ?? "تعذر تنفيذ العملية", tone: "error" });
     setLoading("");
   }
 
@@ -74,27 +75,27 @@ export function VisitAdminActions({ visit }: { visit: VisitRow }) {
 
   return (
     <div className="grid min-w-[320px] gap-3">
-      {message ? <p className="rounded-md bg-salon-mist px-2 py-2 text-xs text-salon-charcoal">{message}</p> : null}
+      <DashboardToast toast={toast} onClose={() => setToast(null)} />
       <form onSubmit={(event) => submit(event, "payment")} className="grid grid-cols-[1fr_1fr] gap-2">
-        <select name="paymentMethod" defaultValue={visit.paymentMethod === "CASH" ? "NETWORK" : "CASH"} className="rounded-md border border-salon-line px-2 py-2 outline-none focus:border-salon-gold">
+        <select name="paymentMethod" defaultValue={visit.paymentMethod === "CASH" ? "NETWORK" : "CASH"} className="dashboard-field py-2">
           <option value="CASH">كاش</option>
           <option value="NETWORK">شبكة</option>
         </select>
-        <input name="reason" required minLength={5} placeholder="سبب تعديل الدفع" className="rounded-md border border-salon-line px-2 py-2 outline-none focus:border-salon-gold" />
-        <button disabled={loading === "payment"} className="col-span-2 rounded-md bg-salon-ink px-3 py-2 font-bold text-white disabled:opacity-60">
+        <input name="reason" required minLength={5} placeholder="سبب تعديل الدفع" className="dashboard-field py-2" />
+        <button disabled={loading === "payment"} className="dashboard-button col-span-2 px-3 py-2">
           تعديل الدفع
         </button>
       </form>
       <form onSubmit={(event) => submit(event, "amount")} className="grid grid-cols-[110px_1fr] gap-2">
-        <input name="grossAmount" required type="number" min={0.01} step="0.01" defaultValue={visit.grossAmount} className="rounded-md border border-salon-line px-2 py-2 outline-none focus:border-salon-gold" />
-        <input name="reason" required minLength={5} placeholder="سبب تعديل المبلغ" className="rounded-md border border-salon-line px-2 py-2 outline-none focus:border-salon-gold" />
-        <button disabled={loading === "amount"} className="col-span-2 rounded-md bg-salon-gold px-3 py-2 font-bold text-salon-ink disabled:opacity-60">
+        <input name="grossAmount" required type="number" min={0.01} step="0.01" defaultValue={visit.grossAmount} className="dashboard-field py-2" />
+        <input name="reason" required minLength={5} placeholder="سبب تعديل المبلغ" className="dashboard-field py-2" />
+        <button disabled={loading === "amount"} className="dashboard-button-gold col-span-2 px-3 py-2">
           تعديل المبلغ
         </button>
       </form>
       <form onSubmit={(event) => submit(event, "cancel")} className="grid gap-2">
-        <input name="reason" required minLength={5} placeholder="سبب الإلغاء" className="rounded-md border border-red-200 px-2 py-2 outline-none focus:border-red-500" />
-        <button disabled={loading === "cancel"} className="rounded-md bg-red-700 px-3 py-2 font-bold text-white disabled:opacity-60">
+        <input name="reason" required minLength={5} placeholder="سبب الإلغاء" className="dashboard-field border-red-200 py-2 focus:border-red-500 focus:ring-red-100" />
+        <button disabled={loading === "cancel"} className="dashboard-danger-button px-3 py-2">
           إلغاء الزيارة
         </button>
       </form>

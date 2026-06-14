@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
+import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 
 type TemplateType = "POST_VISIT" | "REWARD_READY" | "CAMPAIGN" | "INACTIVE_CUSTOMER" | "CUSTOM";
 type MessageStatus = "DRAFTED" | "OPENED" | "MARKED_SENT" | "SKIPPED" | "FAILED";
@@ -90,12 +91,12 @@ export function WhatsAppDashboard({
   const [messages, setMessages] = useState(initialMessages);
   const [generated, setGenerated] = useState<GeneratedMessage | null>(null);
   const [campaignAudience, setCampaignAudience] = useState<AudienceCustomer[]>([]);
-  const [status, setStatus] = useState("");
+  const [toast, setToast] = useState<ToastState | null>(null);
   const activeTemplates = useMemo(() => templates.filter((template) => template.isActive), [templates]);
 
   async function createTemplate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setStatus("");
+    setToast(null);
     const form = new FormData(event.currentTarget);
     const response = await fetch("/api/dashboard/whatsapp/templates", {
       method: "POST",
@@ -110,9 +111,9 @@ export function WhatsAppDashboard({
     if (response.ok && data.template) {
       setTemplates((current) => [data.template!, ...current]);
       event.currentTarget.reset();
-      setStatus("تم حفظ القالب");
+      setToast({ message: "تم حفظ القالب بنجاح", tone: "success" });
     } else {
-      setStatus(data.message ?? "تعذر حفظ القالب");
+      setToast({ message: data.message ?? "تعذر حفظ القالب", tone: "error" });
     }
   }
 
@@ -125,15 +126,15 @@ export function WhatsAppDashboard({
     const data = (await response.json().catch(() => ({}))) as { template?: Template; message?: string };
     if (response.ok && data.template) {
       setTemplates((current) => current.map((template) => (template.id === id ? data.template! : template)));
-      setStatus("تم تحديث القالب");
+      setToast({ message: "تم تحديث القالب", tone: "success" });
     } else {
-      setStatus(data.message ?? "تعذر تحديث القالب");
+      setToast({ message: data.message ?? "تعذر تحديث القالب", tone: "error" });
     }
   }
 
   async function generateMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setStatus("");
+    setToast(null);
     const form = new FormData(event.currentTarget);
     const payload = {
       customerId: form.get("customerId"),
@@ -150,10 +151,10 @@ export function WhatsAppDashboard({
     const data = (await response.json().catch(() => ({}))) as GeneratedMessage & { message?: string };
     if (response.ok && data.messageLogId) {
       setGenerated(data);
-      setStatus("تم تجهيز الرسالة. الإرسال يدوي فقط.");
+      setToast({ message: "تم تجهيز الرسالة. الإرسال يدوي فقط.", tone: "success" });
       await refreshMessages();
     } else {
-      setStatus(data.message ?? "تعذر تجهيز الرسالة");
+      setToast({ message: data.message ?? "تعذر تجهيز الرسالة", tone: "error" });
     }
   }
 
@@ -164,17 +165,17 @@ export function WhatsAppDashboard({
       window.open(data.waUrl ?? message.waUrl, "_blank", "noopener,noreferrer");
       await refreshMessages();
     } else {
-      setStatus("تعذر تحديث حالة فتح واتساب");
+      setToast({ message: "تعذر تحديث حالة فتح واتساب", tone: "error" });
     }
   }
 
   async function markSent(id: string) {
     const response = await fetch(`/api/dashboard/whatsapp/messages/${id}/mark-sent`, { method: "POST" });
     if (response.ok) {
-      setStatus("تم تعليم الرسالة كمرسلة يدويًا");
+      setToast({ message: "تم تعليم الرسالة كمرسلة يدويًا", tone: "success" });
       await refreshMessages();
     } else {
-      setStatus("تعذر تعليم الرسالة كمرسلة");
+      setToast({ message: "تعذر تعليم الرسالة كمرسلة", tone: "error" });
     }
   }
 
@@ -184,7 +185,7 @@ export function WhatsAppDashboard({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ whatsappOptIn }),
     });
-    setStatus(response.ok ? "تم تحديث تفضيل واتساب" : "تعذر تحديث تفضيل واتساب");
+    setToast(response.ok ? { message: "تم تحديث تفضيل واتساب", tone: "success" } : { message: "تعذر تحديث تفضيل واتساب", tone: "error" });
   }
 
   async function loadCampaignAudience(campaignId: string) {
@@ -197,7 +198,7 @@ export function WhatsAppDashboard({
     if (response.ok) {
       setCampaignAudience(data.customers ?? []);
     } else {
-      setStatus(data.message ?? "تعذر تحميل جمهور الحملة");
+      setToast({ message: data.message ?? "تعذر تحميل جمهور الحملة", tone: "error" });
     }
   }
 
@@ -209,29 +210,29 @@ export function WhatsAppDashboard({
 
   return (
     <div className="mt-8 space-y-6">
+      <DashboardToast toast={toast} onClose={() => setToast(null)} />
       <div className="rounded-lg border border-salon-gold/40 bg-white p-4 text-sm text-salon-charcoal">
         الإرسال يتم يدويًا عبر واتساب. النظام يجهز الرسالة والرابط فقط، ولا يرسل تلقائيًا ولا يستخدم WhatsApp API.
       </div>
-      {status ? <p className="rounded-lg border border-salon-line bg-white px-4 py-3 text-sm font-bold text-salon-charcoal">{status}</p> : null}
 
       <section className="grid gap-6 xl:grid-cols-[420px_1fr]">
-        <form onSubmit={createTemplate} className="space-y-3 rounded-lg border border-salon-line bg-white p-5">
-          <h2 className="text-xl font-bold">القوالب</h2>
-          <input name="name" required placeholder="اسم القالب" className="w-full rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold" />
-          <select name="type" defaultValue="CUSTOM" className="w-full rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold">
+        <form onSubmit={createTemplate} className="dashboard-panel space-y-3 p-5">
+          <h2 className="text-xl font-black">القوالب</h2>
+          <input name="name" required placeholder="اسم القالب" className="dashboard-field" />
+          <select name="type" defaultValue="CUSTOM" className="dashboard-field">
             <option value="POST_VISIT">بعد الزيارة</option>
             <option value="REWARD_READY">مكافأة جاهزة</option>
             <option value="CAMPAIGN">حملة</option>
             <option value="INACTIVE_CUSTOMER">عميل منقطع</option>
             <option value="CUSTOM">مخصص</option>
           </select>
-          <textarea name="body" required rows={7} placeholder="نص القالب مع المتغيرات مثل {name} و {points}" className="w-full rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold" />
-          <button className="w-full rounded-md bg-salon-ink px-4 py-3 font-bold text-white">حفظ قالب</button>
+          <textarea name="body" required rows={7} placeholder="نص القالب مع المتغيرات مثل {name} و {points}" className="dashboard-field" />
+          <button className="dashboard-button w-full">حفظ قالب</button>
         </form>
 
-        <div className="overflow-x-auto rounded-lg border border-salon-line bg-white">
-          <table className="w-full min-w-[760px] text-sm">
-            <thead className="bg-salon-mist text-salon-charcoal">
+        <div className="dashboard-panel overflow-x-auto">
+          <table className="dashboard-table min-w-[760px]">
+            <thead>
               <tr>
                 <th className="px-3 py-3 text-right">القالب</th>
                 <th className="px-3 py-3 text-right">النوع</th>
@@ -249,7 +250,7 @@ export function WhatsAppDashboard({
                     <button
                       type="button"
                       onClick={() => updateTemplate(template.id, { isActive: !template.isActive })}
-                      className={`rounded-md px-3 py-2 font-bold ${template.isActive ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}
+                      className={`rounded-lg px-3 py-2 font-bold ${template.isActive ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}
                     >
                       {template.isActive ? "فعال" : "معطل"}
                     </button>
@@ -262,9 +263,9 @@ export function WhatsAppDashboard({
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[420px_1fr]">
-        <form onSubmit={generateMessage} className="space-y-3 rounded-lg border border-salon-line bg-white p-5">
-          <h2 className="text-xl font-bold">إرسال رسالة لعميل</h2>
-          <select name="customerId" defaultValue={prefillCustomerId ?? ""} required className="w-full rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold">
+        <form onSubmit={generateMessage} className="dashboard-panel space-y-3 p-5">
+          <h2 className="text-xl font-black">إرسال رسالة لعميل</h2>
+          <select name="customerId" defaultValue={prefillCustomerId ?? ""} required className="dashboard-field">
             <option value="">اختر العميل</option>
             {customers.map((customer) => (
               <option key={customer.id} value={customer.id}>
@@ -272,31 +273,31 @@ export function WhatsAppDashboard({
               </option>
             ))}
           </select>
-          <select name="templateId" className="w-full rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold">
+          <select name="templateId" className="dashboard-field">
             <option value="">رسالة مخصصة بدون قالب</option>
             {activeTemplates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
           </select>
-          <select name="visitId" defaultValue={prefillVisitId ?? ""} className="w-full rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold">
+          <select name="visitId" defaultValue={prefillVisitId ?? ""} className="dashboard-field">
             <option value="">بدون زيارة</option>
             {visits.map((visit) => <option key={visit.id} value={visit.id}>{visit.label}</option>)}
           </select>
-          <select name="campaignId" className="w-full rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold">
+          <select name="campaignId" className="dashboard-field">
             <option value="">بدون حملة</option>
             {campaigns.map((campaign) => <option key={campaign.id} value={campaign.id}>{campaign.name}</option>)}
           </select>
-          <textarea name="customMessage" rows={4} placeholder="رسالة مخصصة اختيارية. يمكنك استخدام {name} و {salon_name}" className="w-full rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold" />
-          <button className="w-full rounded-md bg-salon-gold px-4 py-3 font-bold text-salon-ink">تجهيز الرسالة</button>
+          <textarea name="customMessage" rows={4} placeholder="رسالة مخصصة اختيارية. يمكنك استخدام {name} و {salon_name}" className="dashboard-field" />
+          <button className="dashboard-button-gold w-full">تجهيز الرسالة</button>
         </form>
 
-        <div className="rounded-lg border border-salon-line bg-white p-5">
-          <h2 className="text-xl font-bold">المعاينة</h2>
+        <div className="dashboard-panel p-5">
+          <h2 className="text-xl font-black">المعاينة</h2>
           {generated ? (
             <div className="mt-4 space-y-4">
               <p className="text-sm text-salon-charcoal">{generated.customer.name} - {generated.phone}</p>
-              <pre className="whitespace-pre-wrap rounded-lg bg-salon-mist p-4 text-sm leading-7">{generated.message}</pre>
+              <pre className="whitespace-pre-wrap rounded-lg border border-salon-line bg-salon-mist p-4 text-sm leading-7">{generated.message}</pre>
               <div className="flex flex-wrap gap-2">
-                <button onClick={() => openWhatsApp(generated)} className="rounded-md bg-green-700 px-4 py-3 font-bold text-white">فتح واتساب</button>
-                <button onClick={() => markSent(generated.messageLogId)} className="rounded-md bg-salon-ink px-4 py-3 font-bold text-white">تم الإرسال يدويًا</button>
+                <button onClick={() => openWhatsApp(generated)} className="rounded-lg bg-salon-forest px-4 py-3 font-bold text-white">فتح واتساب</button>
+                <button onClick={() => markSent(generated.messageLogId)} className="dashboard-button">تم الإرسال يدويًا</button>
               </div>
             </div>
           ) : (
@@ -308,9 +309,9 @@ export function WhatsAppDashboard({
       <section className="grid gap-6 lg:grid-cols-3">
         <AudienceCard title="العملاء المنقطعون" customers={inactiveAudience} onToggle={toggleWhatsapp} />
         <AudienceCard title="لديهم مكافأة" customers={rewardAudience} onToggle={toggleWhatsapp} />
-        <div className="rounded-lg border border-salon-line bg-white p-5">
-          <h2 className="text-xl font-bold">عملاء حملة</h2>
-          <select onChange={(event) => loadCampaignAudience(event.currentTarget.value)} className="mt-3 w-full rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold">
+        <div className="dashboard-panel p-5">
+          <h2 className="text-xl font-black">عملاء حملة</h2>
+          <select onChange={(event) => loadCampaignAudience(event.currentTarget.value)} className="dashboard-field mt-3">
             <option value="">اختر حملة</option>
             {campaigns.map((campaign) => <option key={campaign.id} value={campaign.id}>{campaign.name}</option>)}
           </select>
@@ -318,12 +319,12 @@ export function WhatsAppDashboard({
         </div>
       </section>
 
-      <section className="overflow-x-auto rounded-lg border border-salon-line bg-white">
+      <section className="dashboard-panel overflow-x-auto">
         <div className="border-b border-salon-line p-5">
-          <h2 className="text-xl font-bold">سجل الرسائل</h2>
+          <h2 className="text-xl font-black">سجل الرسائل</h2>
         </div>
-        <table className="w-full min-w-[960px] text-sm">
-          <thead className="bg-salon-mist text-salon-charcoal">
+        <table className="dashboard-table min-w-[960px]">
+          <thead>
             <tr>
               <th className="px-3 py-3 text-right">التاريخ</th>
               <th className="px-3 py-3 text-right">العميل</th>
@@ -341,8 +342,8 @@ export function WhatsAppDashboard({
                 <td className="px-3 py-3">{statusLabel(message.status)}</td>
                 <td className="px-3 py-3">
                   <div className="flex flex-wrap gap-2">
-                    <button onClick={() => openWhatsApp({ messageLogId: message.id, waUrl: message.waUrl })} className="rounded-md bg-green-700 px-3 py-2 font-bold text-white">فتح</button>
-                    <button onClick={() => markSent(message.id)} className="rounded-md bg-salon-ink px-3 py-2 font-bold text-white">تم الإرسال</button>
+                    <button onClick={() => openWhatsApp({ messageLogId: message.id, waUrl: message.waUrl })} className="rounded-lg bg-salon-forest px-3 py-2 font-bold text-white">فتح</button>
+                    <button onClick={() => markSent(message.id)} className="dashboard-button px-3 py-2">تم الإرسال</button>
                   </div>
                 </td>
               </tr>
@@ -357,8 +358,8 @@ export function WhatsAppDashboard({
 
 function AudienceCard({ title, customers, onToggle }: { title: string; customers: AudienceCustomer[]; onToggle: (customerId: string, whatsappOptIn: boolean) => void }) {
   return (
-    <div className="rounded-lg border border-salon-line bg-white p-5">
-      <h2 className="text-xl font-bold">{title}</h2>
+    <div className="dashboard-panel p-5">
+      <h2 className="text-xl font-black">{title}</h2>
       <AudienceList customers={customers} onToggle={onToggle} />
     </div>
   );
@@ -368,7 +369,7 @@ function AudienceList({ customers, onToggle }: { customers: AudienceCustomer[]; 
   return (
     <div className="mt-3 max-h-[420px] space-y-3 overflow-auto">
       {customers.map((customer) => (
-        <div key={customer.customerId} className="rounded-md border border-salon-line p-3 text-sm">
+        <div key={customer.customerId} className="rounded-lg border border-salon-line bg-white/80 p-3 text-sm">
           <p className="font-bold">{customer.name}</p>
           <p className="text-salon-charcoal">{customer.phone}</p>
           <p className="text-salon-charcoal">النقاط: {customer.points} {customer.daysSinceLastVisit !== null ? `- منقطع ${customer.daysSinceLastVisit} يوم` : ""}</p>
@@ -376,7 +377,7 @@ function AudienceList({ customers, onToggle }: { customers: AudienceCustomer[]; 
           <button
             type="button"
             onClick={() => onToggle(customer.customerId, !customer.isWhatsappAllowed)}
-            className={`mt-2 rounded-md px-3 py-2 font-bold ${customer.isWhatsappAllowed ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}
+            className={`mt-2 rounded-lg px-3 py-2 font-bold ${customer.isWhatsappAllowed ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}
           >
             {customer.isWhatsappAllowed ? "واتساب مسموح" : "واتساب موقوف"}
           </button>

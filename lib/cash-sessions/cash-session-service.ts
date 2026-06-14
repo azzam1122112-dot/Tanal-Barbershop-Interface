@@ -7,7 +7,8 @@ type SessionVisit = Prisma.VisitGetPayload<{ include: { loyaltyTransactions: tru
 export type CashSessionCloseInput = {
   cashSessionId?: string | null;
   barberId?: string | null;
-  closedByUserId: string;
+  closedByUserId?: string | null;
+  closedByBarberId?: string | null;
   closedByActorType?: AuditActorType;
   cashReceivedAmount?: number | null;
   notes?: string | null;
@@ -102,7 +103,7 @@ export async function closeCashSession(prisma: PrismaClient, input: CashSessionC
       data: {
         status: "CLOSED",
         closedAt: new Date(),
-        closedByUserId: input.closedByUserId,
+        ...(input.closedByUserId ? { closedByUserId: input.closedByUserId } : {}),
         visitsCount: totals.visitsCount,
         grossTotal: totals.grossTotal,
         discountTotal: totals.discountTotal,
@@ -123,6 +124,7 @@ export async function closeCashSession(prisma: PrismaClient, input: CashSessionC
       data: {
         actorType: input.closedByActorType ?? "ADMIN",
         actorUserId: input.closedByUserId,
+        actorBarberId: input.closedByBarberId,
         action: "cash_session.closed",
         entityType: "CashSession",
         entityId: close.id,

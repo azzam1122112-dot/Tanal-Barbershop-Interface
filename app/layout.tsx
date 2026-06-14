@@ -2,13 +2,13 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "TANAL Loyalty",
-  description: "نظام ولاء وتشغيل لصالون حلاقة رجالي",
+  title: "حلاق تنال | واجهة تنال للحلاقة الرجالية",
+  description: "نظام تشغيل وولاء فاخر للحلاقة الرجالية وإدارة جلسات الصندوق والعملاء.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "TANAL",
+    title: "حلاق تنال",
   },
   icons: {
     icon: [

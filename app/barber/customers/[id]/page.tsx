@@ -36,20 +36,20 @@ export default async function BarberCustomerPage({ params }: { params: Promise<{
   const availableRewards = rewardRules.filter((reward) => reward.requiredPoints <= summary.pointsBalance);
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#17130f_0%,#24211d_210px,#f6f3ee_211px)] px-4 pb-28 pt-6 text-salon-ink">
-      <section className="mx-auto max-w-md space-y-5">
-        <Link href="/barber" className="inline-flex rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-black text-salon-gold backdrop-blur">العودة للبحث</Link>
-        <div className="overflow-hidden rounded-[1.75rem] border border-white/10 bg-white shadow-2xl shadow-black/15">
-          <div className="bg-[linear-gradient(135deg,#24211d_0%,#1f4a3d_100%)] p-5 text-white">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-                <p className="text-xs font-black tracking-[0.18em] text-salon-gold">ملف العميل</p>
-                <h1 className="mt-2 text-3xl font-black">{summary.name}</h1>
-                <p className="mt-1 font-semibold text-white/70">{summary.phone}</p>
-            </div>
-              <div className="rounded-3xl border border-salon-gold/30 bg-salon-gold/15 px-4 py-3 text-center">
-                <p className="text-xs font-bold text-white/65">النقاط</p>
-                <p className="text-2xl font-black text-salon-gold">{summary.pointsBalance}</p>
+    <main className="barber-shell pb-28 pt-6">
+      <section className="barber-container space-y-5">
+        <Link href="/barber" className="barber-ghost-button inline-flex py-2 text-sm">العودة للبحث</Link>
+        <div className="overflow-hidden rounded-3xl border border-salon-line bg-white shadow-sm shadow-salon-ink/5">
+          <div className="border-b border-salon-line bg-salon-pearl p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-black tracking-[0.18em] text-salon-forest">ملف العميل</p>
+                <h1 className="mt-2 text-3xl font-black text-salon-ink">{summary.name}</h1>
+                <p className="mt-1 font-semibold text-salon-charcoal/75">{summary.phone}</p>
+              </div>
+              <div className="rounded-2xl border border-salon-gold/40 bg-white px-4 py-3 text-center">
+                <p className="text-xs font-bold text-salon-charcoal/65">النقاط</p>
+                <p className="text-2xl font-black text-salon-forest">{summary.pointsBalance}</p>
               </div>
             </div>
           </div>
@@ -73,7 +73,7 @@ export default async function BarberCustomerPage({ params }: { params: Promise<{
                 <p className="mt-1 text-salon-charcoal">{visit.services.map((service) => service.serviceName).join("، ") || "-"}</p>
               </div>
             ))}
-            {customer.visits.length === 0 ? <p className="rounded-2xl bg-salon-mist py-5 text-center text-sm font-semibold text-salon-charcoal">لا توجد زيارات بعد</p> : null}
+            {customer.visits.length === 0 ? <p className="rounded-2xl border border-dashed border-salon-line bg-salon-pearl py-5 text-center text-sm font-semibold text-salon-charcoal">لا توجد زيارات بعد</p> : null}
           </div>
         </SectionCard>
 
@@ -104,12 +104,12 @@ export default async function BarberCustomerPage({ params }: { params: Promise<{
           <p className="mt-2 text-sm leading-6 text-salon-charcoal">قد تظهر حملات متاحة عند تسجيل الزيارة حسب المبلغ والخدمات وحالة العميل.</p>
         </SectionCard>
       </section>
-      <div className="fixed inset-x-0 bottom-0 border-t border-white/15 bg-salon-ink/95 px-4 py-3 text-white backdrop-blur">
+      <div className="fixed inset-x-0 bottom-0 border-t border-salon-line bg-white/95 px-4 py-3 shadow-[0_-8px_24px_rgba(23,19,15,0.08)]">
         <div className="mx-auto grid max-w-md grid-cols-[1fr_120px] gap-2">
-          <Link href={`/barber/customers/${summary.id}/visits/new`} className="h-14 rounded-2xl bg-salon-gold px-4 py-4 text-center text-lg font-black text-salon-ink shadow-lg shadow-salon-gold/20 transition active:scale-[0.98]">
+          <Link href={`/barber/customers/${summary.id}/visits/new`} className="barber-gold-button h-14 py-4 text-center text-lg">
             تسجيل زيارة جديدة
           </Link>
-          <Link href="/barber" className="h-14 rounded-2xl border border-white/15 bg-white/10 px-4 py-4 text-center font-black text-white transition active:scale-[0.98]">
+          <Link href="/barber" className="barber-ghost-button h-14 py-4 text-center">
             بحث
           </Link>
         </div>
@@ -129,7 +129,7 @@ function InfoTile({ label, value }: { label: string; value: string }) {
 
 function SectionCard({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="rounded-[1.5rem] border border-salon-line bg-white p-5 shadow-lg shadow-salon-ink/5">
+    <div className="barber-card p-5">
       <h2 className="text-lg font-black">{title}</h2>
       {children}
     </div>

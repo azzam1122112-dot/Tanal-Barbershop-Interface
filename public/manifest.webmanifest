@@ -1,7 +1,7 @@
 {
-  "name": "TANAL Barber Loyalty",
-  "short_name": "TANAL",
-  "description": "تطبيق ولاء وتشغيل لصالون حلاقة رجالي",
+  "name": "حلاق تنال - واجهة تنال للحلاقة الرجالية",
+  "short_name": "حلاق تنال",
+  "description": "تطبيق تشغيل وولاء فاخر للحلاقة الرجالية وإدارة جلسات الصندوق والعملاء",
   "start_url": "/barber",
   "scope": "/",
   "display": "standalone",

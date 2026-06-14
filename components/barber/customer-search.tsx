@@ -15,7 +15,7 @@ type CustomerSummary = {
 };
 
 export function CustomerSearch() {
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState("05");
   const [customer, setCustomer] = useState<CustomerSummary | null>(null);
   const [notFoundPhone, setNotFoundPhone] = useState("");
   const [newName, setNewName] = useState("");
@@ -24,6 +24,11 @@ export function CustomerSearch() {
 
   async function search(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!/^05\d{8}$/.test(phone)) {
+      setMessage("رقم جوال العميل يجب أن يبدأ بـ 05 ويتكون من 10 أرقام");
+      return;
+    }
+
     setLoading(true);
     setMessage("");
     setCustomer(null);
@@ -42,7 +47,7 @@ export function CustomerSearch() {
     } else if (data.found && data.customer) {
       setCustomer(data.customer);
     } else {
-      setNotFoundPhone(data.phone ?? phone);
+      setNotFoundPhone(toLocalSaudiMobile(data.phone ?? phone));
       setMessage("العميل غير موجود، يمكنك إضافته الآن");
     }
     setLoading(false);
@@ -50,6 +55,11 @@ export function CustomerSearch() {
 
   async function createCustomer(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!/^05\d{8}$/.test(notFoundPhone)) {
+      setMessage("رقم جوال العميل يجب أن يبدأ بـ 05 ويتكون من 10 أرقام");
+      return;
+    }
+
     setLoading(true);
     setMessage("");
 
@@ -71,26 +81,30 @@ export function CustomerSearch() {
 
   return (
     <div className="mt-5 space-y-4">
-      <form onSubmit={search} className="space-y-4 rounded-[1.5rem] border border-salon-line bg-white p-4 shadow-lg shadow-salon-ink/5">
+      <form onSubmit={search} className="barber-card space-y-4 p-4">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-black">بحث العميل</h2>
             <p className="mt-1 text-xs font-semibold text-salon-charcoal/70">أدخل رقم الجوال ثم تابع مباشرة</p>
           </div>
-          <span className="rounded-full bg-salon-ink px-3 py-1 text-xs font-black text-salon-gold">سريع</span>
+          <span className="rounded-full border border-salon-line bg-salon-pearl px-3 py-1 text-xs font-black text-salon-forest">سريع</span>
         </div>
         <label className="block text-sm font-bold">
           رقم جوال العميل
           <input
             value={phone}
-            onChange={(event) => setPhone(event.target.value)}
-            inputMode="tel"
+            onChange={(event) => setPhone(toLocalSaudiMobile(event.target.value))}
+            inputMode="numeric"
             required
-            placeholder="05xxxxxxxx"
-            className="mt-2 h-16 w-full rounded-2xl border border-salon-line bg-salon-pearl px-4 text-xl font-black outline-none transition focus:border-salon-gold focus:ring-4 focus:ring-salon-gold/15"
+            minLength={10}
+            maxLength={10}
+            pattern="05[0-9]{8}"
+            placeholder="0555967209"
+            className="barber-field mt-2 h-16 bg-salon-pearl text-xl"
           />
+          <span className="mt-2 block text-xs font-semibold text-salon-charcoal/65">مثال: 0555967209، وسيتم حفظه تلقائيًا بصيغة واتساب الدولية.</span>
         </label>
-        <button disabled={loading} className="h-14 w-full rounded-2xl bg-salon-ink px-4 text-lg font-black text-white shadow-lg shadow-salon-ink/20 transition active:scale-[0.98] disabled:opacity-60">
+        <button disabled={loading} className="barber-primary-button h-14 w-full text-lg">
           {loading ? "جاري البحث..." : "بحث"}
         </button>
       </form>
@@ -98,11 +112,11 @@ export function CustomerSearch() {
       {message ? <p className="rounded-2xl border border-salon-line bg-white px-4 py-3 text-sm font-bold text-salon-charcoal shadow-sm">{message}</p> : null}
 
       {customer ? (
-        <div className="overflow-hidden rounded-[1.5rem] border border-salon-line bg-white shadow-xl shadow-salon-ink/10">
-          <div className="bg-[linear-gradient(135deg,#24211d_0%,#1f4a3d_100%)] p-4 text-white">
-            <p className="text-xs font-bold text-white/60">تم العثور على العميل</p>
-            <h2 className="mt-1 text-2xl font-black">{customer.name}</h2>
-            <p className="mt-1 font-semibold text-white/75">{customer.phone}</p>
+        <div className="overflow-hidden rounded-2xl border border-salon-line bg-white shadow-sm shadow-salon-ink/5">
+          <div className="border-b border-salon-line bg-salon-pearl p-4">
+            <p className="text-xs font-bold text-salon-forest">تم العثور على العميل</p>
+            <h2 className="mt-1 text-2xl font-black text-salon-ink">{customer.name}</h2>
+            <p className="mt-1 font-semibold text-salon-charcoal/75">{customer.phone}</p>
           </div>
           <dl className="grid grid-cols-2 gap-2 p-4 text-sm">
             <InfoTile label="النقاط" value={customer.pointsBalance.toString()} />
@@ -110,33 +124,39 @@ export function CustomerSearch() {
             <InfoTile label="آخر حلاق" value={customer.lastBarberName ?? "-"} />
             <InfoTile label="آخر خدمة" value={customer.lastServices.join("، ") || "-"} />
           </dl>
-          <Link href={`/barber/customers/${customer.id}`} className="mx-4 mb-4 block h-14 rounded-2xl bg-salon-gold px-4 py-4 text-center text-lg font-black text-salon-ink shadow-lg shadow-salon-gold/25 transition active:scale-[0.98]">
+          <Link href={`/barber/customers/${customer.id}`} className="barber-gold-button mx-4 mb-4 block h-14 py-4 text-center text-lg">
             عرض العميل
           </Link>
         </div>
       ) : null}
 
       {notFoundPhone ? (
-        <form onSubmit={createCustomer} className="space-y-3 rounded-[1.5rem] border border-salon-line bg-white p-4 shadow-lg shadow-salon-ink/5">
+        <form onSubmit={createCustomer} className="barber-card space-y-3 p-4">
           <div>
             <h2 className="text-lg font-black">إضافة عميل جديد</h2>
             <p className="mt-1 text-xs font-semibold text-salon-charcoal/70">الرقم جاهز، أضف الاسم فقط</p>
           </div>
-          <input value={notFoundPhone} readOnly className="h-12 w-full rounded-2xl border border-salon-line bg-salon-mist px-4 font-black" />
+          <input value={notFoundPhone} readOnly className="barber-field h-12 bg-salon-mist" />
           <input
             value={newName}
             onChange={(event) => setNewName(event.target.value)}
             required
             placeholder="اسم العميل"
-            className="h-14 w-full rounded-2xl border border-salon-line px-4 text-lg font-bold outline-none transition focus:border-salon-gold focus:ring-4 focus:ring-salon-gold/15"
+            className="barber-field h-14 text-lg"
           />
-          <button disabled={loading} className="h-14 w-full rounded-2xl bg-salon-gold px-4 text-lg font-black text-salon-ink shadow-lg shadow-salon-gold/25 transition active:scale-[0.98] disabled:opacity-60">
+          <button disabled={loading} className="barber-gold-button h-14 w-full text-lg">
             {loading ? "جاري الحفظ..." : "حفظ ومتابعة"}
           </button>
         </form>
       ) : null}
     </div>
   );
+}
+
+function toLocalSaudiMobile(value: string) {
+  const digits = value.replace(/\D/g, "");
+  const localPhone = digits.startsWith("9665") ? `0${digits.slice(3)}` : digits.startsWith("5") ? `0${digits}` : digits;
+  return localPhone.startsWith("05") ? localPhone.slice(0, 10) : `05${localPhone.replace(/^0+/, "")}`.slice(0, 10);
 }
 
 function InfoTile({ label, value }: { label: string; value: string }) {

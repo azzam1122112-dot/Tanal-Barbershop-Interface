@@ -90,6 +90,31 @@ describe("cash sessions", () => {
     createdVisitIds.push(secondVisit.visit.id);
     expect(secondVisit.visit.cashSessionId).toBe(newOpen.cashSession.id);
   }, 30000);
+
+  it("allows the barber to end the current cash session and records audit ownership", async () => {
+    const opened = await openCashSession(prisma, { barberId });
+    createdCashSessionIds.push(opened.cashSession.id);
+
+    const closed = await closeCashSession(prisma, {
+      barberId,
+      closedByBarberId: barberId,
+      closedByActorType: "BARBER",
+      notes: "أغلقها الحلاق من واجهة الحلاق",
+    });
+
+    expect(closed.status).toBe("CLOSED");
+    expect(closed.closedBy).toBeNull();
+    await expect(createVisit("barber-closed-session")).rejects.toThrow("لا توجد جلسة صندوق مفتوحة");
+
+    const audit = await prisma.auditLog.findFirstOrThrow({
+      where: {
+        action: "cash_session.closed",
+        entityId: closed.id,
+      },
+    });
+    expect(audit.actorType).toBe("BARBER");
+    expect(audit.actorBarberId).toBe(barberId);
+  }, 30000);
 });
 
 function createVisit(key: string) {

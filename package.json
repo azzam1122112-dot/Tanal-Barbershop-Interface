@@ -1,8 +1,8 @@
 {
-  "name": "tanal-loyalty",
+  "name": "tanal-barber-interface",
   "version": "0.1.0",
   "private": true,
-  "description": "Arabic RTL loyalty and barber operations system for a men's salon.",
+  "description": "Arabic RTL barber operations, cash sessions, loyalty, and customer care system for TANAL men's barbershop.",
   "engines": {
     "node": ">=22 <23",
     "npm": ">=10"

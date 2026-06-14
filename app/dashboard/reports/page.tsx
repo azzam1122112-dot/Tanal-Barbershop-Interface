@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { LogoutButton } from "@/components/logout-button";
+import { DashboardShell, SectionPanel, StatCard } from "@/components/dashboard/ui";
 import { canAccessDashboard } from "@/lib/auth/access";
 import { getRequestSession } from "@/lib/auth/http";
 import { prisma } from "@/lib/db/prisma";
@@ -42,56 +41,47 @@ export default async function DashboardReportsPage({
   ]);
 
   return (
-    <main className="min-h-screen bg-salon-mist px-5 py-8 text-salon-ink">
-      <section className="mx-auto max-w-7xl">
-        <div className="flex flex-col gap-4 border-b border-salon-line pb-6 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <Link href="/dashboard" className="text-sm font-bold text-salon-gold">لوحة الإدارة</Link>
-            <h1 className="mt-2 text-3xl font-bold">التقارير المالية والتشغيلية</h1>
-          </div>
-          <LogoutButton />
-        </div>
-
-        <form className="mt-6 grid gap-3 rounded-lg border border-salon-line bg-white p-4 lg:grid-cols-[150px_150px_150px_1fr_150px_120px]">
-          <select name="preset" defaultValue={params.preset ?? "today"} className="rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold">
+    <DashboardShell title="التقارير المالية والتشغيلية" description="قراءة واضحة للدخل، الأداء، الخصومات، العملاء، وحركة الخدمات حسب الفترة والحلاق وطريقة الدفع.">
+        <form className="dashboard-panel mt-6 grid gap-3 p-4 lg:grid-cols-[150px_150px_150px_1fr_150px_120px]">
+          <select name="preset" defaultValue={params.preset ?? "today"} className="dashboard-field">
             <option value="today">اليوم</option>
             <option value="yesterday">أمس</option>
             <option value="last7">آخر 7 أيام</option>
             <option value="month">هذا الشهر</option>
             <option value="custom">فترة مخصصة</option>
           </select>
-          <input name="from" type="date" defaultValue={params.from ?? ""} className="rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold" />
-          <input name="to" type="date" defaultValue={params.to ?? ""} className="rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold" />
-          <select name="barberId" defaultValue={params.barberId ?? ""} className="rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold">
+          <input name="from" type="date" defaultValue={params.from ?? ""} className="dashboard-field" />
+          <input name="to" type="date" defaultValue={params.to ?? ""} className="dashboard-field" />
+          <select name="barberId" defaultValue={params.barberId ?? ""} className="dashboard-field">
             <option value="">كل الحلاقين</option>
             {barbers.map((barber) => <option key={barber.id} value={barber.id}>{barber.name}</option>)}
           </select>
-          <select name="paymentMethod" defaultValue={params.paymentMethod ?? ""} className="rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold">
+          <select name="paymentMethod" defaultValue={params.paymentMethod ?? ""} className="dashboard-field">
             <option value="">كل طرق الدفع</option>
             <option value="CASH">كاش</option>
             <option value="NETWORK">شبكة</option>
           </select>
-          <button className="rounded-md bg-salon-ink px-4 py-3 font-bold text-white">تطبيق</button>
+          <button className="dashboard-button">تطبيق</button>
         </form>
 
         <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <MetricCard label="قبل الخصم" value={formatMoney(revenue.grossAmount)} />
-          <MetricCard label="الخصومات" value={formatMoney(revenue.discountAmount)} />
-          <MetricCard label="الصافي" value={formatMoney(revenue.netAmount)} />
-          <MetricCard label="متوسط الفاتورة" value={formatMoney(revenue.averageTicket)} />
-          <MetricCard label="الكاش" value={formatMoney(revenue.cashAmount)} />
-          <MetricCard label="الشبكة" value={formatMoney(revenue.networkAmount)} />
-          <MetricCard label="الزيارات" value={revenue.visitsCount.toString()} />
-          <MetricCard label="عملاء جدد / عائدون" value={`${revenue.newCustomersCount} / ${revenue.returningCustomersCount}`} />
-          <MetricCard label="النقاط المكتسبة" value={revenue.pointsEarned.toString()} />
-          <MetricCard label="النقاط المستبدلة" value={revenue.pointsRedeemed.toString()} />
-          <MetricCard label="مكافآت مستخدمة" value={revenue.rewardRedemptionsCount.toString()} />
-          <MetricCard label="حملات مستخدمة" value={revenue.campaignRedemptionsCount.toString()} />
+          <StatCard label="قبل الخصم" value={formatMoney(revenue.grossAmount)} />
+          <StatCard label="الخصومات" value={formatMoney(revenue.discountAmount)} />
+          <StatCard label="الصافي" value={formatMoney(revenue.netAmount)} />
+          <StatCard label="متوسط الفاتورة" value={formatMoney(revenue.averageTicket)} />
+          <StatCard label="الكاش" value={formatMoney(revenue.cashAmount)} />
+          <StatCard label="الشبكة" value={formatMoney(revenue.networkAmount)} />
+          <StatCard label="الزيارات" value={revenue.visitsCount.toString()} />
+          <StatCard label="عملاء جدد / عائدون" value={`${revenue.newCustomersCount} / ${revenue.returningCustomersCount}`} />
+          <StatCard label="النقاط المكتسبة" value={revenue.pointsEarned.toString()} />
+          <StatCard label="النقاط المستبدلة" value={revenue.pointsRedeemed.toString()} />
+          <StatCard label="مكافآت مستخدمة" value={revenue.rewardRedemptionsCount.toString()} />
+          <StatCard label="حملات مستخدمة" value={revenue.campaignRedemptionsCount.toString()} />
         </div>
 
         <ReportSection title="أداء الحلاقين">
-          <table className="w-full min-w-[980px] text-sm">
-            <thead className="bg-salon-mist text-salon-charcoal">
+          <table className="dashboard-table min-w-[980px]">
+            <thead>
               <tr>
                 <Header>الحلاق</Header>
                 <Header>الزيارات</Header>
@@ -127,8 +117,8 @@ export default async function DashboardReportsPage({
 
         <div className="mt-6 grid gap-6 xl:grid-cols-2">
           <ReportSection title="الخدمات الأكثر طلبًا">
-            <table className="w-full min-w-[560px] text-sm">
-              <thead className="bg-salon-mist text-salon-charcoal">
+            <table className="dashboard-table min-w-[560px]">
+              <thead>
                 <tr><Header>الخدمة</Header><Header>الاستخدام</Header><Header>الزيارات</Header><Header>مبيعات مرتبطة</Header></tr>
               </thead>
               <tbody className="divide-y divide-salon-line">
@@ -147,10 +137,10 @@ export default async function DashboardReportsPage({
 
           <ReportSection title="الخصومات">
             <div className="grid gap-3 p-4 sm:grid-cols-2">
-              <MetricCard label="خصومات المكافآت" value={formatMoney(discounts.rewardDiscountAmount)} />
-              <MetricCard label="خصومات الحملات" value={formatMoney(discounts.campaignDiscountAmount)} />
-              <MetricCard label="استخدام المكافآت" value={discounts.rewardRedemptionsCount.toString()} />
-              <MetricCard label="استخدام الحملات" value={discounts.campaignRedemptionsCount.toString()} />
+              <StatCard label="خصومات المكافآت" value={formatMoney(discounts.rewardDiscountAmount)} />
+              <StatCard label="خصومات الحملات" value={formatMoney(discounts.campaignDiscountAmount)} />
+              <StatCard label="استخدام المكافآت" value={discounts.rewardRedemptionsCount.toString()} />
+              <StatCard label="استخدام الحملات" value={discounts.campaignRedemptionsCount.toString()} />
             </div>
             <p className="px-4 pb-4 text-sm text-salon-charcoal">
               أكثر حملة استخدامًا: {discounts.topCampaign ? `${discounts.topCampaign.name} (${discounts.topCampaign.uses})` : "-"}
@@ -160,8 +150,8 @@ export default async function DashboardReportsPage({
 
         <div className="mt-6 grid gap-6 xl:grid-cols-2">
           <ReportSection title="أفضل العملاء">
-            <table className="w-full min-w-[680px] text-sm">
-              <thead className="bg-salon-mist text-salon-charcoal">
+            <table className="dashboard-table min-w-[680px]">
+              <thead>
                 <tr><Header>العميل</Header><Header>الجوال</Header><Header>الزيارات</Header><Header>الصافي</Header><Header>آخر زيارة</Header><Header>النقاط</Header></tr>
               </thead>
               <tbody className="divide-y divide-salon-line">
@@ -181,8 +171,8 @@ export default async function DashboardReportsPage({
           </ReportSection>
 
           <ReportSection title="عملاء لم يزوروا منذ 30 يوم">
-            <table className="w-full min-w-[620px] text-sm">
-              <thead className="bg-salon-mist text-salon-charcoal">
+            <table className="dashboard-table min-w-[620px]">
+              <thead>
                 <tr><Header>العميل</Header><Header>الجوال</Header><Header>آخر زيارة</Header><Header>الأيام</Header><Header>النقاط</Header></tr>
               </thead>
               <tbody className="divide-y divide-salon-line">
@@ -200,27 +190,12 @@ export default async function DashboardReportsPage({
             </table>
           </ReportSection>
         </div>
-      </section>
-    </main>
+    </DashboardShell>
   );
 }
 
 function ReportSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="mt-6 overflow-x-auto rounded-lg border border-salon-line bg-white">
-      <h2 className="border-b border-salon-line px-4 py-4 text-xl font-bold">{title}</h2>
-      {children}
-    </section>
-  );
-}
-
-function MetricCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg border border-salon-line bg-white p-4">
-      <p className="text-sm text-salon-charcoal">{label}</p>
-      <p className="mt-2 text-2xl font-bold">{value}</p>
-    </div>
-  );
+  return <SectionPanel title={title} className="overflow-x-auto">{children}</SectionPanel>;
 }
 
 function Header({ children }: { children: React.ReactNode }) {

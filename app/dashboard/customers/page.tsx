@@ -1,10 +1,9 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { canAccessDashboard } from "@/lib/auth/access";
 import { getRequestSession } from "@/lib/auth/http";
 import { prisma } from "@/lib/db/prisma";
 import { toCustomerDashboardRow } from "@/lib/customers/customer-summary";
-import { LogoutButton } from "@/components/logout-button";
+import { DashboardShell, EmptyState, FilterBar, TablePanel } from "@/components/dashboard/ui";
 import { CustomerWhatsAppToggle } from "@/components/dashboard/customer-whatsapp-toggle";
 
 export default async function DashboardCustomersPage({
@@ -40,27 +39,18 @@ export default async function DashboardCustomersPage({
   const rows = customers.map(toCustomerDashboardRow);
 
   return (
-    <main className="min-h-screen bg-salon-mist px-5 py-8 text-salon-ink">
-      <section className="mx-auto max-w-6xl">
-        <div className="flex flex-col gap-4 border-b border-salon-line pb-6 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <Link href="/dashboard" className="text-sm font-bold text-salon-gold">لوحة الإدارة</Link>
-            <h1 className="mt-2 text-3xl font-bold">العملاء</h1>
-          </div>
-          <LogoutButton />
-        </div>
-
-        <form className="mt-6 grid gap-3 rounded-lg border border-salon-line bg-white p-4 md:grid-cols-[1fr_180px_120px]">
-          <input name="q" defaultValue={q} placeholder="بحث بالاسم أو رقم الجوال" className="rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold" />
-          <select name="status" defaultValue={status} className="rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold">
+    <DashboardShell title="العملاء" description="بحث سريع في العملاء، متابعة النقاط والزيارات، والتحكم بتفضيل رسائل واتساب.">
+        <FilterBar className="md:grid-cols-[1fr_190px_130px]">
+          <input name="q" defaultValue={q} placeholder="بحث بالاسم أو رقم الجوال" className="dashboard-field" />
+          <select name="status" defaultValue={status} className="dashboard-field">
             <option value="all">كل العملاء</option>
             <option value="new">عملاء جدد</option>
             <option value="visited">عملاء لديهم زيارات</option>
           </select>
-          <button className="rounded-md bg-salon-ink px-4 py-3 font-bold text-white">تصفية</button>
-        </form>
+          <button className="dashboard-button">تصفية</button>
+        </FilterBar>
 
-        <div className="mt-6 overflow-hidden rounded-lg border border-salon-line bg-white">
+        <TablePanel className="overflow-hidden">
           <div className="grid grid-cols-[1fr_150px_100px_110px_150px_140px] gap-3 border-b border-salon-line px-4 py-3 text-sm font-bold text-salon-charcoal">
             <span>الاسم</span>
             <span>الجوال</span>
@@ -80,10 +70,9 @@ export default async function DashboardCustomersPage({
                 <span>{new Date(customer.createdAt).toLocaleDateString("ar-SA")}</span>
               </div>
             ))}
-            {rows.length === 0 ? <p className="px-4 py-8 text-center text-salon-charcoal">لا توجد نتائج</p> : null}
+            {rows.length === 0 ? <div className="p-5"><EmptyState title="لا توجد نتائج" description="جرّب تغيير كلمة البحث أو حالة العميل." /></div> : null}
           </div>
-        </div>
-      </section>
-    </main>
+        </TablePanel>
+    </DashboardShell>
   );
 }

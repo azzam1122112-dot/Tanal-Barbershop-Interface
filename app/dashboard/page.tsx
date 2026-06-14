@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getRequestSession } from "@/lib/auth/http";
 import { canAccessDashboard } from "@/lib/auth/access";
-import { DashboardShell, StatCard } from "@/components/dashboard/ui";
+import { DashboardShell, EmptyState, SectionPanel, StatCard } from "@/components/dashboard/ui";
 import { prisma } from "@/lib/db/prisma";
 import { getOperationAlerts } from "@/lib/daily-close/operation-alerts";
 import { getDashboardSummary } from "@/lib/reports/dashboard-reports";
@@ -18,7 +18,7 @@ export default async function DashboardPage() {
   ]);
 
   return (
-    <DashboardShell title="ملخص اليوم التشغيلي">
+    <DashboardShell title="ملخص اليوم التشغيلي" description="نظرة فورية على دخل اليوم، حركة الزيارات، الجلسات المفتوحة، وأبرز التنبيهات التشغيلية.">
       <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard label="دخل اليوم" value={formatMoney(summary.netAmount)} />
         <StatCard label="الكاش اليوم" value={formatMoney(summary.cashAmount)} />
@@ -34,6 +34,23 @@ export default async function DashboardPage() {
         <StatCard label="جلسات مغلقة اليوم" value={operationAlerts.closesTodayCount.toString()} />
         <StatCard label="تنبيهات تشغيلية" value={operationAlerts.alerts.length.toString()} />
       </div>
+
+      <SectionPanel title="التنبيهات التشغيلية">
+        {operationAlerts.alerts.length > 0 ? (
+          <div className="grid gap-3 p-4 lg:grid-cols-2">
+            {operationAlerts.alerts.map((alert, index) => (
+              <div key={`${alert.type}-${index}`} className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                <p className="font-black">{alert.message}</p>
+                {"amount" in alert ? <p className="mt-1 font-semibold">{formatMoney(alert.amount ?? 0)}</p> : null}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="p-4">
+            <EmptyState title="الأمور مستقرة اليوم" description="لا توجد تنبيهات تشغيلية تحتاج متابعة الآن." />
+          </div>
+        )}
+      </SectionPanel>
     </DashboardShell>
   );
 }

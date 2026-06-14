@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 
 type Campaign = {
   id: string;
@@ -24,13 +25,13 @@ type CampaignResponse = {
 
 export function CampaignManager({ initialCampaigns }: { initialCampaigns: Campaign[] }) {
   const [campaigns, setCampaigns] = useState(initialCampaigns);
-  const [message, setMessage] = useState("");
+  const [toast, setToast] = useState<ToastState | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function createCampaign(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
-    setMessage("");
+    setToast(null);
     const form = new FormData(event.currentTarget);
     const response = await fetch("/api/dashboard/campaigns", {
       method: "POST",
@@ -53,15 +54,15 @@ export function CampaignManager({ initialCampaigns }: { initialCampaigns: Campai
     if (response.ok && data.campaign) {
       setCampaigns((current) => [data.campaign!, ...current]);
       event.currentTarget.reset();
-      setMessage("تم إنشاء الحملة");
+      setToast({ message: "تم إنشاء الحملة بنجاح", tone: "success" });
     } else {
-      setMessage(data.message ?? "تعذر إنشاء الحملة");
+      setToast({ message: data.message ?? "تعذر إنشاء الحملة", tone: "error" });
     }
     setLoading(false);
   }
 
   async function updateCampaign(id: string, body: Record<string, unknown>) {
-    setMessage("");
+    setToast(null);
     const response = await fetch(`/api/dashboard/campaigns/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -71,55 +72,55 @@ export function CampaignManager({ initialCampaigns }: { initialCampaigns: Campai
 
     if (response.ok && data.campaign) {
       setCampaigns((current) => current.map((campaign) => (campaign.id === id ? data.campaign! : campaign)));
-      setMessage("تم تحديث الحملة");
+      setToast({ message: "تم تحديث الحملة", tone: "success" });
     } else {
-      setMessage(data.message ?? "تعذر تحديث الحملة");
+      setToast({ message: data.message ?? "تعذر تحديث الحملة", tone: "error" });
     }
   }
 
   return (
     <div className="mt-8 grid gap-6 xl:grid-cols-[380px_1fr]">
-      <form onSubmit={createCampaign} className="space-y-4 rounded-lg border border-salon-line bg-white p-5">
-        <h2 className="text-xl font-bold">إضافة حملة</h2>
-        <input name="name" required placeholder="اسم الحملة" className="w-full rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold" />
-        <textarea name="description" placeholder="وصف مختصر" rows={2} className="w-full rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold" />
+      <DashboardToast toast={toast} onClose={() => setToast(null)} />
+      <form onSubmit={createCampaign} className="dashboard-panel space-y-4 p-5">
+        <h2 className="text-xl font-black">إضافة حملة</h2>
+        <input name="name" required placeholder="اسم الحملة" className="dashboard-field" />
+        <textarea name="description" placeholder="وصف مختصر" rows={2} className="dashboard-field" />
         <div className="grid grid-cols-2 gap-2">
-          <select name="discountType" defaultValue="FIXED_AMOUNT" className="rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold">
+          <select name="discountType" defaultValue="FIXED_AMOUNT" className="dashboard-field">
             <option value="FIXED_AMOUNT">مبلغ ثابت</option>
             <option value="PERCENTAGE">نسبة</option>
           </select>
-          <input name="discountValue" required type="number" min={0.01} step="0.01" placeholder="قيمة الخصم" className="rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold" />
+          <input name="discountValue" required type="number" min={0.01} step="0.01" placeholder="قيمة الخصم" className="dashboard-field" />
         </div>
-        <select name="targetType" defaultValue="ALL_CUSTOMERS" className="w-full rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold">
+        <select name="targetType" defaultValue="ALL_CUSTOMERS" className="dashboard-field">
           <option value="ALL_CUSTOMERS">كل العملاء</option>
           <option value="NEW_CUSTOMERS">عملاء جدد</option>
           <option value="INACTIVE_CUSTOMERS">عملاء منقطعون</option>
           <option value="CUSTOMERS_WITH_MIN_POINTS">حسب رصيد النقاط</option>
         </select>
         <div className="grid grid-cols-2 gap-2">
-          <input name="inactiveDays" type="number" min={1} placeholder="أيام الانقطاع" className="rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold" />
-          <input name="minPoints" type="number" min={1} placeholder="أقل رصيد نقاط" className="rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold" />
+          <input name="inactiveDays" type="number" min={1} placeholder="أيام الانقطاع" className="dashboard-field" />
+          <input name="minPoints" type="number" min={1} placeholder="أقل رصيد نقاط" className="dashboard-field" />
         </div>
         <div className="grid grid-cols-2 gap-2">
           <label className="text-sm font-bold text-salon-charcoal">
             البداية
-            <input name="startAt" required type="datetime-local" className="mt-1 w-full rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold" />
+            <input name="startAt" required type="datetime-local" className="dashboard-field mt-1" />
           </label>
           <label className="text-sm font-bold text-salon-charcoal">
             النهاية
-            <input name="endAt" required type="datetime-local" className="mt-1 w-full rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold" />
+            <input name="endAt" required type="datetime-local" className="dashboard-field mt-1" />
           </label>
         </div>
-        <input name="maxUsesPerCustomer" required type="number" min={1} defaultValue={1} placeholder="الاستخدام لكل عميل" className="w-full rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold" />
-        <button disabled={loading} className="w-full rounded-md bg-salon-ink px-4 py-3 font-bold text-white disabled:opacity-60">
+        <input name="maxUsesPerCustomer" required type="number" min={1} defaultValue={1} placeholder="الاستخدام لكل عميل" className="dashboard-field" />
+        <button disabled={loading} className="dashboard-button w-full">
           {loading ? "جاري الحفظ..." : "حفظ الحملة"}
         </button>
-        {message ? <p className="rounded-md bg-salon-mist px-3 py-2 text-sm text-salon-charcoal">{message}</p> : null}
       </form>
 
-      <div className="overflow-x-auto rounded-lg border border-salon-line bg-white">
-        <table className="w-full min-w-[980px] text-sm">
-          <thead className="bg-salon-mist text-salon-charcoal">
+      <div className="dashboard-panel overflow-x-auto">
+        <table className="dashboard-table min-w-[980px]">
+          <thead>
             <tr>
               <th className="px-3 py-3 text-right">الحملة</th>
               <th className="px-3 py-3 text-right">الخصم</th>
@@ -136,7 +137,7 @@ export function CampaignManager({ initialCampaigns }: { initialCampaigns: Campai
                   <input
                     defaultValue={campaign.name}
                     onBlur={(event) => event.currentTarget.value !== campaign.name && updateCampaign(campaign.id, { name: event.currentTarget.value })}
-                    className="w-full rounded-md border border-salon-line px-2 py-2 font-bold outline-none focus:border-salon-gold"
+                    className="dashboard-field py-2 font-bold"
                   />
                   <p className="mt-1 text-xs text-salon-charcoal">{campaign.description || "بدون وصف"}</p>
                 </td>
@@ -152,7 +153,7 @@ export function CampaignManager({ initialCampaigns }: { initialCampaigns: Campai
                   <button
                     type="button"
                     onClick={() => updateCampaign(campaign.id, { isActive: !campaign.isActive })}
-                    className={`rounded-md px-3 py-2 font-bold ${campaign.isActive ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}
+                    className={`rounded-lg px-3 py-2 font-bold ${campaign.isActive ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}
                   >
                     {campaign.isActive ? "فعالة" : "معطلة"}
                   </button>

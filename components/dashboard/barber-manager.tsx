@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 import type { SafeBarber } from "@/lib/auth/sanitize";
 
 type BarberResponse = {
@@ -11,13 +12,13 @@ type BarberResponse = {
 
 export function BarberManager({ initialBarbers }: { initialBarbers: SafeBarber[] }) {
   const [barbers, setBarbers] = useState(initialBarbers);
-  const [message, setMessage] = useState("");
+  const [toast, setToast] = useState<ToastState | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function createBarber(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
-    setMessage("");
+    setToast(null);
     const form = new FormData(event.currentTarget);
 
     const response = await fetch("/api/dashboard/barbers", {
@@ -34,15 +35,15 @@ export function BarberManager({ initialBarbers }: { initialBarbers: SafeBarber[]
     if (response.ok && data.barber) {
       setBarbers((current) => [data.barber!, ...current]);
       event.currentTarget.reset();
-      setMessage("تم إضافة الحلاق");
+      setToast({ message: "تم إضافة الحلاق بنجاح", tone: "success" });
     } else {
-      setMessage(data.message ?? "تعذر حفظ الحلاق");
+      setToast({ message: data.message ?? "تعذر حفظ الحلاق", tone: "error" });
     }
     setLoading(false);
   }
 
   async function patchBarber(id: string, body: Record<string, unknown>) {
-    setMessage("");
+    setToast(null);
     const response = await fetch(`/api/dashboard/barbers/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -52,14 +53,14 @@ export function BarberManager({ initialBarbers }: { initialBarbers: SafeBarber[]
 
     if (response.ok && data.barber) {
       setBarbers((current) => current.map((barber) => (barber.id === id ? data.barber! : barber)));
-      setMessage("تم تحديث بيانات الحلاق");
+      setToast({ message: "تم تحديث بيانات الحلاق", tone: "success" });
     } else {
-      setMessage(data.message ?? "تعذر تحديث الحلاق");
+      setToast({ message: data.message ?? "تعذر تحديث الحلاق", tone: "error" });
     }
   }
 
   async function resetPin(id: string, pin: string) {
-    setMessage("");
+    setToast(null);
     const response = await fetch(`/api/dashboard/barbers/${id}/reset-pin`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -67,23 +68,23 @@ export function BarberManager({ initialBarbers }: { initialBarbers: SafeBarber[]
     });
     const data = (await response.json().catch(() => ({}))) as BarberResponse;
 
-    setMessage(response.ok ? "تم تعيين رمز دخول جديد" : data.message ?? "تعذر تعيين الرمز");
+    setToast(response.ok ? { message: "تم تعيين رمز دخول جديد", tone: "success" } : { message: data.message ?? "تعذر تعيين الرمز", tone: "error" });
   }
 
   return (
     <div className="mt-8 grid gap-6 lg:grid-cols-[360px_1fr]">
-      <form onSubmit={createBarber} className="space-y-4 rounded-lg border border-salon-line bg-white p-5">
-        <h2 className="text-xl font-bold">إضافة حلاق</h2>
-        <input name="name" required placeholder="اسم الحلاق" className="w-full rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold" />
-        <input name="phone" required placeholder="رقم الجوال" className="w-full rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold" />
-        <input name="pin" required minLength={4} maxLength={6} inputMode="numeric" placeholder="رمز الدخول 4 أو 6 أرقام" className="w-full rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold" />
-        <button disabled={loading} className="w-full rounded-md bg-salon-ink px-4 py-3 font-bold text-white disabled:opacity-60">
+      <DashboardToast toast={toast} onClose={() => setToast(null)} />
+      <form onSubmit={createBarber} className="dashboard-panel space-y-4 p-5">
+        <h2 className="text-xl font-black">إضافة حلاق</h2>
+        <input name="name" required placeholder="اسم الحلاق" className="dashboard-field" />
+        <input name="phone" required placeholder="رقم الجوال" className="dashboard-field" />
+        <input name="pin" required minLength={4} maxLength={6} inputMode="numeric" placeholder="رمز الدخول 4 أو 6 أرقام" className="dashboard-field" />
+        <button disabled={loading} className="dashboard-button w-full">
           {loading ? "جاري الحفظ..." : "حفظ الحلاق"}
         </button>
-        {message ? <p className="rounded-md bg-salon-mist px-3 py-2 text-sm text-salon-charcoal">{message}</p> : null}
       </form>
 
-      <div className="overflow-hidden rounded-lg border border-salon-line bg-white">
+      <div className="dashboard-panel overflow-hidden">
         <div className="grid grid-cols-[1fr_140px_120px] gap-3 border-b border-salon-line px-4 py-3 text-sm font-bold text-salon-charcoal">
           <span>الحلاق</span>
           <span>الحالة</span>
@@ -96,19 +97,19 @@ export function BarberManager({ initialBarbers }: { initialBarbers: SafeBarber[]
                 <input
                   defaultValue={barber.name}
                   onBlur={(event) => event.currentTarget.value !== barber.name && patchBarber(barber.id, { name: event.currentTarget.value })}
-                  className="mb-2 w-full rounded-md border border-salon-line px-2 py-2 font-bold outline-none focus:border-salon-gold"
+                  className="dashboard-field mb-2 py-2 font-bold"
                 />
                 <input
                   defaultValue={barber.phone}
                   onBlur={(event) => event.currentTarget.value !== barber.phone && patchBarber(barber.id, { phone: event.currentTarget.value })}
-                  className="w-full rounded-md border border-salon-line px-2 py-2 outline-none focus:border-salon-gold"
+                  className="dashboard-field py-2"
                 />
               </div>
               <div>
                 <button
                   type="button"
                   onClick={() => patchBarber(barber.id, { isActive: !barber.isActive })}
-                  className={`rounded-md px-3 py-2 font-bold ${barber.isActive ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}
+                  className={`rounded-lg px-3 py-2 font-bold ${barber.isActive ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}
                 >
                   {barber.isActive ? "نشط" : "غير نشط"}
                 </button>
@@ -120,7 +121,7 @@ export function BarberManager({ initialBarbers }: { initialBarbers: SafeBarber[]
                     const pin = window.prompt("أدخل رمزًا من 4 أو 6 أرقام");
                     if (pin) void resetPin(barber.id, pin);
                   }}
-                  className="rounded-md border border-salon-line px-3 py-2 font-bold hover:border-salon-gold"
+                  className="dashboard-button-soft px-3 py-2"
                 >
                   رمز جديد
                 </button>

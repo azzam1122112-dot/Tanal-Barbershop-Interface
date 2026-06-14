@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { LogoutButton } from "@/components/logout-button";
+import { DashboardShell, EmptyState, FilterBar, StatCard, TablePanel } from "@/components/dashboard/ui";
 import { canAccessDashboard } from "@/lib/auth/access";
 import { getRequestSession } from "@/lib/auth/http";
 import { prisma } from "@/lib/db/prisma";
@@ -27,43 +26,34 @@ export default async function PostCloseAdjustmentsPage({
   ]);
 
   return (
-    <main className="min-h-screen bg-salon-mist px-5 py-8 text-salon-ink">
-      <section className="mx-auto max-w-7xl">
-        <div className="flex flex-col gap-4 border-b border-salon-line pb-6 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <Link href="/dashboard" className="text-sm font-bold text-salon-gold">لوحة الإدارة</Link>
-            <h1 className="mt-2 text-3xl font-bold">تصحيحات ما بعد الإغلاق</h1>
-          </div>
-          <LogoutButton />
-        </div>
-
-        <form className="mt-6 grid gap-3 rounded-lg border border-salon-line bg-white p-4 md:grid-cols-[150px_150px_1fr_220px_120px]">
-          <input name="from" type="date" defaultValue={params.from ?? ""} className="rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold" />
-          <input name="to" type="date" defaultValue={params.to ?? ""} className="rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold" />
-          <select name="barberId" defaultValue={params.barberId ?? ""} className="rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold">
+    <DashboardShell title="تصحيحات ما بعد الإغلاق" description="سجل رقابي لكل تعديل يحدث بعد إغلاق جلسات الصندوق، مع الأثر المالي وأثر النقاط.">
+        <FilterBar className="md:grid-cols-[150px_150px_1fr_220px_120px]">
+          <input name="from" type="date" defaultValue={params.from ?? ""} className="dashboard-field" />
+          <input name="to" type="date" defaultValue={params.to ?? ""} className="dashboard-field" />
+          <select name="barberId" defaultValue={params.barberId ?? ""} className="dashboard-field">
             <option value="">كل الحلاقين</option>
             {barbers.map((barber) => <option key={barber.id} value={barber.id}>{barber.name}</option>)}
           </select>
-          <select name="adjustmentType" defaultValue={params.adjustmentType ?? ""} className="rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold">
+          <select name="adjustmentType" defaultValue={params.adjustmentType ?? ""} className="dashboard-field">
             <option value="">كل التصحيحات</option>
             <option value="VISIT_CANCELLED">إلغاء زيارة</option>
             <option value="VISIT_PAYMENT_METHOD_UPDATED">تعديل طريقة الدفع</option>
             <option value="VISIT_AMOUNT_UPDATED">تعديل مبلغ</option>
           </select>
-          <button className="rounded-md bg-salon-ink px-4 py-3 font-bold text-white">تصفية</button>
-        </form>
+          <button className="dashboard-button">تصفية</button>
+        </FilterBar>
 
         <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <MetricCard label="عدد التصحيحات" value={report.summary.count.toString()} />
-          <MetricCard label="فرق الكاش" value={formatMoney(report.summary.cashDelta)} />
-          <MetricCard label="فرق الشبكة" value={formatMoney(report.summary.cardDelta)} />
-          <MetricCard label="فرق الصافي" value={formatMoney(report.summary.netDelta)} />
-          <MetricCard label="فرق النقاط" value={report.summary.pointsDelta.toString()} />
+          <StatCard label="عدد التصحيحات" value={report.summary.count.toString()} />
+          <StatCard label="فرق الكاش" value={formatMoney(report.summary.cashDelta)} />
+          <StatCard label="فرق الشبكة" value={formatMoney(report.summary.cardDelta)} />
+          <StatCard label="فرق الصافي" value={formatMoney(report.summary.netDelta)} />
+          <StatCard label="فرق النقاط" value={report.summary.pointsDelta.toString()} />
         </div>
 
-        <div className="mt-6 overflow-x-auto rounded-lg border border-salon-line bg-white">
-          <table className="w-full min-w-[1320px] text-sm">
-            <thead className="bg-salon-mist text-salon-charcoal">
+        <TablePanel>
+          <table className="dashboard-table min-w-[1320px]">
+            <thead>
               <tr>
                 <th className="px-3 py-3 text-right">وقت التصحيح</th>
                 <th className="px-3 py-3 text-right">النوع</th>
@@ -98,21 +88,11 @@ export default async function PostCloseAdjustmentsPage({
                   </td>
                 </tr>
               ))}
-              {report.adjustments.length === 0 ? <tr><td colSpan={9} className="px-4 py-8 text-center text-salon-charcoal">لا توجد تصحيحات بعد الإغلاق</td></tr> : null}
+              {report.adjustments.length === 0 ? <tr><td colSpan={9} className="px-4 py-8"><EmptyState title="لا توجد تصحيحات بعد الإغلاق" description="الوضع مستقر ولا يوجد سجل مطابق للفلاتر الحالية." /></td></tr> : null}
             </tbody>
           </table>
-        </div>
-      </section>
-    </main>
-  );
-}
-
-function MetricCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg border border-salon-line bg-white p-4">
-      <p className="text-sm text-salon-charcoal">{label}</p>
-      <p className="mt-2 text-2xl font-bold">{value}</p>
-    </div>
+        </TablePanel>
+    </DashboardShell>
   );
 }
 

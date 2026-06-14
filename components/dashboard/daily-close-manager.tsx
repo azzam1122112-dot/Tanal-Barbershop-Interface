@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 
 type SummaryRow = {
   barberId: string;
@@ -38,7 +39,7 @@ type CloseResponse = {
 
 export function DailyCloseManager({ initialSummary }: { initialSummary: SummaryRow[] }) {
   const [summary, setSummary] = useState(initialSummary);
-  const [message, setMessage] = useState("");
+  const [toast, setToast] = useState<ToastState | null>(null);
   const [loadingSessionId, setLoadingSessionId] = useState("");
 
   async function closeSession(event: FormEvent<HTMLFormElement>, row: SummaryRow) {
@@ -47,7 +48,7 @@ export function DailyCloseManager({ initialSummary }: { initialSummary: SummaryR
     if (!window.confirm(`تأكيد إغلاق جلسة صندوق ${row.barberName} واستلام الكاش؟`)) {
       return;
     }
-    setMessage("");
+    setToast(null);
     setLoadingSessionId(row.openSession.id);
     const form = new FormData(event.currentTarget);
     const response = await fetch("/api/dashboard/cash-sessions/close", {
@@ -63,19 +64,19 @@ export function DailyCloseManager({ initialSummary }: { initialSummary: SummaryR
 
     if (response.ok && data.cashSession) {
       setSummary((current) => current.map((item) => (item.barberId === row.barberId ? { ...item, status: "CLOSED", openSession: null } : item)));
-      setMessage("تم إغلاق جلسة الصندوق");
+      setToast({ message: "تم إغلاق جلسة الصندوق واستلام الكاش", tone: "success" });
     } else {
-      setMessage(data.message ?? "تعذر إغلاق جلسة الصندوق");
+      setToast({ message: data.message ?? "تعذر إغلاق جلسة الصندوق", tone: "error" });
     }
     setLoadingSessionId("");
   }
 
   return (
     <div className="mt-6 space-y-4">
-      {message ? <p className="rounded-md border border-salon-line bg-white px-4 py-3 text-sm text-salon-charcoal">{message}</p> : null}
-      <div className="overflow-x-auto rounded-lg border border-salon-line bg-white">
-        <table className="w-full min-w-[1160px] text-sm">
-          <thead className="bg-salon-mist text-salon-charcoal">
+      <DashboardToast toast={toast} onClose={() => setToast(null)} />
+      <div className="dashboard-panel overflow-x-auto">
+        <table className="dashboard-table min-w-[1160px]">
+          <thead>
             <tr>
               <th className="px-3 py-3 text-right">الحلاق</th>
               <th className="px-3 py-3 text-right">الحالة</th>
@@ -96,7 +97,7 @@ export function DailyCloseManager({ initialSummary }: { initialSummary: SummaryR
                 <tr key={row.barberId}>
                   <td className="px-3 py-3 font-bold">{row.barberName}</td>
                   <td className="px-3 py-3">
-                    <span className={`rounded-md px-2 py-1 text-xs font-bold ${session ? "bg-green-50 text-green-700" : "bg-salon-mist text-salon-charcoal"}`}>
+                    <span className={`rounded-lg px-2 py-1 text-xs font-bold ${session ? "bg-green-50 text-green-700" : "bg-salon-mist text-salon-charcoal"}`}>
                       {session ? "مفتوحة" : "لا توجد جلسة مفتوحة"}
                     </span>
                   </td>
@@ -116,14 +117,14 @@ export function DailyCloseManager({ initialSummary }: { initialSummary: SummaryR
                           min={0}
                           step="0.01"
                           defaultValue={session.cashTotal}
-                          className="rounded-md border border-salon-line px-2 py-2 outline-none focus:border-salon-gold"
+                          className="dashboard-field py-2"
                         />
                         <input
                           name="notes"
                           placeholder="ملاحظات"
-                          className="rounded-md border border-salon-line px-2 py-2 outline-none focus:border-salon-gold"
+                          className="dashboard-field py-2"
                         />
-                        <button disabled={loadingSessionId === session.id} className="rounded-md bg-salon-gold px-3 py-2 font-bold text-salon-ink disabled:opacity-60">
+                        <button disabled={loadingSessionId === session.id} className="dashboard-button-gold px-3 py-2">
                           {loadingSessionId === session.id ? "جاري الإغلاق..." : "إغلاق جلسة الصندوق"}
                         </button>
                       </form>

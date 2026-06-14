@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { DashboardShell, EmptyState, FilterBar, TablePanel } from "@/components/dashboard/ui";
 import { VisitAdminActions } from "@/components/dashboard/visit-admin-actions";
-import { LogoutButton } from "@/components/logout-button";
 import { canAccessDashboard } from "@/lib/auth/access";
 import { getRequestSession } from "@/lib/auth/http";
 import { prisma } from "@/lib/db/prisma";
@@ -45,33 +45,24 @@ export default async function DashboardVisitsPage({
   const campaignById = new Map(campaigns.map((campaign) => [campaign.id, campaign.name]));
 
   return (
-    <main className="min-h-screen bg-salon-mist px-5 py-8 text-salon-ink">
-      <section className="mx-auto max-w-7xl">
-        <div className="flex flex-col gap-4 border-b border-salon-line pb-6 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <Link href="/dashboard" className="text-sm font-bold text-salon-gold">لوحة الإدارة</Link>
-            <h1 className="mt-2 text-3xl font-bold">الزيارات</h1>
-          </div>
-          <LogoutButton />
-        </div>
-
-        <form className="mt-6 grid gap-3 rounded-lg border border-salon-line bg-white p-4 md:grid-cols-[1fr_160px_180px_120px]">
-          <input name="q" defaultValue={params.q} placeholder="بحث باسم أو جوال العميل" className="rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold" />
-          <select name="paymentMethod" defaultValue={params.paymentMethod ?? ""} className="rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold">
+    <DashboardShell title="الزيارات" description="متابعة الزيارات المؤكدة والملغاة، تصفية السجل، وإجراء التصحيحات المصرح بها عند الحاجة.">
+        <FilterBar className="md:grid-cols-[1fr_160px_180px_120px]">
+          <input name="q" defaultValue={params.q} placeholder="بحث باسم أو جوال العميل" className="dashboard-field" />
+          <select name="paymentMethod" defaultValue={params.paymentMethod ?? ""} className="dashboard-field">
             <option value="">كل طرق الدفع</option>
             <option value="CASH">كاش</option>
             <option value="NETWORK">شبكة</option>
           </select>
-          <select name="barberId" defaultValue={params.barberId ?? ""} className="rounded-md border border-salon-line px-3 py-3 outline-none focus:border-salon-gold">
+          <select name="barberId" defaultValue={params.barberId ?? ""} className="dashboard-field">
             <option value="">كل الحلاقين</option>
             {barbers.map((barber) => <option key={barber.id} value={barber.id}>{barber.name}</option>)}
           </select>
-          <button className="rounded-md bg-salon-ink px-4 py-3 font-bold text-white">تصفية</button>
-        </form>
+          <button className="dashboard-button">تصفية</button>
+        </FilterBar>
 
-        <div className="mt-6 overflow-x-auto rounded-lg border border-salon-line bg-white">
-          <table className="w-full min-w-[1260px] text-sm">
-            <thead className="bg-salon-mist text-salon-charcoal">
+        <TablePanel>
+          <table className="dashboard-table min-w-[1260px]">
+            <thead>
               <tr>
                 <th className="px-3 py-3 text-right">التاريخ</th>
                 <th className="px-3 py-3 text-right">العميل</th>
@@ -105,7 +96,7 @@ export default async function DashboardVisitsPage({
                     <div className="space-y-2">
                       <Link
                         href={`/dashboard/whatsapp?customerId=${visit.customer.id}&visitId=${visit.id}`}
-                        className="block rounded-md bg-green-700 px-3 py-2 text-center font-bold text-white"
+                        className="block rounded-lg bg-salon-forest px-3 py-2 text-center font-bold text-white transition hover:bg-salon-forest/90"
                       >
                         رسالة واتساب
                       </Link>
@@ -114,12 +105,11 @@ export default async function DashboardVisitsPage({
                   </td>
                 </tr>
               ))}
-              {rows.length === 0 ? <tr><td colSpan={12} className="px-4 py-8 text-center text-salon-charcoal">لا توجد زيارات</td></tr> : null}
+              {rows.length === 0 ? <tr><td colSpan={12} className="px-4 py-8"><EmptyState title="لا توجد زيارات" description="غيّر الفلاتر أو وسّع البحث لرؤية نتائج أكثر." /></td></tr> : null}
             </tbody>
           </table>
-        </div>
-      </section>
-    </main>
+        </TablePanel>
+    </DashboardShell>
   );
 }
 

@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { LogoutButton } from "@/components/logout-button";
+import { DashboardShell } from "@/components/dashboard/ui";
 import { WhatsAppDashboard } from "@/components/dashboard/whatsapp-dashboard";
 import { canAccessDashboard } from "@/lib/auth/access";
 import { getRequestSession } from "@/lib/auth/http";
@@ -47,19 +46,7 @@ export default async function WhatsAppPage({
   ]);
 
   return (
-    <main className="min-h-screen bg-salon-mist px-5 py-8 text-salon-ink">
-      <section className="mx-auto max-w-7xl">
-        <div className="flex flex-col gap-4 border-b border-salon-line pb-6 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <Link href="/dashboard" className="text-sm font-bold text-salon-gold">لوحة الإدارة</Link>
-            <h1 className="mt-2 text-3xl font-bold">واتساب ورسائل العملاء</h1>
-            <p className="mt-2 max-w-3xl text-sm text-salon-charcoal">
-              جهز رسائل واتساب بروابط wa.me، ثم افتح واتساب وأرسل يدويًا. لا يوجد إرسال تلقائي داخل النظام.
-            </p>
-          </div>
-          <LogoutButton />
-        </div>
-
+    <DashboardShell title="واتساب ورسائل العملاء" description="جهز رسائل واتساب بروابط wa.me، ثم افتح واتساب وأرسل يدويًا. لا يوجد إرسال تلقائي داخل النظام.">
         <WhatsAppDashboard
           initialTemplates={templates}
           initialMessages={messages}
@@ -75,7 +62,6 @@ export default async function WhatsAppPage({
           prefillCustomerId={params.customerId}
           prefillVisitId={params.visitId}
         />
-      </section>
-    </main>
+    </DashboardShell>
   );
 }

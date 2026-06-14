@@ -123,7 +123,7 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
 
   return (
     <form onSubmit={submitPreview} className="space-y-4">
-      <div className="rounded-[1.5rem] border border-salon-line bg-white p-4 shadow-lg shadow-salon-ink/5">
+      <div className="barber-card p-4">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-black">الخدمات</h2>
@@ -136,7 +136,7 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
             <label
               key={service.id}
               className={`flex min-h-16 items-center justify-between rounded-2xl border px-3 py-3 transition active:scale-[0.99] ${
-                selectedServices.includes(service.id) ? "border-salon-gold bg-salon-gold/15 shadow-md shadow-salon-gold/10" : "border-salon-line bg-salon-pearl"
+                selectedServices.includes(service.id) ? "border-salon-forest bg-salon-forest/10 shadow-sm shadow-salon-forest/10" : "border-salon-line bg-salon-pearl"
               }`}
             >
               <span className="flex items-center gap-3 font-black">
@@ -144,7 +144,7 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
                   type="checkbox"
                   checked={selectedServices.includes(service.id)}
                   onChange={() => toggleService(service.id)}
-                  className="h-5 w-5 accent-salon-gold"
+                  className="h-5 w-5 accent-salon-forest"
                 />
                 {service.name}
               </span>
@@ -153,13 +153,13 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
           ))}
         </div>
         {selectedServices.length > 0 ? (
-          <div className="mt-3 rounded-2xl bg-salon-ink px-4 py-3 text-sm font-bold text-white">
-            مجموع الأسعار الافتراضية: <span className="text-salon-gold">{selectedServicesTotal} ريال</span>
+          <div className="mt-3 rounded-2xl border border-salon-line bg-salon-pearl px-4 py-3 text-sm font-bold text-salon-charcoal">
+            مجموع الأسعار الافتراضية: <span className="text-salon-forest">{selectedServicesTotal} ريال</span>
           </div>
         ) : null}
       </div>
 
-      <div className="rounded-[1.5rem] border border-salon-line bg-white p-4 shadow-lg shadow-salon-ink/5">
+      <div className="barber-card p-4">
         <label className="block text-sm font-bold">
           المبلغ قبل الخصم
           <input
@@ -174,7 +174,7 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
             min={0.01}
             step="0.01"
             placeholder="0"
-            className="mt-2 h-20 w-full rounded-3xl border border-salon-line bg-salon-pearl px-3 text-center text-4xl font-black outline-none transition focus:border-salon-gold focus:ring-4 focus:ring-salon-gold/15"
+            className="barber-field mt-2 h-20 bg-salon-pearl px-3 text-center text-4xl"
           />
         </label>
         <div className="mt-4 grid grid-cols-2 gap-2">
@@ -185,7 +185,7 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
               setPreview(null);
               setSelectedDiscount("NONE");
             }}
-            className={`h-14 rounded-2xl border px-3 text-lg font-black transition active:scale-[0.98] ${paymentMethod === "CASH" ? "border-salon-gold bg-salon-gold text-salon-ink shadow-lg shadow-salon-gold/20" : "border-salon-line bg-salon-pearl"}`}
+            className={`h-14 rounded-2xl border px-3 text-lg font-black transition active:scale-[0.98] ${paymentMethod === "CASH" ? "border-salon-forest bg-salon-forest text-white shadow-sm shadow-salon-forest/20" : "border-salon-line bg-salon-pearl text-salon-ink"}`}
           >
             كاش
           </button>
@@ -196,7 +196,7 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
               setPreview(null);
               setSelectedDiscount("NONE");
             }}
-            className={`h-14 rounded-2xl border px-3 text-lg font-black transition active:scale-[0.98] ${paymentMethod === "NETWORK" ? "border-salon-gold bg-salon-gold text-salon-ink shadow-lg shadow-salon-gold/20" : "border-salon-line bg-salon-pearl"}`}
+            className={`h-14 rounded-2xl border px-3 text-lg font-black transition active:scale-[0.98] ${paymentMethod === "NETWORK" ? "border-salon-forest bg-salon-forest text-white shadow-sm shadow-salon-forest/20" : "border-salon-line bg-salon-pearl text-salon-ink"}`}
           >
             شبكة
           </button>
@@ -205,16 +205,16 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
 
       {message ? <p className="rounded-2xl border border-salon-line bg-white px-4 py-3 text-sm font-bold text-salon-charcoal shadow-sm">{message}</p> : null}
 
-      <button disabled={!canPreview} className="h-14 w-full rounded-2xl bg-salon-ink px-4 text-lg font-black text-white shadow-lg shadow-salon-ink/20 transition active:scale-[0.98] disabled:opacity-50">
+      <button disabled={!canPreview} className="barber-primary-button h-14 w-full text-lg">
         {loadingPreview ? "جاري المعاينة..." : "معاينة العملية"}
       </button>
 
       {preview ? (
-        <div className="overflow-hidden rounded-[1.75rem] border border-salon-line bg-white shadow-2xl shadow-salon-ink/10">
-          <div className="bg-[linear-gradient(135deg,#17130f_0%,#1f4a3d_100%)] p-5 text-white">
-            <p className="text-sm font-bold text-white/60">المطلوب تحصيله</p>
-            <p className="mt-1 text-5xl font-black text-salon-gold">{displayNetAmount} ريال</p>
-            <p className="mt-2 text-sm font-semibold text-white/70">النقاط المتوقعة: {displayExpectedPoints}</p>
+        <div className="overflow-hidden rounded-3xl border border-salon-line bg-white shadow-sm shadow-salon-ink/5">
+          <div className="border-b border-salon-line bg-salon-pearl p-5">
+            <p className="text-sm font-bold text-salon-charcoal/65">المطلوب تحصيله</p>
+            <p className="mt-1 text-5xl font-black text-salon-forest">{displayNetAmount} ريال</p>
+            <p className="mt-2 text-sm font-semibold text-salon-charcoal/70">النقاط المتوقعة: {displayExpectedPoints}</p>
           </div>
           <div className="p-4">
             <div className="rounded-2xl border border-salon-line bg-salon-pearl p-3">
@@ -247,7 +247,7 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
                 ))}
               </div>
               {preview.availableRewards.length === 0 && preview.availableCampaigns.length === 0 ? (
-                <p className="mt-3 rounded-2xl bg-white px-3 py-2 text-xs font-semibold text-salon-charcoal">لا توجد خصومات متاحة لهذه الزيارة</p>
+                <p className="mt-3 rounded-2xl border border-dashed border-salon-line bg-white px-3 py-2 text-xs font-semibold text-salon-charcoal">لا توجد خصومات متاحة لهذه الزيارة</p>
               ) : null}
             </div>
             <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
@@ -264,7 +264,7 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
               type="button"
               onClick={confirmVisit}
               disabled={loadingConfirm}
-              className="mt-4 h-14 w-full rounded-2xl bg-salon-gold px-4 text-lg font-black text-salon-ink shadow-lg shadow-salon-gold/25 transition active:scale-[0.98] disabled:opacity-60"
+              className="barber-gold-button mt-4 h-14 w-full text-lg"
             >
               {loadingConfirm ? "جاري الحفظ..." : "تأكيد وإغلاق"}
             </button>
@@ -291,7 +291,7 @@ function DiscountButton({
       type="button"
       onClick={onClick}
       className={`min-h-16 rounded-2xl border px-3 py-3 text-right transition active:scale-[0.99] ${
-        selected ? "border-salon-gold bg-salon-gold/15 shadow-md shadow-salon-gold/10" : "border-salon-line bg-white"
+        selected ? "border-salon-forest bg-salon-forest/10 shadow-sm shadow-salon-forest/10" : "border-salon-line bg-white"
       }`}
     >
       <span className="block text-sm font-black">{title}</span>
