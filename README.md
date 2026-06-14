@@ -150,6 +150,67 @@ npm run demo:seed
 
 لتجربة التثبيت على الجوال، افتح `/barber` من المتصفح بعد تشغيل `npm run dev` أو نسخة الإنتاج، ثم استخدم خيار إضافة التطبيق إلى الشاشة الرئيسية إذا ظهر من المتصفح.
 
+## النشر على Render
+
+المشروع يحتوي على ملف `render.yaml` في جذر المستودع لإنشاء:
+
+- Web Service باسم `tanal-loyalty-web`.
+- PostgreSQL باسم `tanal-loyalty-db`.
+- Health check على `/api/health`.
+- تشغيل الهجرات والـ seed قبل بدء الخدمة عبر:
+
+```bash
+npm run prisma:deploy && npm run prisma:seed
+```
+
+خطوات النشر:
+
+1. ادفع آخر نسخة إلى GitHub.
+2. من Render Dashboard اختر `New > Blueprint`.
+3. اربط المستودع:
+
+```txt
+azzam1122112-dot/Tanal-Barbershop-Interface
+```
+
+4. اختر الفرع `main` واترك مسار Blueprint الافتراضي `render.yaml`.
+5. عند طلب متغيرات البيئة السرية، أدخل قيم إنتاج حقيقية:
+
+```txt
+SEED_ADMIN_PHONE
+SEED_ADMIN_EMAIL
+SEED_ADMIN_PASSWORD
+SEED_BARBER_PHONE
+SEED_BARBER_PIN
+```
+
+6. لا تستخدم كلمات المرور التجريبية في Render. الملف يفعّل:
+
+```txt
+REQUIRE_EXPLICIT_SEED_CREDENTIALS=true
+```
+
+لذلك سيفشل الـ seed في الإنتاج إذا لم يتم إدخال بيانات seed صريحة وآمنة.
+
+أوامر Render المستخدمة:
+
+```bash
+# Build Command
+npm ci && npm run prisma:generate && npm run build
+
+# Pre-Deploy Command
+npm run prisma:deploy && npm run prisma:seed
+
+# Start Command
+npm run start:render
+```
+
+ملاحظات:
+
+- `DATABASE_URL` يأتي من PostgreSQL الذي ينشئه Render، ولا يوضع يدويًا داخل Git.
+- `NODE_VERSION=22.22.3` مضبوط في Blueprint، ويوجد أيضًا `.nvmrc` و`.node-version`.
+- خطة الخدمة وقاعدة البيانات في `render.yaml` قابلة للتغيير من Render حسب ميزانية التشغيل.
+
 ## فحص قاعدة جديدة من الصفر
 
 عند إضافة migrations جديدة، يمكن التحقق من أن الترتيب يعمل على قاعدة فارغة بدون لمس قاعدة التطوير. أنشئ قاعدة مؤقتة مثل `tanal_loyalty_fresh_check` ثم شغّل الأوامر مع `DATABASE_URL` يشير إليها:

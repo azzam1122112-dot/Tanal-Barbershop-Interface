@@ -4,12 +4,24 @@ import { hashBarberPin } from "../lib/auth/barber-pin";
 
 const prisma = new PrismaClient();
 
+const requireExplicitSeedCredentials = process.env.REQUIRE_EXPLICIT_SEED_CREDENTIALS === "true";
+
+function readSeedEnv(key: string, fallback: string) {
+  const value = process.env[key];
+
+  if (requireExplicitSeedCredentials && !value) {
+    throw new Error(`${key} is required when REQUIRE_EXPLICIT_SEED_CREDENTIALS=true`);
+  }
+
+  return value ?? fallback;
+}
+
 async function main() {
-  const adminPhone = process.env.SEED_ADMIN_PHONE ?? "966500000001";
-  const adminEmail = process.env.SEED_ADMIN_EMAIL ?? "admin@tanal.local";
-  const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? "Admin@12345";
-  const barberPhone = process.env.SEED_BARBER_PHONE ?? "966500000002";
-  const barberPin = process.env.SEED_BARBER_PIN ?? "1234";
+  const adminPhone = readSeedEnv("SEED_ADMIN_PHONE", "966500000001");
+  const adminEmail = readSeedEnv("SEED_ADMIN_EMAIL", "admin@tanal.local");
+  const adminPassword = readSeedEnv("SEED_ADMIN_PASSWORD", "Admin@12345");
+  const barberPhone = readSeedEnv("SEED_BARBER_PHONE", "966500000002");
+  const barberPin = readSeedEnv("SEED_BARBER_PIN", "1234");
 
   const admin = await prisma.user.upsert({
     where: { phone: adminPhone },

@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: tanal-loyalty-web
+    runtime: node
+    plan: starter
+    region: oregon
+    repo: https://github.com/azzam1122112-dot/Tanal-Barbershop-Interface
+    branch: main
+    buildCommand: npm ci && npm run prisma:generate && npm run build
+    preDeployCommand: npm run prisma:deploy && npm run prisma:seed
+    startCommand: npm run start:render
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_VERSION
+        value: 22.22.3
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      - key: REQUIRE_EXPLICIT_SEED_CREDENTIALS
+        value: "true"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: tanal-loyalty-db
+          property: connectionString
+      - key: SEED_ADMIN_PHONE
+        sync: false
+      - key: SEED_ADMIN_EMAIL
+        sync: false
+      - key: SEED_ADMIN_PASSWORD
+        sync: false
+      - key: SEED_BARBER_PHONE
+        sync: false
+      - key: SEED_BARBER_PIN
+        sync: false
+
+databases:
+  - name: tanal-loyalty-db
+    databaseName: tanal_loyalty
+    user: tanal_user
+    plan: basic-256mb
+    region: oregon
