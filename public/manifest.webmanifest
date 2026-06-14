@@ -1,0 +1,26 @@
+{
+  "name": "TANAL Barber Loyalty",
+  "short_name": "TANAL",
+  "description": "تطبيق ولاء وتشغيل لصالون حلاقة رجالي",
+  "start_url": "/barber",
+  "scope": "/",
+  "display": "standalone",
+  "dir": "rtl",
+  "lang": "ar",
+  "theme_color": "#17130f",
+  "background_color": "#f6f3ee",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

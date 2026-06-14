@@ -1,0 +1,200 @@
+# TANAL Loyalty
+
+نظام ولاء وتشغيل لصالون حلاقة رجالي، مبني كـ Next.js Web/PWA بواجهة عربية RTL، ولوحة مدير منفصلة عن تطبيق الحلاق.
+
+## المتطلبات
+
+- Node.js LTS فقط: استخدم النسخة المحددة في `.nvmrc` وهي `22.22.3`.
+- npm 10 أو أحدث.
+- PostgreSQL للتطوير والإنتاج.
+
+> لا يعتمد المشروع على Node Current أو Node v25 في الإنتاج.
+
+## تجهيز Node على Windows
+
+الخيار المفضل هو `nvm-windows`:
+
+```powershell
+nvm install 22.22.3
+nvm use
+node --version
+```
+
+إذا لم يكن `nvm` متاحًا، ثبّت Node.js LTS 22 يدويًا من موقع Node.js الرسمي أو استخدم نسخة محمولة، ثم تأكد أن `node --version` يعرض `v22.x` وليس Node v25.
+
+## تجهيز PostgreSQL على Windows
+
+لا تستخدم مستخدم `postgres` الافتراضي للتطبيق. إذا ظهر الخطأ:
+
+```txt
+password authentication failed for user "postgres"
+```
+
+فهذا يعني أن خدمة PostgreSQL تعمل، لكن كلمة مرور `postgres` غير صحيحة أو أن سياسة المصادقة لا تسمح بها. الحل الموصى به هو إنشاء مستخدم وقاعدة مخصصين للمشروع.
+
+### خيار 1: داخل خدمة PostgreSQL المثبتة
+
+نفّذ الأوامر التالية من `psql` أو pgAdmin بحساب يملك صلاحية إنشاء مستخدم وقاعدة:
+
+```sql
+CREATE USER tanal_user WITH PASSWORD 'tanal_dev_password';
+CREATE DATABASE tanal_loyalty OWNER tanal_user;
+GRANT ALL PRIVILEGES ON DATABASE tanal_loyalty TO tanal_user;
+```
+
+ثم استخدم:
+
+```env
+DATABASE_URL="postgresql://tanal_user:tanal_dev_password@localhost:5432/tanal_loyalty?schema=public"
+```
+
+### خيار 2: PostgreSQL محلي معزول داخل المشروع
+
+هذا الخيار مناسب إذا لم تكن كلمة مرور `postgres` معروفة ولا تريد تعديل خدمة PostgreSQL الأصلية:
+
+```powershell
+Set-Content -LiteralPath ".postgres-pw" -Value "tanal_dev_password" -NoNewline
+initdb -D ".postgres-data" -U "tanal_user" --pwfile=".postgres-pw" --encoding="UTF8" --locale="C"
+Remove-Item -LiteralPath ".postgres-pw" -Force
+pg_ctl -D ".postgres-data" -o "-p 55432" -l ".postgres-log" start
+createdb -h localhost -p 55432 -U tanal_user tanal_loyalty
+```
+
+وفي هذه الحالة استخدم:
+
+```env
+DATABASE_URL="postgresql://tanal_user:tanal_dev_password@localhost:55432/tanal_loyalty?schema=public"
+```
+
+لإيقاف قاعدة المشروع المحلية:
+
+```powershell
+pg_ctl -D ".postgres-data" stop
+```
+
+## التشغيل المحلي
+
+1. ثبّت الحزم:
+
+```bash
+npm install
+```
+
+2. انسخ ملف البيئة وعدّل `DATABASE_URL` حسب خيار PostgreSQL الذي تستخدمه:
+
+```bash
+cp .env.example .env
+```
+
+3. شغّل migration والـ seed:
+
+```bash
+npm run prisma:migrate -- --name init
+npm run prisma:seed
+```
+
+4. للتحقق اليدوي من البيانات يمكن تشغيل Prisma Studio:
+
+```bash
+npx prisma studio
+```
+
+5. شغّل بيئة التطوير:
+
+```bash
+npm run dev
+```
+
+## أوامر الفحص
+
+```bash
+npm run typecheck
+npm test
+npm run lint
+npm run build
+npm audit
+```
+
+## بيانات Demo اختيارية
+
+الـ seed الأساسي يبقى نظيفًا ومناسبًا كبداية تشغيل. إذا أردت تجهيز بيانات عرض داخلية للتجربة، شغّل الأمر الاختياري التالي بعد `npm run prisma:seed`:
+
+```bash
+npm run demo:seed
+```
+
+ينشئ الأمر بيانات مميزة بالبادئة `[DEMO]` مثل عملاء تجريبيين، زيارات كاش وشبكة، زيارة بمكافأة، زيارة بحملة، جلسة صندوق مغلقة، تصحيح بعد الإغلاق، ورسالة واتساب draft. يمكن إعادة تشغيله لأنه ينظف بيانات `[DEMO]` السابقة أولًا. لا تشغّله على الإنتاج إلا إذا كنت تقصد إنشاء بيانات تجربة.
+
+## جلسة الصندوق CashSession
+
+الصالون يعمل 24 ساعة، لذلك لا يوجد مفهوم وردية أو وقت دوام ثابت داخل النظام. القفل التشغيلي لتسجيل الزيارات يعتمد فقط على جلسة الصندوق:
+
+- يفتح الحلاق جلسة صندوق عندما يبدأ استقبال العملاء.
+- لا يستطيع الحلاق تسجيل زيارة إذا لا توجد جلسة صندوق مفتوحة.
+- كل زيارة جديدة ترتبط بـ `cashSessionId`.
+- المدير يغلق جلسة الصندوق عند استلام الكاش أو المراجعة.
+- بعد إغلاق الجلسة لا يمكن إضافة زيارات عليها.
+- يمكن للحلاق فتح جلسة صندوق جديدة في نفس اليوم بعد إغلاق السابقة.
+- التقارير اليومية تبقى تقارير حسب تاريخ الزيارة فقط، وليست هي التي تسمح أو تمنع العمل.
+- `DailyClose` لم يعد القفل التشغيلي لتسجيل الزيارات.
+
+## تجربة PWA
+
+واجهة الحلاق تبدأ من:
+
+```txt
+/barber
+```
+
+يحتوي المشروع على `public/manifest.webmanifest` وأيقونات محلية داخل `public/icons`. لا يوجد service worker أو cache offline للصفحات المحمية في هذه المرحلة، لتجنب تخزين بيانات العملاء أو الجلسات محليًا.
+
+لتجربة التثبيت على الجوال، افتح `/barber` من المتصفح بعد تشغيل `npm run dev` أو نسخة الإنتاج، ثم استخدم خيار إضافة التطبيق إلى الشاشة الرئيسية إذا ظهر من المتصفح.
+
+## فحص قاعدة جديدة من الصفر
+
+عند إضافة migrations جديدة، يمكن التحقق من أن الترتيب يعمل على قاعدة فارغة بدون لمس قاعدة التطوير. أنشئ قاعدة مؤقتة مثل `tanal_loyalty_fresh_check` ثم شغّل الأوامر مع `DATABASE_URL` يشير إليها:
+
+```powershell
+createdb -h localhost -p 55432 -U tanal_user tanal_loyalty_fresh_check
+$env:DATABASE_URL="postgresql://tanal_user:tanal_dev_password@localhost:55432/tanal_loyalty_fresh_check?schema=public"
+npm run prisma:migrate
+npm run prisma:seed
+npm run typecheck
+npm test
+npm run lint
+npm run build
+npm audit
+dropdb -h localhost -p 55432 -U tanal_user tanal_loyalty_fresh_check
+```
+
+لا تحفظ رابط قاعدة الفحص داخل `.env`، واستخدمه كمتغير بيئة مؤقت في نافذة الطرفية فقط.
+
+## حسابات seed التجريبية
+
+- مدير النظام:
+  - البريد: `admin@tanal.local`
+  - الجوال: `966500000001`
+  - كلمة المرور: `Admin@12345`
+- الحلاق:
+  - الجوال: `966500000002`
+  - رمز الدخول: `1234`
+
+## روابط الصفحات الأساسية
+
+- تطبيق الحلاق: `/barber/login`
+- دخول المدير: `/dashboard/login`
+- الداشبورد: `/dashboard`
+- التقارير: `/dashboard/reports`
+- جلسات الصندوق: `/dashboard/daily-close`
+- واتساب اليدوي: `/dashboard/whatsapp`
+- الإعدادات: `/dashboard/settings`
+
+## ملاحظات أمان وتشغيل
+
+- لا ترفع `.env` إلى Git، واستخدم `.env.example` فقط كمرجع.
+- لا ترفع `.postgres-data` أو ملفات logs أو build output.
+- Cookies مصممة لتكون `httpOnly` و `sameSite`، وتتحول إلى `secure` في production.
+- لا يوجد إرسال واتساب تلقائي. النظام يجهز روابط `wa.me` فقط، والمدير يرسل يدويًا.
+- لا يوجد WhatsApp API أو أي إرسال تلقائي أو bulk sender.
+- لا يوجد service worker يخزن صفحات محمية offline في هذه المرحلة.
+- الصالون يعمل 24 ساعة؛ السماح بتسجيل الزيارة مرتبط بوجود جلسة صندوق مفتوحة للحلاق، وليس بتاريخ اليوم أو جدول دوام.
