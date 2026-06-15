@@ -37,3 +37,5 @@ export function toVisitDashboardRow(visit: VisitWithDetails) {
     campaignId: visit.discountType === "CAMPAIGN" ? visit.discountSourceId : null,
   };
 }
+
+export type VisitDashboardRow = ReturnType<typeof toVisitDashboardRow>;

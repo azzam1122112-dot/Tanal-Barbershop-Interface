@@ -2,7 +2,7 @@ import { cookies, headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS } from "./config";
-import { canAccessBarberApp, canAccessDashboard } from "./access";
+import { canAccessBarberApp, canAccessDashboard, canManageStaff } from "./access";
 import { getAuthSession } from "./session";
 
 export function setSessionCookie(response: NextResponse, token: string) {
@@ -40,6 +40,20 @@ export async function requireDashboardApi() {
 
   if (!canAccessDashboard(session)) {
     return { session: null, response: NextResponse.json({ message: "غير مصرح" }, { status: 401 }) };
+  }
+
+  return { session, response: null };
+}
+
+export async function requireAdminApi() {
+  const session = await getRequestSession();
+
+  if (!canAccessDashboard(session)) {
+    return { session: null, response: NextResponse.json({ message: "غير مصرح" }, { status: 401 }) };
+  }
+
+  if (!canManageStaff(session)) {
+    return { session, response: NextResponse.json({ message: "صلاحية المدير مطلوبة" }, { status: 403 }) };
   }
 
   return { session, response: null };

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { BrandLogo } from "@/components/brand-logo";
 import { canAccessBarberApp } from "@/lib/auth/access";
 import { getRequestSession } from "@/lib/auth/http";
 import { LogoutButton } from "@/components/logout-button";
@@ -19,9 +20,12 @@ export default async function BarberHomePage() {
       <section className="barber-container">
         <div className="sticky top-0 z-10 -mx-4 border-b border-salon-line bg-salon-mist/95 px-4 py-3">
           <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-xs font-black text-salon-forest">حلاق تنال</p>
-              <h1 className="mt-1 text-2xl font-black text-salon-ink">مرحبًا {session.barber.name}</h1>
+            <div className="flex min-w-0 items-center gap-3">
+              <BrandLogo className="h-12 w-12 border border-salon-line shadow-sm" priority />
+              <div className="min-w-0">
+                <p className="text-xs font-black text-salon-forest">حلاق تنال</p>
+                <h1 className="mt-1 truncate text-2xl font-black text-salon-ink">مرحبًا {session.barber.name}</h1>
+              </div>
             </div>
             <LogoutButton className="border-salon-line bg-white text-salon-charcoal shadow-sm hover:border-salon-forest/40" />
           </div>

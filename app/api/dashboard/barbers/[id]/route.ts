@@ -53,3 +53,62 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     throw error;
   }
 }
+
+export async function DELETE(_request: Request, context: { params: Promise<{ id: string }> }) {
+  const auth = await requireDashboardApi();
+  if (auth.response) return auth.response;
+  const session = auth.session;
+  if (!session || session.type !== "dashboard") return NextResponse.json({ message: "غير مصرح" }, { status: 401 });
+
+  const { id } = await context.params;
+  const before = await prisma.barber.findUnique({ where: { id } });
+  if (!before) {
+    return NextResponse.json({ message: "الحلاق غير موجود" }, { status: 404 });
+  }
+
+  const [visitsCount, dailyClosesCount, cashSessionsCount, customersCount] = await prisma.$transaction([
+    prisma.visit.count({ where: { barberId: id } }),
+    prisma.dailyClose.count({ where: { barberId: id } }),
+    prisma.cashSession.count({ where: { barberId: id } }),
+    prisma.customer.count({ where: { createdByBarberId: id } }),
+  ]);
+
+  if (visitsCount + dailyClosesCount + cashSessionsCount + customersCount > 0) {
+    return NextResponse.json(
+      { message: "لا يمكن حذف الحلاق لوجود زيارات أو بيانات مرتبطة به. يمكنك تعطيل الحساب بدل الحذف." },
+      { status: 409 },
+    );
+  }
+
+  try {
+    await prisma.barber.delete({ where: { id } });
+
+    const meta = await getRequestMeta();
+    await writeAuditLog({
+      prisma,
+      actorType: session.role,
+      actorUserId: session.user.id,
+      action: "barber.deleted",
+      entityType: "Barber",
+      entityId: id,
+      before: toSafeBarber(before, true),
+      after: null,
+      ...meta,
+    });
+
+    return NextResponse.json({ message: "تم حذف الحلاق" });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
+      return NextResponse.json(
+        { message: "لا يمكن حذف الحلاق لوجود بيانات مرتبطة به. يمكنك تعطيل الحساب بدل الحذف." },
+        { status: 409 },
+      );
+    }
+
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+      return NextResponse.json({ message: "الحلاق غير موجود" }, { status: 404 });
+    }
+
+    throw error;
+  }
+}

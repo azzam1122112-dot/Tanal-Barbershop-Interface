@@ -5,6 +5,11 @@ export type SafeAdminUser = {
   name: string;
   email: string | null;
   role: Exclude<UserRole, "BARBER">;
+  phone?: string;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  lastLoginAt?: string | null;
 };
 
 export type SafeBarber = {
@@ -18,13 +23,23 @@ export type SafeBarber = {
   lastLoginAt?: string | null;
 };
 
-export function toSafeAdminUser(user: User): SafeAdminUser {
-  return {
+export function toSafeAdminUser(user: User, includeManagementFields = false): SafeAdminUser {
+  const safeUser: SafeAdminUser = {
     id: user.id,
     name: user.name,
     email: user.email,
     role: user.role as Exclude<UserRole, "BARBER">,
   };
+
+  if (includeManagementFields) {
+    safeUser.phone = user.phone;
+    safeUser.isActive = user.isActive;
+    safeUser.createdAt = user.createdAt.toISOString();
+    safeUser.updatedAt = user.updatedAt.toISOString();
+    safeUser.lastLoginAt = user.lastLoginAt?.toISOString() ?? null;
+  }
+
+  return safeUser;
 }
 
 export function toSafeBarber(barber: Barber, includeManagementFields = false): SafeBarber {

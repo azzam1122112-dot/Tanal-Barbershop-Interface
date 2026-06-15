@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 import type { SafeBarber } from "@/lib/auth/sanitize";
 
@@ -10,16 +10,54 @@ type BarberResponse = {
   message?: string;
 };
 
+type BarberDraft = {
+  name: string;
+  phone: string;
+  pin: string;
+  isActive: boolean;
+};
+
+type BarberFilter = "all" | "active" | "inactive";
+
+const dateFormatter = new Intl.DateTimeFormat("ar-SA", {
+  year: "numeric",
+  month: "short",
+  day: "numeric",
+});
+
 export function BarberManager({ initialBarbers }: { initialBarbers: SafeBarber[] }) {
   const [barbers, setBarbers] = useState(initialBarbers);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [loading, setLoading] = useState(false);
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [drafts, setDrafts] = useState<Record<string, BarberDraft>>({});
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<BarberFilter>("all");
+
+  const activeCount = barbers.filter((barber) => barber.isActive).length;
+  const inactiveCount = barbers.length - activeCount;
+
+  const filteredBarbers = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+
+    return barbers.filter((barber) => {
+      const matchesFilter = filter === "all" || (filter === "active" ? barber.isActive : !barber.isActive);
+      const matchesQuery =
+        normalizedQuery.length === 0 ||
+        barber.name.toLowerCase().includes(normalizedQuery) ||
+        barber.phone.includes(normalizedQuery);
+
+      return matchesFilter && matchesQuery;
+    });
+  }, [barbers, filter, query]);
 
   async function createBarber(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
     setToast(null);
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
 
     const response = await fetch("/api/dashboard/barbers", {
       method: "POST",
@@ -34,7 +72,7 @@ export function BarberManager({ initialBarbers }: { initialBarbers: SafeBarber[]
 
     if (response.ok && data.barber) {
       setBarbers((current) => [data.barber!, ...current]);
-      event.currentTarget.reset();
+      formElement.reset();
       setToast({ message: "تم إضافة الحلاق بنجاح", tone: "success" });
     } else {
       setToast({ message: data.message ?? "تعذر حفظ الحلاق", tone: "error" });
@@ -42,8 +80,39 @@ export function BarberManager({ initialBarbers }: { initialBarbers: SafeBarber[]
     setLoading(false);
   }
 
+  function startEdit(barber: SafeBarber) {
+    setEditingId(barber.id);
+    setDrafts((current) => ({
+      ...current,
+      [barber.id]: {
+        name: barber.name,
+        phone: barber.phone,
+        pin: "",
+        isActive: Boolean(barber.isActive),
+      },
+    }));
+  }
+
+  function updateDraft(id: string, patch: Partial<BarberDraft>) {
+    setDrafts((current) => ({
+      ...current,
+      [id]: {
+        ...current[id],
+        ...patch,
+      },
+    }));
+  }
+
+  function cancelEdit(id: string) {
+    setEditingId(null);
+    setDrafts((current) => {
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
+  }
+
   async function patchBarber(id: string, body: Record<string, unknown>) {
-    setToast(null);
     const response = await fetch(`/api/dashboard/barbers/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -53,14 +122,14 @@ export function BarberManager({ initialBarbers }: { initialBarbers: SafeBarber[]
 
     if (response.ok && data.barber) {
       setBarbers((current) => current.map((barber) => (barber.id === id ? data.barber! : barber)));
-      setToast({ message: "تم تحديث بيانات الحلاق", tone: "success" });
-    } else {
-      setToast({ message: data.message ?? "تعذر تحديث الحلاق", tone: "error" });
+      return { ok: true, barber: data.barber };
     }
+
+    setToast({ message: data.message ?? "تعذر تحديث الحلاق", tone: "error" });
+    return { ok: false };
   }
 
   async function resetPin(id: string, pin: string) {
-    setToast(null);
     const response = await fetch(`/api/dashboard/barbers/${id}/reset-pin`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -68,69 +137,292 @@ export function BarberManager({ initialBarbers }: { initialBarbers: SafeBarber[]
     });
     const data = (await response.json().catch(() => ({}))) as BarberResponse;
 
-    setToast(response.ok ? { message: "تم تعيين رمز دخول جديد", tone: "success" } : { message: data.message ?? "تعذر تعيين الرمز", tone: "error" });
+    if (response.ok && data.barber) {
+      setBarbers((current) => current.map((barber) => (barber.id === id ? data.barber! : barber)));
+      return true;
+    }
+
+    setToast({ message: data.message ?? "تعذر تعيين الرمز", tone: "error" });
+    return false;
+  }
+
+  async function saveBarber(barber: SafeBarber) {
+    const draft = drafts[barber.id];
+    if (!draft) return;
+
+    setPendingId(barber.id);
+    setToast(null);
+
+    const updateBody: Record<string, unknown> = {};
+    if (draft.name.trim() !== barber.name) updateBody.name = draft.name;
+    if (draft.phone.trim() !== barber.phone) updateBody.phone = draft.phone;
+    if (draft.isActive !== Boolean(barber.isActive)) updateBody.isActive = draft.isActive;
+
+    const detailsChanged = Object.keys(updateBody).length > 0;
+    const pinChanged = draft.pin.trim().length > 0;
+
+    if (!detailsChanged && !pinChanged) {
+      setPendingId(null);
+      cancelEdit(barber.id);
+      setToast({ message: "لا توجد تغييرات للحفظ", tone: "info" });
+      return;
+    }
+
+    if (detailsChanged) {
+      const result = await patchBarber(barber.id, updateBody);
+      if (!result.ok) {
+        setPendingId(null);
+        return;
+      }
+    }
+
+    if (pinChanged) {
+      const pinSaved = await resetPin(barber.id, draft.pin);
+      if (!pinSaved) {
+        setPendingId(null);
+        return;
+      }
+    }
+
+    setPendingId(null);
+    cancelEdit(barber.id);
+    setToast({ message: pinChanged ? "تم حفظ البيانات وتحديث رمز الدخول" : "تم حفظ بيانات الحلاق", tone: "success" });
+  }
+
+  async function toggleStatus(barber: SafeBarber) {
+    setPendingId(barber.id);
+    setToast(null);
+    await patchBarber(barber.id, { isActive: !barber.isActive });
+    setPendingId(null);
+  }
+
+  async function deleteBarber(barber: SafeBarber) {
+    const confirmed = window.confirm(`هل تريد حذف ${barber.name} نهائيًا؟ لا يمكن التراجع عن هذا الإجراء.`);
+    if (!confirmed) return;
+
+    setPendingId(barber.id);
+    setToast(null);
+
+    const response = await fetch(`/api/dashboard/barbers/${barber.id}`, { method: "DELETE" });
+    const data = (await response.json().catch(() => ({}))) as BarberResponse;
+
+    if (response.ok) {
+      setBarbers((current) => current.filter((item) => item.id !== barber.id));
+      cancelEdit(barber.id);
+      setToast({ message: "تم حذف الحلاق", tone: "success" });
+    } else {
+      setToast({ message: data.message ?? "تعذر حذف الحلاق", tone: "error" });
+    }
+
+    setPendingId(null);
   }
 
   return (
-    <div className="mt-8 grid gap-6 lg:grid-cols-[360px_1fr]">
+    <div className="mt-8 space-y-6">
       <DashboardToast toast={toast} onClose={() => setToast(null)} />
-      <form onSubmit={createBarber} className="dashboard-panel space-y-4 p-5">
-        <h2 className="text-xl font-black">إضافة حلاق</h2>
-        <input name="name" required placeholder="اسم الحلاق" className="dashboard-field" />
-        <input name="phone" required placeholder="رقم الجوال" className="dashboard-field" />
-        <input name="pin" required minLength={4} maxLength={6} inputMode="numeric" placeholder="رمز الدخول 4 أو 6 أرقام" className="dashboard-field" />
-        <button disabled={loading} className="dashboard-button w-full">
-          {loading ? "جاري الحفظ..." : "حفظ الحلاق"}
-        </button>
-      </form>
 
-      <div className="dashboard-panel overflow-hidden">
-        <div className="grid grid-cols-[1fr_140px_120px] gap-3 border-b border-salon-line px-4 py-3 text-sm font-bold text-salon-charcoal">
-          <span>الحلاق</span>
-          <span>الحالة</span>
-          <span>إجراءات</span>
+      <section className="grid gap-4 md:grid-cols-3">
+        <div className="dashboard-soft-panel p-4">
+          <p className="text-xs font-black text-salon-charcoal">إجمالي الحلاقين</p>
+          <p className="mt-2 text-3xl font-black">{barbers.length}</p>
         </div>
-        <div className="divide-y divide-salon-line">
-          {barbers.map((barber) => (
-            <div key={barber.id} className="grid grid-cols-[1fr_140px_120px] gap-3 px-4 py-4 text-sm">
+        <div className="dashboard-soft-panel p-4">
+          <p className="text-xs font-black text-salon-charcoal">حسابات نشطة</p>
+          <p className="mt-2 text-3xl font-black text-green-700">{activeCount}</p>
+        </div>
+        <div className="dashboard-soft-panel p-4">
+          <p className="text-xs font-black text-salon-charcoal">حسابات معطلة</p>
+          <p className="mt-2 text-3xl font-black text-salon-ruby">{inactiveCount}</p>
+        </div>
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[380px_1fr]">
+        <form onSubmit={createBarber} className="dashboard-panel h-fit overflow-hidden">
+          <div className="border-b border-salon-line bg-salon-ink px-5 py-4 text-white">
+            <p className="text-xs font-black text-salon-gold">حساب جديد</p>
+            <h2 className="mt-2 text-2xl font-black">إضافة حلاق</h2>
+          </div>
+          <div className="space-y-4 p-5">
+            <label className="block">
+              <span className="mb-2 block text-xs font-black text-salon-charcoal">اسم الحلاق</span>
+              <input name="name" required placeholder="مثال: عبدالله الغامدي" className="dashboard-field" />
+            </label>
+            <label className="block">
+              <span className="mb-2 block text-xs font-black text-salon-charcoal">رقم الجوال</span>
+              <input name="phone" required inputMode="tel" placeholder="9665xxxxxxxx" className="dashboard-field" />
+            </label>
+            <label className="block">
+              <span className="mb-2 block text-xs font-black text-salon-charcoal">رمز الدخول</span>
+              <input name="pin" required minLength={4} maxLength={6} inputMode="numeric" placeholder="4 أو 6 أرقام" className="dashboard-field" />
+            </label>
+            <button disabled={loading} className="dashboard-button w-full">
+              {loading ? "جاري الحفظ..." : "حفظ الحلاق"}
+            </button>
+          </div>
+        </form>
+
+        <div className="dashboard-panel overflow-hidden">
+          <div className="border-b border-salon-line px-5 py-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <input
-                  defaultValue={barber.name}
-                  onBlur={(event) => event.currentTarget.value !== barber.name && patchBarber(barber.id, { name: event.currentTarget.value })}
-                  className="dashboard-field mb-2 py-2 font-bold"
-                />
-                <input
-                  defaultValue={barber.phone}
-                  onBlur={(event) => event.currentTarget.value !== barber.phone && patchBarber(barber.id, { phone: event.currentTarget.value })}
-                  className="dashboard-field py-2"
-                />
+                <p className="text-xs font-black text-salon-gold">قائمة الحلاقين</p>
+                <h2 className="mt-2 text-2xl font-black">التحكم الكامل بالحسابات</h2>
               </div>
-              <div>
-                <button
-                  type="button"
-                  onClick={() => patchBarber(barber.id, { isActive: !barber.isActive })}
-                  className={`rounded-lg px-3 py-2 font-bold ${barber.isActive ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}
-                >
-                  {barber.isActive ? "نشط" : "غير نشط"}
-                </button>
-              </div>
-              <div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const pin = window.prompt("أدخل رمزًا من 4 أو 6 أرقام");
-                    if (pin) void resetPin(barber.id, pin);
-                  }}
-                  className="dashboard-button-soft px-3 py-2"
-                >
-                  رمز جديد
-                </button>
+              <div className="grid gap-2 sm:grid-cols-[220px_1fr]">
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="بحث بالاسم أو الجوال"
+                  className="dashboard-field py-2.5"
+                />
+                <div className="grid grid-cols-3 rounded-lg border border-salon-line bg-white p-1 text-xs font-black">
+                  {[
+                    ["all", "الكل"],
+                    ["active", "نشط"],
+                    ["inactive", "معطل"],
+                  ].map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setFilter(value as BarberFilter)}
+                      className={`rounded-md px-3 py-2 transition ${filter === value ? "bg-salon-ink text-white" : "text-salon-charcoal hover:bg-salon-pearl"}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-          ))}
-          {barbers.length === 0 ? <p className="px-4 py-8 text-center text-salon-charcoal">لا يوجد حلاقون بعد</p> : null}
+          </div>
+
+          <div className="divide-y divide-salon-line">
+            {filteredBarbers.map((barber) => {
+              const isEditing = editingId === barber.id;
+              const draft = drafts[barber.id];
+              const isPending = pendingId === barber.id;
+
+              return (
+                <article key={barber.id} className="grid gap-4 px-5 py-5 xl:grid-cols-[1fr_180px_260px] xl:items-start">
+                  <div className="min-w-0">
+                    {isEditing && draft ? (
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <label className="block">
+                          <span className="mb-2 block text-xs font-black text-salon-charcoal">اسم الحلاق</span>
+                          <input value={draft.name} onChange={(event) => updateDraft(barber.id, { name: event.target.value })} className="dashboard-field py-2.5" />
+                        </label>
+                        <label className="block">
+                          <span className="mb-2 block text-xs font-black text-salon-charcoal">رقم الجوال</span>
+                          <input value={draft.phone} onChange={(event) => updateDraft(barber.id, { phone: event.target.value })} inputMode="tel" className="dashboard-field py-2.5" />
+                        </label>
+                        <label className="block">
+                          <span className="mb-2 block text-xs font-black text-salon-charcoal">رمز دخول جديد</span>
+                          <input
+                            data-pin-input={barber.id}
+                            value={draft.pin}
+                            onChange={(event) => updateDraft(barber.id, { pin: event.target.value })}
+                            minLength={4}
+                            maxLength={6}
+                            inputMode="numeric"
+                            placeholder="اتركه فارغًا إذا لم يتغير"
+                            className="dashboard-field py-2.5"
+                          />
+                        </label>
+                        <label className="flex items-center justify-between gap-3 rounded-lg border border-salon-line bg-salon-pearl px-3 py-2.5">
+                          <span className="text-sm font-black text-salon-charcoal">الحساب نشط</span>
+                          <input
+                            type="checkbox"
+                            checked={draft.isActive}
+                            onChange={(event) => updateDraft(barber.id, { isActive: event.target.checked })}
+                            className="h-5 w-5 accent-salon-forest"
+                          />
+                        </label>
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-xl font-black">{barber.name}</h3>
+                          <span className={`rounded-full px-3 py-1 text-xs font-black ${barber.isActive ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+                            {barber.isActive ? "نشط" : "معطل"}
+                          </span>
+                        </div>
+                        <dl className="mt-3 grid gap-2 text-sm font-bold text-salon-charcoal md:grid-cols-2">
+                          <div>
+                            <dt className="text-xs font-black text-salon-charcoal/70">رقم الجوال</dt>
+                            <dd className="mt-1 text-salon-ink">{barber.phone}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs font-black text-salon-charcoal/70">آخر تحديث</dt>
+                            <dd className="mt-1 text-salon-ink">{barber.updatedAt ? dateFormatter.format(new Date(barber.updatedAt)) : "غير متاح"}</dd>
+                          </div>
+                        </dl>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="rounded-lg border border-salon-line bg-salon-pearl px-4 py-3">
+                    <p className="text-xs font-black text-salon-charcoal">حالة الوصول</p>
+                    <button
+                      type="button"
+                      disabled={isPending || isEditing}
+                      onClick={() => void toggleStatus(barber)}
+                      className={`mt-3 w-full rounded-lg px-3 py-2 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-55 ${
+                        barber.isActive ? "bg-green-50 text-green-700 hover:bg-green-100" : "bg-red-50 text-red-700 hover:bg-red-100"
+                      }`}
+                    >
+                      {barber.isActive ? "تعطيل الحساب" : "تفعيل الحساب"}
+                    </button>
+                  </div>
+
+                  <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-1">
+                    {isEditing ? (
+                      <>
+                        <button type="button" disabled={isPending} onClick={() => void saveBarber(barber)} className="dashboard-button py-2.5">
+                          {isPending ? "جاري الحفظ..." : "حفظ"}
+                        </button>
+                        <button type="button" disabled={isPending} onClick={() => cancelEdit(barber.id)} className="dashboard-button-soft py-2.5">
+                          إلغاء
+                        </button>
+                        <button type="button" disabled={isPending} onClick={() => void deleteBarber(barber)} className="dashboard-danger-button py-2.5">
+                          حذف
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button type="button" disabled={Boolean(editingId) || isPending} onClick={() => startEdit(barber)} className="dashboard-button py-2.5">
+                          تعديل
+                        </button>
+                        <button
+                          type="button"
+                          disabled={Boolean(editingId) || isPending}
+                          onClick={() => {
+                            startEdit(barber);
+                            setTimeout(() => {
+                              document.querySelector<HTMLInputElement>(`[data-pin-input="${barber.id}"]`)?.focus();
+                            }, 0);
+                          }}
+                          className="dashboard-button-soft py-2.5"
+                        >
+                          رمز جديد
+                        </button>
+                        <button type="button" disabled={Boolean(editingId) || isPending} onClick={() => void deleteBarber(barber)} className="dashboard-danger-button py-2.5">
+                          حذف
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+
+            {filteredBarbers.length === 0 ? (
+              <div className="px-5 py-12 text-center">
+                <p className="text-lg font-black">لا توجد نتائج مطابقة</p>
+                <p className="dashboard-muted mt-2">غيّر البحث أو الفلتر لعرض الحلاقين.</p>
+              </div>
+            ) : null}
+          </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 }

@@ -1,22 +1,9 @@
-import Link from "next/link";
+import { BrandLogo } from "@/components/brand-logo";
+import { DashboardNav } from "@/components/dashboard/dashboard-nav";
 import { LogoutButton } from "@/components/logout-button";
+import { getRequestSession } from "@/lib/auth/http";
 
-const navItems = [
-  { href: "/dashboard", label: "الرئيسية" },
-  { href: "/dashboard/reports", label: "التقارير" },
-  { href: "/dashboard/barbers", label: "الحلاقون" },
-  { href: "/dashboard/customers", label: "العملاء" },
-  { href: "/dashboard/services", label: "الخدمات" },
-  { href: "/dashboard/visits", label: "الزيارات" },
-  { href: "/dashboard/loyalty", label: "الولاء" },
-  { href: "/dashboard/campaigns", label: "الحملات" },
-  { href: "/dashboard/daily-close", label: "جلسات الصندوق" },
-  { href: "/dashboard/post-close-adjustments", label: "تصحيحات الإغلاق" },
-  { href: "/dashboard/whatsapp", label: "واتساب" },
-  { href: "/dashboard/settings", label: "الإعدادات" },
-];
-
-export function DashboardShell({
+export async function DashboardShell({
   title,
   eyebrow = "لوحة الإدارة",
   description,
@@ -27,29 +14,32 @@ export function DashboardShell({
   description?: string;
   children: React.ReactNode;
 }) {
+  const session = await getRequestSession();
+  const role = session?.type === "dashboard" ? session.role : null;
+
   return (
     <main className="dashboard-page">
-      <div className="mx-auto grid max-w-[1680px] gap-0 lg:grid-cols-[288px_1fr]">
-        <aside className="border-b border-white/10 bg-salon-ink px-4 py-5 text-white shadow-2xl shadow-salon-ink/25 lg:sticky lg:top-0 lg:min-h-screen lg:border-b-0 lg:px-5">
-          <div className="flex items-center justify-between gap-3 lg:block">
-            <div>
-              <p className="text-xs font-black text-salon-gold">حلاق تنال</p>
-              <p className="mt-2 text-2xl font-black">إدارة الحلاقة الرجالية</p>
-              <p className="mt-2 hidden text-xs leading-6 text-white/55 lg:block">لوحة فاخرة لمتابعة جلسات الصندوق، الحلاقين، العملاء، الزيارات، والرسائل.</p>
+      <div className="mx-auto grid max-w-[1680px] gap-0 lg:grid-cols-[320px_1fr]">
+        <aside className="border-b border-white/10 bg-salon-ink px-4 py-4 text-white shadow-2xl shadow-salon-ink/25 lg:sticky lg:top-0 lg:flex lg:min-h-screen lg:flex-col lg:border-b-0 lg:px-5 lg:py-5">
+          <div className="rounded-lg border border-white/10 bg-white/[0.06] p-4">
+            <div className="flex items-center gap-3">
+              <BrandLogo className="h-12 w-12 ring-1 ring-white/20" priority />
+              <div className="min-w-0">
+                <p className="text-xs font-black text-salon-gold">حلاق تنال</p>
+                <p className="mt-1 truncate text-lg font-black">لوحة الإدارة</p>
+              </div>
             </div>
-            <LogoutButton className="border-white/15 bg-white/10 text-white hover:bg-white/15 lg:mt-6 lg:w-full" />
+            <p className="mt-3 text-xs leading-6 text-white/55">إدارة التشغيل، العملاء، الصندوق، الحملات، ورسائل واتساب من مكان واحد.</p>
           </div>
-          <nav className="mt-5 flex gap-2 overflow-x-auto pb-1 lg:block lg:space-y-1.5 lg:overflow-visible lg:pb-0">
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="block whitespace-nowrap rounded-lg border border-transparent px-3 py-2.5 text-sm font-bold text-white/76 transition hover:border-white/10 hover:bg-white/10 hover:text-white"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+
+          <div className="overflow-x-auto pb-2 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overflow-x-visible lg:pb-0">
+            <DashboardNav role={role} />
+          </div>
+
+          <div className="mt-5 rounded-lg border border-white/10 bg-black/10 p-3">
+            <p className="text-xs font-bold text-white/45">{role === "SUPERVISOR" ? "جلسة مشرف" : "جلسة المدير"}</p>
+            <LogoutButton className="mt-3 w-full border-white/15 bg-white/10 text-white hover:bg-white/15" />
+          </div>
         </aside>
         <section className="min-w-0 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           <PageHeader eyebrow={eyebrow} title={title} description={description} />

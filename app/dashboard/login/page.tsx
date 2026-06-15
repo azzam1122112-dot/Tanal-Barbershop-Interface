@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { BrandLogo } from "@/components/brand-logo";
 
 export default function DashboardLoginPage() {
   const [error, setError] = useState("");
@@ -35,7 +36,8 @@ export default function DashboardLoginPage() {
     <main className="min-h-screen bg-salon-ink px-5 py-8 text-white">
       <section className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-md flex-col justify-center">
         <div className="mb-8">
-          <p className="text-xs font-black tracking-[0.28em] text-salon-gold">TANAL</p>
+          <BrandLogo className="mb-5 h-24 w-24 ring-1 ring-white/15" priority />
+          <p className="text-xs font-black text-salon-gold">حلاق تنال</p>
           <h1 className="mt-3 text-4xl font-black leading-tight">دخول إدارة الحلاقة الرجالية</h1>
           <p className="mt-3 text-sm leading-7 text-white/65">ادخل إلى لوحة التشغيل لمتابعة اليوم وإدارة الفريق والعملاء.</p>
         </div>

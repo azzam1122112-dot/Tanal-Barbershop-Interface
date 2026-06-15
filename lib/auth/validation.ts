@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { barberPinSchema } from "./barber-pin";
+import { adminPasswordSchema } from "./password";
 import { normalizeSaudiPhone } from "@/lib/phone/saudi-phone";
 
 export const emailSchema = z
@@ -44,6 +45,27 @@ export const updateBarberSchema = z.object({
 
 export const resetBarberPinSchema = z.object({
   pin: barberPinSchema,
+});
+
+export const staffRoleSchema = z.enum(["ADMIN", "SUPERVISOR"], {
+  message: "صلاحية الموظف غير صحيحة",
+});
+
+export const createStaffSchema = z.object({
+  name: z.string().trim().min(2, "اسم الموظف مطلوب"),
+  email: emailSchema,
+  phone: phoneSchema,
+  password: adminPasswordSchema,
+  role: staffRoleSchema,
+});
+
+export const updateStaffSchema = z.object({
+  name: z.string().trim().min(2, "اسم الموظف مطلوب").optional(),
+  email: emailSchema.optional(),
+  phone: phoneSchema.optional(),
+  role: staffRoleSchema.optional(),
+  isActive: z.boolean().optional(),
+  password: adminPasswordSchema.optional(),
 });
 
 export const customerCreateSchema = z.object({

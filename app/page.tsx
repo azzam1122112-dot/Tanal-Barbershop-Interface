@@ -1,8 +1,11 @@
+import { BrandLogo } from "@/components/brand-logo";
+
 export default function HomePage() {
   return (
     <main className="min-h-screen bg-salon-mist px-5 py-8 text-salon-ink">
       <section className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-5xl flex-col justify-center gap-8">
         <div className="max-w-2xl">
+          <BrandLogo className="mb-5 h-24 w-24 shadow-lg shadow-salon-ink/10" priority />
           <p className="mb-3 text-sm font-semibold text-salon-gold">حلاق تنال</p>
           <h1 className="text-4xl font-bold leading-tight md:text-6xl">
             واجهة تنال للحلاقة الرجالية

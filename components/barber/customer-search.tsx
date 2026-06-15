@@ -15,7 +15,7 @@ type CustomerSummary = {
 };
 
 export function CustomerSearch() {
-  const [phone, setPhone] = useState("05");
+  const [phone, setPhone] = useState("");
   const [customer, setCustomer] = useState<CustomerSummary | null>(null);
   const [notFoundPhone, setNotFoundPhone] = useState("");
   const [newName, setNewName] = useState("");
@@ -25,7 +25,9 @@ export function CustomerSearch() {
 
   async function search(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!/^05\d{8}$/.test(phone)) {
+    const localPhone = toLocalSaudiMobile(phone);
+
+    if (!/^05\d{8}$/.test(localPhone)) {
       setMessage("رقم جوال العميل يجب أن يبدأ بـ 05 ويتكون من 10 أرقام");
       return;
     }
@@ -35,7 +37,7 @@ export function CustomerSearch() {
     setCustomer(null);
     setNotFoundPhone("");
 
-    const response = await fetch(`/api/barber/customers/search?phone=${encodeURIComponent(phone)}`);
+    const response = await fetch(`/api/barber/customers/search?phone=${encodeURIComponent(localPhone)}`);
     const data = (await response.json().catch(() => ({}))) as {
       found?: boolean;
       phone?: string;
@@ -48,7 +50,7 @@ export function CustomerSearch() {
     } else if (data.found && data.customer) {
       setCustomer(data.customer);
     } else {
-      setNotFoundPhone(toLocalSaudiMobile(data.phone ?? phone));
+      setNotFoundPhone(toLocalSaudiMobile(data.phone ?? localPhone));
       setMessage("العميل غير موجود، يمكنك إضافته الآن");
     }
     setLoading(false);
@@ -105,15 +107,14 @@ export function CustomerSearch() {
             <input
               value={phone}
               onChange={(event) => {
-                setPhone(toLocalSaudiMobile(event.target.value));
+                setPhone(event.target.value.replace(/\D/g, "").slice(0, 12));
                 setMessage("");
               }}
               inputMode="numeric"
               required
-              minLength={10}
-              maxLength={10}
-              pattern="05[0-9]{8}"
-              placeholder="0555967209"
+              minLength={9}
+              maxLength={12}
+              placeholder="05xxxxxxxx"
               className="barber-field mt-2 h-16 bg-salon-pearl text-center text-2xl"
             />
           </label>
