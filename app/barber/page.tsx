@@ -27,6 +27,10 @@ export default async function BarberHomePage() {
           </div>
         </div>
 
+        {summary.cashSession ? <CustomerSearch /> : null}
+
+        <CashSessionPanel initialSession={summary.cashSession} />
+
         <div className="mt-5 rounded-3xl border border-salon-line bg-white p-5 shadow-sm shadow-salon-ink/5">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -44,8 +48,6 @@ export default async function BarberHomePage() {
             <SummaryTile label="الشبكة اليوم" value={formatMoney(summary.networkTotal)} tone="steel" />
           </div>
         </div>
-
-        <CashSessionPanel initialSession={summary.cashSession} />
 
         <div className="barber-card mt-4 p-4">
           <div className="flex items-center justify-between gap-3">
@@ -67,14 +69,6 @@ export default async function BarberHomePage() {
             {summary.latestVisits.length === 0 ? <p className="rounded-2xl border border-dashed border-salon-line bg-salon-pearl py-5 text-center text-sm font-semibold text-salon-charcoal">لا توجد زيارات اليوم بعد</p> : null}
           </div>
         </div>
-
-        {summary.cashSession ? (
-          <CustomerSearch />
-        ) : (
-          <div className="barber-card mt-4 p-5 text-center text-sm font-semibold text-salon-charcoal">
-            البحث وتسجيل الزيارات يظهران بعد فتح جلسة صندوق.
-          </div>
-        )}
       </section>
     </main>
   );

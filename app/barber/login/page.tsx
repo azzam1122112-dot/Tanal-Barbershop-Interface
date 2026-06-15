@@ -46,21 +46,21 @@ export default function BarberLoginPage() {
 
   return (
     <main className="barber-shell px-5 py-6">
-      <section className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-sm flex-col justify-center">
-        <div className="mb-5 rounded-3xl border border-salon-line bg-white p-5 shadow-sm shadow-salon-ink/5">
+      <section className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-[21.875rem] min-w-0 flex-col justify-center sm:max-w-md">
+        <div className="mb-4 w-full overflow-hidden rounded-lg border border-salon-ink/10 bg-salon-ink p-5 text-white shadow-[0_24px_58px_rgba(16,25,22,0.18)]">
           <div className="flex items-center justify-between">
-            <p className="rounded-full border border-salon-gold/45 bg-salon-gold/10 px-3 py-1 text-sm font-black text-salon-ink">حلاق تنال</p>
-            <span className="rounded-full border border-salon-line bg-salon-pearl px-3 py-1 text-xs font-bold text-salon-charcoal">واجهة الحلاق</span>
+            <p className="rounded-full border border-salon-gold/45 bg-salon-gold/15 px-3 py-1 text-sm font-black text-salon-gold">حلاق تنال</p>
+            <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-bold text-white/70">واجهة الحلاق</span>
           </div>
-          <h1 className="mt-6 text-4xl font-black leading-tight text-salon-ink">واجهة تنال للحلاقة الرجالية</h1>
-          <p className="mt-3 text-sm leading-6 text-salon-charcoal/75">دخول الحلاقين لإدارة العملاء والزيارات وجلسة الصندوق.</p>
-          <div className="mt-6 grid grid-cols-3 gap-2 text-center text-xs font-bold text-salon-charcoal">
-            <span className="rounded-2xl border border-salon-line bg-salon-pearl px-2 py-3">عميل</span>
-            <span className="rounded-2xl border border-salon-line bg-salon-pearl px-2 py-3">صندوق</span>
-            <span className="rounded-2xl border border-salon-line bg-salon-pearl px-2 py-3">حلاقة</span>
+          <h1 className="mt-6 break-words text-2xl font-black leading-tight sm:text-4xl">واجهة تنال للحلاقة الرجالية</h1>
+          <p className="mt-3 text-sm leading-7 text-white/68">دخول الحلاقين لإدارة العملاء والزيارات وجلسة الصندوق بأسلوب هادئ وسريع.</p>
+          <div className="mt-6 grid grid-cols-3 gap-2 text-center text-xs font-bold text-white/78">
+            <span className="rounded-lg border border-white/10 bg-white/10 px-2 py-3">عميل</span>
+            <span className="rounded-lg border border-white/10 bg-white/10 px-2 py-3">صندوق</span>
+            <span className="rounded-lg border border-white/10 bg-white/10 px-2 py-3">حلاقة</span>
           </div>
         </div>
-        <form onSubmit={submit} className="barber-card space-y-4 p-5">
+        <form onSubmit={submit} className="barber-card w-full space-y-4 p-5">
           <label className="block text-sm font-semibold">
             رقم الجوال
             <input
@@ -88,10 +88,10 @@ export default function BarberLoginPage() {
               maxLength={6}
               autoComplete="one-time-code"
               placeholder="1234"
-              className="barber-field mt-2 h-14 text-center text-2xl tracking-[0.35em]"
+              className="barber-field mt-2 h-14 text-center text-2xl"
             />
           </label>
-          {error ? <p className="rounded-2xl border border-red-100 bg-red-50 px-3 py-3 text-sm font-semibold text-red-700">{error}</p> : null}
+          {error ? <p className="rounded-lg border border-red-100 bg-red-50 px-3 py-3 text-sm font-semibold text-red-700">{error}</p> : null}
           <button
             type="submit"
             disabled={loading}

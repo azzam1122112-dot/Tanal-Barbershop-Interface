@@ -21,6 +21,7 @@ export function CustomerSearch() {
   const [newName, setNewName] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const sheetOpen = Boolean(customer || notFoundPhone);
 
   async function search(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -71,7 +72,7 @@ export function CustomerSearch() {
     const data = (await response.json().catch(() => ({}))) as { customer?: CustomerSummary; message?: string };
 
     if (response.ok && data.customer) {
-      window.location.href = `/barber/customers/${data.customer.id}`;
+      window.location.href = `/barber/customers/${data.customer.id}/visits/new`;
       return;
     }
 
@@ -79,75 +80,115 @@ export function CustomerSearch() {
     setLoading(false);
   }
 
+  function closeSheet() {
+    setCustomer(null);
+    setNotFoundPhone("");
+    setNewName("");
+    setMessage("");
+  }
+
   return (
-    <div className="mt-5 space-y-4">
-      <form onSubmit={search} className="barber-card space-y-4 p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-black">بحث العميل</h2>
-            <p className="mt-1 text-xs font-semibold text-salon-charcoal/70">أدخل رقم الجوال ثم تابع مباشرة</p>
+    <div className="mt-5">
+      <form onSubmit={search} className="overflow-hidden rounded-[1.75rem] border border-salon-forest/20 bg-white shadow-sm shadow-salon-ink/5">
+        <div className="border-b border-salon-line bg-salon-pearl px-4 py-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-black text-salon-forest">ابدأ من هنا</p>
+              <h2 className="mt-1 text-xl font-black">بحث العميل</h2>
+            </div>
+            <span className="rounded-full border border-salon-line bg-white px-3 py-1 text-xs font-black text-salon-forest">سريع</span>
           </div>
-          <span className="rounded-full border border-salon-line bg-salon-pearl px-3 py-1 text-xs font-black text-salon-forest">سريع</span>
         </div>
-        <label className="block text-sm font-bold">
-          رقم جوال العميل
-          <input
-            value={phone}
-            onChange={(event) => setPhone(toLocalSaudiMobile(event.target.value))}
-            inputMode="numeric"
-            required
-            minLength={10}
-            maxLength={10}
-            pattern="05[0-9]{8}"
-            placeholder="0555967209"
-            className="barber-field mt-2 h-16 bg-salon-pearl text-xl"
-          />
-          <span className="mt-2 block text-xs font-semibold text-salon-charcoal/65">مثال: 0555967209، وسيتم حفظه تلقائيًا بصيغة واتساب الدولية.</span>
-        </label>
-        <button disabled={loading} className="barber-primary-button h-14 w-full text-lg">
-          {loading ? "جاري البحث..." : "بحث"}
-        </button>
+        <div className="space-y-4 p-4">
+          <label className="block text-sm font-bold">
+            رقم جوال العميل
+            <input
+              value={phone}
+              onChange={(event) => {
+                setPhone(toLocalSaudiMobile(event.target.value));
+                setMessage("");
+              }}
+              inputMode="numeric"
+              required
+              minLength={10}
+              maxLength={10}
+              pattern="05[0-9]{8}"
+              placeholder="0555967209"
+              className="barber-field mt-2 h-16 bg-salon-pearl text-center text-2xl"
+            />
+          </label>
+          {message && !sheetOpen ? <p className="rounded-2xl border border-salon-line bg-salon-mist px-4 py-3 text-sm font-bold text-salon-charcoal">{message}</p> : null}
+          <button disabled={loading} className="barber-primary-button h-14 w-full text-lg">
+            {loading ? "جاري البحث..." : "بحث وفتح الإجراء"}
+          </button>
+        </div>
       </form>
 
-      {message ? <p className="rounded-2xl border border-salon-line bg-white px-4 py-3 text-sm font-bold text-salon-charcoal shadow-sm">{message}</p> : null}
+      {sheetOpen ? (
+        <div className="fixed inset-0 z-40 flex items-end bg-salon-ink/35 px-3 pb-3 pt-16 backdrop-blur-sm" role="dialog" aria-modal="true">
+          <button type="button" aria-label="إغلاق" className="absolute inset-0 cursor-default" onClick={closeSheet} />
+          <div className="relative mx-auto w-full max-w-md overflow-hidden rounded-[1.75rem] border border-salon-line bg-white shadow-2xl shadow-salon-ink/25">
+            <div className="flex items-center justify-between gap-3 border-b border-salon-line bg-salon-pearl px-4 py-3">
+              <div className="h-1.5 w-12 rounded-full bg-salon-line" />
+              <button type="button" onClick={closeSheet} className="rounded-full border border-salon-line bg-white px-3 py-1 text-sm font-black text-salon-charcoal">
+                إغلاق
+              </button>
+            </div>
 
-      {customer ? (
-        <div className="overflow-hidden rounded-2xl border border-salon-line bg-white shadow-sm shadow-salon-ink/5">
-          <div className="border-b border-salon-line bg-salon-pearl p-4">
-            <p className="text-xs font-bold text-salon-forest">تم العثور على العميل</p>
-            <h2 className="mt-1 text-2xl font-black text-salon-ink">{customer.name}</h2>
-            <p className="mt-1 font-semibold text-salon-charcoal/75">{customer.phone}</p>
+            {message ? <p className="mx-4 mt-4 rounded-2xl border border-salon-line bg-salon-mist px-4 py-3 text-sm font-bold text-salon-charcoal">{message}</p> : null}
+
+            {customer ? (
+              <div className="p-4">
+                <p className="text-xs font-black text-salon-forest">تم العثور على العميل</p>
+                <div className="mt-2 flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h2 className="break-words text-3xl font-black text-salon-ink">{customer.name}</h2>
+                    <p className="mt-1 font-semibold text-salon-charcoal/75">{customer.phone}</p>
+                  </div>
+                  <div className="rounded-2xl border border-salon-gold/40 bg-salon-gold/10 px-4 py-3 text-center">
+                    <p className="text-xs font-bold text-salon-charcoal/65">النقاط</p>
+                    <p className="text-2xl font-black text-salon-forest">{customer.pointsBalance}</p>
+                  </div>
+                </div>
+                <dl className="mt-4 grid grid-cols-2 gap-2 text-sm">
+                  <InfoTile label="الزيارات" value={customer.visitsCount.toString()} />
+                  <InfoTile label="آخر حلاق" value={customer.lastBarberName ?? "-"} />
+                  <InfoTile label="آخر خدمة" value={customer.lastServices.join("، ") || "-"} />
+                  <InfoTile label="آخر زيارة" value={customer.lastVisitAt ? new Date(customer.lastVisitAt).toLocaleDateString("ar-SA") : "-"} />
+                </dl>
+                <div className="mt-4 grid grid-cols-[1fr_112px] gap-2">
+                  <Link href={`/barber/customers/${customer.id}/visits/new`} className="barber-gold-button h-14 py-4 text-center text-lg">
+                    تسجيل زيارة
+                  </Link>
+                  <Link href={`/barber/customers/${customer.id}`} className="barber-ghost-button h-14 py-4 text-center">
+                    الملف
+                  </Link>
+                </div>
+              </div>
+            ) : null}
+
+            {notFoundPhone ? (
+              <form onSubmit={createCustomer} className="space-y-3 p-4">
+                <div>
+                  <p className="text-xs font-black text-salon-forest">عميل جديد</p>
+                  <h2 className="mt-1 text-2xl font-black">إضافة العميل والمتابعة</h2>
+                  <p className="mt-1 text-sm font-semibold text-salon-charcoal/70">الرقم جاهز، أضف الاسم فقط وسيتم فتح تسجيل الزيارة.</p>
+                </div>
+                <input value={notFoundPhone} readOnly className="barber-field h-12 bg-salon-mist" />
+                <input
+                  value={newName}
+                  onChange={(event) => setNewName(event.target.value)}
+                  required
+                  placeholder="اسم العميل"
+                  className="barber-field h-14 text-lg"
+                />
+                <button disabled={loading} className="barber-gold-button h-14 w-full text-lg">
+                  {loading ? "جاري الحفظ..." : "حفظ وفتح تسجيل الزيارة"}
+                </button>
+              </form>
+            ) : null}
           </div>
-          <dl className="grid grid-cols-2 gap-2 p-4 text-sm">
-            <InfoTile label="النقاط" value={customer.pointsBalance.toString()} />
-            <InfoTile label="الزيارات" value={customer.visitsCount.toString()} />
-            <InfoTile label="آخر حلاق" value={customer.lastBarberName ?? "-"} />
-            <InfoTile label="آخر خدمة" value={customer.lastServices.join("، ") || "-"} />
-          </dl>
-          <Link href={`/barber/customers/${customer.id}`} className="barber-gold-button mx-4 mb-4 block h-14 py-4 text-center text-lg">
-            عرض العميل
-          </Link>
         </div>
-      ) : null}
-
-      {notFoundPhone ? (
-        <form onSubmit={createCustomer} className="barber-card space-y-3 p-4">
-          <div>
-            <h2 className="text-lg font-black">إضافة عميل جديد</h2>
-            <p className="mt-1 text-xs font-semibold text-salon-charcoal/70">الرقم جاهز، أضف الاسم فقط</p>
-          </div>
-          <input value={notFoundPhone} readOnly className="barber-field h-12 bg-salon-mist" />
-          <input
-            value={newName}
-            onChange={(event) => setNewName(event.target.value)}
-            required
-            placeholder="اسم العميل"
-            className="barber-field h-14 text-lg"
-          />
-          <button disabled={loading} className="barber-gold-button h-14 w-full text-lg">
-            {loading ? "جاري الحفظ..." : "حفظ ومتابعة"}
-          </button>
-        </form>
       ) : null}
     </div>
   );

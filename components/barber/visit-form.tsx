@@ -99,7 +99,7 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
 
     if (response.ok && data.visit) {
       setMessage("تم حفظ الزيارة بنجاح");
-      window.location.href = `/barber/customers/${data.visit.customer.id}`;
+      window.location.href = "/barber";
       return;
     }
 
@@ -210,64 +210,89 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
       </button>
 
       {preview ? (
-        <div className="overflow-hidden rounded-3xl border border-salon-line bg-white shadow-sm shadow-salon-ink/5">
-          <div className="border-b border-salon-line bg-salon-pearl p-5">
-            <p className="text-sm font-bold text-salon-charcoal/65">المطلوب تحصيله</p>
-            <p className="mt-1 text-5xl font-black text-salon-forest">{displayNetAmount} ريال</p>
-            <p className="mt-2 text-sm font-semibold text-salon-charcoal/70">النقاط المتوقعة: {displayExpectedPoints}</p>
-          </div>
-          <div className="p-4">
-            <div className="rounded-2xl border border-salon-line bg-salon-pearl p-3">
-              <p className="text-sm font-black">الخصومات المتاحة</p>
-              <p className="mt-1 text-xs font-semibold text-salon-charcoal/70">رصيد النقاط: {preview.pointsBalance}</p>
-              <div className="mt-3 grid gap-2">
-                <DiscountButton
-                  selected={selectedDiscount === "NONE"}
-                  title="بدون خصم"
-                  subtitle="تحصيل كامل المبلغ"
-                  onClick={() => setSelectedDiscount("NONE")}
-                />
-                {preview.availableRewards.map((reward) => (
-                  <DiscountButton
-                    key={reward.id}
-                    selected={selectedDiscount === `REWARD:${reward.id}`}
-                    title={reward.label}
-                    subtitle={`استخدام ${reward.pointsRequired} نقطة`}
-                    onClick={() => setSelectedDiscount(`REWARD:${reward.id}`)}
-                  />
-                ))}
-                {preview.availableCampaigns.map((campaign) => (
-                  <DiscountButton
-                    key={campaign.id}
-                    selected={selectedDiscount === `CAMPAIGN:${campaign.id}`}
-                    title={campaign.label}
-                    subtitle={campaign.description ?? campaign.name}
-                    onClick={() => setSelectedDiscount(`CAMPAIGN:${campaign.id}`)}
-                  />
-                ))}
+        <div className="fixed inset-0 z-40 flex items-end bg-salon-ink/35 px-3 pb-3 pt-12 backdrop-blur-sm" role="dialog" aria-modal="true">
+          <button
+            type="button"
+            aria-label="إغلاق المعاينة"
+            className="absolute inset-0 cursor-default"
+            onClick={() => {
+              setPreview(null);
+              setSelectedDiscount("NONE");
+            }}
+          />
+          <div className="relative mx-auto flex max-h-[92vh] w-full max-w-md flex-col overflow-hidden rounded-[1.75rem] border border-salon-line bg-white shadow-2xl shadow-salon-ink/25">
+            <div className="border-b border-salon-line bg-salon-pearl p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="h-1.5 w-12 rounded-full bg-salon-line" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPreview(null);
+                    setSelectedDiscount("NONE");
+                  }}
+                  className="rounded-full border border-salon-line bg-white px-3 py-1 text-sm font-black text-salon-charcoal"
+                >
+                  تعديل
+                </button>
               </div>
-              {preview.availableRewards.length === 0 && preview.availableCampaigns.length === 0 ? (
-                <p className="mt-3 rounded-2xl border border-dashed border-salon-line bg-white px-3 py-2 text-xs font-semibold text-salon-charcoal">لا توجد خصومات متاحة لهذه الزيارة</p>
-              ) : null}
+              <p className="mt-4 text-sm font-bold text-salon-charcoal/65">المطلوب تحصيله</p>
+              <p className="mt-1 text-5xl font-black text-salon-forest">{displayNetAmount} ريال</p>
+              <p className="mt-2 text-sm font-semibold text-salon-charcoal/70">النقاط المتوقعة: {displayExpectedPoints}</p>
             </div>
-            <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
-              <SummaryCell label="العميل" value={preview.customer.name} />
-              <SummaryCell label="الحلاق" value={preview.barber.name} />
-              <SummaryCell label="قبل الخصم" value={`${preview.grossAmount} ريال`} />
-              <SummaryCell label="الخصم" value={`${displayDiscount} ريال`} />
-              <SummaryCell label="المطلوب" value={`${displayNetAmount} ريال`} strong />
-              <SummaryCell label="النقاط المستخدمة" value={`${selectedReward?.pointsRequired ?? 0}`} />
-              <SummaryCell label="النقاط المتوقعة" value={`${displayExpectedPoints}`} />
-            </dl>
-            <p className="mt-3 rounded-2xl bg-salon-mist px-3 py-3 text-sm font-semibold text-salon-charcoal">{preview.services.map((service) => service.name).join("، ")}</p>
-            <button
-              type="button"
-              onClick={confirmVisit}
-              disabled={loadingConfirm}
-              className="barber-gold-button mt-4 h-14 w-full text-lg"
-            >
-              {loadingConfirm ? "جاري الحفظ..." : "تأكيد وإغلاق"}
-            </button>
+            <div className="min-h-0 overflow-y-auto p-4">
+              <div className="rounded-2xl border border-salon-line bg-salon-pearl p-3">
+                <p className="text-sm font-black">الخصومات المتاحة</p>
+                <p className="mt-1 text-xs font-semibold text-salon-charcoal/70">رصيد النقاط: {preview.pointsBalance}</p>
+                <div className="mt-3 grid gap-2">
+                  <DiscountButton
+                    selected={selectedDiscount === "NONE"}
+                    title="بدون خصم"
+                    subtitle="تحصيل كامل المبلغ"
+                    onClick={() => setSelectedDiscount("NONE")}
+                  />
+                  {preview.availableRewards.map((reward) => (
+                    <DiscountButton
+                      key={reward.id}
+                      selected={selectedDiscount === `REWARD:${reward.id}`}
+                      title={reward.label}
+                      subtitle={`استخدام ${reward.pointsRequired} نقطة`}
+                      onClick={() => setSelectedDiscount(`REWARD:${reward.id}`)}
+                    />
+                  ))}
+                  {preview.availableCampaigns.map((campaign) => (
+                    <DiscountButton
+                      key={campaign.id}
+                      selected={selectedDiscount === `CAMPAIGN:${campaign.id}`}
+                      title={campaign.label}
+                      subtitle={campaign.description ?? campaign.name}
+                      onClick={() => setSelectedDiscount(`CAMPAIGN:${campaign.id}`)}
+                    />
+                  ))}
+                </div>
+                {preview.availableRewards.length === 0 && preview.availableCampaigns.length === 0 ? (
+                  <p className="mt-3 rounded-2xl border border-dashed border-salon-line bg-white px-3 py-2 text-xs font-semibold text-salon-charcoal">لا توجد خصومات متاحة لهذه الزيارة</p>
+                ) : null}
+              </div>
+              <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                <SummaryCell label="العميل" value={preview.customer.name} />
+                <SummaryCell label="طريقة الدفع" value={paymentMethod === "CASH" ? "كاش" : "شبكة"} />
+                <SummaryCell label="قبل الخصم" value={`${preview.grossAmount} ريال`} />
+                <SummaryCell label="الخصم" value={`${displayDiscount} ريال`} />
+                <SummaryCell label="المطلوب" value={`${displayNetAmount} ريال`} strong />
+                <SummaryCell label="النقاط المستخدمة" value={`${selectedReward?.pointsRequired ?? 0}`} />
+              </dl>
+              <p className="mt-3 rounded-2xl bg-salon-mist px-3 py-3 text-sm font-semibold text-salon-charcoal">{preview.services.map((service) => service.name).join("، ")}</p>
+            </div>
+            <div className="border-t border-salon-line bg-white p-4">
+              <button
+                type="button"
+                onClick={confirmVisit}
+                disabled={loadingConfirm}
+                className="barber-gold-button h-14 w-full text-lg"
+              >
+                {loadingConfirm ? "جاري الحفظ..." : "تأكيد واستقبال العميل التالي"}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

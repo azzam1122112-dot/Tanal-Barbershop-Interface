@@ -4,8 +4,8 @@
 
 :root {
   color-scheme: light;
-  --font-sans: "Segoe UI", "Tahoma";
-  background: #f7f3ec;
+  --font-sans: "IBM Plex Sans Arabic", "Segoe UI", "Tahoma";
+  background: #f4f2ed;
 }
 
 * {
@@ -19,17 +19,15 @@ html {
 body {
   min-height: 100%;
   margin: 0;
-  background:
-    radial-gradient(circle at top right, rgba(200, 163, 91, 0.16), transparent 30rem),
-    linear-gradient(180deg, #fbf8f0 0%, #f3eee4 46%, #eee6d8 100%);
-  color: #17130f;
+  background: linear-gradient(180deg, #f9f8f5 0%, #f4f2ed 48%, #ebe6dc 100%);
+  color: #101916;
   font-family: var(--font-sans), Arial, sans-serif;
   text-rendering: optimizeLegibility;
 }
 
 ::selection {
-  background: #b9904a;
-  color: #17130f;
+  background: #a98245;
+  color: #101916;
 }
 
 button,
@@ -42,15 +40,15 @@ select {
 
 @layer components {
   .dashboard-page {
-    @apply min-h-screen bg-[radial-gradient(circle_at_top_right,rgba(200,163,91,0.18),transparent_32rem),linear-gradient(180deg,#fbf8f0_0%,#f4eee4_52%,#eee6d8_100%)] text-salon-ink;
+    @apply min-h-screen bg-[linear-gradient(180deg,#f9f8f5_0%,#f4f2ed_50%,#ebe6dc_100%)] text-salon-ink;
   }
 
   .dashboard-panel {
-    @apply rounded-lg border border-white/70 bg-white/90 shadow-[0_18px_50px_rgba(23,19,15,0.08)] backdrop-blur;
+    @apply rounded-lg border border-white/80 bg-white/95 shadow-[0_18px_48px_rgba(16,25,22,0.08)] backdrop-blur;
   }
 
   .dashboard-soft-panel {
-    @apply rounded-lg border border-salon-line/80 bg-salon-pearl/90 shadow-sm shadow-salon-ink/5;
+    @apply rounded-lg border border-salon-line/80 bg-salon-pearl/95 shadow-sm shadow-salon-ink/5;
   }
 
   .dashboard-field {
@@ -58,11 +56,11 @@ select {
   }
 
   .dashboard-button {
-    @apply rounded-lg bg-salon-ink px-4 py-3 text-sm font-black text-white shadow-sm shadow-salon-ink/15 transition hover:bg-salon-charcoal active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55;
+    @apply rounded-lg bg-salon-ink px-4 py-3 text-sm font-black text-white shadow-sm shadow-salon-ink/15 transition hover:bg-salon-forest active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55;
   }
 
   .dashboard-button-gold {
-    @apply rounded-lg bg-salon-gold px-4 py-3 text-sm font-black text-salon-ink shadow-sm shadow-salon-gold/25 transition hover:bg-[#d5b46f] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55;
+    @apply rounded-lg bg-salon-gold px-4 py-3 text-sm font-black text-white shadow-sm shadow-salon-gold/25 transition hover:bg-[#94703a] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55;
   }
 
   .dashboard-button-soft {
@@ -102,7 +100,7 @@ select {
   }
 
   .barber-shell {
-    @apply min-h-screen bg-salon-mist px-4 font-sans text-salon-ink;
+    @apply min-h-screen bg-[linear-gradient(180deg,#f9f8f5_0%,#f4f2ed_54%,#ebe6dc_100%)] px-4 font-sans text-salon-ink;
   }
 
   .barber-container {
@@ -110,27 +108,27 @@ select {
   }
 
   .barber-card {
-    @apply rounded-2xl border border-salon-line bg-white shadow-sm shadow-salon-ink/5;
+    @apply rounded-lg border border-white/80 bg-white/95 shadow-[0_18px_42px_rgba(16,25,22,0.08)];
   }
 
   .barber-soft-card {
-    @apply rounded-2xl border border-salon-line bg-salon-pearl shadow-sm shadow-salon-ink/5;
+    @apply rounded-lg border border-salon-line bg-salon-pearl shadow-sm shadow-salon-ink/5;
   }
 
   .barber-field {
-    @apply w-full rounded-2xl border border-salon-line bg-white px-4 font-bold text-salon-ink outline-none transition focus:border-salon-forest focus:ring-4 focus:ring-salon-forest/10;
+    @apply w-full rounded-lg border border-salon-line bg-white px-4 font-bold text-salon-ink outline-none transition placeholder:text-salon-charcoal/45 focus:border-salon-forest focus:ring-4 focus:ring-salon-forest/10;
   }
 
   .barber-primary-button {
-    @apply rounded-2xl bg-salon-forest px-4 font-black text-white shadow-sm shadow-salon-forest/20 transition hover:bg-salon-forest/95 active:scale-[0.98] disabled:opacity-55;
+    @apply rounded-lg bg-salon-forest px-4 font-black text-white shadow-sm shadow-salon-forest/20 transition hover:bg-salon-ink active:scale-[0.98] disabled:opacity-55;
   }
 
   .barber-gold-button {
-    @apply rounded-2xl bg-salon-gold px-4 font-black text-salon-ink shadow-sm shadow-salon-gold/20 transition hover:bg-salon-gold/90 active:scale-[0.98] disabled:opacity-55;
+    @apply rounded-lg bg-salon-gold px-4 font-black text-white shadow-sm shadow-salon-gold/20 transition hover:bg-[#94703a] active:scale-[0.98] disabled:opacity-55;
   }
 
   .barber-ghost-button {
-    @apply rounded-2xl border border-salon-line bg-white px-4 font-black text-salon-ink shadow-sm transition hover:border-salon-forest/35 active:scale-[0.98] disabled:opacity-55;
+    @apply rounded-lg border border-salon-line bg-white px-4 font-black text-salon-ink shadow-sm transition hover:border-salon-forest/35 active:scale-[0.98] disabled:opacity-55;
   }
 }
 

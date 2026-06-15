@@ -9,15 +9,15 @@ const config: Config = {
     extend: {
       colors: {
         salon: {
-          ink: "#17130f",
-          charcoal: "#24211d",
-          gold: "#b9904a",
-          mist: "#f6f3ee",
-          line: "#ded6c8",
-          pearl: "#fffaf1",
-          forest: "#1f4a3d",
-          ruby: "#8d2f2f",
-          steel: "#35506b",
+          ink: "#101916",
+          charcoal: "#303832",
+          gold: "#a98245",
+          mist: "#f4f2ed",
+          line: "#d6cec1",
+          pearl: "#fbfaf6",
+          forest: "#173b33",
+          ruby: "#7f2d35",
+          steel: "#33485a",
         },
       },
       fontFamily: {
