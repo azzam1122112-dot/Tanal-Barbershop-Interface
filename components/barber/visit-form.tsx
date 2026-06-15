@@ -24,6 +24,14 @@ type VisitPreview = {
     discountAmount: number;
     label: string;
   }>;
+  availableManagerRewards: Array<{
+    id: string;
+    title: string;
+    description: string | null;
+    discountAmount: number;
+    expiresAt: string | null;
+    label: string;
+  }>;
   availableCampaigns: Array<{
     id: string;
     name: string;
@@ -91,6 +99,7 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
         grossAmount,
         paymentMethod,
         rewardRuleId: selectedDiscount.startsWith("REWARD:") ? selectedDiscount.replace("REWARD:", "") : undefined,
+        managerRewardId: selectedDiscount.startsWith("MANAGER_REWARD:") ? selectedDiscount.replace("MANAGER_REWARD:", "") : undefined,
         campaignId: selectedDiscount.startsWith("CAMPAIGN:") ? selectedDiscount.replace("CAMPAIGN:", "") : undefined,
         idempotencyKey,
       }),
@@ -110,10 +119,13 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
   const selectedReward = selectedDiscount.startsWith("REWARD:")
     ? preview?.availableRewards.find((reward) => reward.id === selectedDiscount.replace("REWARD:", ""))
     : undefined;
+  const selectedManagerReward = selectedDiscount.startsWith("MANAGER_REWARD:")
+    ? preview?.availableManagerRewards.find((reward) => reward.id === selectedDiscount.replace("MANAGER_REWARD:", ""))
+    : undefined;
   const selectedCampaign = selectedDiscount.startsWith("CAMPAIGN:")
     ? preview?.availableCampaigns.find((campaign) => campaign.id === selectedDiscount.replace("CAMPAIGN:", ""))
     : undefined;
-  const displayDiscount = selectedReward?.discountAmount ?? selectedCampaign?.discountAmount ?? 0;
+  const displayDiscount = selectedReward?.discountAmount ?? selectedManagerReward?.discountAmount ?? selectedCampaign?.discountAmount ?? 0;
   const displayNetAmount = preview ? Math.max(0, preview.grossAmount - displayDiscount) : 0;
   const displayExpectedPoints = Math.floor(displayNetAmount);
   const selectedServicesTotal = services
@@ -259,6 +271,15 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
                       onClick={() => setSelectedDiscount(`REWARD:${reward.id}`)}
                     />
                   ))}
+                  {preview.availableManagerRewards.map((reward) => (
+                    <DiscountButton
+                      key={reward.id}
+                      selected={selectedDiscount === `MANAGER_REWARD:${reward.id}`}
+                      title={reward.label}
+                      subtitle={reward.description ?? (reward.expiresAt ? `تنتهي في ${new Date(reward.expiresAt).toLocaleDateString("ar-SA")}` : "مكافأة من الإدارة")}
+                      onClick={() => setSelectedDiscount(`MANAGER_REWARD:${reward.id}`)}
+                    />
+                  ))}
                   {preview.availableCampaigns.map((campaign) => (
                     <DiscountButton
                       key={campaign.id}
@@ -269,7 +290,7 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
                     />
                   ))}
                 </div>
-                {preview.availableRewards.length === 0 && preview.availableCampaigns.length === 0 ? (
+                {preview.availableRewards.length === 0 && preview.availableManagerRewards.length === 0 && preview.availableCampaigns.length === 0 ? (
                   <p className="mt-3 rounded-2xl border border-dashed border-salon-line bg-white px-3 py-2 text-xs font-semibold text-salon-charcoal">لا توجد خصومات متاحة لهذه الزيارة</p>
                 ) : null}
               </div>
@@ -280,6 +301,7 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
                 <SummaryCell label="الخصم" value={`${displayDiscount} ريال`} />
                 <SummaryCell label="المطلوب" value={`${displayNetAmount} ريال`} strong />
                 <SummaryCell label="النقاط المستخدمة" value={`${selectedReward?.pointsRequired ?? 0}`} />
+                <SummaryCell label="مكافأة الإدارة" value={selectedManagerReward ? selectedManagerReward.title : "-"} />
               </dl>
               <p className="mt-3 rounded-2xl bg-salon-mist px-3 py-3 text-sm font-semibold text-salon-charcoal">{preview.services.map((service) => service.name).join("، ")}</p>
             </div>

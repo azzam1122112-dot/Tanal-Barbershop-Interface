@@ -126,6 +126,7 @@ function VisitBadge({ children, tone }: { children: React.ReactNode; tone: "neut
 
 function discountLabel(visit: VisitDashboardRow, discounts: DiscountMaps) {
   if (visit.discountType === "REWARD") return visit.rewardRuleId ? discounts.rewards[visit.rewardRuleId] ?? "مكافأة نقاط" : "مكافأة نقاط";
+  if (visit.discountType === "MANAGER_REWARD") return "مكافأة إدارية";
   if (visit.discountType === "CAMPAIGN") return visit.campaignId ? discounts.campaigns[visit.campaignId] ?? "حملة" : "حملة";
   return "بدون";
 }

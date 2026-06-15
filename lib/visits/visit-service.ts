@@ -3,6 +3,7 @@ import type { PaymentMethod, PrismaClient } from "@prisma/client";
 import { getAvailableCampaigns, getEligibleCampaignOrThrow } from "@/lib/campaigns/campaign-eligibility";
 import { assertOpenCashSession } from "@/lib/cash-sessions/cash-session-service";
 import { calculateVisitTotals } from "@/lib/loyalty/calculations";
+import { getActiveManagerRewards, getRedeemableManagerRewardOrThrow } from "@/lib/manager-rewards/manager-reward-service";
 import { toSafeService } from "@/lib/services/service-summary";
 
 type VisitPrisma = PrismaClient | Prisma.TransactionClient;
@@ -14,6 +15,7 @@ type VisitInput = {
   grossAmount: number;
   paymentMethod: PaymentMethod;
   rewardRuleId?: string;
+  managerRewardId?: string;
   campaignId?: string;
   idempotencyKey?: string;
   auditMeta?: {
@@ -75,6 +77,9 @@ export async function buildVisitPreview(prisma: VisitPrisma, input: VisitInput) 
     customer,
     grossAmount: totals.grossAmount,
   });
+  const managerRewards = await getActiveManagerRewards(prisma, customer.id, {
+    grossAmount: totals.grossAmount,
+  });
 
   return {
     customer: {
@@ -98,6 +103,14 @@ export async function buildVisitPreview(prisma: VisitPrisma, input: VisitInput) 
       pointsRequired: reward.requiredPoints,
       discountAmount: Number(reward.discountAmount),
       label: `خصم ${Number(reward.discountAmount)} ريال مقابل ${reward.requiredPoints} نقطة`,
+    })),
+    availableManagerRewards: managerRewards.map((reward) => ({
+      id: reward.id,
+      title: reward.title,
+      description: reward.description,
+      discountAmount: reward.discountAmount,
+      expiresAt: reward.expiresAt,
+      label: `${reward.title} - خصم ${reward.discountAmount} ريال`,
     })),
     availableCampaigns: campaigns,
   };
@@ -125,8 +138,12 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
     if (!input.idempotencyKey) {
       throw new Error("مفتاح منع التكرار مطلوب");
     }
-    if (input.rewardRuleId && input.campaignId) {
-      throw new Error("لا يمكن جمع مكافأة نقاط مع حملة في نفس الزيارة");
+    const selectedDiscounts = [input.rewardRuleId, input.managerRewardId, input.campaignId].filter(Boolean);
+    if (selectedDiscounts.length > 1) {
+      if (input.rewardRuleId && input.campaignId && !input.managerRewardId) {
+        throw new Error("لا يمكن جمع مكافأة نقاط مع حملة في نفس الزيارة");
+      }
+      throw new Error("لا يمكن جمع أكثر من خصم في نفس الزيارة");
     }
 
     const existingVisit = await tx.visit.findFirst({
@@ -164,6 +181,14 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
     const reward = input.rewardRuleId
       ? await tx.rewardRule.findUnique({ where: { id: input.rewardRuleId } })
       : null;
+    const managerReward = input.managerRewardId
+      ? await getRedeemableManagerRewardOrThrow(tx, {
+          managerRewardId: input.managerRewardId,
+          customerId: input.customerId,
+          grossAmount: input.grossAmount,
+          now,
+        })
+      : null;
     const campaignSelection = input.campaignId
       ? await getEligibleCampaignOrThrow({
           prisma: tx,
@@ -189,13 +214,13 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
     });
     const startingBalance = loyaltyAccount.points;
     const redeemedPoints = reward?.requiredPoints ?? 0;
-    const discountAmount = reward ? Number(reward.discountAmount) : campaignSelection?.discountAmount ?? 0;
+    const discountAmount = reward ? Number(reward.discountAmount) : managerReward ? Number(managerReward.discountAmount) : campaignSelection?.discountAmount ?? 0;
 
     if (reward && startingBalance < reward.requiredPoints) {
       throw new Error("رصيد النقاط غير كافٍ");
     }
 
-    if ((reward || campaignSelection) && discountAmount > input.grossAmount) {
+    if ((reward || managerReward || campaignSelection) && discountAmount > input.grossAmount) {
       throw new Error("قيمة الخصم أكبر من مبلغ الزيارة");
     }
 
@@ -220,8 +245,8 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
         discountAmount: totals.discountAmount,
         netAmount: totals.netAmount,
         paymentMethod: input.paymentMethod,
-        discountType: reward ? "REWARD" : campaignSelection ? "CAMPAIGN" : "NONE",
-        discountSourceId: reward?.id ?? campaignSelection?.campaign.id,
+        discountType: reward ? "REWARD" : managerReward ? "MANAGER_REWARD" : campaignSelection ? "CAMPAIGN" : "NONE",
+        discountSourceId: reward?.id ?? managerReward?.id ?? campaignSelection?.campaign.id,
         cashSessionId: cashSession.id,
         idempotencyKey: input.idempotencyKey,
         pointsEarned: totals.pointsEarned,
@@ -255,6 +280,16 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
           },
         })
       : null;
+
+    if (managerReward) {
+      await tx.managerReward.update({
+        where: { id: managerReward.id },
+        data: {
+          redeemedAt: now,
+          redeemedVisitId: visit.id,
+        },
+      });
+    }
 
     const createdTransactions = [];
     if (reward) {
@@ -325,6 +360,7 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
           paymentMethod: input.paymentMethod,
           serviceIds: input.serviceIds,
           rewardRuleId: reward?.id ?? null,
+          managerRewardId: managerReward?.id ?? null,
           campaignId: campaignSelection?.campaign.id ?? null,
           redeemedPoints,
           pointsEarned: totals.pointsEarned,
@@ -344,6 +380,29 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
           entityId: campaignSelection.campaign.id,
           after: {
             campaignId: campaignSelection.campaign.id,
+            customerId: input.customerId,
+            visitId: visit.id,
+            grossAmount: totals.grossAmount,
+            discountAmount: totals.discountAmount,
+            netAmount: totals.netAmount,
+            pointsEarned: totals.pointsEarned,
+          },
+          ipAddress: input.auditMeta?.ipAddress,
+          userAgent: input.auditMeta?.userAgent,
+        },
+      });
+    }
+
+    if (managerReward) {
+      await tx.auditLog.create({
+        data: {
+          actorType: "BARBER",
+          actorBarberId: input.barberId,
+          action: "manager_reward.redeemed",
+          entityType: "ManagerReward",
+          entityId: managerReward.id,
+          after: {
+            managerRewardId: managerReward.id,
             customerId: input.customerId,
             visitId: visit.id,
             grossAmount: totals.grossAmount,
@@ -416,6 +475,7 @@ function toConfirmedVisitSummary(visit: ConfirmedVisit) {
     cashSessionId: visit.cashSessionId,
     pointsEarned: visit.pointsEarned,
     rewardRuleId: visit.discountType === "REWARD" ? visit.discountSourceId : null,
+    managerRewardId: visit.discountType === "MANAGER_REWARD" ? visit.discountSourceId : null,
     campaignId: visit.discountType === "CAMPAIGN" ? visit.discountSourceId : null,
     campaignRedemptionId: visit.campaignRedemption?.id ?? null,
     redeemedPoints: redeem ? Math.abs(redeem.points) : 0,

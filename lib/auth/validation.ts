@@ -101,6 +101,7 @@ export const visitRequestSchema = z.object({
   grossAmount: z.coerce.number().positive("المبلغ يجب أن يكون أكبر من صفر"),
   paymentMethod: visitPaymentMethodSchema,
   rewardRuleId: z.string().trim().min(1).optional(),
+  managerRewardId: z.string().trim().min(1).optional(),
   campaignId: z.string().trim().min(1).optional(),
 });
 
@@ -122,6 +123,17 @@ export const rewardRuleUpdateSchema = z.object({
   discountAmount: z.coerce.number().positive("قيمة الخصم يجب أن تكون أكبر من صفر").optional(),
   isActive: z.boolean().optional(),
   sortOrder: z.coerce.number().int().optional(),
+});
+
+export const managerRewardCreateSchema = z.object({
+  title: z.string().trim().min(2, "عنوان المكافأة مطلوب").default("مكافأة من الإدارة"),
+  description: z.string().trim().max(500).optional().nullable(),
+  discountAmount: z.coerce.number().positive("قيمة الخصم يجب أن تكون أكبر من صفر"),
+  expiresAt: z.coerce.date().optional().nullable(),
+}).superRefine((data, ctx) => {
+  if (data.expiresAt && data.expiresAt <= new Date()) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["expiresAt"], message: "تاريخ الانتهاء يجب أن يكون في المستقبل" });
+  }
 });
 
 export const campaignDiscountTypeSchema = z.enum(["FIXED_AMOUNT", "PERCENTAGE"], {

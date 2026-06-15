@@ -34,6 +34,7 @@ export function toVisitDashboardRow(visit: VisitWithDetails) {
     discountType: visit.discountType,
     pointsEarned: visit.pointsEarned,
     rewardRuleId: visit.discountType === "REWARD" ? visit.discountSourceId : null,
+    managerRewardId: visit.discountType === "MANAGER_REWARD" ? visit.discountSourceId : null,
     campaignId: visit.discountType === "CAMPAIGN" ? visit.discountSourceId : null,
   };
 }

@@ -36,6 +36,7 @@ let customerId = "";
 let optOutCustomerId = "";
 let inactiveCustomerId = "";
 let rewardCustomerId = "";
+let managerRewardCustomerId = "";
 let visitId = "";
 let templateId = "";
 let campaignId = "";
@@ -65,6 +66,7 @@ describe("whatsapp templates and message logs", () => {
     optOutCustomerId = (await createCustomer("عميل لا يريد واتساب")).customer.id;
     inactiveCustomerId = (await createCustomer("عميل منقطع واتساب")).customer.id;
     rewardCustomerId = (await createCustomer("عميل مكافأة واتساب")).customer.id;
+    managerRewardCustomerId = (await createCustomer("عميل مكافأة إدارية واتساب")).customer.id;
 
     await prisma.customer.update({
       where: { id: optOutCustomerId },
@@ -77,6 +79,15 @@ describe("whatsapp templates and message logs", () => {
     await prisma.loyaltyAccount.update({
       where: { customerId: rewardCustomerId },
       data: { points: 700, lifetimeEarned: 700 },
+    });
+    await prisma.managerReward.create({
+      data: {
+        customerId: managerRewardCustomerId,
+        issuedByUserId: adminUserId,
+        title: "هدية عودة",
+        discountAmount: 30,
+        description: "عميل منقطع",
+      },
     });
 
     const template = await createWhatsAppTemplate(
@@ -183,6 +194,21 @@ describe("whatsapp templates and message logs", () => {
     expect(await prisma.auditLog.count({ where: { action: "whatsapp.message_marked_sent", entityId: generated.messageLogId } })).toBeGreaterThan(0);
   });
 
+  it("renders manager reward variables for reward messages without requiring loyalty points", async () => {
+    const generated = await generateWhatsAppMessage(
+      prisma,
+      {
+        customerId: managerRewardCustomerId,
+        customMessage: "لديك {manager_reward_title} بقيمة {reward_discount} ريال",
+      },
+      adminMeta(),
+    );
+    createdMessageIds.push(generated.messageLogId);
+
+    expect(generated.message).toContain("هدية عودة");
+    expect(generated.message).toContain("30 ريال");
+  });
+
   it("lists inactive customers, reward-ready customers, campaign audience, and message logs", async () => {
     const inactive = await getInactiveWhatsAppAudience(prisma, 30);
     const rewards = await getRewardReadyWhatsAppAudience(prisma);
@@ -191,6 +217,7 @@ describe("whatsapp templates and message logs", () => {
 
     expect(inactive.some((customer) => customer.customerId === inactiveCustomerId)).toBe(true);
     expect(rewards.some((customer) => customer.customerId === rewardCustomerId)).toBe(true);
+    expect(rewards.some((customer) => customer.customerId === managerRewardCustomerId)).toBe(true);
     expect(campaignAudience.some((customer) => customer.customerId === customerId)).toBe(true);
     expect(logs.every((log) => log.customer.id === customerId)).toBe(true);
   });

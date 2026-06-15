@@ -32,6 +32,7 @@ enum DiscountType {
   NONE
   REWARD
   CAMPAIGN
+  MANAGER_REWARD
 }
 
 enum CampaignDiscountType {
@@ -95,6 +96,7 @@ model User {
   cancelledVisits            Visit[]              @relation("VisitCancelledBy")
   openedWhatsAppMessages     WhatsAppMessageLog[] @relation("WhatsAppOpenedBy")
   markedSentWhatsAppMessages WhatsAppMessageLog[] @relation("WhatsAppMarkedSentBy")
+  issuedManagerRewards       ManagerReward[]      @relation("ManagerRewardIssuedBy")
 
   @@index([role, isActive])
 }
@@ -158,6 +160,7 @@ model Customer {
   loyaltyAccount      LoyaltyAccount?
   loyaltyTransactions LoyaltyTransaction[]
   campaignRedemptions CampaignRedemption[]
+  managerRewards      ManagerReward[]
   whatsappMessages    WhatsAppMessageLog[]
 
   @@index([lastVisitAt])
@@ -204,6 +207,7 @@ model Visit {
   services            VisitService[]
   loyaltyTransactions LoyaltyTransaction[]
   campaignRedemption  CampaignRedemption?
+  managerReward        ManagerReward?
   cancelledBy         User?                @relation("VisitCancelledBy", fields: [cancelledByUserId], references: [id])
   cashSessionId       String?
   cashSession         CashSession?         @relation(fields: [cashSessionId], references: [id])
@@ -311,6 +315,28 @@ model CampaignRedemption {
 
   @@index([campaignId, customerId])
   @@index([customerId, createdAt])
+}
+
+model ManagerReward {
+  id              String    @id @default(cuid())
+  customerId      String
+  issuedByUserId  String
+  redeemedVisitId String?   @unique
+  title           String
+  description     String?
+  discountAmount  Decimal   @db.Decimal(10, 2)
+  expiresAt       DateTime?
+  redeemedAt      DateTime?
+  revokedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  customer        Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  issuedBy        User      @relation("ManagerRewardIssuedBy", fields: [issuedByUserId], references: [id])
+  redeemedVisit   Visit?    @relation(fields: [redeemedVisitId], references: [id])
+
+  @@index([customerId, redeemedAt, revokedAt, expiresAt])
+  @@index([issuedByUserId, createdAt])
+  @@index([redeemedVisitId])
 }
 
 model DailyClose {

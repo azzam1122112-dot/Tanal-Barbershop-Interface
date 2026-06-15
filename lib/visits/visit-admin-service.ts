@@ -20,6 +20,7 @@ type VisitForAdmin = Prisma.VisitGetPayload<{
     services: true;
     loyaltyTransactions: true;
     campaignRedemption: { include: { campaign: true } };
+    managerReward: true;
     cancelledBy: true;
     cashSession: true;
   };
@@ -68,6 +69,15 @@ export async function cancelVisit(prisma: PrismaClient, visitId: string, meta: A
         },
       });
     }
+    if (visit.discountType === "MANAGER_REWARD" && visit.managerReward) {
+      await tx.managerReward.update({
+        where: { id: visit.managerReward.id },
+        data: {
+          redeemedAt: null,
+          redeemedVisitId: null,
+        },
+      });
+    }
 
     await tx.loyaltyAccount.update({
       where: { customerId: visit.customerId },
@@ -109,6 +119,7 @@ export async function cancelVisit(prisma: PrismaClient, visitId: string, meta: A
         reason: meta.reason,
         pointsReversed: pointsEarnedToReverse,
         redeemedPointsRestored: redeemedPointsToRestore,
+        managerRewardRestored: visit.discountType === "MANAGER_REWARD",
         postCloseAdjustment,
       },
       postCloseAdjustment,
@@ -254,6 +265,14 @@ async function calculateUpdatedDiscount(tx: AdminVisitPrisma, visit: VisitForAdm
     }
     return discountAmount;
   }
+  if (visit.discountType === "MANAGER_REWARD") {
+    const managerReward = visit.managerReward ?? (visit.discountSourceId ? await tx.managerReward.findUnique({ where: { id: visit.discountSourceId } }) : null);
+    const discountAmount = managerReward ? Number(managerReward.discountAmount) : Number(visit.discountAmount);
+    if (discountAmount > grossAmount) {
+      throw new Error("قيمة مكافأة الإدارة أكبر من مبلغ الزيارة الجديد");
+    }
+    return discountAmount;
+  }
   const campaign = visit.campaignRedemption?.campaign ?? (visit.discountSourceId ? await tx.campaign.findUnique({ where: { id: visit.discountSourceId } }) : null);
   if (!campaign) {
     const discountAmount = Number(visit.discountAmount);
@@ -371,6 +390,7 @@ const adminVisitInclude = {
   services: true,
   loyaltyTransactions: true,
   campaignRedemption: { include: { campaign: true } },
+  managerReward: true,
   cancelledBy: true,
   cashSession: true,
 } satisfies Prisma.VisitInclude;

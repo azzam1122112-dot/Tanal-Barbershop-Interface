@@ -2,6 +2,7 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
+import { ManagerRewardButton } from "@/components/dashboard/manager-reward-button";
 
 type TemplateType = "POST_VISIT" | "REWARD_READY" | "CAMPAIGN" | "INACTIVE_CUSTOMER" | "CUSTOM";
 type MessageStatus = "DRAFTED" | "OPENED" | "MARKED_SENT" | "SKIPPED" | "FAILED";
@@ -43,6 +44,9 @@ type AudienceCustomer = {
   isWhatsappAllowed: boolean;
   campaignName?: string;
   campaignDiscount?: string;
+  managerRewardTitle?: string;
+  managerRewardDiscount?: number;
+  managerRewardExpiresAt?: string | null;
 };
 
 type MessageLog = {
@@ -221,12 +225,12 @@ export function WhatsAppDashboard({
           <input name="name" required placeholder="اسم القالب" className="dashboard-field" />
           <select name="type" defaultValue="CUSTOM" className="dashboard-field">
             <option value="POST_VISIT">بعد الزيارة</option>
-            <option value="REWARD_READY">مكافأة جاهزة</option>
+            <option value="REWARD_READY">مكافأة نقاط جاهزة</option>
             <option value="CAMPAIGN">حملة</option>
             <option value="INACTIVE_CUSTOMER">عميل منقطع</option>
             <option value="CUSTOM">مخصص</option>
           </select>
-          <textarea name="body" required rows={7} placeholder="نص القالب مع المتغيرات مثل {name} و {points}" className="dashboard-field" />
+          <textarea name="body" required rows={7} placeholder="متغيرات: {name} {points} {reward_discount} {manager_reward_title} {manager_reward_discount}" className="dashboard-field" />
           <button className="dashboard-button w-full">حفظ قالب</button>
         </form>
 
@@ -373,6 +377,11 @@ function AudienceList({ customers, onToggle }: { customers: AudienceCustomer[]; 
           <p className="font-bold">{customer.name}</p>
           <p className="text-salon-charcoal">{customer.phone}</p>
           <p className="text-salon-charcoal">النقاط: {customer.points} {customer.daysSinceLastVisit !== null ? `- منقطع ${customer.daysSinceLastVisit} يوم` : ""}</p>
+          {customer.managerRewardTitle ? (
+            <p className="text-salon-charcoal">
+              مكافأة الإدارة: {customer.managerRewardTitle} - {customer.managerRewardDiscount} ريال
+            </p>
+          ) : null}
           {customer.campaignName ? <p className="text-salon-charcoal">{customer.campaignName} - {customer.campaignDiscount}</p> : null}
           <button
             type="button"
@@ -381,6 +390,9 @@ function AudienceList({ customers, onToggle }: { customers: AudienceCustomer[]; 
           >
             {customer.isWhatsappAllowed ? "واتساب مسموح" : "واتساب موقوف"}
           </button>
+          <div className="mt-2">
+            <ManagerRewardButton customerId={customer.customerId} customerName={customer.name} />
+          </div>
         </div>
       ))}
       {customers.length === 0 ? <p className="py-6 text-center text-sm text-salon-charcoal">لا توجد نتائج</p> : null}
@@ -391,7 +403,7 @@ function AudienceList({ customers, onToggle }: { customers: AudienceCustomer[]; 
 function templateTypeLabel(type: TemplateType) {
   const labels: Record<TemplateType, string> = {
     POST_VISIT: "بعد الزيارة",
-    REWARD_READY: "مكافأة جاهزة",
+    REWARD_READY: "مكافأة نقاط جاهزة",
     CAMPAIGN: "حملة",
     INACTIVE_CUSTOMER: "عميل منقطع",
     CUSTOM: "مخصص",

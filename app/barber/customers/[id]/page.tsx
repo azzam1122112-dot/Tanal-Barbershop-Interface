@@ -13,11 +13,20 @@ export default async function BarberCustomerPage({ params }: { params: Promise<{
   if (!canAccessBarberApp(session)) redirect("/dashboard");
 
   const { id } = await params;
+  const now = new Date();
   const [customer, services, rewardRules] = await Promise.all([
     prisma.customer.findUnique({
       where: { id },
       include: {
         loyaltyAccount: true,
+        managerRewards: {
+          where: {
+            redeemedAt: null,
+            revokedAt: null,
+            OR: [{ expiresAt: null }, { expiresAt: { gte: now } }],
+          },
+          orderBy: [{ expiresAt: "asc" }, { createdAt: "asc" }],
+        },
         visits: {
           orderBy: { visitedAt: "desc" },
           take: 5,
@@ -97,6 +106,19 @@ export default async function BarberCustomerPage({ params }: { params: Promise<{
               </div>
             ))}
             {availableRewards.length === 0 ? <p className="rounded-2xl bg-salon-mist py-4 text-center text-sm font-semibold text-salon-charcoal">لا توجد مكافآت متاحة حاليًا</p> : null}
+          </div>
+        </SectionCard>
+
+        <SectionCard title="مكافآت الإدارة">
+          <div className="mt-3 grid gap-2">
+            {customer.managerRewards.map((reward) => (
+              <div key={reward.id} className="rounded-2xl border border-salon-gold/30 bg-salon-gold/10 px-3 py-3 text-sm font-bold">
+                <p>{reward.title} - خصم {Number(reward.discountAmount)} ريال</p>
+                {reward.description ? <p className="mt-1 text-xs font-semibold text-salon-charcoal">{reward.description}</p> : null}
+                {reward.expiresAt ? <p className="mt-1 text-xs font-semibold text-salon-charcoal">تنتهي في {reward.expiresAt.toLocaleDateString("ar-SA")}</p> : null}
+              </div>
+            ))}
+            {customer.managerRewards.length === 0 ? <p className="rounded-2xl bg-salon-mist py-4 text-center text-sm font-semibold text-salon-charcoal">لا توجد مكافآت إدارية متاحة</p> : null}
           </div>
         </SectionCard>
 

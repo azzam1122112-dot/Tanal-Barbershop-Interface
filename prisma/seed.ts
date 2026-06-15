@@ -123,6 +123,7 @@ async function main() {
       type: "REWARD_READY" as const,
       body: `أهلًا {name} 👋
 لديك مكافأة جاهزة في {salon_name}.
+{manager_reward_title}
 خصم {reward_discount} ريال متاح في زيارتك القادمة.
 رصيدك الحالي: {points} نقطة`,
     },

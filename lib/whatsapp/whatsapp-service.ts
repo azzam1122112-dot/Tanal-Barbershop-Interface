@@ -2,6 +2,7 @@ import type {
   Campaign,
   Customer,
   LoyaltyAccount,
+  ManagerReward,
   Prisma,
   PrismaClient,
   UserRole,
@@ -11,6 +12,7 @@ import type {
 } from "@prisma/client";
 import { normalizeSaudiPhone } from "@/lib/phone/saudi-phone";
 import { writeAuditLog } from "@/lib/audit/audit-log";
+import { getActiveManagerRewards } from "@/lib/manager-rewards/manager-reward-service";
 
 type WhatsAppPrisma = PrismaClient | Prisma.TransactionClient;
 
@@ -35,6 +37,9 @@ const allowedVariables = new Set([
   "phone",
   "points",
   "reward_discount",
+  "manager_reward_title",
+  "manager_reward_discount",
+  "manager_reward_expires",
   "last_visit",
   "days_since_last_visit",
   "campaign_name",
@@ -139,7 +144,7 @@ export async function generateWhatsAppMessage(prisma: PrismaClient, input: Gener
     throw new Error("قالب واتساب غير متاح");
   }
 
-  const [settings, visit, campaign, reward] = await Promise.all([
+  const [settings, visit, campaign, reward, managerRewards] = await Promise.all([
     prisma.systemSettings.findUnique({ where: { singletonKey: "default" } }),
     input.visitId
       ? prisma.visit.findUnique({
@@ -149,7 +154,9 @@ export async function generateWhatsAppMessage(prisma: PrismaClient, input: Gener
       : null,
     input.campaignId ? prisma.campaign.findUnique({ where: { id: input.campaignId } }) : null,
     getBestAvailableReward(prisma, customer.loyaltyAccount?.points ?? 0),
+    getActiveManagerRewards(prisma, customer.id),
   ]);
+  const managerReward = managerRewards[0] ?? null;
 
   if (input.visitId && (!visit || visit.customerId !== customer.id)) {
     throw new Error("الزيارة غير موجودة لهذا العميل");
@@ -164,7 +171,8 @@ export async function generateWhatsAppMessage(prisma: PrismaClient, input: Gener
     salonName: settings?.salonName ?? "صالون تانال",
     visit,
     campaign,
-    rewardDiscount: reward ? Number(reward.discountAmount) : "",
+    managerReward,
+    rewardDiscount: managerReward ? managerReward.discountAmount : reward ? Number(reward.discountAmount) : "",
   });
   const body = input.customMessage?.trim() || template?.body || "";
   const message = renderWhatsAppTemplate(body, variables).trim();
@@ -282,20 +290,45 @@ export async function getInactiveWhatsAppAudience(prisma: WhatsAppPrisma, days =
 }
 
 export async function getRewardReadyWhatsAppAudience(prisma: WhatsAppPrisma) {
+  const now = new Date();
   const minRule = await prisma.rewardRule.findFirst({
     where: { isActive: true },
     orderBy: { requiredPoints: "asc" },
   });
-  if (!minRule) return [];
+  const rewardFilters: Prisma.CustomerWhereInput[] = [
+    {
+      managerRewards: {
+        some: {
+          redeemedAt: null,
+          revokedAt: null,
+          OR: [{ expiresAt: null }, { expiresAt: { gte: now } }],
+        },
+      },
+    },
+  ];
+  if (minRule) {
+    rewardFilters.push({ loyaltyAccount: { points: { gte: minRule.requiredPoints } } });
+  }
   const customers = await prisma.customer.findMany({
     where: {
-      loyaltyAccount: { points: { gte: minRule.requiredPoints } },
+      OR: rewardFilters,
     },
-    include: { loyaltyAccount: true },
+    include: {
+      loyaltyAccount: true,
+      managerRewards: {
+        where: {
+          redeemedAt: null,
+          revokedAt: null,
+          OR: [{ expiresAt: null }, { expiresAt: { gte: now } }],
+        },
+        orderBy: [{ expiresAt: "asc" }, { createdAt: "asc" }],
+        take: 1,
+      },
+    },
     orderBy: { updatedAt: "desc" },
     take: 100,
   });
-  return customers.map((customer) => toAudienceCustomer(customer, new Date()));
+  return customers.map((customer) => toAudienceCustomer(customer, now));
 }
 
 export async function getCampaignWhatsAppAudience(prisma: WhatsAppPrisma, campaignId: string) {
@@ -403,6 +436,7 @@ function buildVariables({
   salonName,
   visit,
   campaign,
+  managerReward,
   rewardDiscount,
 }: {
   customer: Customer & { visits?: Array<{ visitedAt: Date }>; loyaltyAccount?: LoyaltyAccount | null };
@@ -410,6 +444,7 @@ function buildVariables({
   salonName: string;
   visit: { netAmount: Prisma.Decimal; pointsEarned: number } | null;
   campaign: Campaign | null;
+  managerReward: { title: string; discountAmount: number; expiresAt: string | null } | null;
   rewardDiscount: number | "";
 }) {
   const lastVisit = customer.lastVisitAt ?? customer.visits?.[0]?.visitedAt ?? null;
@@ -418,6 +453,9 @@ function buildVariables({
     phone: customer.phone,
     points,
     reward_discount: rewardDiscount,
+    manager_reward_title: managerReward?.title ?? "",
+    manager_reward_discount: managerReward?.discountAmount ?? "",
+    manager_reward_expires: managerReward?.expiresAt ? managerReward.expiresAt.slice(0, 10) : "",
     last_visit: lastVisit ? formatDate(lastVisit) : "",
     days_since_last_visit: lastVisit ? Math.max(0, Math.floor((Date.now() - lastVisit.getTime()) / (24 * 60 * 60 * 1000))) : "",
     campaign_name: campaign?.name ?? "",
@@ -454,7 +492,8 @@ async function isCampaignCustomerEligible(
   return redemptionCount < campaign.maxUsesPerCustomer;
 }
 
-function toAudienceCustomer(customer: Customer & { loyaltyAccount?: LoyaltyAccount | null }, now: Date) {
+function toAudienceCustomer(customer: Customer & { loyaltyAccount?: LoyaltyAccount | null; managerRewards?: ManagerReward[] }, now: Date) {
+  const managerReward = customer.managerRewards?.[0];
   return {
     customerId: customer.id,
     name: customer.name,
@@ -463,6 +502,9 @@ function toAudienceCustomer(customer: Customer & { loyaltyAccount?: LoyaltyAccou
     daysSinceLastVisit: customer.lastVisitAt ? Math.floor((now.getTime() - customer.lastVisitAt.getTime()) / (24 * 60 * 60 * 1000)) : null,
     points: customer.loyaltyAccount?.points ?? 0,
     isWhatsappAllowed: customer.whatsappOptIn,
+    managerRewardTitle: managerReward?.title,
+    managerRewardDiscount: managerReward ? Number(managerReward.discountAmount) : undefined,
+    managerRewardExpiresAt: managerReward?.expiresAt?.toISOString() ?? null,
   };
 }
 
