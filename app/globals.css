@@ -346,7 +346,17 @@ select {
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    /* إيقاف تكرار الحركات اللانهائية حتى لا تومض/تهتز */
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  /* أوقف الحركات المستمرة تمامًا وأبقِ الحالة الساكنة */
+  .animate-glow,
+  .animate-float,
+  .bg-royal-gold,
+  .text-gold-sheen {
+    animation: none !important;
   }
   /* أبقِ المحتوى مرئيًا عند تعطيل الحركة */
   .reveal-init {
