@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { BusinessError } from "@/lib/errors";
 import { hashAdminPassword } from "@/lib/auth/password";
+import { getDefaultSignupPlan } from "@/lib/plans/subscription-service";
 
 const TRIAL_DAYS = 14;
 
@@ -36,7 +37,11 @@ export async function createOrganizationWithOwner(
     throw new BusinessError("هذا المعرّف مستخدم مسبقًا، اختر معرّفًا آخر");
   }
 
-  const plan = await prisma.plan.findFirst({ where: { isActive: true }, orderBy: { sortOrder: "asc" } });
+  const plan = await getDefaultSignupPlan(prisma);
+  if (!plan) {
+    throw new BusinessError("لا توجد باقة مجانية فعّالة حاليًا. فعّل باقة مجانية من لوحة المنصة أولًا.");
+  }
+
   const passwordHash = await hashAdminPassword(input.password);
   const salonName = input.salonName?.trim() || "الصالون الرئيسي";
 
@@ -46,7 +51,7 @@ export async function createOrganizationWithOwner(
         name: input.organizationName,
         slug: input.slug,
         status: "ACTIVE",
-        planId: plan?.id ?? null,
+        planId: plan.id,
         subscriptionStatus: "TRIALING",
         trialEndsAt: new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000),
       },

@@ -14,6 +14,7 @@ export type IconName =
   | "whatsapp"
   | "settings"
   | "staff"
+  | "billing"
   | "logout"
   | "search"
   | "scissors"
@@ -84,6 +85,12 @@ const PATHS: Record<IconName, ReactElement> = {
   ),
   staff: (
     <path d="M12 3 5 6v5c0 4.2 2.9 7.7 7 9 4.1-1.3 7-4.8 7-9V6l-7-3Zm-2.5 9 1.8 1.8L15 9.6" />
+  ),
+  billing: (
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="M3 9h18M7 15h4M15 15h2" />
+    </>
   ),
   logout: (
     <path d="M15 4h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-2M10 8l-4 4 4 4M6 12h11" />

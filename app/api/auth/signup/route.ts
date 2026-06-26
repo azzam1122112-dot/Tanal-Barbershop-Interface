@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     });
 
     logger.info("organization.created", { organizationId: organization.id, slug: organization.slug });
-    const response = NextResponse.json({ redirectTo: "/dashboard", slug: organization.slug }, { status: 201 });
+    const response = NextResponse.json({ redirectTo: "/dashboard/subscription", slug: organization.slug }, { status: 201 });
     setSessionCookie(response, token);
     return response;
   } catch (error) {

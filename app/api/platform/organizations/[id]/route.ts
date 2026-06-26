@@ -10,6 +10,9 @@ const schema = z.object({
   status: z.enum(["ACTIVE", "SUSPENDED"]).optional(),
   planId: z.string().min(1).nullable().optional(),
   subscriptionStatus: z.enum(["TRIALING", "ACTIVE", "PAST_DUE", "CANCELED"]).optional(),
+  trialEndsAt: z.string().datetime().nullable().optional(),
+  currentPeriodEnd: z.string().datetime().nullable().optional(),
+  extendTrialDays: z.coerce.number().int().positive().max(365).optional(),
 });
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -33,12 +36,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       action: "platform.organization_updated",
       entityType: "Organization",
       entityId: org.id,
-      after: { status: org.status, planId: org.planId, subscriptionStatus: org.subscriptionStatus, by: session.admin.id },
+      after: { status: org.status, planId: org.planId, subscriptionStatus: org.subscriptionStatus, trialEndsAt: org.trialEndsAt, by: session.admin.id },
       ...(await getRequestMeta()),
     });
-    return NextResponse.json({
-      organization: { id: org.id, status: org.status, planId: org.planId, subscriptionStatus: org.subscriptionStatus },
-    });
+    return NextResponse.json({ organization: org });
   } catch (error) {
     return toErrorResponse(error, "تعذر تحديث المؤسسة");
   }

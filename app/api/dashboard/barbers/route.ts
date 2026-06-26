@@ -6,6 +6,8 @@ import { createBarberSchema } from "@/lib/auth/validation";
 import { requireDashboardApi, getRequestMeta, parseJsonBody } from "@/lib/auth/http";
 import { toSafeBarber } from "@/lib/auth/sanitize";
 import { writeAuditLog } from "@/lib/audit/audit-log";
+import { BusinessError } from "@/lib/errors";
+import { toErrorResponse } from "@/lib/http/error-response";
 
 export async function GET() {
   const auth = await requireDashboardApi();
@@ -35,6 +37,19 @@ export async function POST(request: Request) {
   }
 
   try {
+    const organization = await prisma.organization.findUnique({
+      where: { id: session.organizationId },
+      include: { plan: true, _count: { select: { barbers: true } } },
+    });
+    if (!organization) {
+      throw new BusinessError("المؤسسة غير موجودة");
+    }
+
+    const maxBarbers = organization.plan?.maxBarbers ?? null;
+    if (maxBarbers !== null && organization._count.barbers >= maxBarbers) {
+      throw new BusinessError(`باقتك تسمح بـ ${maxBarbers} حلاق. رقّ باقتك لإضافة حلاقين أكثر.`);
+    }
+
     const barber = await prisma.barber.create({
       data: {
         organizationId: session.organizationId,
@@ -65,6 +80,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "رقم الجوال مستخدم مسبقًا" }, { status: 409 });
     }
 
-    throw error;
+    return toErrorResponse(error, "تعذر إنشاء الحلاق");
   }
 }

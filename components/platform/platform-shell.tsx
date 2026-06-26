@@ -5,8 +5,10 @@ import { LogoutButton } from "@/components/logout-button";
 import { getRequestSession } from "@/lib/auth/http";
 
 const navItems = [
-  { href: "/platform", key: "orgs", label: "المؤسسات" },
+  { href: "/platform", key: "overview", label: "نظرة عامة" },
+  { href: "/platform/organizations", key: "orgs", label: "المؤسسات" },
   { href: "/platform/plans", key: "plans", label: "الباقات" },
+  { href: "/platform/admins", key: "admins", label: "المدراء" },
 ] as const;
 
 export async function PlatformShell({
@@ -15,7 +17,7 @@ export async function PlatformShell({
   description,
   children,
 }: {
-  active: "orgs" | "plans";
+  active: "overview" | "orgs" | "plans" | "admins";
   title: string;
   description?: string;
   children: React.ReactNode;

@@ -10,6 +10,7 @@ const updateSchema = z.object({
   priceMonthly: z.coerce.number().nonnegative().optional(),
   maxSalons: z.coerce.number().int().positive().optional(),
   maxBarbers: z.coerce.number().int().positive().nullable().optional(),
+  maxCustomers: z.coerce.number().int().positive().nullable().optional(),
   isActive: z.boolean().optional(),
   sortOrder: z.coerce.number().int().optional(),
 });

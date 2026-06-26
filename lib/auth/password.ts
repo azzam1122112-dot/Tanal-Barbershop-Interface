@@ -10,5 +10,6 @@ export async function hashAdminPassword(password: string) {
 }
 
 export async function verifyAdminPassword(password: string, hash: string) {
-  return bcrypt.compare(adminPasswordSchema.parse(password), hash);
+  // التحقق لا يفرض قواعد التعقيد: كلمة مرور خاطئة أو قصيرة تعني عدم تطابق فقط، لا خطأ نظام.
+  return bcrypt.compare(password, hash);
 }

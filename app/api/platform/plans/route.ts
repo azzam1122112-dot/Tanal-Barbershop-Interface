@@ -11,6 +11,7 @@ const createSchema = z.object({
   priceMonthly: z.coerce.number().nonnegative().default(0),
   maxSalons: z.coerce.number().int().positive("عدد الصالونات يجب أن يكون أكبر من صفر"),
   maxBarbers: z.coerce.number().int().positive().nullable().optional(),
+  maxCustomers: z.coerce.number().int().positive().nullable().optional(),
   sortOrder: z.coerce.number().int().default(0),
 });
 
@@ -31,7 +32,23 @@ export async function POST(request: Request) {
 
   try {
     const plan = await createPlan(prisma, parsed.data);
-    return NextResponse.json({ plan: { id: plan.id, name: plan.name, slug: plan.slug } }, { status: 201 });
+    return NextResponse.json(
+      {
+        plan: {
+          id: plan.id,
+          name: plan.name,
+          slug: plan.slug,
+          priceMonthly: Number(plan.priceMonthly),
+          maxSalons: plan.maxSalons,
+          maxBarbers: plan.maxBarbers,
+          maxCustomers: plan.maxCustomers,
+          isActive: plan.isActive,
+          sortOrder: plan.sortOrder,
+          organizationsCount: 0,
+        },
+      },
+      { status: 201 },
+    );
   } catch (error) {
     return toErrorResponse(error, "تعذر إنشاء الباقة");
   }

@@ -40,6 +40,7 @@ const navGroups: NavGroup[] = [
     ownerOnly: true,
     items: [
       { href: "/dashboard/salons", label: "الفروع", description: "صالونات المؤسسة", icon: "home" },
+      { href: "/dashboard/subscription", label: "الباقة", description: "الحدود والترقية", icon: "billing" },
     ],
   },
   {
