@@ -108,6 +108,8 @@ describe("daily close and operation alerts", () => {
     createdCampaignIds.push(campaignId);
 
     const cashVisit = await confirmVisit(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
       customerId: cashCustomer.customer.id,
       barberId,
       serviceIds: [serviceId],
@@ -116,6 +118,8 @@ describe("daily close and operation alerts", () => {
       idempotencyKey: `daily-cash-${Date.now()}`,
     });
     const cardVisit = await confirmVisit(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
       customerId: cardCustomer.customer.id,
       barberId,
       serviceIds: [serviceId],
@@ -124,6 +128,8 @@ describe("daily close and operation alerts", () => {
       idempotencyKey: `daily-card-${Date.now()}`,
     });
     const campaignVisit = await confirmVisit(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
       customerId: campaignCustomer.customer.id,
       barberId,
       serviceIds: [serviceId],
@@ -133,6 +139,8 @@ describe("daily close and operation alerts", () => {
       idempotencyKey: `daily-campaign-${Date.now()}`,
     });
     const rewardVisit = await confirmVisit(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
       customerId: rewardCustomerId,
       barberId,
       serviceIds: [serviceId],
@@ -142,6 +150,8 @@ describe("daily close and operation alerts", () => {
       idempotencyKey: `daily-reward-${Date.now()}`,
     });
     const openCashVisit = await confirmVisit(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
       customerId: openCashCustomer.customer.id,
       barberId: openBarberId,
       serviceIds: [serviceId],
@@ -150,6 +160,8 @@ describe("daily close and operation alerts", () => {
       idempotencyKey: `daily-open-cash-${Date.now()}`,
     });
     const highDiscountVisit = await confirmVisit(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
       customerId: highDiscountCustomer.customer.id,
       barberId: highDiscountBarberId,
       serviceIds: [serviceId],
@@ -233,6 +245,8 @@ describe("daily close and operation alerts", () => {
 
   it("daily close remains a snapshot and does not block visits while a cash session is open", async () => {
     const visit = await confirmVisit(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
       customerId: closedCustomerId,
       barberId,
       serviceIds: [serviceId],
@@ -259,6 +273,8 @@ describe("daily close and operation alerts", () => {
         type: "barber",
         id: "daily-close-barber-session",
         role: "BARBER",
+        organizationId: "org_default",
+        salonId: "salon_default",
         barber: { id: barberId, name: "حلاق", phone: "966500000099", role: "BARBER" },
       }),
     ).toBe(false);
@@ -267,6 +283,8 @@ describe("daily close and operation alerts", () => {
         type: "dashboard",
         id: "daily-close-admin-session",
         role: "ADMIN",
+        organizationId: "org_default",
+        salonId: null,
         user: { id: adminUserId, name: "مدير", email: "admin@tanal.local", role: "ADMIN" },
       }),
     ).toBe(true);
@@ -276,6 +294,7 @@ describe("daily close and operation alerts", () => {
 async function createCustomer(name: string) {
   const result = await createCustomerWithLoyalty({
     prisma,
+    organizationId: "org_default",
     name,
     phone: `9665${Math.floor(10000000 + Math.random() * 89999999)}`,
     createdByBarberId: barberId,

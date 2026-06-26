@@ -4,7 +4,9 @@ import { writeAuditLog } from "@/lib/audit/audit-log";
 
 type SettingsMeta = {
   actorUserId: string;
-  actorType: Extract<UserRole, "ADMIN" | "SUPERVISOR">;
+  actorType: Extract<UserRole, "OWNER" | "ADMIN" | "SUPERVISOR">;
+  salonId?: string | null;
+  organizationId?: string | null;
   ipAddress?: string | null;
   userAgent?: string | null;
 };
@@ -28,10 +30,14 @@ export async function updateSystemSettings(
   data: Partial<{ salonName: string; currency: string; pointsPerCurrencyUnit: number; whatsappEnabled: boolean }>,
   meta: SettingsMeta,
 ) {
-  const before = await prisma.systemSettings.findUnique({ where: { singletonKey: "default" } });
+  const before = meta.salonId
+    ? await prisma.systemSettings.findFirst({ where: { salonId: meta.salonId } })
+    : meta.organizationId
+      ? await prisma.systemSettings.findFirst({ where: { organizationId: meta.organizationId } })
+      : await prisma.systemSettings.findFirst({});
   if (!before) throw new BusinessError("إعدادات النظام غير موجودة");
   const settings = await prisma.systemSettings.update({
-    where: { singletonKey: "default" },
+    where: { id: before.id },
     data,
   });
   await writeAuditLog({

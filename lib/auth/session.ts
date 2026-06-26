@@ -7,13 +7,17 @@ export type AuthSession =
   | {
       type: "dashboard";
       id: string;
-      role: "ADMIN" | "SUPERVISOR";
+      role: "OWNER" | "ADMIN" | "SUPERVISOR";
+      organizationId: string;
+      salonId: string | null;
       user: ReturnType<typeof toSafeAdminUser>;
     }
   | {
       type: "barber";
       id: string;
       role: "BARBER";
+      organizationId: string;
+      salonId: string;
       barber: ReturnType<typeof toSafeBarber>;
     };
 
@@ -25,11 +29,15 @@ export function hashSessionToken(token: string) {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
+const USER_ACTOR_TYPES: AuditActorType[] = ["OWNER", "ADMIN", "SUPERVISOR"];
+
 export async function createStoredSession({
   prisma,
   actorType,
   actorId,
   role,
+  organizationId,
+  activeSalonId,
   userAgent,
   ipAddress,
 }: {
@@ -37,6 +45,8 @@ export async function createStoredSession({
   actorType: AuditActorType;
   actorId: string;
   role: UserRole;
+  organizationId?: string | null;
+  activeSalonId?: string | null;
   userAgent?: string | null;
   ipAddress?: string | null;
 }) {
@@ -47,7 +57,9 @@ export async function createStoredSession({
     data: {
       tokenHash,
       actorType,
-      userId: actorType === "ADMIN" || actorType === "SUPERVISOR" ? actorId : null,
+      organizationId: organizationId ?? null,
+      activeSalonId: activeSalonId ?? null,
+      userId: USER_ACTOR_TYPES.includes(actorType) ? actorId : null,
       barberId: actorType === "BARBER" ? actorId : null,
       role,
       expiresAt: getSessionExpiresAt(),
@@ -82,20 +94,33 @@ export async function getAuthSession(prisma: PrismaClient, token?: string | null
     data: { lastUsedAt: new Date() },
   });
 
-  if (session.user && session.user.isActive && (session.role === "ADMIN" || session.role === "SUPERVISOR")) {
+  if (
+    session.user &&
+    session.user.isActive &&
+    (session.role === "OWNER" || session.role === "ADMIN" || session.role === "SUPERVISOR")
+  ) {
+    const organizationId = session.organizationId ?? session.user.organizationId;
+    if (!organizationId) return null;
     return {
       type: "dashboard",
       id: session.id,
       role: session.role,
+      organizationId,
+      salonId: session.activeSalonId ?? null,
       user: toSafeAdminUser(session.user),
     } satisfies AuthSession;
   }
 
   if (session.barber && session.barber.isActive && session.role === "BARBER") {
+    const organizationId = session.organizationId ?? session.barber.organizationId;
+    const salonId = session.activeSalonId ?? session.barber.salonId;
+    if (!organizationId || !salonId) return null;
     return {
       type: "barber",
       id: session.id,
       role: "BARBER",
+      organizationId,
+      salonId,
       barber: toSafeBarber(session.barber),
     } satisfies AuthSession;
   }

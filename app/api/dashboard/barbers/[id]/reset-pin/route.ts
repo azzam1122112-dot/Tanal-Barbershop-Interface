@@ -20,7 +20,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     return NextResponse.json({ message: "رمز الدخول يجب أن يكون 4 أو 6 أرقام" }, { status: 400 });
   }
 
-  const before = await prisma.barber.findUnique({ where: { id } });
+  const before = await prisma.barber.findFirst({ where: { id, organizationId: session.organizationId } });
   if (!before) {
     return NextResponse.json({ message: "الحلاق غير موجود" }, { status: 404 });
   }

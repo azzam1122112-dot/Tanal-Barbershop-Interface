@@ -3,6 +3,7 @@ import type { PaymentMethod, Prisma, PrismaClient } from "@prisma/client";
 type ReportPrisma = PrismaClient | Prisma.TransactionClient;
 
 export type ReportFilters = {
+  organizationId?: string | null;
   from?: Date | string | null;
   to?: Date | string | null;
   barberId?: string | null;
@@ -53,6 +54,7 @@ export function normalizeReportFilters(filters: ReportFilters = {}) {
   const to = filters.to ? new Date(filters.to) : fallback.to;
 
   return {
+    organizationId: filters.organizationId || undefined,
     from,
     to,
     barberId: filters.barberId || undefined,
@@ -60,9 +62,9 @@ export function normalizeReportFilters(filters: ReportFilters = {}) {
   };
 }
 
-export async function getDashboardSummary(prisma: ReportPrisma, now = new Date()) {
+export async function getDashboardSummary(prisma: ReportPrisma, organizationId?: string, now = new Date()) {
   const range = getTodayRange(now);
-  const normalized = normalizeReportFilters(range);
+  const normalized = normalizeReportFilters({ ...range, organizationId });
   const visits = await getVisitsForReport(prisma, normalized);
   const revenue = buildRevenueSummary(visits, range);
   const barberRows = buildBarberPerformance(visits, range);
@@ -97,7 +99,7 @@ export async function getCustomerReport(prisma: ReportPrisma, filters: ReportFil
   const normalized = normalizeReportFilters(filters);
   const visits = await getVisitsForReport(prisma, normalized);
   const topCustomers = buildTopCustomers(visits);
-  const inactiveCustomers = await buildInactiveCustomers(prisma);
+  const inactiveCustomers = await buildInactiveCustomers(prisma, normalized.organizationId);
   return { topCustomers, inactiveCustomers };
 }
 
@@ -112,6 +114,7 @@ async function getVisitsForReport(prisma: ReportPrisma, filters: ReturnType<type
     where: {
       status: "COMPLETED",
       visitedAt: { gte: filters.from, lt: filters.to },
+      ...(filters.organizationId ? { organizationId: filters.organizationId } : {}),
       ...(filters.barberId ? { barberId: filters.barberId } : {}),
       ...(filters.paymentMethod ? { paymentMethod: filters.paymentMethod } : {}),
     },
@@ -239,12 +242,13 @@ function buildTopCustomers(visits: VisitForReport[]) {
     .slice(0, 20);
 }
 
-async function buildInactiveCustomers(prisma: ReportPrisma) {
+async function buildInactiveCustomers(prisma: ReportPrisma, organizationId?: string) {
   const cutoff = new Date();
   cutoff.setHours(0, 0, 0, 0);
   cutoff.setDate(cutoff.getDate() - 30);
   const customers = await prisma.customer.findMany({
     where: {
+      ...(organizationId ? { organizationId } : {}),
       visitCount: { gt: 0 },
       lastVisitAt: { lt: cutoff },
     },

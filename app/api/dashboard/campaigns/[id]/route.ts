@@ -20,7 +20,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     return NextResponse.json({ message: "بيانات الحملة غير صحيحة" }, { status: 400 });
   }
 
-  const before = await prisma.campaign.findUnique({ where: { id } });
+  const before = await prisma.campaign.findFirst({ where: { id, organizationId: session.organizationId } });
   if (!before) {
     return NextResponse.json({ message: "الحملة غير موجودة" }, { status: 404 });
   }

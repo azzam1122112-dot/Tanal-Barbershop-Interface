@@ -22,6 +22,8 @@ describe("service management rules", () => {
         type: "dashboard",
         id: "session-1",
         role: "ADMIN",
+        organizationId: "org_default",
+        salonId: null,
         user: { id: "admin-1", name: "مدير", email: "admin@tanal.local", role: "ADMIN" },
       }),
     ).toBe(false);
@@ -34,6 +36,8 @@ describe("service management rules", () => {
         type: "barber",
         id: "session-1",
         role: "BARBER",
+        organizationId: "org_default",
+        salonId: "salon_default",
         barber: { id: "barber-1", name: "حلاق", phone: "966500000002", role: "BARBER" },
       }),
     ).toBe(false);

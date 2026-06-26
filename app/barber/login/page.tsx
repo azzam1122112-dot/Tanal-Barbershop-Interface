@@ -54,20 +54,13 @@ export default function BarberLoginPage() {
   }, []);
 
   function updatePhone(value: string) {
-    setPhone(value.replace(/\D/g, "").slice(0, 12));
-  }
-
-  function normalizePhone(value: string) {
-    const digits = value.replace(/\D/g, "");
-    if (digits.startsWith("9665")) return `0${digits.slice(3, 12)}`;
-    if (digits.startsWith("5")) return `0${digits.slice(0, 9)}`;
-    return digits.slice(0, 10);
+    setPhone(value.replace(/\D/g, "").slice(0, 10));
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
-    const localPhone = normalizePhone(phone);
+    const localPhone = phone;
 
     if (!/^05\d{8}$/.test(localPhone)) {
       setError("رقم الجوال يجب أن يبدأ بـ 05 ويتكون من 10 أرقام");
@@ -168,8 +161,9 @@ export default function BarberLoginPage() {
                 onChange={(event) => updatePhone(event.target.value)}
                 inputMode="numeric"
                 required
-                minLength={9}
-                maxLength={12}
+                minLength={10}
+                maxLength={10}
+                pattern="05[0-9]{8}"
                 autoComplete="tel"
                 placeholder="05xxxxxxxx"
                 className="barber-field mt-2 h-14 text-xl"

@@ -22,11 +22,12 @@ export default async function DashboardDailyClosePage({
   const selectedDate = params.date ? new Date(params.date) : new Date();
   const last7From = new Date(selectedDate);
   last7From.setDate(last7From.getDate() - 6);
+  const organizationId = session.type === "dashboard" ? session.organizationId : undefined;
   const [summary, history, barbers, adjustmentReport] = await Promise.all([
-    getCashSessionSummary(prisma),
-    getCashSessionHistory(prisma, { from: params.from ?? selectedDate, to: params.to ?? selectedDate, barberId: params.barberId }),
-    prisma.barber.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
-    getPostCloseAdjustmentReport(prisma, { from: last7From, to: selectedDate }),
+    getCashSessionSummary(prisma, organizationId),
+    getCashSessionHistory(prisma, { organizationId, from: params.from ?? selectedDate, to: params.to ?? selectedDate, barberId: params.barberId }),
+    prisma.barber.findMany({ where: { isActive: true, ...(organizationId ? { organizationId } : {}) }, orderBy: { name: "asc" } }),
+    getPostCloseAdjustmentReport(prisma, { organizationId, from: last7From, to: selectedDate }),
   ]);
 
   return (

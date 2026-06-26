@@ -22,7 +22,7 @@ let originalSettings: ReturnType<typeof toSafeSystemSettings>;
 describe("pwa and settings polish", () => {
   beforeAll(async () => {
     adminUserId = (await prisma.user.findFirstOrThrow({ where: { role: "ADMIN", isActive: true } })).id;
-    const settings = await prisma.systemSettings.findUniqueOrThrow({ where: { singletonKey: "default" } });
+    const settings = await prisma.systemSettings.findFirstOrThrow({});
     originalSettings = toSafeSystemSettings(settings);
     const barber = await prisma.barber.create({
       data: {
@@ -118,8 +118,8 @@ describe("pwa and settings polish", () => {
 
     expect(updated.salonName).toBe("صالون تانال اختبار");
     expect(JSON.stringify(updated)).not.toContain("passwordHash");
-    expect(canAccessDashboard({ type: "barber", id: "pwa-b", role: "BARBER", barber: { id: barberId, name: "حلاق", phone: "966500000001", role: "BARBER" } })).toBe(false);
-    expect(canAccessDashboard({ type: "dashboard", id: "pwa-a", role: "ADMIN", user: { id: adminUserId, name: "مدير", email: "admin@tanal.local", role: "ADMIN" } })).toBe(true);
+    expect(canAccessDashboard({ type: "barber", id: "pwa-b", role: "BARBER", organizationId: "org_default", salonId: "salon_default", barber: { id: barberId, name: "حلاق", phone: "966500000001", role: "BARBER" } })).toBe(false);
+    expect(canAccessDashboard({ type: "dashboard", id: "pwa-a", role: "ADMIN", organizationId: "org_default", salonId: null, user: { id: adminUserId, name: "مدير", email: "admin@tanal.local", role: "ADMIN" } })).toBe(true);
   });
 });
 

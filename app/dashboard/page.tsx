@@ -13,9 +13,10 @@ export default async function DashboardPage() {
   if (!session) redirect("/dashboard/login");
   if (!canAccessDashboard(session)) redirect("/barber");
 
+  const organizationId = session.type === "dashboard" ? session.organizationId : undefined;
   const [summary, operationAlerts] = await Promise.all([
-    getDashboardSummary(prisma),
-    getOperationAlerts(prisma),
+    getDashboardSummary(prisma, organizationId),
+    getOperationAlerts(prisma, new Date(), organizationId),
   ]);
 
   return (

@@ -20,6 +20,7 @@ export async function POST(request: Request) {
     const message = await generateWhatsAppMessage(prisma, parsed.data, {
       actorUserId: session.user.id,
       actorType: session.role,
+      organizationId: session.organizationId,
       ...(await getRequestMeta()),
     });
     return NextResponse.json(message, { status: 201 });

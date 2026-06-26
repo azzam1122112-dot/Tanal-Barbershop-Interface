@@ -10,9 +10,11 @@ import { toSafeAdminUser } from "@/lib/auth/sanitize";
 export async function GET() {
   const auth = await requireAdminApi();
   if (auth.response) return auth.response;
+  const session = auth.session;
+  if (!session || session.type !== "dashboard") return NextResponse.json({ message: "غير مصرح" }, { status: 401 });
 
   const users = await prisma.user.findMany({
-    where: { role: { in: ["ADMIN", "SUPERVISOR"] } },
+    where: { organizationId: session.organizationId, role: { in: ["OWNER", "ADMIN", "SUPERVISOR"] } },
     orderBy: [{ isActive: "desc" }, { role: "asc" }, { createdAt: "desc" }],
   });
 
@@ -35,6 +37,7 @@ export async function POST(request: Request) {
   try {
     const user = await prisma.user.create({
       data: {
+        organizationId: session.organizationId,
         name: parsed.data.name,
         email: parsed.data.email,
         phone: parsed.data.phone,

@@ -7,7 +7,9 @@ import { createWhatsAppTemplate, getWhatsAppTemplates } from "@/lib/whatsapp/wha
 export async function GET() {
   const auth = await requireDashboardApi();
   if (auth.response) return auth.response;
-  return NextResponse.json({ templates: await getWhatsAppTemplates(prisma) });
+  const session = auth.session;
+  if (!session || session.type !== "dashboard") return NextResponse.json({ message: "غير مصرح" }, { status: 401 });
+  return NextResponse.json({ templates: await getWhatsAppTemplates(prisma, session.organizationId) });
 }
 
 export async function POST(request: Request) {
@@ -24,6 +26,7 @@ export async function POST(request: Request) {
   const template = await createWhatsAppTemplate(prisma, parsed.data, {
     actorUserId: session.user.id,
     actorType: session.role,
+    organizationId: session.organizationId,
     ...(await getRequestMeta()),
   });
   return NextResponse.json({ template }, { status: 201 });

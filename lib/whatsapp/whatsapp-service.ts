@@ -11,7 +11,7 @@ import type {
   WhatsAppMessageStatus,
   WhatsAppTemplateType,
 } from "@prisma/client";
-import { normalizeSaudiPhone } from "@/lib/phone/saudi-phone";
+import { normalizeSaudiPhone, toSaudiWhatsAppPhone } from "@/lib/phone/saudi-phone";
 import { writeAuditLog } from "@/lib/audit/audit-log";
 import { getActiveManagerRewards } from "@/lib/manager-rewards/manager-reward-service";
 
@@ -19,7 +19,8 @@ type WhatsAppPrisma = PrismaClient | Prisma.TransactionClient;
 
 type ActorMeta = {
   actorUserId: string;
-  actorType: Extract<UserRole, "ADMIN" | "SUPERVISOR">;
+  actorType: Extract<UserRole, "OWNER" | "ADMIN" | "SUPERVISOR">;
+  organizationId?: string;
   ipAddress?: string | null;
   userAgent?: string | null;
 };
@@ -51,7 +52,7 @@ const allowedVariables = new Set([
 ]);
 
 export function buildWhatsAppUrl(phone: string, message: string) {
-  const normalizedPhone = normalizeSaudiPhone(phone);
+  const normalizedPhone = toSaudiWhatsAppPhone(phone);
   if (!message.trim()) {
     throw new BusinessError("نص الرسالة مطلوب");
   }
@@ -66,8 +67,9 @@ export function renderWhatsAppTemplate(body: string, variables: Record<string, u
   });
 }
 
-export async function getWhatsAppTemplates(prisma: WhatsAppPrisma) {
+export async function getWhatsAppTemplates(prisma: WhatsAppPrisma, organizationId?: string) {
   const templates = await prisma.whatsAppTemplate.findMany({
+    where: { ...(organizationId ? { organizationId } : {}) },
     orderBy: [{ type: "asc" }, { createdAt: "asc" }],
   });
   return templates.map(toSafeTemplate);
@@ -80,6 +82,7 @@ export async function createWhatsAppTemplate(
 ) {
   const template = await prisma.whatsAppTemplate.create({
     data: {
+      organizationId: meta.organizationId,
       name: input.name,
       type: input.type,
       body: input.body,
@@ -106,7 +109,7 @@ export async function updateWhatsAppTemplate(
   input: Partial<{ name: string; type: WhatsAppTemplateType; body: string; isActive: boolean }>,
   meta: ActorMeta,
 ) {
-  const before = await prisma.whatsAppTemplate.findUnique({ where: { id } });
+  const before = await prisma.whatsAppTemplate.findFirst({ where: { id, ...(meta.organizationId ? { organizationId: meta.organizationId } : {}) } });
   if (!before) throw new BusinessError("قالب واتساب غير موجود");
   const template = await prisma.whatsAppTemplate.update({ where: { id }, data: input });
   await writeAuditLog({
@@ -146,7 +149,7 @@ export async function generateWhatsAppMessage(prisma: PrismaClient, input: Gener
   }
 
   const [settings, visit, campaign, reward, managerRewards] = await Promise.all([
-    prisma.systemSettings.findUnique({ where: { singletonKey: "default" } }),
+    prisma.systemSettings.findFirst({}),
     input.visitId
       ? prisma.visit.findUnique({
           where: { id: input.visitId },
@@ -158,6 +161,10 @@ export async function generateWhatsAppMessage(prisma: PrismaClient, input: Gener
     getActiveManagerRewards(prisma, customer.id),
   ]);
   const managerReward = managerRewards[0] ?? null;
+
+  if (settings?.whatsappEnabled === false) {
+    throw new BusinessError("واتساب معطل من إعدادات النظام");
+  }
 
   if (input.visitId && (!visit || visit.customerId !== customer.id)) {
     throw new BusinessError("الزيارة غير موجودة لهذا العميل");
@@ -180,6 +187,7 @@ export async function generateWhatsAppMessage(prisma: PrismaClient, input: Gener
   const waUrl = buildWhatsAppUrl(phone, message);
   const log = await prisma.whatsAppMessageLog.create({
     data: {
+      organizationId: customer.organizationId,
       customerId: customer.id,
       templateId: template?.id,
       campaignId: campaign?.id,
@@ -208,6 +216,7 @@ export async function generateWhatsAppMessage(prisma: PrismaClient, input: Gener
 }
 
 export async function markWhatsAppMessageOpened(prisma: PrismaClient, id: string, meta: ActorMeta) {
+  await assertMessageInOrg(prisma, id, meta.organizationId);
   const log = await prisma.whatsAppMessageLog.update({
     where: { id },
     data: {
@@ -232,6 +241,7 @@ export async function markWhatsAppMessageOpened(prisma: PrismaClient, id: string
 }
 
 export async function markWhatsAppMessageSent(prisma: PrismaClient, id: string, meta: ActorMeta) {
+  await assertMessageInOrg(prisma, id, meta.organizationId);
   const log = await prisma.whatsAppMessageLog.update({
     where: { id },
     data: {
@@ -257,12 +267,13 @@ export async function markWhatsAppMessageSent(prisma: PrismaClient, id: string, 
 
 export async function getWhatsAppMessages(
   prisma: WhatsAppPrisma,
-  filters: { from?: Date; to?: Date; status?: WhatsAppMessageStatus; templateType?: WhatsAppTemplateType; customerId?: string } = {},
+  filters: { organizationId?: string; from?: Date; to?: Date; status?: WhatsAppMessageStatus; templateType?: WhatsAppTemplateType; customerId?: string } = {},
 ) {
   const from = filters.from ? startOfDay(filters.from) : undefined;
   const to = filters.to ? endExclusive(filters.to) : undefined;
   const logs = await prisma.whatsAppMessageLog.findMany({
     where: {
+      ...(filters.organizationId ? { organizationId: filters.organizationId } : {}),
       ...(filters.customerId ? { customerId: filters.customerId } : {}),
       ...(filters.status ? { status: filters.status } : {}),
       ...(from || to ? { createdAt: { ...(from ? { gte: from } : {}), ...(to ? { lt: to } : {}) } } : {}),
@@ -275,11 +286,12 @@ export async function getWhatsAppMessages(
   return logs.map(toSafeMessageLog);
 }
 
-export async function getInactiveWhatsAppAudience(prisma: WhatsAppPrisma, days = 30) {
+export async function getInactiveWhatsAppAudience(prisma: WhatsAppPrisma, days = 30, organizationId?: string) {
   const now = new Date();
   const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
   const customers = await prisma.customer.findMany({
     where: {
+      ...(organizationId ? { organizationId } : {}),
       lastVisitAt: { lt: cutoff },
       visitCount: { gt: 0 },
     },
@@ -290,10 +302,10 @@ export async function getInactiveWhatsAppAudience(prisma: WhatsAppPrisma, days =
   return customers.map((customer) => toAudienceCustomer(customer, now));
 }
 
-export async function getRewardReadyWhatsAppAudience(prisma: WhatsAppPrisma) {
+export async function getRewardReadyWhatsAppAudience(prisma: WhatsAppPrisma, organizationId?: string) {
   const now = new Date();
   const minRule = await prisma.rewardRule.findFirst({
-    where: { isActive: true },
+    where: { isActive: true, ...(organizationId ? { organizationId } : {}) },
     orderBy: { requiredPoints: "asc" },
   });
   const rewardFilters: Prisma.CustomerWhereInput[] = [
@@ -312,6 +324,7 @@ export async function getRewardReadyWhatsAppAudience(prisma: WhatsAppPrisma) {
   }
   const customers = await prisma.customer.findMany({
     where: {
+      ...(organizationId ? { organizationId } : {}),
       OR: rewardFilters,
     },
     include: {
@@ -332,11 +345,12 @@ export async function getRewardReadyWhatsAppAudience(prisma: WhatsAppPrisma) {
   return customers.map((customer) => toAudienceCustomer(customer, now));
 }
 
-export async function getCampaignWhatsAppAudience(prisma: WhatsAppPrisma, campaignId: string) {
+export async function getCampaignWhatsAppAudience(prisma: WhatsAppPrisma, campaignId: string, organizationId?: string) {
   const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
   if (!campaign) throw new BusinessError("الحملة غير موجودة");
   const now = new Date();
   const customers = await prisma.customer.findMany({
+    where: { ...(organizationId ? { organizationId } : {}) },
     include: { loyaltyAccount: true },
     orderBy: { updatedAt: "desc" },
     take: 200,
@@ -354,7 +368,7 @@ export async function getCampaignWhatsAppAudience(prisma: WhatsAppPrisma, campai
 }
 
 export async function updateCustomerWhatsappPreference(prisma: PrismaClient, customerId: string, whatsappOptIn: boolean, meta: ActorMeta) {
-  const before = await prisma.customer.findUnique({ where: { id: customerId } });
+  const before = await prisma.customer.findFirst({ where: { id: customerId, ...(meta.organizationId ? { organizationId: meta.organizationId } : {}) } });
   if (!before) throw new BusinessError("العميل غير موجود");
   const customer = await prisma.customer.update({ where: { id: customerId }, data: { whatsappOptIn } });
   await writeAuditLog({
@@ -387,6 +401,12 @@ export function toSafeTemplate(template: { id: string; name: string; type: Whats
     createdAt: template.createdAt.toISOString(),
     updatedAt: template.updatedAt.toISOString(),
   };
+}
+
+async function assertMessageInOrg(prisma: WhatsAppPrisma, id: string, organizationId?: string) {
+  if (!organizationId) return;
+  const exists = await prisma.whatsAppMessageLog.findFirst({ where: { id, organizationId }, select: { id: true } });
+  if (!exists) throw new BusinessError("رسالة واتساب غير موجودة");
 }
 
 function toGeneratedMessage(log: MessageLogWithRelations) {

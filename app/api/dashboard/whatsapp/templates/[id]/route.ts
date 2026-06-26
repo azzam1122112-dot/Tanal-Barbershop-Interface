@@ -21,6 +21,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const template = await updateWhatsAppTemplate(prisma, id, parsed.data, {
       actorUserId: session.user.id,
       actorType: session.role,
+      organizationId: session.organizationId,
       ...(await getRequestMeta()),
     });
     return NextResponse.json({ template });

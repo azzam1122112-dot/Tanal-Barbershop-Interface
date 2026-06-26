@@ -9,6 +9,7 @@ describe("auth sanitization and access rules", () => {
   it("does not return passwordHash from safe admin data", () => {
     const safe = toSafeAdminUser({
       id: "admin-1",
+      organizationId: "org_default",
       name: "مدير",
       email: "admin@tanal.local",
       phone: "966500000001",
@@ -33,6 +34,8 @@ describe("auth sanitization and access rules", () => {
     const safe = toSafeBarber(
       {
         id: "barber-1",
+        organizationId: "org_default",
+        salonId: "salon_default",
         name: "حلاق",
         phone: "966500000002",
         accessPinHash: "pin-hash",
@@ -61,6 +64,8 @@ describe("auth sanitization and access rules", () => {
         type: "barber",
         id: "session-1",
         role: "BARBER",
+        organizationId: "org_default",
+        salonId: "salon_default",
         barber: {
           id: "barber-1",
           name: "حلاق",
@@ -81,6 +86,8 @@ describe("auth sanitization and access rules", () => {
         type: "dashboard",
         id: "admin-session",
         role: "ADMIN",
+        organizationId: "org_default",
+        salonId: null,
         user: { id: "admin-1", name: "مدير", email: "admin@tanal.local", role: "ADMIN" },
       }),
     ).toBe(true);
@@ -89,6 +96,8 @@ describe("auth sanitization and access rules", () => {
         type: "dashboard",
         id: "supervisor-session",
         role: "SUPERVISOR",
+        organizationId: "org_default",
+        salonId: null,
         user: { id: "supervisor-1", name: "مشرف", email: "supervisor@tanal.local", role: "SUPERVISOR" },
       }),
     ).toBe(false);

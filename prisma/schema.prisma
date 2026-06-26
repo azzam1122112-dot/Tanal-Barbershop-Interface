@@ -8,9 +8,22 @@ datasource db {
 }
 
 enum UserRole {
+  OWNER
   ADMIN
   SUPERVISOR
   BARBER
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
 }
 
 enum PaymentMethod {
@@ -56,6 +69,8 @@ enum LoyaltyTransactionType {
 }
 
 enum AuditActorType {
+  PLATFORM_ADMIN
+  OWNER
   ADMIN
   SUPERVISOR
   BARBER
@@ -78,17 +93,115 @@ enum WhatsAppMessageStatus {
   FAILED
 }
 
+// ===== Platform / Tenancy =====
+
+// مدير المنصة (super-admin) — يدير كل المؤسسات والباقات. خارج أي مستأجر.
+model PlatformAdmin {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  passwordHash String
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+// الباقة — يضبطها السوبر-آدمن من لوحة المنصة (بلا بوابة دفع حاليًا).
+model Plan {
+  id            String         @id @default(cuid())
+  name          String         @unique
+  slug          String         @unique
+  description   String?
+  priceMonthly  Decimal        @default(0) @db.Decimal(10, 2)
+  maxSalons     Int            @default(1)
+  maxBarbers    Int? // null = غير محدود
+  maxCustomers  Int?
+  isActive      Boolean        @default(true)
+  sortOrder     Int            @default(0)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  organizations Organization[]
+
+  @@index([isActive, sortOrder])
+}
+
+// المؤسسة (المالك) — حدّ العزل الأساسي + العميل/الولاء + الفوترة.
+model Organization {
+  id                 String             @id @default(cuid())
+  name               String
+  slug               String             @unique // النطاق الفرعي
+  status             OrganizationStatus @default(ACTIVE)
+  planId             String?
+  subscriptionStatus SubscriptionStatus @default(TRIALING)
+  trialEndsAt        DateTime?
+  currentPeriodEnd   DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  plan                 Plan?                @relation(fields: [planId], references: [id])
+  salons               Salon[]
+  users                User[]
+  barbers              Barber[]
+  customers            Customer[]
+  services             Service[]
+  visits               Visit[]
+  loyaltyAccounts      LoyaltyAccount[]
+  loyaltyTransactions  LoyaltyTransaction[]
+  rewardRules          RewardRule[]
+  campaigns            Campaign[]
+  campaignRedemptions  CampaignRedemption[]
+  managerRewards       ManagerReward[]
+  dailyCloses          DailyClose[]
+  cashSessions         CashSession[]
+  systemSettings       SystemSettings[]
+  whatsappTemplates    WhatsAppTemplate[]
+  whatsappMessages     WhatsAppMessageLog[]
+  auditLogs            AuditLog[]
+  sessions             Session[]
+
+  @@index([status])
+  @@index([planId])
+}
+
+// الصالون — الوحدة التشغيلية داخل المؤسسة.
+model Salon {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  slug           String
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  barbers      Barber[]
+  services     Service[]
+  visits       Visit[]
+  cashSessions CashSession[]
+  dailyCloses  DailyClose[]
+  settings     SystemSettings?
+  sessions     Session[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId, isActive])
+}
+
+// ===== Tenant data =====
+
 model User {
   id                         String               @id @default(cuid())
+  organizationId             String?
   name                       String
-  email                      String?              @unique
-  phone                      String               @unique
+  email                      String?
+  phone                      String
   passwordHash               String
   role                       UserRole             @default(ADMIN)
   isActive                   Boolean              @default(true)
   lastLoginAt                DateTime?
   createdAt                  DateTime             @default(now())
   updatedAt                  DateTime             @updatedAt
+  organization               Organization?        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   auditLogs                  AuditLog[]
   sessions                   Session[]
   dailyCloses                DailyClose[]         @relation("DailyCloseReceivedBy")
@@ -98,55 +211,70 @@ model User {
   markedSentWhatsAppMessages WhatsAppMessageLog[] @relation("WhatsAppMarkedSentBy")
   issuedManagerRewards       ManagerReward[]      @relation("ManagerRewardIssuedBy")
 
-  @@index([role, isActive])
+  @@unique([organizationId, email])
+  @@unique([organizationId, phone])
+  @@index([organizationId, role, isActive])
 }
 
 model Barber {
-  id               String       @id @default(cuid())
+  id               String        @id @default(cuid())
+  organizationId   String?
+  salonId          String?
   name             String
-  phone            String       @unique
+  phone            String
   accessPinHash    String
-  role             UserRole     @default(BARBER)
-  isActive         Boolean      @default(true)
+  role             UserRole      @default(BARBER)
+  isActive         Boolean       @default(true)
   lastLoginAt      DateTime?
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
-  createdCustomers Customer[]   @relation("CustomerCreatedByBarber")
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  organization     Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  salon            Salon?        @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  createdCustomers Customer[]    @relation("CustomerCreatedByBarber")
   visits           Visit[]
-  auditLogs        AuditLog[]   @relation("BarberAuditLogs")
+  auditLogs        AuditLog[]    @relation("BarberAuditLogs")
   sessions         Session[]
   dailyCloses      DailyClose[]
   cashSessions     CashSession[]
 
-  @@index([isActive])
+  @@unique([salonId, phone])
+  @@index([salonId, isActive])
+  @@index([organizationId])
 }
 
 model Session {
-  id         String         @id @default(cuid())
-  tokenHash  String         @unique
-  actorType  AuditActorType
-  userId     String?
-  barberId   String?
-  role       UserRole
-  createdAt  DateTime       @default(now())
-  expiresAt  DateTime
-  lastUsedAt DateTime?
-  revokedAt  DateTime?
-  userAgent  String?
-  ipAddress  String?
-  user       User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  barber     Barber?        @relation(fields: [barberId], references: [id], onDelete: Cascade)
+  id             String         @id @default(cuid())
+  tokenHash      String         @unique
+  actorType      AuditActorType
+  organizationId String?
+  activeSalonId  String?
+  userId         String?
+  barberId       String?
+  platformAdmin  Boolean        @default(false)
+  role           UserRole
+  createdAt      DateTime       @default(now())
+  expiresAt      DateTime
+  lastUsedAt     DateTime?
+  revokedAt      DateTime?
+  userAgent      String?
+  ipAddress      String?
+  user           User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  barber         Barber?        @relation(fields: [barberId], references: [id], onDelete: Cascade)
+  organization   Organization?  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  activeSalon    Salon?         @relation(fields: [activeSalonId], references: [id], onDelete: SetNull)
 
   @@index([tokenHash])
   @@index([userId, revokedAt])
   @@index([barberId, revokedAt])
   @@index([expiresAt])
+  @@index([organizationId])
 }
 
 model Customer {
   id                  String               @id @default(cuid())
+  organizationId      String?
   name                String
-  phone               String               @unique
+  phone               String
   whatsappOptIn       Boolean              @default(true)
   visitCount          Int                  @default(0)
   totalPaid           Decimal              @default(0) @db.Decimal(12, 2)
@@ -155,6 +283,7 @@ model Customer {
   createdByBarberId   String?
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
+  organization        Organization?        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdByBarber     Barber?              @relation("CustomerCreatedByBarber", fields: [createdByBarberId], references: [id])
   visits              Visit[]
   loyaltyAccount      LoyaltyAccount?
@@ -163,26 +292,35 @@ model Customer {
   managerRewards      ManagerReward[]
   whatsappMessages    WhatsAppMessageLog[]
 
-  @@index([lastVisitAt])
-  @@index([whatsappOptIn])
+  @@unique([organizationId, phone])
+  @@index([organizationId, lastVisitAt])
+  @@index([organizationId, whatsappOptIn])
   @@index([createdByBarberId])
 }
 
 model Service {
-  id            String         @id @default(cuid())
-  name          String         @unique
-  defaultPrice  Decimal        @db.Decimal(10, 2)
-  isActive      Boolean        @default(true)
-  sortOrder     Int            @default(0)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  visitServices VisitService[]
+  id             String         @id @default(cuid())
+  organizationId String?
+  salonId        String?
+  name           String
+  defaultPrice   Decimal        @db.Decimal(10, 2)
+  isActive       Boolean        @default(true)
+  sortOrder      Int            @default(0)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  organization   Organization?  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  salon          Salon?         @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  visitServices  VisitService[]
 
-  @@index([isActive, sortOrder])
+  @@unique([salonId, name])
+  @@index([salonId, isActive, sortOrder])
+  @@index([organizationId])
 }
 
 model Visit {
   id                  String               @id @default(cuid())
+  organizationId      String?
+  salonId             String?
   customerId          String
   barberId            String
   status              VisitStatus          @default(COMPLETED)
@@ -202,18 +340,22 @@ model Visit {
   visitedAt           DateTime             @default(now())
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
+  organization        Organization?        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  salon               Salon?               @relation(fields: [salonId], references: [id], onDelete: Cascade)
   customer            Customer             @relation(fields: [customerId], references: [id])
   barber              Barber               @relation(fields: [barberId], references: [id])
   services            VisitService[]
   loyaltyTransactions LoyaltyTransaction[]
   campaignRedemption  CampaignRedemption?
-  managerReward        ManagerReward?
+  managerReward       ManagerReward?
   cancelledBy         User?                @relation("VisitCancelledBy", fields: [cancelledByUserId], references: [id])
   cashSessionId       String?
   cashSession         CashSession?         @relation(fields: [cashSessionId], references: [id])
   whatsappMessages    WhatsAppMessageLog[]
 
   @@unique([barberId, idempotencyKey])
+  @@index([organizationId, visitedAt])
+  @@index([salonId, visitedAt])
   @@index([visitedAt])
   @@index([barberId, visitedAt])
   @@index([customerId, visitedAt])
@@ -238,50 +380,60 @@ model VisitService {
 }
 
 model LoyaltyAccount {
-  id               String   @id @default(cuid())
-  customerId       String   @unique
-  points           Int      @default(0)
-  lifetimeEarned   Int      @default(0)
-  lifetimeRedeemed Int      @default(0)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  customer         Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  id               String        @id @default(cuid())
+  organizationId   String?
+  customerId       String        @unique
+  points           Int           @default(0)
+  lifetimeEarned   Int           @default(0)
+  lifetimeRedeemed Int           @default(0)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  organization     Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer         Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
-  @@index([points])
+  @@index([organizationId, points])
 }
 
 model LoyaltyTransaction {
-  id           String                 @id @default(cuid())
-  customerId   String
-  visitId      String?
-  type         LoyaltyTransactionType
-  points       Int
-  balanceAfter Int
-  description  String?
-  createdAt    DateTime               @default(now())
-  customer     Customer               @relation(fields: [customerId], references: [id])
-  visit        Visit?                 @relation(fields: [visitId], references: [id])
+  id             String                 @id @default(cuid())
+  organizationId String?
+  customerId     String
+  visitId        String?
+  type           LoyaltyTransactionType
+  points         Int
+  balanceAfter   Int
+  description    String?
+  createdAt      DateTime               @default(now())
+  organization   Organization?          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer       Customer               @relation(fields: [customerId], references: [id])
+  visit          Visit?                 @relation(fields: [visitId], references: [id])
 
   @@index([customerId, createdAt])
   @@index([visitId])
   @@index([type])
+  @@index([organizationId])
 }
 
 model RewardRule {
-  id             String   @id @default(cuid())
-  name           String   @unique
-  requiredPoints Int      @unique
-  discountAmount Decimal  @db.Decimal(10, 2)
-  isActive       Boolean  @default(true)
-  sortOrder      Int      @default(0)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id             String        @id @default(cuid())
+  organizationId String?
+  name           String
+  requiredPoints Int
+  discountAmount Decimal       @db.Decimal(10, 2)
+  isActive       Boolean       @default(true)
+  sortOrder      Int           @default(0)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  @@index([isActive, requiredPoints])
+  @@unique([organizationId, name])
+  @@unique([organizationId, requiredPoints])
+  @@index([organizationId, isActive, requiredPoints])
 }
 
 model Campaign {
   id                 String               @id @default(cuid())
+  organizationId     String?
   name               String
   description        String?
   discountType       CampaignDiscountType
@@ -295,80 +447,95 @@ model Campaign {
   isActive           Boolean              @default(true)
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
+  organization       Organization?        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   redemptions        CampaignRedemption[]
   whatsappMessages   WhatsAppMessageLog[]
 
-  @@index([isActive, startAt, endAt])
+  @@index([organizationId, isActive, startAt, endAt])
   @@index([targetType])
 }
 
 model CampaignRedemption {
-  id             String   @id @default(cuid())
+  id             String        @id @default(cuid())
+  organizationId String?
   campaignId     String
   customerId     String
-  visitId        String   @unique
-  discountAmount Decimal  @db.Decimal(10, 2)
-  createdAt      DateTime @default(now())
-  campaign       Campaign @relation(fields: [campaignId], references: [id])
-  customer       Customer @relation(fields: [customerId], references: [id])
-  visit          Visit    @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  visitId        String        @unique
+  discountAmount Decimal       @db.Decimal(10, 2)
+  createdAt      DateTime      @default(now())
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaign       Campaign      @relation(fields: [campaignId], references: [id])
+  customer       Customer      @relation(fields: [customerId], references: [id])
+  visit          Visit         @relation(fields: [visitId], references: [id], onDelete: Cascade)
 
   @@index([campaignId, customerId])
   @@index([customerId, createdAt])
+  @@index([organizationId])
 }
 
 model ManagerReward {
-  id              String    @id @default(cuid())
+  id              String        @id @default(cuid())
+  organizationId  String?
   customerId      String
   issuedByUserId  String
-  redeemedVisitId String?   @unique
+  redeemedVisitId String?       @unique
   title           String
   description     String?
-  discountAmount  Decimal   @db.Decimal(10, 2)
+  discountAmount  Decimal       @db.Decimal(10, 2)
   expiresAt       DateTime?
   redeemedAt      DateTime?
   revokedAt       DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  customer        Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  issuedBy        User      @relation("ManagerRewardIssuedBy", fields: [issuedByUserId], references: [id])
-  redeemedVisit   Visit?    @relation(fields: [redeemedVisitId], references: [id])
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer        Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  issuedBy        User          @relation("ManagerRewardIssuedBy", fields: [issuedByUserId], references: [id])
+  redeemedVisit   Visit?        @relation(fields: [redeemedVisitId], references: [id])
 
   @@index([customerId, redeemedAt, revokedAt, expiresAt])
   @@index([issuedByUserId, createdAt])
   @@index([redeemedVisitId])
+  @@index([organizationId])
 }
 
 model DailyClose {
-  id                       String   @id @default(cuid())
+  id                       String        @id @default(cuid())
+  organizationId           String?
+  salonId                  String?
   barberId                 String
   date                     DateTime
-  visitsCount              Int      @default(0)
-  grossTotal               Decimal  @default(0) @db.Decimal(12, 2)
-  discountTotal            Decimal  @default(0) @db.Decimal(12, 2)
-  netTotal                 Decimal  @default(0) @db.Decimal(12, 2)
-  cashTotal                Decimal  @default(0) @db.Decimal(12, 2)
-  cardTotal                Decimal  @default(0) @db.Decimal(12, 2)
-  pointsEarnedTotal        Int      @default(0)
-  pointsRedeemedTotal      Int      @default(0)
-  rewardRedemptionsCount   Int      @default(0)
-  campaignRedemptionsCount Int      @default(0)
-  cashReceivedAmount       Decimal  @default(0) @db.Decimal(12, 2)
+  visitsCount              Int           @default(0)
+  grossTotal               Decimal       @default(0) @db.Decimal(12, 2)
+  discountTotal            Decimal       @default(0) @db.Decimal(12, 2)
+  netTotal                 Decimal       @default(0) @db.Decimal(12, 2)
+  cashTotal                Decimal       @default(0) @db.Decimal(12, 2)
+  cardTotal                Decimal       @default(0) @db.Decimal(12, 2)
+  pointsEarnedTotal        Int           @default(0)
+  pointsRedeemedTotal      Int           @default(0)
+  rewardRedemptionsCount   Int           @default(0)
+  campaignRedemptionsCount Int           @default(0)
+  cashReceivedAmount       Decimal       @default(0) @db.Decimal(12, 2)
   receivedByUserId         String
-  receivedAt               DateTime @default(now())
+  receivedAt               DateTime      @default(now())
   notes                    String?
-  createdAt                DateTime @default(now())
-  updatedAt                DateTime @updatedAt
-  barber                   Barber   @relation(fields: [barberId], references: [id])
-  receivedBy               User     @relation("DailyCloseReceivedBy", fields: [receivedByUserId], references: [id])
+  createdAt                DateTime      @default(now())
+  updatedAt                DateTime      @updatedAt
+  organization             Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  salon                    Salon?        @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  barber                   Barber        @relation(fields: [barberId], references: [id])
+  receivedBy               User          @relation("DailyCloseReceivedBy", fields: [receivedByUserId], references: [id])
 
   @@unique([barberId, date])
+  @@index([organizationId, date])
+  @@index([salonId, date])
   @@index([date])
   @@index([receivedByUserId])
 }
 
 model CashSession {
   id                       String            @id @default(cuid())
+  organizationId           String?
+  salonId                  String?
   barberId                 String
   status                   CashSessionStatus @default(OPEN)
   openedAt                 DateTime          @default(now())
@@ -388,10 +555,14 @@ model CashSession {
   notes                    String?
   createdAt                DateTime          @default(now())
   updatedAt                DateTime          @updatedAt
+  organization             Organization?     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  salon                    Salon?            @relation(fields: [salonId], references: [id], onDelete: Cascade)
   barber                   Barber            @relation(fields: [barberId], references: [id])
   closedBy                 User?             @relation("CashSessionClosedBy", fields: [closedByUserId], references: [id])
   visits                   Visit[]
 
+  @@index([organizationId, status])
+  @@index([salonId, status])
   @@index([barberId, status])
   @@index([openedAt])
   @@index([closedAt])
@@ -399,34 +570,43 @@ model CashSession {
 }
 
 model SystemSettings {
-  id                            String   @id @default(cuid())
-  singletonKey                  String   @unique @default("default")
+  id                            String        @id @default(cuid())
+  organizationId                String?
+  salonId                       String?       @unique
+  singletonKey                  String?
   salonName                     String
-  currency                      String   @default("SAR")
-  pointsPerCurrencyUnit         Decimal  @default(1) @db.Decimal(8, 2)
-  pointsCalculatedAfterDiscount Boolean  @default(true)
-  allowMultipleDiscounts        Boolean  @default(false)
-  whatsappDefaultCountryCode    String   @default("966")
-  whatsappEnabled               Boolean  @default(true)
-  createdAt                     DateTime @default(now())
-  updatedAt                     DateTime @updatedAt
+  currency                      String        @default("SAR")
+  pointsPerCurrencyUnit         Decimal       @default(1) @db.Decimal(8, 2)
+  pointsCalculatedAfterDiscount Boolean       @default(true)
+  allowMultipleDiscounts        Boolean       @default(false)
+  whatsappDefaultCountryCode    String        @default("966")
+  whatsappEnabled               Boolean       @default(true)
+  createdAt                     DateTime      @default(now())
+  updatedAt                     DateTime      @updatedAt
+  organization                  Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  salon                         Salon?        @relation(fields: [salonId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
 }
 
 model WhatsAppTemplate {
-  id        String               @id @default(cuid())
-  name      String
-  type      WhatsAppTemplateType
-  body      String
-  isActive  Boolean              @default(true)
-  createdAt DateTime             @default(now())
-  updatedAt DateTime             @updatedAt
-  messages  WhatsAppMessageLog[]
+  id             String               @id @default(cuid())
+  organizationId String?
+  name           String
+  type           WhatsAppTemplateType
+  body           String
+  isActive       Boolean              @default(true)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  organization   Organization?        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  messages       WhatsAppMessageLog[]
 
-  @@index([type, isActive])
+  @@index([organizationId, type, isActive])
 }
 
 model WhatsAppMessageLog {
   id                 String                @id @default(cuid())
+  organizationId     String?
   customerId         String
   templateId         String?
   campaignId         String?
@@ -442,6 +622,7 @@ model WhatsAppMessageLog {
   skippedReason      String?
   createdAt          DateTime              @default(now())
   updatedAt          DateTime              @updatedAt
+  organization       Organization?         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   customer           Customer              @relation(fields: [customerId], references: [id], onDelete: Cascade)
   template           WhatsAppTemplate?     @relation(fields: [templateId], references: [id])
   campaign           Campaign?             @relation(fields: [campaignId], references: [id])
@@ -456,6 +637,7 @@ model WhatsAppMessageLog {
   @@index([status, createdAt])
   @@index([openedByUserId])
   @@index([markedSentByUserId])
+  @@index([organizationId])
 }
 
 model LoginAttempt {
@@ -470,22 +652,26 @@ model LoginAttempt {
 }
 
 model AuditLog {
-  id            String         @id @default(cuid())
-  actorType     AuditActorType
-  actorUserId   String?
-  actorBarberId String?
-  action        String
-  entityType    String
-  entityId      String?
-  before        Json?
-  after         Json?
-  ipAddress     String?
-  userAgent     String?
-  createdAt     DateTime       @default(now())
-  actorUser     User?          @relation(fields: [actorUserId], references: [id])
-  actorBarber   Barber?        @relation("BarberAuditLogs", fields: [actorBarberId], references: [id])
+  id             String         @id @default(cuid())
+  organizationId String?
+  salonId        String?
+  actorType      AuditActorType
+  actorUserId    String?
+  actorBarberId  String?
+  action         String
+  entityType     String
+  entityId       String?
+  before         Json?
+  after          Json?
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime       @default(now())
+  organization   Organization?  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actorUser      User?          @relation(fields: [actorUserId], references: [id])
+  actorBarber    Barber?        @relation("BarberAuditLogs", fields: [actorBarberId], references: [id])
 
   @@index([createdAt])
   @@index([actorType, createdAt])
   @@index([entityType, entityId])
+  @@index([organizationId, createdAt])
 }

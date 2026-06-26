@@ -31,12 +31,13 @@ export function getCloseDateRange(date: Date | string) {
   return { from, to };
 }
 
-export async function getDailyCloseSummary(prisma: DailyClosePrisma, date: Date | string = new Date()) {
+export async function getDailyCloseSummary(prisma: DailyClosePrisma, date: Date | string = new Date(), organizationId?: string) {
   const closeDate = normalizeCloseDate(date);
+  const orgFilter = organizationId ? { organizationId } : {};
   const [barbers, closes] = await Promise.all([
-    prisma.barber.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
+    prisma.barber.findMany({ where: { isActive: true, ...orgFilter }, orderBy: { name: "asc" } }),
     prisma.dailyClose.findMany({
-      where: { date: closeDate },
+      where: { date: closeDate, ...orgFilter },
       include: { barber: true, receivedBy: true },
     }),
   ]);
@@ -101,6 +102,8 @@ export async function closeBarberDay(prisma: PrismaClient, input: DailyCloseInpu
     const cashReceivedAmount = input.cashReceivedAmount ?? totals.cashTotal;
     const close = await tx.dailyClose.create({
       data: {
+        organizationId: barber.organizationId,
+        salonId: barber.salonId,
         barberId: input.barberId,
         date: closeDate,
         visitsCount: totals.visitsCount,
@@ -140,7 +143,7 @@ export async function closeBarberDay(prisma: PrismaClient, input: DailyCloseInpu
   });
 }
 
-export async function getDailyCloseHistory(prisma: DailyClosePrisma, filters: { from?: Date | string | null; to?: Date | string | null; barberId?: string | null } = {}) {
+export async function getDailyCloseHistory(prisma: DailyClosePrisma, filters: { organizationId?: string | null; from?: Date | string | null; to?: Date | string | null; barberId?: string | null } = {}) {
   const fallback = getCloseDateRange(new Date());
   const from = filters.from ? normalizeCloseDate(filters.from) : fallback.from;
   const to = filters.to ? getCloseDateRange(filters.to).to : fallback.to;
@@ -148,6 +151,7 @@ export async function getDailyCloseHistory(prisma: DailyClosePrisma, filters: { 
   const closes = await prisma.dailyClose.findMany({
     where: {
       date: { gte: from, lt: to },
+      ...(filters.organizationId ? { organizationId: filters.organizationId } : {}),
       ...(filters.barberId ? { barberId: filters.barberId } : {}),
     },
     include: { barber: true, receivedBy: true },

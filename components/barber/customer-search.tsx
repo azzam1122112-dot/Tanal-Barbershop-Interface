@@ -26,7 +26,7 @@ export function CustomerSearch() {
 
   async function search(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const localPhone = toLocalSaudiMobile(phone);
+    const localPhone = phone;
 
     if (!/^05\d{8}$/.test(localPhone)) {
       setMessage("رقم جوال العميل يجب أن يبدأ بـ 05 ويتكون من 10 أرقام");
@@ -51,7 +51,7 @@ export function CustomerSearch() {
     } else if (data.found && data.customer) {
       setCustomer(data.customer);
     } else {
-      setNotFoundPhone(toLocalSaudiMobile(data.phone ?? localPhone));
+      setNotFoundPhone(data.phone ?? localPhone);
       setMessage("العميل غير موجود، يمكنك إضافته الآن");
     }
     setLoading(false);
@@ -110,13 +110,14 @@ export function CustomerSearch() {
             <input
               value={phone}
               onChange={(event) => {
-                setPhone(event.target.value.replace(/\D/g, "").slice(0, 12));
+                setPhone(event.target.value.replace(/\D/g, "").slice(0, 10));
                 setMessage("");
               }}
               inputMode="numeric"
               required
-              minLength={9}
-              maxLength={12}
+              minLength={10}
+              maxLength={10}
+              pattern="05[0-9]{8}"
               placeholder="05xxxxxxxx"
               className="barber-field mt-2 h-16 bg-salon-pearl text-center text-2xl"
             />
@@ -196,12 +197,6 @@ export function CustomerSearch() {
       ) : null}
     </div>
   );
-}
-
-function toLocalSaudiMobile(value: string) {
-  const digits = value.replace(/\D/g, "");
-  const localPhone = digits.startsWith("9665") ? `0${digits.slice(3)}` : digits.startsWith("5") ? `0${digits}` : digits;
-  return localPhone.startsWith("05") ? localPhone.slice(0, 10) : `05${localPhone.replace(/^0+/, "")}`.slice(0, 10);
 }
 
 function InfoTile({ label, value }: { label: string; value: string }) {

@@ -10,6 +10,8 @@ import { toSafeService } from "@/lib/services/service-summary";
 type VisitPrisma = PrismaClient | Prisma.TransactionClient;
 
 type VisitInput = {
+  organizationId: string;
+  salonId: string;
   customerId: string;
   barberId: string;
   serviceIds: string[];
@@ -43,7 +45,7 @@ export async function buildVisitPreview(prisma: VisitPrisma, input: VisitInput) 
       where: { id: { in: serviceIds }, isActive: true },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     }),
-    prisma.systemSettings.findUnique({ where: { singletonKey: "default" } }),
+    prisma.systemSettings.findFirst({}),
   ]);
 
   if (!customer) {
@@ -67,6 +69,7 @@ export async function buildVisitPreview(prisma: VisitPrisma, input: VisitInput) 
   const pointsBalance = customer.loyaltyAccount?.points ?? 0;
   const rewards = await prisma.rewardRule.findMany({
     where: {
+      organizationId: input.organizationId,
       isActive: true,
       requiredPoints: { lte: pointsBalance },
       discountAmount: { lte: totals.grossAmount },
@@ -171,7 +174,7 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
     const now = new Date();
     const cashSession = await assertOpenCashSession(tx, input.barberId);
     const preview = await buildVisitPreview(tx, input);
-    const settings = await tx.systemSettings.findUnique({ where: { singletonKey: "default" } });
+    const settings = await tx.systemSettings.findFirst({});
     const customer = await tx.customer.findUnique({
       where: { id: input.customerId },
       include: { loyaltyAccount: true },
@@ -208,6 +211,7 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
       where: { customerId: input.customerId },
       update: {},
       create: {
+        organizationId: input.organizationId,
         customerId: input.customerId,
         points: 0,
         lifetimeEarned: 0,
@@ -239,6 +243,8 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
 
     const visit = await tx.visit.create({
       data: {
+        organizationId: input.organizationId,
+        salonId: input.salonId,
         customerId: input.customerId,
         barberId: input.barberId,
         status: "COMPLETED",
@@ -274,6 +280,7 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
     const campaignRedemption = campaignSelection
       ? await tx.campaignRedemption.create({
           data: {
+            organizationId: input.organizationId,
             campaignId: campaignSelection.campaign.id,
             customerId: input.customerId,
             visitId: visit.id,
@@ -297,6 +304,7 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
       createdTransactions.push(
         await tx.loyaltyTransaction.create({
           data: {
+            organizationId: input.organizationId,
             customerId: input.customerId,
             visitId: visit.id,
             type: "REDEEM",
@@ -313,6 +321,7 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
       createdTransactions.push(
         await tx.loyaltyTransaction.create({
           data: {
+            organizationId: input.organizationId,
             customerId: input.customerId,
             visitId: visit.id,
             type: "EARN",
@@ -345,6 +354,8 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
 
     await tx.auditLog.create({
       data: {
+        organizationId: input.organizationId,
+        salonId: input.salonId,
         actorType: "BARBER",
         actorBarberId: input.barberId,
         action: "visit.confirmed",
@@ -374,6 +385,8 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
     if (campaignSelection) {
       await tx.auditLog.create({
         data: {
+          organizationId: input.organizationId,
+          salonId: input.salonId,
           actorType: "BARBER",
           actorBarberId: input.barberId,
           action: "campaign.redeemed",
@@ -397,6 +410,8 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
     if (managerReward) {
       await tx.auditLog.create({
         data: {
+          organizationId: input.organizationId,
+          salonId: input.salonId,
           actorType: "BARBER",
           actorBarberId: input.barberId,
           action: "manager_reward.redeemed",

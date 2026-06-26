@@ -14,6 +14,7 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
     const message = await markWhatsAppMessageOpened(prisma, id, {
       actorUserId: session.user.id,
       actorType: session.role,
+      organizationId: session.organizationId,
       ...(await getRequestMeta()),
     });
     return NextResponse.json({ message, waUrl: message.waUrl });

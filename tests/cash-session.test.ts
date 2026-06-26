@@ -39,6 +39,7 @@ describe("cash sessions", () => {
 
     const customer = await createCustomerWithLoyalty({
       prisma,
+      organizationId: "org_default",
       name: "عميل جلسة صندوق",
       phone: randomSaudiPhone(),
       createdByBarberId: barberId,
@@ -119,6 +120,8 @@ describe("cash sessions", () => {
 
 function createVisit(key: string) {
   return confirmVisit(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
     customerId,
     barberId,
     serviceIds: [serviceId],

@@ -3,6 +3,16 @@ import { Skeleton, CardGridSkeleton } from "@/components/skeleton";
 export default function DashboardLoading() {
   return (
     <main className="dashboard-page">
+      <div className="flex items-center justify-between gap-3 border-b border-white/5 bg-sidebar-onyx px-4 py-3 lg:hidden">
+        <div className="flex items-center gap-3">
+          <span className="skeleton h-10 w-10 rounded-lg bg-white/10" />
+          <div className="space-y-1.5">
+            <span className="skeleton block h-2 w-12 bg-white/10" />
+            <span className="skeleton block h-3 w-20 bg-white/10" />
+          </div>
+        </div>
+        <span className="skeleton h-11 w-11 rounded-xl bg-white/10" />
+      </div>
       <div className="mx-auto grid max-w-[1680px] gap-0 lg:grid-cols-[320px_1fr]">
         <aside className="hidden bg-sidebar-onyx px-5 py-5 lg:flex lg:min-h-screen lg:flex-col lg:gap-4">
           <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-4">

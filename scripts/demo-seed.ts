@@ -14,7 +14,7 @@ async function main() {
   const barber = await prisma.barber.create({
     data: {
       name: `${demoPrefix} حلاق تجربة`,
-      phone: "966599990000",
+      phone: "0599990000",
       accessPinHash: await hashBarberPin("1234"),
       isActive: true,
     },
@@ -38,10 +38,10 @@ async function main() {
     },
   });
 
-  const cashCustomer = await createDemoCustomer("عميل كاش", "966599990001", 0);
-  const cardCustomer = await createDemoCustomer("عميل شبكة", "966599990002", 0);
-  const rewardCustomer = await createDemoCustomer("عميل مكافأة", "966599990003", 700);
-  const inactiveCustomer = await createDemoCustomer("عميل منقطع", "966599990004", 300);
+  const cashCustomer = await createDemoCustomer("عميل كاش", "0599990001", 0);
+  const cardCustomer = await createDemoCustomer("عميل شبكة", "0599990002", 0);
+  const rewardCustomer = await createDemoCustomer("عميل مكافأة", "0599990003", 700);
+  const inactiveCustomer = await createDemoCustomer("عميل منقطع", "0599990004", 300);
   await prisma.customer.update({
     where: { id: inactiveCustomer.id },
     data: { visitCount: 1, lastVisitAt: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000) },
@@ -49,6 +49,8 @@ async function main() {
 
   const rewardRule = await prisma.rewardRule.findFirst({ where: { isActive: true, requiredPoints: { lte: 700 } }, orderBy: { requiredPoints: "desc" } });
   const cashVisit = await confirmVisit(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
     customerId: cashCustomer.id,
     barberId: barber.id,
     serviceIds: [services[0].id],
@@ -57,6 +59,8 @@ async function main() {
     idempotencyKey: "demo-cash-visit",
   });
   await confirmVisit(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
     customerId: cardCustomer.id,
     barberId: barber.id,
     serviceIds: [services[0].id],
@@ -66,6 +70,8 @@ async function main() {
   });
   if (rewardRule) {
     await confirmVisit(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
       customerId: rewardCustomer.id,
       barberId: barber.id,
       serviceIds: [services[0].id],
@@ -76,6 +82,8 @@ async function main() {
     });
   }
   await confirmVisit(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
     customerId: inactiveCustomer.id,
     barberId: barber.id,
     serviceIds: [services[0].id],
@@ -109,9 +117,9 @@ async function main() {
 }
 
 async function cleanupDemoData() {
-  const demoBarbers = await prisma.barber.findMany({ where: { OR: [{ name: { startsWith: demoPrefix } }, { phone: "966599990000" }] } });
+  const demoBarbers = await prisma.barber.findMany({ where: { OR: [{ name: { startsWith: demoPrefix } }, { phone: "0599990000" }] } });
   const barberIds = demoBarbers.map((barber) => barber.id);
-  const demoCustomers = await prisma.customer.findMany({ where: { OR: [{ name: { startsWith: demoPrefix } }, { phone: { startsWith: "96659999" } }] } });
+  const demoCustomers = await prisma.customer.findMany({ where: { OR: [{ name: { startsWith: demoPrefix } }, { phone: { startsWith: "059999" } }] } });
   const customerIds = demoCustomers.map((customer) => customer.id);
   const demoVisits = await prisma.visit.findMany({ where: { OR: [{ customerId: { in: customerIds } }, { barberId: { in: barberIds } }, { idempotencyKey: { startsWith: "demo-" } }] } });
   const visitIds = demoVisits.map((visit) => visit.id);

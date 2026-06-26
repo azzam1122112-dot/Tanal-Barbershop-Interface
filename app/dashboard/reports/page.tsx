@@ -23,9 +23,11 @@ export default async function DashboardReportsPage({
   if (!session) redirect("/dashboard/login");
   if (!canAccessDashboard(session)) redirect("/barber");
 
+  const organizationId = session.type === "dashboard" ? session.organizationId : undefined;
   const params = await searchParams;
   const presetRange = getPresetRange(params.preset);
   const filters: ReportFilters = {
+    organizationId,
     from: params.from ? startOfDay(params.from) : presetRange.from,
     to: params.to ? endExclusive(params.to) : presetRange.to,
     barberId: params.barberId,
@@ -33,7 +35,7 @@ export default async function DashboardReportsPage({
   };
 
   const [barbers, revenue, barberPerformance, services, customers, discounts] = await Promise.all([
-    prisma.barber.findMany({ orderBy: { name: "asc" } }),
+    prisma.barber.findMany({ where: { ...(organizationId ? { organizationId } : {}) }, orderBy: { name: "asc" } }),
     getRevenueReport(prisma, filters),
     getBarberPerformanceReport(prisma, filters),
     getServiceReport(prisma, filters),

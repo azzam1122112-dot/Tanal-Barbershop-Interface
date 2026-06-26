@@ -28,6 +28,7 @@ describe("customer creation service", () => {
   it("creates a new customer and loyalty account", async () => {
     const result = await createCustomerWithLoyalty({
       prisma,
+      organizationId: "org_default",
       name: "عميل اختبار",
       phone,
       createdByBarberId: barberId,
@@ -43,6 +44,7 @@ describe("customer creation service", () => {
   it("prevents duplicate customers for the same phone", async () => {
     const result = await createCustomerWithLoyalty({
       prisma,
+      organizationId: "org_default",
       name: "اسم آخر",
       phone,
       createdByBarberId: barberId,

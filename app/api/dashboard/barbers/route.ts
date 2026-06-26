@@ -14,6 +14,7 @@ export async function GET() {
   if (!session || session.type !== "dashboard") return NextResponse.json({ message: "غير مصرح" }, { status: 401 });
 
   const barbers = await prisma.barber.findMany({
+    where: { organizationId: session.organizationId },
     orderBy: [{ isActive: "desc" }, { createdAt: "desc" }],
   });
 
@@ -36,6 +37,8 @@ export async function POST(request: Request) {
   try {
     const barber = await prisma.barber.create({
       data: {
+        organizationId: session.organizationId,
+        salonId: session.salonId,
         name: parsed.data.name,
         phone: parsed.data.phone,
         accessPinHash: await hashBarberPin(parsed.data.pin),

@@ -6,7 +6,8 @@ type ManagerRewardPrisma = PrismaClient | Prisma.TransactionClient;
 
 type ActorMeta = {
   actorUserId: string;
-  actorType: Extract<UserRole, "ADMIN" | "SUPERVISOR">;
+  actorType: Extract<UserRole, "OWNER" | "ADMIN" | "SUPERVISOR">;
+  organizationId?: string;
   ipAddress?: string | null;
   userAgent?: string | null;
 };
@@ -22,11 +23,12 @@ export async function createManagerReward(
   },
   meta: ActorMeta,
 ) {
-  const customer = await prisma.customer.findUnique({ where: { id: input.customerId } });
+  const customer = await prisma.customer.findFirst({ where: { id: input.customerId, ...(meta.organizationId ? { organizationId: meta.organizationId } : {}) } });
   if (!customer) throw new BusinessError("العميل غير موجود");
 
   const reward = await prisma.managerReward.create({
     data: {
+      organizationId: customer.organizationId,
       customerId: input.customerId,
       issuedByUserId: meta.actorUserId,
       title: input.title,

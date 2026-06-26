@@ -9,8 +9,13 @@ import { toSafeService } from "@/lib/services/service-summary";
 export async function GET() {
   const auth = await requireDashboardApi();
   if (auth.response) return auth.response;
+  const session = auth.session;
+  if (!session || session.type !== "dashboard") {
+    return NextResponse.json({ message: "غير مصرح" }, { status: 401 });
+  }
 
   const services = await prisma.service.findMany({
+    where: { organizationId: session.organizationId },
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
   });
 
@@ -34,7 +39,7 @@ export async function POST(request: Request) {
 
   try {
     const service = await prisma.service.create({
-      data: parsed.data,
+      data: { ...parsed.data, organizationId: session.organizationId, salonId: session.salonId },
     });
     const meta = await getRequestMeta();
     await writeAuditLog({

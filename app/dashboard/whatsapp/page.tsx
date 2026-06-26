@@ -22,27 +22,30 @@ export default async function WhatsAppPage({
   if (!canAccessDashboard(session)) redirect("/barber");
   const params = await searchParams;
 
+  const organizationId = session.type === "dashboard" ? session.organizationId : undefined;
+  const orgFilter = organizationId ? { organizationId } : {};
   const [templates, messages, customers, visits, campaigns, inactiveAudience, rewardAudience] = await Promise.all([
-    getWhatsAppTemplates(prisma),
-    getWhatsAppMessages(prisma),
+    getWhatsAppTemplates(prisma, organizationId),
+    getWhatsAppMessages(prisma, { organizationId }),
     prisma.customer.findMany({
+      where: orgFilter,
       include: { loyaltyAccount: true },
       orderBy: { updatedAt: "desc" },
       take: 100,
     }),
     prisma.visit.findMany({
-      where: { status: "COMPLETED" },
+      where: { status: "COMPLETED", ...orgFilter },
       include: { customer: true },
       orderBy: { visitedAt: "desc" },
       take: 100,
     }),
     prisma.campaign.findMany({
-      where: { isActive: true },
+      where: { isActive: true, ...orgFilter },
       orderBy: { createdAt: "desc" },
       take: 100,
     }),
-    getInactiveWhatsAppAudience(prisma, 30),
-    getRewardReadyWhatsAppAudience(prisma),
+    getInactiveWhatsAppAudience(prisma, 30, organizationId),
+    getRewardReadyWhatsAppAudience(prisma, organizationId),
   ]);
 
   return (

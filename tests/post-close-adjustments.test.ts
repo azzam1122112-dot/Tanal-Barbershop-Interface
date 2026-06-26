@@ -81,8 +81,8 @@ describe("post-close adjustment report", () => {
     expect(report.adjustments.some((adjustment) => adjustment.visitId === openAdjustmentVisitId)).toBe(false);
     expect(report.adjustments.every((adjustment) => adjustment.postCloseAdjustment)).toBe(true);
     expect(canAccessDashboard(null)).toBe(false);
-    expect(canAccessDashboard({ type: "barber", id: "b", role: "BARBER", barber: { id: barberId, name: "حلاق", phone: "966500000001", role: "BARBER" } })).toBe(false);
-    expect(canAccessDashboard({ type: "dashboard", id: "a", role: "ADMIN", user: { id: adminUserId, name: "مدير", email: "admin@tanal.local", role: "ADMIN" } })).toBe(true);
+    expect(canAccessDashboard({ type: "barber", id: "b", role: "BARBER", organizationId: "org_default", salonId: "salon_default", barber: { id: barberId, name: "حلاق", phone: "966500000001", role: "BARBER" } })).toBe(false);
+    expect(canAccessDashboard({ type: "dashboard", id: "a", role: "ADMIN", organizationId: "org_default", salonId: null, user: { id: adminUserId, name: "مدير", email: "admin@tanal.local", role: "ADMIN" } })).toBe(true);
   });
 
   it("calculates payment method financial impact from cash to network", async () => {
@@ -149,6 +149,8 @@ async function createBarber(name: string) {
 async function createVisit(targetBarberId: string, name: string, grossAmount: number, paymentMethod: "CASH" | "NETWORK") {
   const customer = await createCustomer(name, targetBarberId);
   const result = await confirmVisit(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
     customerId: customer.customer.id,
     barberId: targetBarberId,
     serviceIds: [serviceId],
@@ -163,6 +165,7 @@ async function createVisit(targetBarberId: string, name: string, grossAmount: nu
 async function createCustomer(name: string, targetBarberId: string) {
   const result = await createCustomerWithLoyalty({
     prisma,
+    organizationId: "org_default",
     name,
     phone: `9665${Math.floor(10000000 + Math.random() * 89999999)}`,
     createdByBarberId: targetBarberId,

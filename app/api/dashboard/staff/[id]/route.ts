@@ -21,7 +21,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     return NextResponse.json({ message: "بيانات الموظف غير صحيحة" }, { status: 400 });
   }
 
-  const before = await prisma.user.findUnique({ where: { id } });
+  const before = await prisma.user.findFirst({ where: { id, organizationId: session.organizationId } });
   if (!before || before.role === "BARBER") {
     return NextResponse.json({ message: "الموظف غير موجود" }, { status: 404 });
   }
@@ -35,6 +35,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   if ((before.role === "ADMIN" && nextRole !== "ADMIN") || (before.role === "ADMIN" && !nextIsActive)) {
     const activeAdmins = await prisma.user.count({
       where: {
+        organizationId: session.organizationId,
         role: "ADMIN",
         isActive: true,
         id: { not: id },

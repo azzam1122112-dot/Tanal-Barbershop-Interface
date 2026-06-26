@@ -14,7 +14,7 @@ type StaffDraft = {
   name: string;
   email: string;
   phone: string;
-  role: "ADMIN" | "SUPERVISOR";
+  role: "OWNER" | "ADMIN" | "SUPERVISOR";
   isActive: boolean;
   password: string;
 };
@@ -87,6 +87,10 @@ export function StaffManager({ initialUsers, currentUserId }: { initialUsers: Sa
     }
 
     setLoading(false);
+  }
+
+  function sanitizePhone(value: string) {
+    return value.replace(/\D/g, "").slice(0, 10);
   }
 
   function startEdit(user: SafeAdminUser) {
@@ -199,7 +203,20 @@ export function StaffManager({ initialUsers, currentUserId }: { initialUsers: Sa
               <input name="email" type="email" required placeholder="name@tanal.local" className="dashboard-field" />
             </Field>
             <Field label="رقم الجوال">
-              <input name="phone" required inputMode="tel" placeholder="9665xxxxxxxx" className="dashboard-field" />
+              <input
+                name="phone"
+                required
+                inputMode="numeric"
+                minLength={10}
+                maxLength={10}
+                pattern="05[0-9]{8}"
+                autoComplete="tel"
+                placeholder="05xxxxxxxx"
+                onInput={(event) => {
+                  event.currentTarget.value = sanitizePhone(event.currentTarget.value);
+                }}
+                className="dashboard-field"
+              />
             </Field>
             <Field label="الصلاحية">
               <select name="role" defaultValue="SUPERVISOR" className="dashboard-field">
@@ -270,7 +287,17 @@ export function StaffManager({ initialUsers, currentUserId }: { initialUsers: Sa
                           <input value={draft.email} onChange={(event) => updateDraft(user.id, { email: event.target.value })} type="email" className="dashboard-field py-2.5" />
                         </Field>
                         <Field label="رقم الجوال">
-                          <input value={draft.phone} onChange={(event) => updateDraft(user.id, { phone: event.target.value })} inputMode="tel" className="dashboard-field py-2.5" />
+                          <input
+                            value={draft.phone}
+                            onChange={(event) => updateDraft(user.id, { phone: sanitizePhone(event.target.value) })}
+                            inputMode="numeric"
+                            minLength={10}
+                            maxLength={10}
+                            pattern="05[0-9]{8}"
+                            autoComplete="tel"
+                            placeholder="05xxxxxxxx"
+                            className="dashboard-field py-2.5"
+                          />
                         </Field>
                         <Field label="الصلاحية">
                           <select
@@ -399,12 +426,10 @@ function SummaryTile({ label, value, tone }: { label: string; value: number; ton
   );
 }
 
-function RoleBadge({ role }: { role: "ADMIN" | "SUPERVISOR" }) {
-  return (
-    <span className={`rounded-full px-3 py-1 text-xs font-black ${role === "ADMIN" ? "bg-salon-ink text-white" : "bg-salon-steel/10 text-salon-steel"}`}>
-      {role === "ADMIN" ? "مدير النظام" : "مشرف"}
-    </span>
-  );
+function RoleBadge({ role }: { role: "OWNER" | "ADMIN" | "SUPERVISOR" }) {
+  const label = role === "OWNER" ? "مالك" : role === "ADMIN" ? "مدير النظام" : "مشرف";
+  const tone = role === "SUPERVISOR" ? "bg-salon-steel/10 text-salon-steel" : "bg-salon-ink text-white";
+  return <span className={`rounded-full px-3 py-1 text-xs font-black ${tone}`}>{label}</span>;
 }
 
 function Info({ label, value }: { label: string; value: string }) {

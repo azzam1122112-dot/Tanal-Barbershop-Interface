@@ -24,6 +24,8 @@ export async function POST(request: Request) {
   try {
     const meta = await getRequestMeta();
     const result = await confirmVisit(prisma, {
+      organizationId: session.organizationId,
+      salonId: session.salonId,
       customerId: parsed.data.customerId,
       barberId: session.barber.id,
       serviceIds: parsed.data.serviceIds,

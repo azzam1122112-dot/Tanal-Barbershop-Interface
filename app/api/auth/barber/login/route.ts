@@ -7,6 +7,7 @@ import { setSessionCookie, getRequestMeta, parseJsonBody } from "@/lib/auth/http
 import { writeAuditLog } from "@/lib/audit/audit-log";
 import { clearRateLimit, consumeRateLimit } from "@/lib/auth/rate-limit";
 import { canBarberLogin } from "@/lib/auth/login-policy";
+import { resolveRequestOrganization } from "@/lib/tenant/request-org";
 
 const ERROR_MESSAGE = "رقم الجوال أو رمز الدخول غير صحيح";
 
@@ -19,7 +20,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: ERROR_MESSAGE }, { status: 401 });
   }
 
-  const rateKey = `barber:${parsed.data.phone}`;
+  const organization = await resolveRequestOrganization();
+  if (!organization) {
+    return NextResponse.json({ message: ERROR_MESSAGE }, { status: 401 });
+  }
+
+  const rateKey = `barber:${organization.id}:${parsed.data.phone}`;
   const rate = await consumeRateLimit(prisma, rateKey);
   if (rate.limited) {
     await writeAuditLog({
@@ -36,7 +42,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const barber = await prisma.barber.findUnique({ where: { phone: parsed.data.phone } });
+  const barber = await prisma.barber.findFirst({ where: { phone: parsed.data.phone, organizationId: organization.id } });
   const pinOk = barber ? await verifyBarberPin(parsed.data.pin, barber.accessPinHash) : false;
 
   if (!barber || !canBarberLogin(barber, pinOk)) {
@@ -58,6 +64,8 @@ export async function POST(request: Request) {
     actorType: "BARBER",
     actorId: authenticatedBarber.id,
     role: "BARBER",
+    organizationId: authenticatedBarber.organizationId,
+    activeSalonId: authenticatedBarber.salonId,
     ...meta,
   });
 

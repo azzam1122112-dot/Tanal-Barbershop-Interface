@@ -80,6 +80,10 @@ export function BarberManager({ initialBarbers }: { initialBarbers: SafeBarber[]
     setLoading(false);
   }
 
+  function sanitizePhone(value: string) {
+    return value.replace(/\D/g, "").slice(0, 10);
+  }
+
   function startEdit(barber: SafeBarber) {
     setEditingId(barber.id);
     setDrafts((current) => ({
@@ -249,7 +253,20 @@ export function BarberManager({ initialBarbers }: { initialBarbers: SafeBarber[]
             </label>
             <label className="block">
               <span className="mb-2 block text-xs font-black text-salon-charcoal">رقم الجوال</span>
-              <input name="phone" required inputMode="tel" placeholder="9665xxxxxxxx" className="dashboard-field" />
+              <input
+                name="phone"
+                required
+                inputMode="numeric"
+                minLength={10}
+                maxLength={10}
+                pattern="05[0-9]{8}"
+                autoComplete="tel"
+                placeholder="05xxxxxxxx"
+                onInput={(event) => {
+                  event.currentTarget.value = sanitizePhone(event.currentTarget.value);
+                }}
+                className="dashboard-field"
+              />
             </label>
             <label className="block">
               <span className="mb-2 block text-xs font-black text-salon-charcoal">رمز الدخول</span>
@@ -312,7 +329,17 @@ export function BarberManager({ initialBarbers }: { initialBarbers: SafeBarber[]
                         </label>
                         <label className="block">
                           <span className="mb-2 block text-xs font-black text-salon-charcoal">رقم الجوال</span>
-                          <input value={draft.phone} onChange={(event) => updateDraft(barber.id, { phone: event.target.value })} inputMode="tel" className="dashboard-field py-2.5" />
+                          <input
+                            value={draft.phone}
+                            onChange={(event) => updateDraft(barber.id, { phone: sanitizePhone(event.target.value) })}
+                            inputMode="numeric"
+                            minLength={10}
+                            maxLength={10}
+                            pattern="05[0-9]{8}"
+                            autoComplete="tel"
+                            placeholder="05xxxxxxxx"
+                            className="dashboard-field py-2.5"
+                          />
                         </label>
                         <label className="block">
                           <span className="mb-2 block text-xs font-black text-salon-charcoal">رمز دخول جديد</span>

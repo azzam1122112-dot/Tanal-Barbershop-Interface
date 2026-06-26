@@ -20,7 +20,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     return NextResponse.json({ message: "بيانات الحلاق غير صحيحة" }, { status: 400 });
   }
 
-  const before = await prisma.barber.findUnique({ where: { id } });
+  const before = await prisma.barber.findFirst({ where: { id, organizationId: session.organizationId } });
   if (!before) {
     return NextResponse.json({ message: "الحلاق غير موجود" }, { status: 404 });
   }
@@ -61,7 +61,7 @@ export async function DELETE(_request: Request, context: { params: Promise<{ id:
   if (!session || session.type !== "dashboard") return NextResponse.json({ message: "غير مصرح" }, { status: 401 });
 
   const { id } = await context.params;
-  const before = await prisma.barber.findUnique({ where: { id } });
+  const before = await prisma.barber.findFirst({ where: { id, organizationId: session.organizationId } });
   if (!before) {
     return NextResponse.json({ message: "الحلاق غير موجود" }, { status: 404 });
   }

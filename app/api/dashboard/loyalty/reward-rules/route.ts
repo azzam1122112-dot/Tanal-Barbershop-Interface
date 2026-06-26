@@ -23,6 +23,7 @@ export async function POST(request: Request) {
   try {
     const rule = await prisma.rewardRule.create({
       data: {
+        organizationId: session.organizationId,
         name: parsed.data.name ?? `خصم ${parsed.data.discountAmount} ريال`,
         requiredPoints: parsed.data.requiredPoints,
         discountAmount: parsed.data.discountAmount,

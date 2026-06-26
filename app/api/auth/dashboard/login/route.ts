@@ -7,6 +7,7 @@ import { setSessionCookie, getRequestMeta, parseJsonBody } from "@/lib/auth/http
 import { writeAuditLog } from "@/lib/audit/audit-log";
 import { clearRateLimit, consumeRateLimit } from "@/lib/auth/rate-limit";
 import { canAdminLogin } from "@/lib/auth/login-policy";
+import { resolveRequestOrganization } from "@/lib/tenant/request-org";
 
 const ERROR_MESSAGE = "بيانات الدخول غير صحيحة";
 
@@ -19,7 +20,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: ERROR_MESSAGE }, { status: 401 });
   }
 
-  const rateKey = `dashboard:${parsed.data.email}`;
+  const organization = await resolveRequestOrganization();
+  if (!organization) {
+    return NextResponse.json({ message: ERROR_MESSAGE }, { status: 401 });
+  }
+
+  const rateKey = `dashboard:${organization.id}:${parsed.data.email}`;
   const rate = await consumeRateLimit(prisma, rateKey);
   if (rate.limited) {
     await writeAuditLog({
@@ -36,7 +42,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const user = await prisma.user.findUnique({ where: { email: parsed.data.email } });
+  const user = await prisma.user.findFirst({ where: { email: parsed.data.email, organizationId: organization.id } });
   const passwordOk = user ? await verifyAdminPassword(parsed.data.password, user.passwordHash) : false;
 
   if (!user || !canAdminLogin(user, passwordOk)) {
@@ -53,11 +59,22 @@ export async function POST(request: Request) {
 
   const authenticatedUser = user;
 
+  // أول صالون في المؤسسة هو الصالون النشط افتراضيًا (يمكن تبديله لاحقًا).
+  const firstSalon = authenticatedUser.organizationId
+    ? await prisma.salon.findFirst({
+        where: { organizationId: authenticatedUser.organizationId, isActive: true },
+        orderBy: { createdAt: "asc" },
+        select: { id: true },
+      })
+    : null;
+
   const { token } = await createStoredSession({
     prisma,
     actorType: authenticatedUser.role,
     actorId: authenticatedUser.id,
     role: authenticatedUser.role,
+    organizationId: authenticatedUser.organizationId,
+    activeSalonId: firstSalon?.id ?? null,
     ...meta,
   });
 

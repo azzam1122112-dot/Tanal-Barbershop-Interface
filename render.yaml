@@ -22,6 +22,8 @@ services:
         value: info
       - key: ALLOWED_ORIGINS
         sync: false
+      - key: ROOT_DOMAIN
+        sync: false
       - key: MAINTENANCE_TOKEN
         sync: false
       - key: DATABASE_URL

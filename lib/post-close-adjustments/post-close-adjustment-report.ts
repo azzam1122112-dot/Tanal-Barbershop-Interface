@@ -3,6 +3,7 @@ import type { AuditLog, PaymentMethod, PrismaClient } from "@prisma/client";
 type AdjustmentType = "VISIT_CANCELLED" | "VISIT_PAYMENT_METHOD_UPDATED" | "VISIT_AMOUNT_UPDATED";
 
 type ReportFilters = {
+  organizationId?: string | null;
   from?: Date | string | null;
   to?: Date | string | null;
   barberId?: string | null;
@@ -25,6 +26,7 @@ export async function getPostCloseAdjustmentReport(prisma: PrismaClient, filters
   const range = normalizeRange(filters);
   const logs = await prisma.auditLog.findMany({
     where: {
+      ...(filters.organizationId ? { organizationId: filters.organizationId } : {}),
       entityType: "Visit",
       action: { in: Object.keys(actionToType) },
       createdAt: { gte: range.from, lt: range.to },

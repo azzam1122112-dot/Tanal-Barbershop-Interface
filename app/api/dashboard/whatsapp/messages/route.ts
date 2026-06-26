@@ -7,6 +7,8 @@ import { getWhatsAppMessages } from "@/lib/whatsapp/whatsapp-service";
 export async function GET(request: Request) {
   const auth = await requireDashboardApi();
   if (auth.response) return auth.response;
+  const session = auth.session;
+  if (!session || session.type !== "dashboard") return NextResponse.json({ message: "غير مصرح" }, { status: 401 });
 
   const searchParams = Object.fromEntries(new URL(request.url).searchParams.entries());
   const parsed = whatsappMessageListSchema.safeParse(searchParams);
@@ -14,6 +16,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: "فلاتر سجل واتساب غير صحيحة" }, { status: 400 });
   }
 
-  const messages = await getWhatsAppMessages(prisma, parsed.data);
+  const messages = await getWhatsAppMessages(prisma, { ...parsed.data, organizationId: session.organizationId });
   return NextResponse.json({ messages });
 }

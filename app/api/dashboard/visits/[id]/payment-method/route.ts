@@ -24,6 +24,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const result = await updateVisitPaymentMethod(prisma, id, parsed.data.paymentMethod, {
       actorUserId: session.user.id,
       actorType: session.role,
+      organizationId: session.organizationId,
       reason: parsed.data.reason,
       ...(await getRequestMeta()),
     });

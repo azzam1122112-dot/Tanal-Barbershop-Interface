@@ -1,10 +1,16 @@
 import { PrismaClient } from "@prisma/client";
 import { hashAdminPassword } from "../lib/auth/password";
 import { hashBarberPin } from "../lib/auth/barber-pin";
+import { normalizeSaudiPhone } from "../lib/phone/saudi-phone";
 
 const prisma = new PrismaClient();
 
 const requireExplicitSeedCredentials = process.env.REQUIRE_EXPLICIT_SEED_CREDENTIALS === "true";
+
+// معرّفات ثابتة تطابق هجرة الترحيل backfill_default_tenant.
+const DEFAULT_PLAN_ID = "plan_starter";
+const DEFAULT_ORG_ID = "org_default";
+const DEFAULT_SALON_ID = "salon_default";
 
 function readSeedEnv(key: string, fallback: string) {
   const value = process.env[key];
@@ -16,15 +22,65 @@ function readSeedEnv(key: string, fallback: string) {
   return value ?? fallback;
 }
 
+function normalizeSeedPhone(value: string) {
+  const digits = value.replace(/\D/g, "");
+  if (/^9665\d{8}$/.test(digits)) {
+    return normalizeSaudiPhone(`0${digits.slice(3)}`);
+  }
+
+  return normalizeSaudiPhone(value);
+}
+
 async function main() {
-  const adminPhone = readSeedEnv("SEED_ADMIN_PHONE", "966500000001");
+  const adminPhone = normalizeSeedPhone(readSeedEnv("SEED_ADMIN_PHONE", "0500000001"));
   const adminEmail = readSeedEnv("SEED_ADMIN_EMAIL", "admin@tanal.local");
   const adminPassword = readSeedEnv("SEED_ADMIN_PASSWORD", "Admin@12345");
-  const barberPhone = readSeedEnv("SEED_BARBER_PHONE", "966500000002");
+  const barberPhone = normalizeSeedPhone(readSeedEnv("SEED_BARBER_PHONE", "0500000002"));
   const barberPin = readSeedEnv("SEED_BARBER_PIN", "1234");
 
+  // الباقة الافتراضية
+  await prisma.plan.upsert({
+    where: { id: DEFAULT_PLAN_ID },
+    update: {},
+    create: {
+      id: DEFAULT_PLAN_ID,
+      name: "البداية",
+      slug: "starter",
+      priceMonthly: 0,
+      maxSalons: 1,
+      isActive: true,
+      sortOrder: 0,
+    },
+  });
+
+  // المؤسسة الافتراضية + الصالون الافتراضي
+  const organization = await prisma.organization.upsert({
+    where: { id: DEFAULT_ORG_ID },
+    update: {},
+    create: {
+      id: DEFAULT_ORG_ID,
+      name: "صالون تانال",
+      slug: "default",
+      status: "ACTIVE",
+      planId: DEFAULT_PLAN_ID,
+      subscriptionStatus: "ACTIVE",
+    },
+  });
+
+  const salon = await prisma.salon.upsert({
+    where: { id: DEFAULT_SALON_ID },
+    update: {},
+    create: {
+      id: DEFAULT_SALON_ID,
+      organizationId: organization.id,
+      name: "الصالون الرئيسي",
+      slug: "main",
+      isActive: true,
+    },
+  });
+
   const admin = await prisma.user.upsert({
-    where: { phone: adminPhone },
+    where: { organizationId_phone: { organizationId: organization.id, phone: adminPhone } },
     update: {
       name: "مدير النظام",
       email: adminEmail,
@@ -33,6 +89,7 @@ async function main() {
       isActive: true,
     },
     create: {
+      organizationId: organization.id,
       name: "مدير النظام",
       email: adminEmail,
       phone: adminPhone,
@@ -43,13 +100,15 @@ async function main() {
   });
 
   const barber = await prisma.barber.upsert({
-    where: { phone: barberPhone },
+    where: { salonId_phone: { salonId: salon.id, phone: barberPhone } },
     update: {
       name: "حلاق تجريبي",
       accessPinHash: await hashBarberPin(barberPin),
       isActive: true,
     },
     create: {
+      organizationId: organization.id,
+      salonId: salon.id,
       name: "حلاق تجريبي",
       phone: barberPhone,
       accessPinHash: await hashBarberPin(barberPin),
@@ -58,7 +117,7 @@ async function main() {
   });
 
   await prisma.systemSettings.upsert({
-    where: { singletonKey: "default" },
+    where: { salonId: salon.id },
     update: {
       salonName: "صالون تانال",
       currency: "SAR",
@@ -69,6 +128,8 @@ async function main() {
       whatsappEnabled: true,
     },
     create: {
+      organizationId: organization.id,
+      salonId: salon.id,
       salonName: "صالون تانال",
       currency: "SAR",
       pointsPerCurrencyUnit: 1,
@@ -81,28 +142,18 @@ async function main() {
 
   await prisma.rewardRule.createMany({
     data: [
-      {
-        name: "خصم 25 ريال",
-        requiredPoints: 500,
-        discountAmount: 25,
-        sortOrder: 1,
-      },
-      {
-        name: "خصم 60 ريال",
-        requiredPoints: 1000,
-        discountAmount: 60,
-        sortOrder: 2,
-      },
+      { organizationId: organization.id, name: "خصم 25 ريال", requiredPoints: 500, discountAmount: 25, sortOrder: 1 },
+      { organizationId: organization.id, name: "خصم 60 ريال", requiredPoints: 1000, discountAmount: 60, sortOrder: 2 },
     ],
     skipDuplicates: true,
   });
 
   await prisma.service.createMany({
     data: [
-      { name: "حلاقة شعر", defaultPrice: 35, sortOrder: 1 },
-      { name: "تهذيب لحية", defaultPrice: 20, sortOrder: 2 },
-      { name: "حلاقة شعر ولحية", defaultPrice: 50, sortOrder: 3 },
-      { name: "تنظيف بشرة", defaultPrice: 80, sortOrder: 4 },
+      { organizationId: organization.id, salonId: salon.id, name: "حلاقة شعر", defaultPrice: 35, sortOrder: 1 },
+      { organizationId: organization.id, salonId: salon.id, name: "تهذيب لحية", defaultPrice: 20, sortOrder: 2 },
+      { organizationId: organization.id, salonId: salon.id, name: "حلاقة شعر ولحية", defaultPrice: 50, sortOrder: 3 },
+      { organizationId: organization.id, salonId: salon.id, name: "تنظيف بشرة", defaultPrice: 80, sortOrder: 4 },
     ],
     skipDuplicates: true,
   });
@@ -146,20 +197,25 @@ async function main() {
   ];
 
   for (const template of whatsappTemplates) {
-    const existing = await prisma.whatsAppTemplate.findFirst({ where: { type: template.type, name: template.name } });
+    const existing = await prisma.whatsAppTemplate.findFirst({
+      where: { organizationId: organization.id, type: template.type, name: template.name },
+    });
     if (existing) {
       await prisma.whatsAppTemplate.update({ where: { id: existing.id }, data: { body: template.body, isActive: true } });
     } else {
-      await prisma.whatsAppTemplate.create({ data: template });
+      await prisma.whatsAppTemplate.create({ data: { ...template, organizationId: organization.id } });
     }
   }
 
   await prisma.auditLog.create({
     data: {
+      organizationId: organization.id,
       actorType: "SYSTEM",
       action: "seed.initialized",
       entityType: "System",
       after: {
+        organizationId: organization.id,
+        salonId: salon.id,
         adminId: admin.id,
         barberId: barber.id,
         phase: 1,

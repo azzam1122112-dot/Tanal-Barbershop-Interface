@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { barberPinSchema } from "./barber-pin";
 import { adminPasswordSchema } from "./password";
-import { normalizeSaudiPhone } from "@/lib/phone/saudi-phone";
+import { normalizeSaudiPhone, SAUDI_LOCAL_MOBILE_MESSAGE } from "@/lib/phone/saudi-phone";
 
 export const emailSchema = z
   .string()
@@ -16,7 +16,7 @@ export const phoneSchema = z
     try {
       return normalizeSaudiPhone(value);
     } catch {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "رقم الجوال السعودي غير صحيح" });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: SAUDI_LOCAL_MOBILE_MESSAGE });
       return z.NEVER;
     }
   });

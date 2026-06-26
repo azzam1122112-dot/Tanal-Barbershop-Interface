@@ -103,6 +103,8 @@ describe("whatsapp templates and message logs", () => {
     createdTemplateIds.push(templateId);
 
     const visit = await confirmVisit(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
       customerId,
       barberId,
       serviceIds: [serviceId],
@@ -154,7 +156,7 @@ describe("whatsapp templates and message logs", () => {
   it("builds a valid encoded wa.me url and rejects invalid phone numbers", () => {
     const url = buildWhatsAppUrl("05 1234 5678", "أهلًا عميل");
     expect(url).toBe(`https://wa.me/966512345678?text=${encodeURIComponent("أهلًا عميل")}`);
-    expect(() => buildWhatsAppUrl("12345", "رسالة")).toThrow("رقم الجوال السعودي غير صحيح");
+    expect(() => buildWhatsAppUrl("12345", "رسالة")).toThrow("رقم الجوال يجب أن يبدأ بـ 05 ويتكون من 10 أرقام");
   });
 
   it("renders known variables and removes unknown placeholders", () => {
@@ -172,7 +174,10 @@ describe("whatsapp templates and message logs", () => {
     const log = await prisma.whatsAppMessageLog.findUniqueOrThrow({ where: { id: generated.messageLogId } });
     expect(generated.status).toBe("DRAFTED");
     expect(log.status).toBe("DRAFTED");
+    expect(log.phone).toMatch(/^05\d{8}$/);
+    expect(generated.phone).toBe(log.phone);
     expect(generated.waUrl).toContain("https://wa.me/9665");
+    expect(generated.waUrl).toContain(`https://wa.me/966${log.phone.slice(1)}`);
     expect(decodeURIComponent(generated.waUrl)).toContain("مبلغ الزيارة 80");
     expect(JSON.stringify(generated)).not.toContain("passwordHash");
     expect(JSON.stringify(generated)).not.toContain("accessPinHash");
@@ -180,6 +185,23 @@ describe("whatsapp templates and message logs", () => {
 
   it("rejects message generation when customer disabled whatsapp", async () => {
     await expect(generateWhatsAppMessage(prisma, { customerId: optOutCustomerId, templateId }, adminMeta())).rejects.toThrow("العميل لا يرغب");
+  });
+
+  it("rejects message generation when whatsapp is disabled in system settings", async () => {
+    const settings = await prisma.systemSettings.findUniqueOrThrow({ where: { salonId: "salon_default" } });
+    await prisma.systemSettings.update({
+      where: { salonId: "salon_default" },
+      data: { whatsappEnabled: false },
+    });
+
+    try {
+      await expect(generateWhatsAppMessage(prisma, { customerId, templateId }, adminMeta())).rejects.toThrow("واتساب معطل من إعدادات النظام");
+    } finally {
+      await prisma.systemSettings.update({
+        where: { salonId: "salon_default" },
+        data: { whatsappEnabled: settings.whatsappEnabled },
+      });
+    }
   });
 
   it("updates opened and marked sent statuses and writes audit logs", async () => {
@@ -227,14 +249,15 @@ describe("whatsapp templates and message logs", () => {
     expect(updated.whatsappOptIn).toBe(false);
     await updateCustomerWhatsappPreference(prisma, customerId, true, adminMeta());
     expect(canAccessDashboard(null)).toBe(false);
-    expect(canAccessDashboard({ type: "barber", id: "wa-b", role: "BARBER", barber: { id: barberId, name: "حلاق", phone: "966500000001", role: "BARBER" } })).toBe(false);
-    expect(canAccessDashboard({ type: "dashboard", id: "wa-a", role: "ADMIN", user: { id: adminUserId, name: "مدير", email: "admin@tanal.local", role: "ADMIN" } })).toBe(true);
+    expect(canAccessDashboard({ type: "barber", id: "wa-b", role: "BARBER", organizationId: "org_default", salonId: "salon_default", barber: { id: barberId, name: "حلاق", phone: "0500000001", role: "BARBER" } })).toBe(false);
+    expect(canAccessDashboard({ type: "dashboard", id: "wa-a", role: "ADMIN", organizationId: "org_default", salonId: null, user: { id: adminUserId, name: "مدير", email: "admin@tanal.local", role: "ADMIN" } })).toBe(true);
   });
 });
 
 async function createCustomer(name: string) {
   const result = await createCustomerWithLoyalty({
     prisma,
+    organizationId: "org_default",
     name,
     phone: randomSaudiPhone(),
     createdByBarberId: barberId,
@@ -251,5 +274,5 @@ function adminMeta() {
 }
 
 function randomSaudiPhone() {
-  return `9665${Math.floor(10000000 + Math.random() * 89999999)}`;
+  return `05${Math.floor(10000000 + Math.random() * 89999999)}`;
 }

@@ -95,6 +95,8 @@ describe("dashboard reports", () => {
     });
 
     const cashVisit = await confirmVisit(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
       customerId: cashCustomer.customer.id,
       barberId,
       serviceIds: [serviceId],
@@ -103,6 +105,8 @@ describe("dashboard reports", () => {
       idempotencyKey: `report-cash-${Date.now()}`,
     });
     const rewardVisit = await confirmVisit(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
       customerId: rewardCustomer.customer.id,
       barberId,
       serviceIds: [serviceId],
@@ -112,6 +116,8 @@ describe("dashboard reports", () => {
       idempotencyKey: `report-reward-${Date.now()}`,
     });
     const campaignVisit = await confirmVisit(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
       customerId: campaignCustomer.customer.id,
       barberId: secondBarberId,
       serviceIds: [secondServiceId],
@@ -241,7 +247,7 @@ describe("dashboard reports", () => {
     });
     createdVisitIds.push(cancelled.id);
 
-    const summary = await getDashboardSummary(prisma, reportDate);
+    const summary = await getDashboardSummary(prisma, undefined, reportDate);
     expect(summary.netAmount).toBe(205);
     expect(JSON.stringify(summary)).not.toContain("passwordHash");
     expect(JSON.stringify(summary)).not.toContain("accessPinHash");
@@ -280,6 +286,8 @@ describe("dashboard reports", () => {
         type: "barber",
         id: "report-session-barber",
         role: "BARBER",
+        organizationId: "org_default",
+        salonId: "salon_default",
         barber: { id: barberId, name: "حلاق", phone: "966500000002", role: "BARBER" },
       }),
     ).toBe(false);
@@ -288,6 +296,8 @@ describe("dashboard reports", () => {
         type: "dashboard",
         id: "report-session-admin",
         role: "ADMIN",
+        organizationId: "org_default",
+        salonId: null,
         user: { id: "admin", name: "مدير", email: "admin@tanal.local", role: "ADMIN" },
       }),
     ).toBe(true);
@@ -297,6 +307,7 @@ describe("dashboard reports", () => {
 async function createCustomer(name: string) {
   const result = await createCustomerWithLoyalty({
     prisma,
+    organizationId: "org_default",
     name,
     phone: `9665${Math.floor(10000000 + Math.random() * 89999999)}`,
     createdByBarberId: barberId,

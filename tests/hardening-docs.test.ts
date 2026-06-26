@@ -9,12 +9,16 @@ describe("phase 13 hardening docs and access gates", () => {
       type: "barber" as const,
       id: "barber-session",
       role: "BARBER" as const,
+      organizationId: "org_default",
+      salonId: "salon_default",
       barber: { id: "barber-1", name: "حلاق", phone: "966500000002", role: "BARBER" as const },
     };
     const adminSession = {
       type: "dashboard" as const,
       id: "admin-session",
       role: "ADMIN" as const,
+      organizationId: "org_default",
+      salonId: null,
       user: { id: "admin-1", name: "مدير", email: "admin@tanal.local", role: "ADMIN" as const },
     };
 

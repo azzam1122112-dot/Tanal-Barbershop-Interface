@@ -21,6 +21,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const customer = await updateCustomerWhatsappPreference(prisma, id, parsed.data.whatsappOptIn, {
       actorUserId: session.user.id,
       actorType: session.role,
+      organizationId: session.organizationId,
       ...(await getRequestMeta()),
     });
     return NextResponse.json({ customer });

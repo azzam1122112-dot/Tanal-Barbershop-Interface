@@ -24,7 +24,9 @@ export default async function DashboardVisitsPage({
   const paymentMethod = params.paymentMethod === "CASH" || params.paymentMethod === "NETWORK" ? params.paymentMethod : undefined;
   const status = params.status === "COMPLETED" || params.status === "CANCELLED" ? params.status : undefined;
   const requestedPage = parsePage(params.page);
+  const organizationId = session.type === "dashboard" ? session.organizationId : undefined;
   const where: Prisma.VisitWhereInput = {
+    ...(organizationId ? { organizationId } : {}),
     ...(paymentMethod ? { paymentMethod } : {}),
     ...(status ? { status } : {}),
     ...(params.barberId ? { barberId: params.barberId } : {}),
@@ -38,11 +40,12 @@ export default async function DashboardVisitsPage({
       : {}),
   };
 
+  const orgFilter = organizationId ? { organizationId } : {};
   const [totalVisits, barbers, rewardRules, campaigns] = await Promise.all([
     prisma.visit.count({ where }),
-    prisma.barber.findMany({ orderBy: { name: "asc" } }),
-    prisma.rewardRule.findMany(),
-    prisma.campaign.findMany(),
+    prisma.barber.findMany({ where: orgFilter, orderBy: { name: "asc" } }),
+    prisma.rewardRule.findMany({ where: orgFilter }),
+    prisma.campaign.findMany({ where: orgFilter }),
   ]);
 
   const totalPages = Math.max(1, Math.ceil(totalVisits / PAGE_SIZE));

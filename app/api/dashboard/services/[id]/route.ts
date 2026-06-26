@@ -22,7 +22,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     return NextResponse.json({ message: "بيانات الخدمة غير صحيحة" }, { status: 400 });
   }
 
-  const before = await prisma.service.findUnique({ where: { id } });
+  const before = await prisma.service.findFirst({ where: { id, organizationId: session.organizationId } });
   if (!before) {
     return NextResponse.json({ message: "الخدمة غير موجودة" }, { status: 404 });
   }

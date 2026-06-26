@@ -8,7 +8,11 @@ import { toSafeSystemSettings, updateSystemSettings } from "@/lib/settings/syste
 export async function GET() {
   const auth = await requireDashboardApi();
   if (auth.response) return auth.response;
-  const settings = await prisma.systemSettings.findUnique({ where: { singletonKey: "default" } });
+  const session = auth.session;
+  if (!session || session.type !== "dashboard") return NextResponse.json({ message: "غير مصرح" }, { status: 401 });
+  const settings = session.salonId
+    ? await prisma.systemSettings.findFirst({ where: { salonId: session.salonId } })
+    : await prisma.systemSettings.findFirst({ where: { organizationId: session.organizationId } });
   if (!settings) return NextResponse.json({ message: "إعدادات النظام غير موجودة" }, { status: 404 });
   return NextResponse.json({ settings: toSafeSystemSettings(settings) });
 }
@@ -28,6 +32,8 @@ export async function PATCH(request: Request) {
     const settings = await updateSystemSettings(prisma, parsed.data, {
       actorUserId: session.user.id,
       actorType: session.role,
+      salonId: session.salonId,
+      organizationId: session.organizationId,
       ...(await getRequestMeta()),
     });
     return NextResponse.json({ settings });

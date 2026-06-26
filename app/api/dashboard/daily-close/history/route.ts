@@ -6,9 +6,12 @@ import { prisma } from "@/lib/db/prisma";
 export async function GET(request: Request) {
   const auth = await requireDashboardApi();
   if (auth.response) return auth.response;
+  const session = auth.session;
+  if (!session || session.type !== "dashboard") return NextResponse.json({ message: "غير مصرح" }, { status: 401 });
 
   const url = new URL(request.url);
   const history = await getDailyCloseHistory(prisma, {
+    organizationId: session.organizationId,
     from: url.searchParams.get("from"),
     to: url.searchParams.get("to"),
     barberId: url.searchParams.get("barberId"),

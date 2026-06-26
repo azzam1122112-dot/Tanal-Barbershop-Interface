@@ -2,11 +2,13 @@ import type { PrismaClient } from "@prisma/client";
 import { getCashSessionSummary } from "@/lib/cash-sessions/cash-session-service";
 import { getTodayRange } from "@/lib/reports/dashboard-reports";
 
-export async function getOperationAlerts(prisma: PrismaClient, date: Date | string = new Date()) {
-  const summary = await getCashSessionSummary(prisma);
+export async function getOperationAlerts(prisma: PrismaClient, date: Date | string = new Date(), organizationId?: string) {
+  const summary = await getCashSessionSummary(prisma, organizationId);
+  const orgFilter = organizationId ? { organizationId } : {};
   const { from, to } = getTodayRange(new Date(date));
   const zeroNetVisits = await prisma.visit.count({
     where: {
+      ...orgFilter,
       status: "COMPLETED",
       visitedAt: { gte: from, lt: to },
       netAmount: 0,
@@ -77,7 +79,7 @@ export async function getOperationAlerts(prisma: PrismaClient, date: Date | stri
     date: new Date(date).toISOString(),
     openCashBarbersCount: openCashRows.length,
     unclosedCashTotal: openCashRows.reduce((total, row) => total + (row.openSession?.cashTotal ?? 0), 0),
-    closesTodayCount: await prisma.cashSession.count({ where: { status: "CLOSED", closedAt: { gte: from, lt: to } } }),
+    closesTodayCount: await prisma.cashSession.count({ where: { ...orgFilter, status: "CLOSED", closedAt: { gte: from, lt: to } } }),
     alerts,
   };
 }

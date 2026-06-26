@@ -96,7 +96,13 @@ export function WhatsAppDashboard({
   const [generated, setGenerated] = useState<GeneratedMessage | null>(null);
   const [campaignAudience, setCampaignAudience] = useState<AudienceCustomer[]>([]);
   const [toast, setToast] = useState<ToastState | null>(null);
+  const [selectedCustomerId, setSelectedCustomerId] = useState(prefillCustomerId ?? "");
+  const [selectedVisitId, setSelectedVisitId] = useState(prefillVisitId ?? "");
   const activeTemplates = useMemo(() => templates.filter((template) => template.isActive), [templates]);
+  const customerVisits = useMemo(
+    () => visits.filter((visit) => visit.customerId === selectedCustomerId),
+    [visits, selectedCustomerId],
+  );
 
   async function createTemplate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -269,7 +275,16 @@ export function WhatsAppDashboard({
       <section className="grid gap-6 xl:grid-cols-[420px_1fr]">
         <form onSubmit={generateMessage} className="dashboard-panel space-y-3 p-5">
           <h2 className="text-xl font-black">إرسال رسالة لعميل</h2>
-          <select name="customerId" defaultValue={prefillCustomerId ?? ""} required className="dashboard-field">
+          <select
+            name="customerId"
+            value={selectedCustomerId}
+            onChange={(event) => {
+              setSelectedCustomerId(event.target.value);
+              setSelectedVisitId("");
+            }}
+            required
+            className="dashboard-field"
+          >
             <option value="">اختر العميل</option>
             {customers.map((customer) => (
               <option key={customer.id} value={customer.id}>
@@ -281,9 +296,17 @@ export function WhatsAppDashboard({
             <option value="">رسالة مخصصة بدون قالب</option>
             {activeTemplates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
           </select>
-          <select name="visitId" defaultValue={prefillVisitId ?? ""} className="dashboard-field">
-            <option value="">بدون زيارة</option>
-            {visits.map((visit) => <option key={visit.id} value={visit.id}>{visit.label}</option>)}
+          <select
+            name="visitId"
+            value={selectedVisitId}
+            onChange={(event) => setSelectedVisitId(event.target.value)}
+            disabled={!selectedCustomerId}
+            className="dashboard-field disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <option value="">
+              {!selectedCustomerId ? "اختر العميل أولًا" : customerVisits.length === 0 ? "لا توجد زيارات لهذا العميل" : "بدون زيارة"}
+            </option>
+            {customerVisits.map((visit) => <option key={visit.id} value={visit.id}>{visit.label}</option>)}
           </select>
           <select name="campaignId" className="dashboard-field">
             <option value="">بدون حملة</option>

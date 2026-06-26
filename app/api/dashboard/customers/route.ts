@@ -6,6 +6,10 @@ import { toCustomerDashboardRow } from "@/lib/customers/customer-summary";
 export async function GET(request: Request) {
   const auth = await requireDashboardApi();
   if (auth.response) return auth.response;
+  const session = auth.session;
+  if (!session || session.type !== "dashboard") {
+    return NextResponse.json({ message: "غير مصرح" }, { status: 401 });
+  }
 
   const url = new URL(request.url);
   const q = url.searchParams.get("q")?.trim();
@@ -13,6 +17,7 @@ export async function GET(request: Request) {
 
   const customers = await prisma.customer.findMany({
     where: {
+      organizationId: session.organizationId,
       ...(q
         ? {
             OR: [

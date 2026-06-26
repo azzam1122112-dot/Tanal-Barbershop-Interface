@@ -11,7 +11,7 @@ export default async function DashboardSettingsPage() {
   if (!session) redirect("/dashboard/login");
   if (!canAccessDashboard(session)) redirect("/barber");
 
-  const settings = await prisma.systemSettings.findUnique({ where: { singletonKey: "default" } });
+  const settings = await prisma.systemSettings.findFirst({});
   if (!settings) redirect("/dashboard");
 
   return (

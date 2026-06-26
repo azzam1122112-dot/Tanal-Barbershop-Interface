@@ -92,8 +92,8 @@ describe("admin visit corrections", () => {
     expect(visitPaymentMethodUpdateSchema.safeParse({ paymentMethod: "NETWORK", reason: "bad" }).success).toBe(false);
     expect(visitAmountUpdateSchema.safeParse({ grossAmount: 100, reason: "bad" }).success).toBe(false);
     expect(canAccessDashboard(null)).toBe(false);
-    expect(canAccessDashboard({ type: "barber", id: "s", role: "BARBER", barber: { id: barberId, name: "حلاق", phone: "966500000000", role: "BARBER" } })).toBe(false);
-    expect(canAccessDashboard({ type: "dashboard", id: "s2", role: "ADMIN", user: { id: adminUserId, name: "مدير", email: "admin@tanal.local", role: "ADMIN" } })).toBe(true);
+    expect(canAccessDashboard({ type: "barber", id: "s", role: "BARBER", organizationId: "org_default", salonId: "salon_default", barber: { id: barberId, name: "حلاق", phone: "966500000000", role: "BARBER" } })).toBe(false);
+    expect(canAccessDashboard({ type: "dashboard", id: "s2", role: "ADMIN", organizationId: "org_default", salonId: null, user: { id: adminUserId, name: "مدير", email: "admin@tanal.local", role: "ADMIN" } })).toBe(true);
   });
 
   it("cancels a normal visit, reverses earned points, keeps services, and excludes it from reports", async () => {
@@ -220,6 +220,8 @@ async function createVisit({
     ? await createCampaign(fixedCampaign ? "FIXED_AMOUNT" : "PERCENTAGE", fixedCampaign ?? percentageCampaign ?? 0)
     : undefined;
   const result = await confirmVisit(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
     customerId: customer.customer.id,
     barberId,
     serviceIds: [serviceId],
@@ -236,6 +238,7 @@ async function createVisit({
 async function createCustomer(name: string) {
   const result = await createCustomerWithLoyalty({
     prisma,
+    organizationId: "org_default",
     name,
     phone: `9665${Math.floor(10000000 + Math.random() * 89999999)}`,
     createdByBarberId: barberId,

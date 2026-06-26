@@ -24,6 +24,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const result = await cancelVisit(prisma, id, {
       actorUserId: session.user.id,
       actorType: session.role,
+      organizationId: session.organizationId,
       reason: parsed.data.reason,
       ...(await getRequestMeta()),
     });

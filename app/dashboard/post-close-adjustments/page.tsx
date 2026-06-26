@@ -15,10 +15,12 @@ export default async function PostCloseAdjustmentsPage({
   if (!session) redirect("/dashboard/login");
   if (!canAccessDashboard(session)) redirect("/barber");
 
+  const organizationId = session.type === "dashboard" ? session.organizationId : undefined;
   const params = await searchParams;
   const [barbers, report] = await Promise.all([
-    prisma.barber.findMany({ orderBy: { name: "asc" } }),
+    prisma.barber.findMany({ where: { ...(organizationId ? { organizationId } : {}) }, orderBy: { name: "asc" } }),
     getPostCloseAdjustmentReport(prisma, {
+      organizationId,
       from: params.from,
       to: params.to,
       barberId: params.barberId,

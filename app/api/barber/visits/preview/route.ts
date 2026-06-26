@@ -22,6 +22,8 @@ export async function POST(request: Request) {
 
   try {
     const preview = await buildVisitPreview(prisma, {
+      organizationId: session.organizationId,
+      salonId: session.salonId,
       customerId: parsed.data.customerId,
       barberId: session.barber.id,
       serviceIds: parsed.data.serviceIds,

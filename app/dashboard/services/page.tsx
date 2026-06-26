@@ -11,7 +11,9 @@ export default async function DashboardServicesPage() {
   if (!session) redirect("/dashboard/login");
   if (!canAccessDashboard(session)) redirect("/barber");
 
+  const organizationId = session.type === "dashboard" ? session.organizationId : undefined;
   const services = await prisma.service.findMany({
+    where: { ...(organizationId ? { organizationId } : {}) },
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
   });
 

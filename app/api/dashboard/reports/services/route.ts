@@ -6,8 +6,9 @@ import { getReportFiltersFromUrl } from "@/lib/reports/report-query";
 
 export async function GET(request: Request) {
   const auth = await requireDashboardApi();
-  if (auth.response) return auth.response;
+  if (auth.response || !auth.session) return auth.response ?? NextResponse.json({ message: "غير مصرح" }, { status: 401 });
+  const organizationId = auth.session.type === "dashboard" ? auth.session.organizationId : undefined;
 
-  const services = await getServiceReport(prisma, getReportFiltersFromUrl(new URL(request.url)));
+  const services = await getServiceReport(prisma, { ...getReportFiltersFromUrl(new URL(request.url)), organizationId });
   return NextResponse.json({ services });
 }

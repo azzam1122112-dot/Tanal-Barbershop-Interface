@@ -54,6 +54,7 @@ describe("visit preview and confirm", () => {
 
     const customerResult = await createCustomerWithLoyalty({
       prisma,
+      organizationId: "org_default",
       name: "عميل زيارة",
       phone: `9665${Date.now().toString().slice(-8)}`,
       createdByBarberId: barberId,
@@ -63,6 +64,7 @@ describe("visit preview and confirm", () => {
 
     const rewardCustomer = await createCustomerWithLoyalty({
       prisma,
+      organizationId: "org_default",
       name: "عميل مكافآت",
       phone: `9665${(Date.now() + 1).toString().slice(-8)}`,
       createdByBarberId: barberId,
@@ -76,6 +78,7 @@ describe("visit preview and confirm", () => {
 
     const inactiveCustomer = await createCustomerWithLoyalty({
       prisma,
+      organizationId: "org_default",
       name: "عميل منقطع",
       phone: `9665${(Date.now() + 2).toString().slice(-8)}`,
       createdByBarberId: barberId,
@@ -89,6 +92,7 @@ describe("visit preview and confirm", () => {
 
     const activeCustomer = await createCustomerWithLoyalty({
       prisma,
+      organizationId: "org_default",
       name: "عميل نشط",
       phone: `9665${(Date.now() + 3).toString().slice(-8)}`,
       createdByBarberId: barberId,
@@ -102,6 +106,7 @@ describe("visit preview and confirm", () => {
 
     const pointsCustomer = await createCustomerWithLoyalty({
       prisma,
+      organizationId: "org_default",
       name: "عميل نقاط للحملات",
       phone: `9665${(Date.now() + 4).toString().slice(-8)}`,
       createdByBarberId: barberId,
@@ -154,6 +159,8 @@ describe("visit preview and confirm", () => {
   it("preview does not create a visit", async () => {
     const before = await prisma.visit.count({ where: { customerId, barberId } });
     const preview = await buildVisitPreview(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
       customerId,
       barberId,
       serviceIds: [activeServiceId],
@@ -170,6 +177,8 @@ describe("visit preview and confirm", () => {
   it("preview rejects zero or negative amount", async () => {
     await expect(
       buildVisitPreview(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
         customerId,
         barberId,
         serviceIds: [activeServiceId],
@@ -182,6 +191,8 @@ describe("visit preview and confirm", () => {
   it("preview rejects empty serviceIds", async () => {
     await expect(
       buildVisitPreview(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
         customerId,
         barberId,
         serviceIds: [],
@@ -194,6 +205,8 @@ describe("visit preview and confirm", () => {
   it("preview rejects inactive services", async () => {
     await expect(
       buildVisitPreview(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
         customerId,
         barberId,
         serviceIds: [inactiveServiceId],
@@ -210,6 +223,8 @@ describe("visit preview and confirm", () => {
     });
 
     const result = await confirmVisit(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
       customerId,
       barberId,
       serviceIds: [activeServiceId],
@@ -242,6 +257,8 @@ describe("visit preview and confirm", () => {
   it("preview shows available rewards only when balance and amount allow it without changing points", async () => {
     const before = await prisma.loyaltyAccount.findUniqueOrThrow({ where: { customerId: rewardCustomerId } });
     const preview = await buildVisitPreview(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
       customerId: rewardCustomerId,
       barberId,
       serviceIds: [activeServiceId],
@@ -256,6 +273,8 @@ describe("visit preview and confirm", () => {
 
   it("preview hides rewards when balance is insufficient or discount exceeds amount", async () => {
     const lowBalancePreview = await buildVisitPreview(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
       customerId,
       barberId,
       serviceIds: [activeServiceId],
@@ -263,6 +282,8 @@ describe("visit preview and confirm", () => {
       paymentMethod: "CASH",
     });
     const lowAmountPreview = await buildVisitPreview(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
       customerId: rewardCustomerId,
       barberId,
       serviceIds: [activeServiceId],
@@ -277,6 +298,8 @@ describe("visit preview and confirm", () => {
   it("confirm with reward redeems points, applies discount, earns on net, and is idempotent", async () => {
     const key = `reward-key-${Date.now()}`;
     const first = await confirmVisit(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
       customerId: rewardCustomerId,
       barberId,
       serviceIds: [activeServiceId],
@@ -288,6 +311,8 @@ describe("visit preview and confirm", () => {
     createdVisitIds.push(first.visit.id);
 
     const second = await confirmVisit(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
       customerId: rewardCustomerId,
       barberId,
       serviceIds: [activeServiceId],
@@ -318,6 +343,8 @@ describe("visit preview and confirm", () => {
   it("confirm rejects inactive rewards, insufficient points, and discounts bigger than gross amount", async () => {
     await expect(
       confirmVisit(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
         customerId: rewardCustomerId,
         barberId,
         serviceIds: [activeServiceId],
@@ -330,6 +357,8 @@ describe("visit preview and confirm", () => {
 
     await expect(
       confirmVisit(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
         customerId,
         barberId,
         serviceIds: [activeServiceId],
@@ -347,6 +376,8 @@ describe("visit preview and confirm", () => {
 
     await expect(
       confirmVisit(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
         customerId: rewardCustomerId,
         barberId,
         serviceIds: [activeServiceId],
@@ -408,6 +439,8 @@ describe("visit preview and confirm", () => {
     const campaignIds = [allCampaign.id, inactiveCampaign.id, pointsCampaign.id];
     const before = await prisma.campaignRedemption.count({ where: { campaignId: { in: campaignIds } } });
     const normalPreview = await buildVisitPreview(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
       customerId: activeCustomerId,
       barberId,
       serviceIds: [activeServiceId],
@@ -415,6 +448,8 @@ describe("visit preview and confirm", () => {
       paymentMethod: "CASH",
     });
     const inactivePreview = await buildVisitPreview(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
       customerId: inactiveCustomerId,
       barberId,
       serviceIds: [activeServiceId],
@@ -422,6 +457,8 @@ describe("visit preview and confirm", () => {
       paymentMethod: "CASH",
     });
     const pointsPreview = await buildVisitPreview(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
       customerId: pointsCustomerId,
       barberId,
       serviceIds: [activeServiceId],
@@ -429,6 +466,8 @@ describe("visit preview and confirm", () => {
       paymentMethod: "CASH",
     });
     const lowAmountPreview = await buildVisitPreview(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
       customerId: activeCustomerId,
       barberId,
       serviceIds: [activeServiceId],
@@ -459,6 +498,8 @@ describe("visit preview and confirm", () => {
     });
 
     const activePreview = await buildVisitPreview(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
       customerId: activeCustomerId,
       barberId,
       serviceIds: [activeServiceId],
@@ -468,6 +509,8 @@ describe("visit preview and confirm", () => {
     expect(activePreview.availableCampaigns.some((campaign) => campaign.id === inactiveCampaign.id)).toBe(false);
 
     const result = await confirmVisit(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
       customerId: inactiveCustomerId,
       barberId,
       serviceIds: [activeServiceId],
@@ -484,6 +527,8 @@ describe("visit preview and confirm", () => {
     });
 
     const afterUsePreview = await buildVisitPreview(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
       customerId: inactiveCustomerId,
       barberId,
       serviceIds: [activeServiceId],
@@ -506,6 +551,8 @@ describe("visit preview and confirm", () => {
     const key = `campaign-fixed-${Date.now()}`;
 
     const first = await confirmVisit(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
       customerId,
       barberId,
       serviceIds: [activeServiceId],
@@ -516,6 +563,8 @@ describe("visit preview and confirm", () => {
     });
     createdVisitIds.push(first.visit.id);
     const second = await confirmVisit(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
       customerId,
       barberId,
       serviceIds: [activeServiceId],
@@ -570,6 +619,8 @@ describe("visit preview and confirm", () => {
     });
 
     const result = await confirmVisit(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
       customerId: pointsCustomerId,
       barberId,
       serviceIds: [activeServiceId],
@@ -586,6 +637,8 @@ describe("visit preview and confirm", () => {
 
     await expect(
       confirmVisit(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
         customerId: rewardCustomerId,
         barberId,
         serviceIds: [activeServiceId],
@@ -599,6 +652,8 @@ describe("visit preview and confirm", () => {
 
     await expect(
       confirmVisit(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
         customerId,
         barberId,
         serviceIds: [activeServiceId],
@@ -611,6 +666,8 @@ describe("visit preview and confirm", () => {
 
     await expect(
       confirmVisit(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
         customerId,
         barberId,
         serviceIds: [activeServiceId],
@@ -629,6 +686,8 @@ describe("visit preview and confirm", () => {
         type: "barber",
         id: "session-1",
         role: "BARBER",
+        organizationId: "org_default",
+        salonId: "salon_default",
         barber: { id: barberId, name: "حلاق", phone: "966500000002", role: "BARBER" },
       }),
     ).toBe(false);
@@ -637,6 +696,8 @@ describe("visit preview and confirm", () => {
         type: "dashboard",
         id: "session-2",
         role: "ADMIN",
+        organizationId: "org_default",
+        salonId: null,
         user: { id: "admin", name: "مدير", email: "admin@tanal.local", role: "ADMIN" },
       }),
     ).toBe(true);

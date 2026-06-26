@@ -182,6 +182,7 @@ SEED_ADMIN_EMAIL
 SEED_ADMIN_PASSWORD
 SEED_BARBER_PHONE
 SEED_BARBER_PIN
+ROOT_DOMAIN
 ```
 
 6. لا تستخدم كلمات المرور التجريبية في Render. الملف يفعّل:
@@ -210,6 +211,7 @@ npm run start:render
 - `DATABASE_URL` يأتي من PostgreSQL الذي ينشئه Render، ولا يوضع يدويًا داخل Git.
 - `NODE_VERSION=22.22.3` مضبوط في Blueprint، ويوجد أيضًا `.nvmrc` و`.node-version`.
 - خطة الخدمة وقاعدة البيانات في `render.yaml` قابلة للتغيير من Render حسب ميزانية التشغيل.
+- لتفعيل نطاقات المؤسسات الفرعية فعليًا، اضبط `ROOT_DOMAIN=tanal.com` في Render، ثم أضف custom domain wildcard مثل `*.tanal.com` ووجّه DNS wildcard من مزود النطاق إلى Render. بدون ذلك يعمل النظام على النطاق الواحد ويرجع للمؤسسة الافتراضية.
 
 ## فحص قاعدة جديدة من الصفر
 
@@ -234,10 +236,10 @@ dropdb -h localhost -p 55432 -U tanal_user tanal_loyalty_fresh_check
 
 - مدير النظام:
   - البريد: `admin@tanal.local`
-  - الجوال: `966500000001`
+  - الجوال: `0500000001`
   - كلمة المرور: `Admin@12345`
 - الحلاق:
-  - الجوال: `966500000002`
+  - الجوال: `0500000002`
   - رمز الدخول: `1234`
 
 ## روابط الصفحات الأساسية

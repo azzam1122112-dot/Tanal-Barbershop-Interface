@@ -16,12 +16,14 @@ export default async function DashboardCustomersPage({
   if (!session) redirect("/dashboard/login");
   if (!canAccessDashboard(session)) redirect("/barber");
 
+  const organizationId = session.type === "dashboard" ? session.organizationId : undefined;
   const params = await searchParams;
   const q = params.q?.trim();
   const status = params.status ?? "all";
   const now = new Date();
   const customers = await prisma.customer.findMany({
     where: {
+      ...(organizationId ? { organizationId } : {}),
       ...(q
         ? {
             OR: [

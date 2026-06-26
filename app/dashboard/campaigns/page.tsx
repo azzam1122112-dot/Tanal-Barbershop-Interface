@@ -11,7 +11,8 @@ export default async function DashboardCampaignsPage() {
   if (!session) redirect("/dashboard/login");
   if (!canAccessDashboard(session)) redirect("/barber");
 
-  const campaigns = await prisma.campaign.findMany({ orderBy: [{ createdAt: "desc" }, { name: "asc" }] });
+  const organizationId = session.type === "dashboard" ? session.organizationId : undefined;
+  const campaigns = await prisma.campaign.findMany({ where: { ...(organizationId ? { organizationId } : {}) }, orderBy: [{ createdAt: "desc" }, { name: "asc" }] });
 
   return (
     <DashboardShell title="الحملات الترويجية" description="إنشاء عروض دقيقة حسب نوع العميل أو النشاط، وتفعيلها أو إيقافها من مكان واحد.">

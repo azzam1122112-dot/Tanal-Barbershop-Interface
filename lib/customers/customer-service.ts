@@ -2,17 +2,19 @@ import type { PrismaClient } from "@prisma/client";
 
 export async function createCustomerWithLoyalty({
   prisma,
+  organizationId,
   name,
   phone,
   createdByBarberId,
 }: {
   prisma: PrismaClient;
+  organizationId: string;
   name: string;
   phone: string;
   createdByBarberId?: string | null;
 }) {
-  const existing = await prisma.customer.findUnique({
-    where: { phone },
+  const existing = await prisma.customer.findFirst({
+    where: { organizationId, phone },
     include: {
       loyaltyAccount: true,
       visits: {
@@ -29,11 +31,12 @@ export async function createCustomerWithLoyalty({
 
   const customer = await prisma.customer.create({
     data: {
+      organizationId,
       name,
       phone,
       createdByBarberId,
       loyaltyAccount: {
-        create: {},
+        create: { organizationId },
       },
     },
     include: {

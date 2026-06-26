@@ -2,21 +2,21 @@ import { BusinessError } from "@/lib/errors";
 import { z } from "zod";
 
 export const saudiPhoneInputSchema = z.string().trim().min(1, "رقم الجوال مطلوب");
+export const SAUDI_LOCAL_MOBILE_PATTERN = /^05\d{8}$/;
+export const SAUDI_LOCAL_MOBILE_MESSAGE = "رقم الجوال يجب أن يبدأ بـ 05 ويتكون من 10 أرقام";
 
 export function normalizeSaudiPhone(input: string) {
   const raw = saudiPhoneInputSchema.parse(input);
-  const digits = raw.replace(/[\s()-]/g, "").replace(/^\+/, "");
+  const digits = raw.replace(/\D/g, "");
 
-  let normalized: string;
-  if (/^05\d{8}$/.test(digits)) {
-    normalized = `966${digits.slice(1)}`;
-  } else if (/^5\d{8}$/.test(digits)) {
-    normalized = `966${digits}`;
-  } else if (/^9665\d{8}$/.test(digits)) {
-    normalized = digits;
-  } else {
-    throw new BusinessError("رقم الجوال السعودي غير صحيح");
+  if (!SAUDI_LOCAL_MOBILE_PATTERN.test(digits)) {
+    throw new BusinessError(SAUDI_LOCAL_MOBILE_MESSAGE);
   }
 
-  return normalized;
+  return digits;
+}
+
+export function toSaudiWhatsAppPhone(input: string) {
+  const localPhone = normalizeSaudiPhone(input);
+  return `966${localPhone.slice(1)}`;
 }

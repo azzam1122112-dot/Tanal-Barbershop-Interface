@@ -1,7 +1,10 @@
 import { BrandLogo } from "@/components/brand-logo";
 import { DashboardNav } from "@/components/dashboard/dashboard-nav";
+import { DashboardMobileBar } from "@/components/dashboard/dashboard-mobile-bar";
+import { SalonSwitcher } from "@/components/dashboard/salon-switcher";
 import { LogoutButton } from "@/components/logout-button";
 import { getRequestSession } from "@/lib/auth/http";
+import { prisma } from "@/lib/db/prisma";
 
 export async function DashboardShell({
   title,
@@ -16,11 +19,21 @@ export async function DashboardShell({
 }) {
   const session = await getRequestSession();
   const role = session?.type === "dashboard" ? session.role : null;
+  const organizationId = session?.type === "dashboard" ? session.organizationId : null;
+  const activeSalonId = session?.type === "dashboard" ? session.salonId : null;
+  const salons = organizationId
+    ? await prisma.salon.findMany({
+        where: { organizationId, isActive: true },
+        orderBy: { name: "asc" },
+        select: { id: true, name: true },
+      })
+    : [];
 
   return (
     <main className="dashboard-page">
+      <DashboardMobileBar role={role} salons={salons} activeSalonId={activeSalonId} />
       <div className="mx-auto grid max-w-[1680px] gap-0 lg:grid-cols-[320px_1fr]">
-        <aside className="relative border-b border-white/5 bg-sidebar-onyx px-4 py-4 text-white shadow-[var(--shadow-sidebar)] lg:sticky lg:top-0 lg:flex lg:min-h-screen lg:flex-col lg:border-b-0 lg:px-5 lg:py-5">
+        <aside className="relative hidden bg-sidebar-onyx text-white shadow-[var(--shadow-sidebar)] lg:sticky lg:top-0 lg:flex lg:min-h-screen lg:flex-col lg:px-5 lg:py-5">
           <span className="pointer-events-none absolute inset-y-0 left-0 hidden w-px bg-gradient-to-b from-transparent via-salon-gold/40 to-transparent lg:block" aria-hidden="true" />
           <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.05] p-4">
             <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-l from-transparent via-salon-gold/70 to-transparent" aria-hidden="true" />
@@ -34,7 +47,11 @@ export async function DashboardShell({
             <p className="mt-3 text-xs leading-6 text-white/55">إدارة التشغيل، العملاء، الصندوق، الحملات، ورسائل واتساب من مكان واحد.</p>
           </div>
 
-          <div className="overflow-x-auto pb-2 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overflow-x-visible lg:pb-0">
+          <div className="mt-4">
+            <SalonSwitcher salons={salons} activeSalonId={activeSalonId} />
+          </div>
+
+          <div className="mt-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
             <DashboardNav role={role} />
           </div>
 

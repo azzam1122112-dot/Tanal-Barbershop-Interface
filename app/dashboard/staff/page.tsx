@@ -14,7 +14,7 @@ export default async function DashboardStaffPage() {
   if (!canManageStaff(session) || session.type !== "dashboard") redirect("/dashboard");
 
   const users = await prisma.user.findMany({
-    where: { role: { in: ["ADMIN", "SUPERVISOR"] } },
+    where: { organizationId: session.organizationId, role: { in: ["OWNER", "ADMIN", "SUPERVISOR"] } },
     orderBy: [{ isActive: "desc" }, { role: "asc" }, { createdAt: "desc" }],
   });
 

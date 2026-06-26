@@ -44,14 +44,14 @@ const navGroups: NavGroup[] = [
   },
 ];
 
-export function DashboardNav({ role }: { role: "ADMIN" | "SUPERVISOR" | null }) {
+export function DashboardNav({ role }: { role: "OWNER" | "ADMIN" | "SUPERVISOR" | null }) {
   const pathname = usePathname();
   const visibleGroups = navGroups.filter((group) => !group.adminOnly || role === "ADMIN");
 
   return (
-    <nav className="mt-5 flex min-w-max gap-4 lg:mt-6 lg:block lg:min-w-0 lg:space-y-6">
+    <nav className="mt-2 space-y-6 lg:mt-6">
       {visibleGroups.map((group) => (
-        <section key={group.title} className="w-[260px] shrink-0 lg:w-auto">
+        <section key={group.title}>
           <p className="px-3 text-[11px] font-black uppercase tracking-[0.08em] text-white/42">{group.title}</p>
           <div className="mt-2 space-y-1">
             {group.items.map((item) => {

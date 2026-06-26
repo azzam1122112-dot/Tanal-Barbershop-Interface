@@ -23,6 +23,7 @@ export async function POST(request: Request) {
 
   const result = await createCustomerWithLoyalty({
     prisma,
+    organizationId: session.organizationId,
     name: parsed.data.name,
     phone: parsed.data.phone,
     createdByBarberId: session.barber.id,

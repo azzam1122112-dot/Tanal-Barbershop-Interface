@@ -11,9 +11,11 @@ export default async function DashboardLoyaltyPage() {
   if (!session) redirect("/dashboard/login");
   if (!canAccessDashboard(session)) redirect("/barber");
 
+  const organizationId = session.type === "dashboard" ? session.organizationId : undefined;
+  const salonId = session.type === "dashboard" ? session.salonId : null;
   const [settings, rewardRules] = await Promise.all([
-    prisma.systemSettings.findUnique({ where: { singletonKey: "default" } }),
-    prisma.rewardRule.findMany({ orderBy: [{ sortOrder: "asc" }, { requiredPoints: "asc" }] }),
+    salonId ? prisma.systemSettings.findFirst({ where: { salonId } }) : prisma.systemSettings.findFirst({ where: { ...(organizationId ? { organizationId } : {}) } }),
+    prisma.rewardRule.findMany({ where: { ...(organizationId ? { organizationId } : {}) }, orderBy: [{ sortOrder: "asc" }, { requiredPoints: "asc" }] }),
   ]);
 
   return (
