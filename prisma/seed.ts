@@ -207,8 +207,8 @@ async function main() {
     }
   }
 
-  const platformAdminEmail = readSeedEnv("PLATFORM_ADMIN_EMAIL", "platform@tanal.local");
-  const platformAdminPassword = readSeedEnv("PLATFORM_ADMIN_PASSWORD", "Platform@12345");
+  const platformAdminEmail = process.env.PLATFORM_ADMIN_EMAIL ?? adminEmail;
+  const platformAdminPassword = process.env.PLATFORM_ADMIN_PASSWORD ?? adminPassword;
   await prisma.platformAdmin.upsert({
     where: { email: platformAdminEmail },
     update: { isActive: true },

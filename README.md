@@ -274,7 +274,7 @@ dropdb -h localhost -p 55432 -U tanal_user tanal_loyalty_fresh_check
 - **الرابط**: `platform.<root>` في الإنتاج (نطاق فرعي محجوز)، ومحليًا `/platform/login`.
 - **الصلاحيات**: إدارة كل المؤسسات (إيقاف/تفعيل، إسناد باقة) من `/platform`، والباقات وحدودها من `/platform/plans`.
 - **الإيقاف**: تعليق مؤسسة يقطع وصول كل مستخدميها فورًا.
-- **الحساب**: يُهيّأ من `PLATFORM_ADMIN_EMAIL` / `PLATFORM_ADMIN_PASSWORD` (غيّرهما في الإنتاج).
+- **الحساب**: يُهيّأ من `PLATFORM_ADMIN_EMAIL` / `PLATFORM_ADMIN_PASSWORD`. إذا لم تُضبط هذه القيم، يستخدم seed بيانات `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` نفسها لتقليل متطلبات Render Free.
 
 > ملاحظة إحكام: مفاتيح المستأجر (`organizationId`/`salonId`) تُضبط في كل عملية كتابة ومُثبّتة باختبارات العزل، لكنها تبقى اختيارية على مستوى المخطط (nullable) حاليًا؛ تحويلها إلى `NOT NULL` تحسين دفاعي اختياري يتطلب تحديث بيانات الاختبارات.
 
