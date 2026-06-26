@@ -35,6 +35,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const meta = await getRequestMeta();
     await writeAuditLog({
       prisma,
+      organizationId: session.organizationId,
       actorType: session.role,
       actorUserId: session.user.id,
       action:

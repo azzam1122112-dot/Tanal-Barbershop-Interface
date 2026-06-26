@@ -26,6 +26,39 @@ export const dashboardLoginSchema = z.object({
   password: z.string().min(1, "كلمة المرور مطلوبة"),
 });
 
+const RESERVED_SLUGS = new Set(["www", "app", "api", "admin", "dashboard", "platform", "default", "tanal", "main"]);
+
+export const organizationSlugSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .regex(/^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/, "المعرّف يجب أن يكون 3-40 حرفًا إنجليزيًا صغيرًا أو أرقامًا أو شرطات")
+  .refine((value) => !RESERVED_SLUGS.has(value), "هذا المعرّف محجوز، اختر غيره");
+
+export const signupSchema = z.object({
+  organizationName: z.string().trim().min(2, "اسم المؤسسة مطلوب"),
+  slug: organizationSlugSchema,
+  salonName: z.string().trim().min(2, "اسم الصالون مطلوب").optional(),
+  ownerName: z.string().trim().min(2, "اسم المالك مطلوب"),
+  email: emailSchema,
+  phone: phoneSchema,
+  password: adminPasswordSchema,
+});
+
+export const salonCreateSchema = z.object({
+  name: z.string().trim().min(2, "اسم الصالون مطلوب"),
+  slug: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .regex(/^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/, "معرّف الصالون يجب أن يكون أحرفًا إنجليزية صغيرة أو أرقامًا أو شرطات"),
+});
+
+export const salonUpdateSchema = z.object({
+  name: z.string().trim().min(2, "اسم الصالون مطلوب").optional(),
+  isActive: z.boolean().optional(),
+});
+
 export const barberLoginSchema = z.object({
   phone: phoneSchema,
   pin: barberPinSchema,

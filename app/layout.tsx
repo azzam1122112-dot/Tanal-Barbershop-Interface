@@ -10,13 +10,13 @@ const arabic = IBM_Plex_Sans_Arabic({
 });
 
 export const metadata: Metadata = {
-  title: "حلاق تنال | واجهة تنال للحلاقة الرجالية",
+  title: "واجهة تنال",
   description: "نظام تشغيل وولاء فاخر للحلاقة الرجالية وإدارة جلسات الصندوق والعملاء.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "حلاق تنال",
+    title: "واجهة تنال",
   },
   icons: {
     icon: [

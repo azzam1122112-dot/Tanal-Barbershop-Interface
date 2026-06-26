@@ -44,6 +44,7 @@ export async function POST(request: Request) {
     const meta = await getRequestMeta();
     await writeAuditLog({
       prisma,
+      organizationId: session.organizationId,
       actorType: session.role,
       actorUserId: session.user.id,
       action: "service.created",

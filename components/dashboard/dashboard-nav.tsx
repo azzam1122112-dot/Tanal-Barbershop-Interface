@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { Icon, type IconName } from "@/components/icons";
 
 type NavItem = { href: string; label: string; description: string; icon: IconName };
-type NavGroup = { title: string; adminOnly?: boolean; items: NavItem[] };
+type NavGroup = { title: string; adminOnly?: boolean; ownerOnly?: boolean; items: NavItem[] };
 
 const navGroups: NavGroup[] = [
   {
@@ -36,6 +36,13 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
+    title: "المؤسسة",
+    ownerOnly: true,
+    items: [
+      { href: "/dashboard/salons", label: "الفروع", description: "صالونات المؤسسة", icon: "home" },
+    ],
+  },
+  {
     title: "النظام",
     adminOnly: true,
     items: [
@@ -46,7 +53,11 @@ const navGroups: NavGroup[] = [
 
 export function DashboardNav({ role }: { role: "OWNER" | "ADMIN" | "SUPERVISOR" | null }) {
   const pathname = usePathname();
-  const visibleGroups = navGroups.filter((group) => !group.adminOnly || role === "ADMIN");
+  const visibleGroups = navGroups.filter((group) => {
+    if (group.ownerOnly) return role === "OWNER";
+    if (group.adminOnly) return role === "OWNER" || role === "ADMIN";
+    return true;
+  });
 
   return (
     <nav className="mt-2 space-y-6 lg:mt-6">

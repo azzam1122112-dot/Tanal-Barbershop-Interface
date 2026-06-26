@@ -147,7 +147,7 @@ export default function BarberLoginPage() {
             <div className="relative flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <BrandLogo className="animate-float h-12 w-12 ring-1 ring-salon-gold/30" priority />
-                <span className="text-[11px] font-bold uppercase tracking-eyebrow text-salon-goldlight">حلاق تنال</span>
+                <span className="text-[11px] font-bold uppercase tracking-eyebrow text-salon-goldlight">واجهة تنال</span>
               </div>
               <span className="h-2 w-2 rounded-full bg-salon-gold shadow-[0_0_12px_2px_rgba(169,130,69,0.6)]" />
             </div>

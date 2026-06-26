@@ -42,6 +42,7 @@ export async function updateSystemSettings(
   });
   await writeAuditLog({
     prisma,
+    organizationId: meta.organizationId,
     actorType: meta.actorType,
     actorUserId: meta.actorUserId,
     action: "system_settings.updated",

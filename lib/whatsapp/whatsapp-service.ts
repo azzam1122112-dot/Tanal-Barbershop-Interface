@@ -91,6 +91,7 @@ export async function createWhatsAppTemplate(
   });
   await writeAuditLog({
     prisma,
+    organizationId: meta.organizationId,
     actorType: meta.actorType,
     actorUserId: meta.actorUserId,
     action: "whatsapp.template_created",
@@ -114,6 +115,7 @@ export async function updateWhatsAppTemplate(
   const template = await prisma.whatsAppTemplate.update({ where: { id }, data: input });
   await writeAuditLog({
     prisma,
+    organizationId: meta.organizationId,
     actorType: meta.actorType,
     actorUserId: meta.actorUserId,
     action: before.isActive !== template.isActive ? "whatsapp.template_status_updated" : "whatsapp.template_updated",
@@ -202,6 +204,7 @@ export async function generateWhatsAppMessage(prisma: PrismaClient, input: Gener
 
   await writeAuditLog({
     prisma,
+    organizationId: meta.organizationId,
     actorType: meta.actorType,
     actorUserId: meta.actorUserId,
     action: "whatsapp.message_drafted",
@@ -228,6 +231,7 @@ export async function markWhatsAppMessageOpened(prisma: PrismaClient, id: string
   });
   await writeAuditLog({
     prisma,
+    organizationId: meta.organizationId,
     actorType: meta.actorType,
     actorUserId: meta.actorUserId,
     action: "whatsapp.message_opened",
@@ -253,6 +257,7 @@ export async function markWhatsAppMessageSent(prisma: PrismaClient, id: string, 
   });
   await writeAuditLog({
     prisma,
+    organizationId: meta.organizationId,
     actorType: meta.actorType,
     actorUserId: meta.actorUserId,
     action: "whatsapp.message_marked_sent",
@@ -373,6 +378,7 @@ export async function updateCustomerWhatsappPreference(prisma: PrismaClient, cus
   const customer = await prisma.customer.update({ where: { id: customerId }, data: { whatsappOptIn } });
   await writeAuditLog({
     prisma,
+    organizationId: meta.organizationId,
     actorType: meta.actorType,
     actorUserId: meta.actorUserId,
     action: "whatsapp.customer_preference_updated",

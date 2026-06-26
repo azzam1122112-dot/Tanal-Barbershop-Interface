@@ -207,6 +207,19 @@ async function main() {
     }
   }
 
+  const platformAdminEmail = readSeedEnv("PLATFORM_ADMIN_EMAIL", "platform@tanal.local");
+  const platformAdminPassword = readSeedEnv("PLATFORM_ADMIN_PASSWORD", "Platform@12345");
+  await prisma.platformAdmin.upsert({
+    where: { email: platformAdminEmail },
+    update: { isActive: true },
+    create: {
+      name: "مدير المنصّة",
+      email: platformAdminEmail,
+      passwordHash: await hashAdminPassword(platformAdminPassword),
+      isActive: true,
+    },
+  });
+
   await prisma.auditLog.create({
     data: {
       organizationId: organization.id,

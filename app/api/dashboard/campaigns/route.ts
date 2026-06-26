@@ -53,6 +53,7 @@ export async function POST(request: Request) {
 
   await writeAuditLog({
     prisma,
+    organizationId: session.organizationId,
     actorType: session.role,
     actorUserId: session.user.id,
     action: "campaign.created",

@@ -2,6 +2,8 @@ import type { AuditActorType, PrismaClient } from "@prisma/client";
 
 export async function writeAuditLog({
   prisma,
+  organizationId,
+  salonId,
   actorType,
   actorUserId,
   actorBarberId,
@@ -14,6 +16,8 @@ export async function writeAuditLog({
   userAgent,
 }: {
   prisma: PrismaClient;
+  organizationId?: string | null;
+  salonId?: string | null;
   actorType: AuditActorType;
   actorUserId?: string | null;
   actorBarberId?: string | null;
@@ -27,6 +31,8 @@ export async function writeAuditLog({
 }) {
   return prisma.auditLog.create({
     data: {
+      organizationId,
+      salonId,
       actorType,
       actorUserId,
       actorBarberId,

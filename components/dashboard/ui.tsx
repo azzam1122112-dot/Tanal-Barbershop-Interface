@@ -40,7 +40,7 @@ export async function DashboardShell({
             <div className="flex items-center gap-3">
               <BrandLogo className="h-12 w-12 ring-1 ring-salon-gold/30" priority />
               <div className="min-w-0">
-                <p className="text-[11px] font-bold uppercase tracking-eyebrow text-salon-goldlight">حلاق تنال</p>
+                <p className="text-[11px] font-bold uppercase tracking-eyebrow text-salon-goldlight">واجهة تنال</p>
                 <p className="mt-1 truncate text-lg font-bold">لوحة الإدارة</p>
               </div>
             </div>

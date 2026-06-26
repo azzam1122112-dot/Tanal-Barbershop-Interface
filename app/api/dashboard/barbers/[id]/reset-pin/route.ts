@@ -33,6 +33,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const meta = await getRequestMeta();
   await writeAuditLog({
     prisma,
+    organizationId: session.organizationId,
     actorType: session.role,
     actorUserId: session.user.id,
     action: "barber.pin_reset",

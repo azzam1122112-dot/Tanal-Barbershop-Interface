@@ -40,6 +40,7 @@ export async function createManagerReward(
 
   await writeAuditLog({
     prisma,
+    organizationId: meta.organizationId,
     actorType: meta.actorType,
     actorUserId: meta.actorUserId,
     action: "manager_reward.created",

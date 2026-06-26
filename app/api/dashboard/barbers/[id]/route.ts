@@ -34,6 +34,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const meta = await getRequestMeta();
     await writeAuditLog({
       prisma,
+      organizationId: session.organizationId,
       actorType: session.role,
       actorUserId: session.user.id,
       action: before.isActive && parsed.data.isActive === false ? "barber.disabled" : "barber.updated",
@@ -86,6 +87,7 @@ export async function DELETE(_request: Request, context: { params: Promise<{ id:
     const meta = await getRequestMeta();
     await writeAuditLog({
       prisma,
+      organizationId: session.organizationId,
       actorType: session.role,
       actorUserId: session.user.id,
       action: "barber.deleted",

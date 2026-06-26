@@ -2,7 +2,7 @@ services:
   - type: web
     name: tanal-loyalty-web
     runtime: node
-    plan: starter
+    plan: free
     region: oregon
     repo: https://github.com/azzam1122112-dot/Tanal-Barbershop-Interface
     branch: main
@@ -38,30 +38,14 @@ services:
         sync: false
       - key: SEED_BARBER_PIN
         sync: false
-
-  - type: cron
-    name: tanal-loyalty-maintenance
-    runtime: node
-    plan: starter
-    region: oregon
-    repo: https://github.com/azzam1122112-dot/Tanal-Barbershop-Interface
-    branch: main
-    schedule: "0 3 * * *"
-    buildCommand: npm ci && npm run prisma:generate
-    startCommand: npm run maintenance:cleanup
-    envVars:
-      - key: NODE_VERSION
-        value: 22.22.3
-      - key: LOG_LEVEL
-        value: info
-      - key: DATABASE_URL
-        fromDatabase:
-          name: tanal-loyalty-db
-          property: connectionString
+      - key: PLATFORM_ADMIN_EMAIL
+        sync: false
+      - key: PLATFORM_ADMIN_PASSWORD
+        sync: false
 
 databases:
   - name: tanal-loyalty-db
     databaseName: tanal_loyalty
     user: tanal_user
-    plan: basic-256mb
+    plan: free
     region: oregon

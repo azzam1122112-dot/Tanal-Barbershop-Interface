@@ -13,7 +13,7 @@ export function BrandLogo({
     <span className={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white ${className}`}>
       <Image
         src="/brand/tanal-logo.png"
-        alt="حلاق تنال للحلاقة الرجالية"
+        alt="شعار واجهة تنال"
         width={512}
         height={512}
         className={`h-full w-full object-cover ${imageClassName}`}

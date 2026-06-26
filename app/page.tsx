@@ -49,7 +49,7 @@ export default function HomePage() {
           <div className="flex items-center gap-3">
             <BrandLogo className="h-11 w-11 shadow-lux ring-1 ring-salon-gold/25" priority />
             <div className="leading-tight">
-              <p className="text-[10px] font-bold uppercase tracking-eyebrow text-salon-gold">حلاق تنال</p>
+              <p className="text-[10px] font-bold uppercase tracking-eyebrow text-salon-gold">واجهة تنال</p>
               <p className="text-sm font-bold text-salon-ink">منصّة الحلاقة الرجالية</p>
             </div>
           </div>
@@ -58,8 +58,8 @@ export default function HomePage() {
             <a href="#how" className="transition-colors hover:text-salon-ink">كيف يعمل</a>
           </nav>
           <div className="flex items-center gap-2">
-            <Link href="/dashboard/login" className="dashboard-button-soft px-3 py-2 text-xs sm:px-4 sm:text-sm">الإدارة</Link>
-            <Link href="/barber/login" className="dashboard-button-gold sheen-overlay px-3 py-2 text-xs sm:px-4 sm:text-sm">دخول الحلاقين</Link>
+            <Link href="/dashboard/login" className="dashboard-button-soft px-3 py-2 text-xs sm:px-4 sm:text-sm">دخول</Link>
+            <Link href="/signup" className="dashboard-button-gold sheen-overlay px-3 py-2 text-xs sm:px-4 sm:text-sm">أنشئ مؤسستك</Link>
           </div>
         </div>
       </header>
@@ -92,13 +92,13 @@ export default function HomePage() {
             </Reveal>
 
             <Reveal delay={240} className="mt-9 flex flex-col gap-3 sm:flex-row">
-              <Link href="/barber/login" className="dashboard-button-gold sheen-overlay px-7 py-4 text-base">
+              <Link href="/signup" className="dashboard-button-gold sheen-overlay px-7 py-4 text-base">
+                <Icon name="loyalty" className="h-5 w-5" />
+                أنشئ مؤسستك مجانًا
+              </Link>
+              <Link href="/barber/login" className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.06] px-7 py-4 text-base font-bold text-white backdrop-blur transition-[transform,background-color] duration-200 hover:bg-white/[0.12] active:scale-[0.99]">
                 <Icon name="scissors" className="h-5 w-5" />
                 دخول الحلاقين
-              </Link>
-              <Link href="/dashboard/login" className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.06] px-7 py-4 text-base font-bold text-white backdrop-blur transition-[transform,background-color] duration-200 hover:bg-white/[0.12] active:scale-[0.99]">
-                <Icon name="reports" className="h-5 w-5" />
-                مسار الإدارة
               </Link>
             </Reveal>
 
@@ -273,7 +273,7 @@ export default function HomePage() {
                 <Icon name="whatsapp" className="h-5 w-5" />
                 للاستفسارات والاشتراكات
               </a>
-              <Link href="/barber/login" className="dashboard-button-gold sheen-overlay px-8 py-4 text-base">دخول الحلاقين</Link>
+              <Link href="/signup" className="dashboard-button-gold sheen-overlay px-8 py-4 text-base">أنشئ مؤسستك</Link>
             </div>
 
             <a href={WHATSAPP_LINK} target="_blank" rel="noopener noreferrer" className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-white/70 transition-colors hover:text-white" dir="ltr">
@@ -289,7 +289,7 @@ export default function HomePage() {
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-5 py-7 text-sm text-salon-charcoal sm:flex-row">
           <div className="flex items-center gap-2">
             <BrandLogo className="h-8 w-8 ring-1 ring-salon-gold/20" />
-            <span className="font-bold text-salon-ink">حلاق تنال</span>
+            <span className="font-bold text-salon-ink">واجهة تنال</span>
           </div>
           <a href={WHATSAPP_LINK} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-full border border-salon-line bg-white px-4 py-2 text-xs font-bold text-salon-ink shadow-sm transition-colors hover:border-[#1faa55]/50 hover:text-[#1faa55]">
             <Icon name="whatsapp" className="h-4 w-4 text-[#1faa55]" />

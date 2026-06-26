@@ -23,6 +23,10 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/barber/login", request.url));
   }
 
+  if (pathname.startsWith("/platform") && pathname !== "/platform/login" && !hasSession) {
+    return NextResponse.redirect(new URL("/platform/login", request.url));
+  }
+
   return NextResponse.next();
 }
 
@@ -39,5 +43,5 @@ function getRequestOrigins(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/barber/:path*", "/api/:path*"],
+  matcher: ["/dashboard/:path*", "/barber/:path*", "/platform/:path*", "/api/:path*"],
 };

@@ -48,7 +48,7 @@ export default function DashboardLoginPage() {
       <section className="relative mx-auto flex min-h-[calc(100vh-6rem)] max-w-md flex-col justify-center">
         <div className="mb-8">
           <BrandLogo className="animate-float mb-6 h-24 w-24 ring-1 ring-salon-gold/30" priority />
-          <p className="text-[11px] font-bold uppercase tracking-eyebrow text-salon-goldlight">حلاق تنال · لوحة الإدارة</p>
+          <p className="text-[11px] font-bold uppercase tracking-eyebrow text-salon-goldlight">واجهة تنال · لوحة الإدارة</p>
           <h1 className="mt-3 text-4xl font-bold leading-tight tracking-tight">
             دخول <span className="text-gold-sheen">الإدارة</span>
           </h1>

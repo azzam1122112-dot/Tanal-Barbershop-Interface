@@ -19,6 +19,11 @@ export type AuthSession =
       organizationId: string;
       salonId: string;
       barber: ReturnType<typeof toSafeBarber>;
+    }
+  | {
+      type: "platform";
+      id: string;
+      admin: { id: string; name: string; email: string };
     };
 
 export function createSessionToken() {
@@ -44,7 +49,7 @@ export async function createStoredSession({
   prisma: PrismaClient;
   actorType: AuditActorType;
   actorId: string;
-  role: UserRole;
+  role?: UserRole | null;
   organizationId?: string | null;
   activeSalonId?: string | null;
   userAgent?: string | null;
@@ -52,6 +57,7 @@ export async function createStoredSession({
 }) {
   const token = createSessionToken();
   const tokenHash = hashSessionToken(token);
+  const isPlatform = actorType === "PLATFORM_ADMIN";
 
   const session = await prisma.session.create({
     data: {
@@ -61,7 +67,8 @@ export async function createStoredSession({
       activeSalonId: activeSalonId ?? null,
       userId: USER_ACTOR_TYPES.includes(actorType) ? actorId : null,
       barberId: actorType === "BARBER" ? actorId : null,
-      role,
+      platformAdminId: isPlatform ? actorId : null,
+      role: role ?? null,
       expiresAt: getSessionExpiresAt(),
       userAgent,
       ipAddress,
@@ -82,6 +89,8 @@ export async function getAuthSession(prisma: PrismaClient, token?: string | null
     include: {
       user: true,
       barber: true,
+      organization: true,
+      platformAdmin: true,
     },
   });
 
@@ -93,6 +102,19 @@ export async function getAuthSession(prisma: PrismaClient, token?: string | null
     where: { id: session.id },
     data: { lastUsedAt: new Date() },
   });
+
+  if (session.platformAdmin && session.platformAdmin.isActive) {
+    return {
+      type: "platform",
+      id: session.id,
+      admin: { id: session.platformAdmin.id, name: session.platformAdmin.name, email: session.platformAdmin.email },
+    } satisfies AuthSession;
+  }
+
+  // امنع وصول مستأجري مؤسسة موقوفة.
+  if (session.organization && session.organization.status === "SUSPENDED") {
+    return null;
+  }
 
   if (
     session.user &&

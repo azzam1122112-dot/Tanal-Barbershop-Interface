@@ -105,6 +105,7 @@ model PlatformAdmin {
   lastLoginAt  DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+  sessions     Session[]
 }
 
 // الباقة — يضبطها السوبر-آدمن من لوحة المنصة (بلا بوابة دفع حاليًا).
@@ -249,25 +250,27 @@ model Session {
   organizationId String?
   activeSalonId  String?
   userId         String?
-  barberId       String?
-  platformAdmin  Boolean        @default(false)
-  role           UserRole
-  createdAt      DateTime       @default(now())
-  expiresAt      DateTime
-  lastUsedAt     DateTime?
-  revokedAt      DateTime?
-  userAgent      String?
-  ipAddress      String?
-  user           User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  barber         Barber?        @relation(fields: [barberId], references: [id], onDelete: Cascade)
-  organization   Organization?  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  activeSalon    Salon?         @relation(fields: [activeSalonId], references: [id], onDelete: SetNull)
+  barberId        String?
+  platformAdminId String?
+  role            UserRole?
+  createdAt       DateTime       @default(now())
+  expiresAt       DateTime
+  lastUsedAt      DateTime?
+  revokedAt       DateTime?
+  userAgent       String?
+  ipAddress       String?
+  user            User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  barber          Barber?        @relation(fields: [barberId], references: [id], onDelete: Cascade)
+  organization    Organization?  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  activeSalon     Salon?         @relation(fields: [activeSalonId], references: [id], onDelete: SetNull)
+  platformAdmin   PlatformAdmin? @relation(fields: [platformAdminId], references: [id], onDelete: Cascade)
 
   @@index([tokenHash])
   @@index([userId, revokedAt])
   @@index([barberId, revokedAt])
   @@index([expiresAt])
   @@index([organizationId])
+  @@index([platformAdminId])
 }
 
 model Customer {

@@ -18,6 +18,15 @@ describe("Render deployment configuration", () => {
     expect(renderYaml).toContain("sync: false");
   });
 
+  it("stays compatible with the Render free plan", () => {
+    const renderYaml = readFileSync(join(process.cwd(), "render.yaml"), "utf8");
+
+    expect(renderYaml).toContain("plan: free");
+    expect(renderYaml).not.toContain("type: cron");
+    expect(renderYaml).not.toContain("basic-256mb");
+    expect(renderYaml).not.toContain("plan: starter");
+  });
+
   it("uses Node LTS consistently for deployment", () => {
     const packageJson = JSON.parse(readFileSync(join(process.cwd(), "package.json"), "utf8")) as {
       scripts: Record<string, string>;

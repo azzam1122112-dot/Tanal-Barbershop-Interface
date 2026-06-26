@@ -37,7 +37,7 @@ export function DashboardMobileBar({
         <div className="flex min-w-0 items-center gap-3">
           <BrandLogo className="h-10 w-10 ring-1 ring-salon-gold/30" priority />
           <div className="min-w-0 leading-tight">
-            <p className="text-[10px] font-bold uppercase tracking-eyebrow text-salon-goldlight">حلاق تنال</p>
+            <p className="text-[10px] font-bold uppercase tracking-eyebrow text-salon-goldlight">واجهة تنال</p>
             <p className="truncate text-sm font-bold">لوحة الإدارة</p>
           </div>
         </div>
@@ -60,7 +60,7 @@ export function DashboardMobileBar({
               <div className="flex min-w-0 items-center gap-3">
                 <BrandLogo className="h-11 w-11 ring-1 ring-salon-gold/30" />
                 <div className="min-w-0">
-                  <p className="text-[10px] font-bold uppercase tracking-eyebrow text-salon-goldlight">حلاق تنال</p>
+                  <p className="text-[10px] font-bold uppercase tracking-eyebrow text-salon-goldlight">واجهة تنال</p>
                   <p className="truncate text-sm font-bold">لوحة الإدارة</p>
                 </div>
               </div>
