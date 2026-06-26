@@ -26,7 +26,7 @@ function normalizeOrigin(value: string): string | null {
  */
 export function isTrustedOrigin(
   originHeader: string | null,
-  requestOrigin: string,
+  requestOrigin: string | string[],
   extraAllowed: string[] = [],
 ): boolean {
   if (!originHeader) return true;
@@ -34,6 +34,12 @@ export function isTrustedOrigin(
   const origin = normalizeOrigin(originHeader);
   if (!origin) return false;
 
-  const allowed = new Set<string>([normalizeOrigin(requestOrigin) ?? requestOrigin, ...extraAllowed]);
+  const requestOrigins = Array.isArray(requestOrigin) ? requestOrigin : [requestOrigin];
+  const allowed = new Set<string>([
+    ...requestOrigins
+      .map((value) => normalizeOrigin(value) ?? value)
+      .filter(Boolean),
+    ...extraAllowed,
+  ]);
   return allowed.has(origin);
 }

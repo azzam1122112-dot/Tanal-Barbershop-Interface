@@ -10,6 +10,10 @@ describe("origin / CSRF helpers", () => {
     expect(isTrustedOrigin("https://app.tanal.com", "https://app.tanal.com")).toBe(true);
   });
 
+  it("allows any normalized request origin candidate", () => {
+    expect(isTrustedOrigin("https://app.tanal.com", ["http://internal:3000", "https://app.tanal.com"])).toBe(true);
+  });
+
   it("rejects a cross-origin request", () => {
     expect(isTrustedOrigin("https://evil.example", "https://app.tanal.com")).toBe(false);
   });

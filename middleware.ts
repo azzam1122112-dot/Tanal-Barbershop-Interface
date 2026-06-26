@@ -8,7 +8,7 @@ export function middleware(request: NextRequest) {
   // دفاع CSRF: ارفض الطلبات المغيّرة للحالة من أصل غير موثوق.
   if (pathname.startsWith("/api") && MUTATING_METHODS.has(request.method)) {
     const allowed = parseAllowedOrigins(process.env.ALLOWED_ORIGINS);
-    if (!isTrustedOrigin(request.headers.get("origin"), request.nextUrl.origin, allowed)) {
+    if (!isTrustedOrigin(request.headers.get("origin"), getRequestOrigins(request), allowed)) {
       return NextResponse.json({ message: "أصل الطلب غير موثوق" }, { status: 403 });
     }
   }
@@ -24,6 +24,18 @@ export function middleware(request: NextRequest) {
   }
 
   return NextResponse.next();
+}
+
+function getRequestOrigins(request: NextRequest) {
+  const origins = new Set<string>([request.nextUrl.origin]);
+  const forwardedHost = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  const forwardedProto = request.headers.get("x-forwarded-proto") ?? request.nextUrl.protocol.replace(":", "");
+
+  if (forwardedHost && forwardedProto) {
+    origins.add(`${forwardedProto}://${forwardedHost}`);
+  }
+
+  return [...origins];
 }
 
 export const config = {
