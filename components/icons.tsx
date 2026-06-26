@@ -18,7 +18,8 @@ export type IconName =
   | "search"
   | "scissors"
   | "menu"
-  | "close";
+  | "close"
+  | "check";
 
 const PATHS: Record<IconName, ReactElement> = {
   home: (
@@ -95,6 +96,7 @@ const PATHS: Record<IconName, ReactElement> = {
   ),
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
   close: <path d="M6 6l12 12M18 6 6 18" />,
+  check: <path d="M4 12.5 9 17.5 20 6.5" />,
 };
 
 export function Icon({ name, ...props }: { name: IconName } & SVGProps<SVGSVGElement>) {

@@ -139,18 +139,21 @@ export default function BarberLoginPage() {
         </div>
       ) : null}
       <section className="mx-auto flex min-h-[calc(100vh-2.5rem)] w-full max-w-sm min-w-0 flex-col justify-center">
-        <div className="overflow-hidden rounded-2xl border border-salon-ink/10 bg-white shadow-[0_30px_70px_-30px_rgba(16,25,22,0.4)]">
+        <div className="sheen-overlay overflow-hidden rounded-2xl border border-salon-ink/10 bg-white shadow-[0_30px_70px_-30px_rgba(16,25,22,0.45)]">
           <div className="relative overflow-hidden bg-sidebar-onyx px-5 py-6 text-white">
-            <span className="absolute inset-x-0 top-0 h-1 bg-gold-sheen" aria-hidden="true" />
-            <span className="pointer-events-none absolute -top-16 left-[-10%] h-40 w-40 rounded-full bg-salon-gold/15 blur-2xl" aria-hidden="true" />
+            <span className="absolute inset-x-0 top-0 h-1 bg-royal-gold" aria-hidden="true" />
+            <span className="animate-glow pointer-events-none absolute -top-16 left-[-10%] h-44 w-44 rounded-full bg-salon-gold/25 blur-2xl" aria-hidden="true" />
+            <span className="animate-glow pointer-events-none absolute -bottom-20 right-[-10%] h-40 w-40 rounded-full bg-salon-forest/30 blur-2xl" style={{ animationDelay: "1.5s" }} aria-hidden="true" />
             <div className="relative flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <BrandLogo className="h-12 w-12 ring-1 ring-salon-gold/30" priority />
+                <BrandLogo className="animate-float h-12 w-12 ring-1 ring-salon-gold/30" priority />
                 <span className="text-[11px] font-bold uppercase tracking-eyebrow text-salon-goldlight">حلاق تنال</span>
               </div>
               <span className="h-2 w-2 rounded-full bg-salon-gold shadow-[0_0_12px_2px_rgba(169,130,69,0.6)]" />
             </div>
-            <h1 className="relative mt-10 text-3xl font-bold leading-tight tracking-tight">دخول الحلاق</h1>
+            <h1 className="relative mt-10 text-3xl font-bold leading-tight tracking-tight">
+              دخول <span className="text-gold-sheen">الحلاق</span>
+            </h1>
           </div>
           <form onSubmit={submit} className="space-y-4 px-5 py-6">
             <label className="block text-sm font-bold">
@@ -186,7 +189,8 @@ export default function BarberLoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="barber-primary-button h-14 w-full text-lg"
+              aria-busy={loading}
+              className="barber-gold-button sheen-overlay h-14 w-full text-lg"
             >
               {loading ? "جاري الدخول..." : "دخول"}
             </button>
