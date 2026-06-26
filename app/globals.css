@@ -4,8 +4,14 @@
 
 :root {
   color-scheme: light;
-  --font-sans: "IBM Plex Sans Arabic", "Segoe UI", "Tahoma";
-  background: #f4f2ed;
+  --font-sans: var(--font-arabic), "Segoe UI", "Tahoma";
+  background: #f3f0e9;
+
+  /* نظام ظلال متدرّج لإحساس فاخر بالعمق */
+  --shadow-sm: 0 1px 2px rgba(16, 25, 22, 0.05), 0 1px 1px rgba(16, 25, 22, 0.04);
+  --shadow-md: 0 10px 24px -12px rgba(16, 25, 22, 0.18), 0 4px 10px -6px rgba(16, 25, 22, 0.1);
+  --shadow-lg: 0 28px 60px -28px rgba(16, 25, 22, 0.32), 0 12px 28px -18px rgba(16, 25, 22, 0.16);
+  --shadow-sidebar: 0 30px 80px -40px rgba(0, 0, 0, 0.55);
 }
 
 * {
@@ -19,15 +25,21 @@ html {
 body {
   min-height: 100%;
   margin: 0;
-  background: linear-gradient(180deg, #f9f8f5 0%, #f4f2ed 48%, #ebe6dc 100%);
+  background:
+    radial-gradient(1200px 600px at 100% -10%, rgba(169, 130, 69, 0.08), transparent 60%),
+    radial-gradient(1000px 500px at 0% 0%, rgba(23, 59, 51, 0.06), transparent 55%),
+    linear-gradient(180deg, #faf9f5 0%, #f4f2ec 48%, #ece7dd 100%);
+  background-attachment: fixed;
   color: #101916;
   font-family: var(--font-sans), Arial, sans-serif;
+  font-feature-settings: "ss01", "kern";
   text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
 
 ::selection {
   background: #a98245;
-  color: #101916;
+  color: #fff;
 }
 
 button,
@@ -38,49 +50,99 @@ select {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* شريط تمرير راقٍ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(169, 130, 69, 0.45) transparent;
+}
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(169, 130, 69, 0.4);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(169, 130, 69, 0.65);
+  background-clip: padding-box;
+}
+
 @layer components {
+  /* ===== Shell ===== */
   .dashboard-page {
-    @apply min-h-screen bg-[linear-gradient(180deg,#f9f8f5_0%,#f4f2ed_50%,#ebe6dc_100%)] text-salon-ink;
+    @apply min-h-screen text-salon-ink;
   }
 
+  /* لوح فاتح فاخر بحد ذهبي خفيف وعمق متدرّج */
   .dashboard-panel {
-    @apply rounded-lg border border-white/80 bg-white/95 shadow-[0_18px_48px_rgba(16,25,22,0.08)] backdrop-blur;
+    @apply rounded-2xl border border-salon-line/70 bg-white/90 backdrop-blur;
+    box-shadow: var(--shadow-md);
   }
 
   .dashboard-soft-panel {
-    @apply rounded-lg border border-salon-line/80 bg-salon-pearl/95 shadow-sm shadow-salon-ink/5;
+    @apply rounded-2xl border border-salon-line/70 bg-salon-pearl/95;
+    box-shadow: var(--shadow-sm);
   }
 
+  /* بطاقة قابلة للتفاعل ترتفع قليلًا عند المرور (حركة هادئة) */
+  .lux-hover {
+    @apply transition-[transform,box-shadow] duration-200 ease-out;
+  }
+  .lux-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* خط ذهبي شعري فاصل */
+  .lux-rule {
+    @apply h-px w-full;
+    background: linear-gradient(90deg, transparent, rgba(169, 130, 69, 0.45), transparent);
+  }
+
+  /* ===== Fields ===== */
   .dashboard-field {
-    @apply w-full rounded-lg border border-salon-line bg-white px-3 py-3 text-sm font-semibold text-salon-ink outline-none transition placeholder:text-salon-charcoal/55 focus:border-salon-gold focus:ring-4 focus:ring-salon-gold/15 disabled:bg-salon-mist disabled:text-salon-charcoal;
+    @apply w-full rounded-xl border border-salon-line bg-white px-3.5 py-3 text-sm font-semibold text-salon-ink outline-none transition-[border-color,box-shadow] duration-200 placeholder:font-medium placeholder:text-salon-charcoal/50 focus:border-salon-gold focus:ring-4 focus:ring-salon-gold/[0.15] disabled:bg-salon-mist disabled:text-salon-charcoal;
   }
 
+  /* ===== Buttons ===== */
   .dashboard-button {
-    @apply rounded-lg bg-salon-ink px-4 py-3 text-sm font-black text-white shadow-sm shadow-salon-ink/15 transition hover:bg-salon-forest active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white transition-[transform,filter,background-color] duration-200 hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55;
+    background: linear-gradient(180deg, #1b2b25 0%, #101916 100%);
+    box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   }
 
   .dashboard-button-gold {
-    @apply rounded-lg bg-salon-gold px-4 py-3 text-sm font-black text-white shadow-sm shadow-salon-gold/25 transition hover:bg-[#94703a] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white transition-[transform,filter] duration-200 hover:brightness-[1.07] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55;
+    background: linear-gradient(180deg, #c19a55 0%, #a98245 55%, #8f6c39 100%);
+    box-shadow: 0 8px 20px -10px rgba(169, 130, 69, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.25);
   }
 
   .dashboard-button-soft {
-    @apply rounded-lg border border-salon-line bg-white px-4 py-3 text-sm font-black text-salon-ink shadow-sm transition hover:border-salon-gold hover:bg-salon-pearl active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-salon-line bg-white px-4 py-3 text-sm font-bold text-salon-ink transition-[transform,border-color,background-color] duration-200 hover:border-salon-gold/60 hover:bg-salon-pearl active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55;
+    box-shadow: var(--shadow-sm);
   }
 
   .dashboard-danger-button {
-    @apply rounded-lg bg-salon-ruby px-4 py-3 text-sm font-black text-white shadow-sm shadow-salon-ruby/20 transition hover:bg-[#782727] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white transition-[transform,filter] duration-200 hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55;
+    background: linear-gradient(180deg, #8f3540 0%, #7f2d35 100%);
+    box-shadow: var(--shadow-sm);
   }
 
+  /* ===== Tables ===== */
   .dashboard-table {
     @apply w-full text-sm;
   }
 
   .dashboard-table thead {
-    @apply bg-salon-ink text-white;
+    background: linear-gradient(180deg, #1b2b25 0%, #101916 100%);
+    @apply text-white;
   }
 
   .dashboard-table th {
-    @apply px-4 py-4 text-right text-xs font-black;
+    @apply px-4 py-4 text-right text-[11px] font-bold uppercase tracking-[0.06em] text-white/85;
   }
 
   .dashboard-table td {
@@ -88,19 +150,20 @@ select {
   }
 
   .dashboard-table tbody {
-    @apply divide-y divide-salon-line;
+    @apply divide-y divide-salon-line/70;
   }
 
   .dashboard-table tbody tr {
-    @apply transition hover:bg-salon-pearl;
+    @apply transition-colors duration-150 hover:bg-salon-gold/[0.06];
   }
 
   .dashboard-muted {
     @apply text-sm leading-7 text-salon-charcoal;
   }
 
+  /* ===== Barber (mobile-first) ===== */
   .barber-shell {
-    @apply min-h-screen bg-[linear-gradient(180deg,#f9f8f5_0%,#f4f2ed_54%,#ebe6dc_100%)] px-4 font-sans text-salon-ink;
+    @apply min-h-screen px-4 font-sans text-salon-ink;
   }
 
   .barber-container {
@@ -108,27 +171,34 @@ select {
   }
 
   .barber-card {
-    @apply rounded-lg border border-white/80 bg-white/95 shadow-[0_18px_42px_rgba(16,25,22,0.08)];
+    @apply rounded-2xl border border-salon-line/70 bg-white/90 backdrop-blur;
+    box-shadow: var(--shadow-md);
   }
 
   .barber-soft-card {
-    @apply rounded-lg border border-salon-line bg-salon-pearl shadow-sm shadow-salon-ink/5;
+    @apply rounded-2xl border border-salon-line/70 bg-salon-pearl;
+    box-shadow: var(--shadow-sm);
   }
 
   .barber-field {
-    @apply w-full rounded-lg border border-salon-line bg-white px-4 font-bold text-salon-ink outline-none transition placeholder:text-salon-charcoal/45 focus:border-salon-forest focus:ring-4 focus:ring-salon-forest/10;
+    @apply w-full rounded-xl border border-salon-line bg-white px-4 font-semibold text-salon-ink outline-none transition-[border-color,box-shadow] duration-200 placeholder:font-medium placeholder:text-salon-charcoal/45 focus:border-salon-forest focus:ring-4 focus:ring-salon-forest/[0.12];
   }
 
   .barber-primary-button {
-    @apply rounded-lg bg-salon-forest px-4 font-black text-white shadow-sm shadow-salon-forest/20 transition hover:bg-salon-ink active:scale-[0.98] disabled:opacity-55;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 font-bold text-white transition-[transform,filter] duration-200 hover:brightness-110 active:scale-[0.98] disabled:opacity-55;
+    background: linear-gradient(180deg, #1e4a40 0%, #173b33 100%);
+    box-shadow: 0 8px 20px -12px rgba(23, 59, 51, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   }
 
   .barber-gold-button {
-    @apply rounded-lg bg-salon-gold px-4 font-black text-white shadow-sm shadow-salon-gold/20 transition hover:bg-[#94703a] active:scale-[0.98] disabled:opacity-55;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 font-bold text-white transition-[transform,filter] duration-200 hover:brightness-[1.07] active:scale-[0.98] disabled:opacity-55;
+    background: linear-gradient(180deg, #c19a55 0%, #a98245 55%, #8f6c39 100%);
+    box-shadow: 0 8px 20px -10px rgba(169, 130, 69, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.25);
   }
 
   .barber-ghost-button {
-    @apply rounded-lg border border-salon-line bg-white px-4 font-black text-salon-ink shadow-sm transition hover:border-salon-forest/35 active:scale-[0.98] disabled:opacity-55;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-salon-line bg-white px-4 font-bold text-salon-ink transition-[transform,border-color] duration-200 hover:border-salon-forest/40 active:scale-[0.98] disabled:opacity-55;
+    box-shadow: var(--shadow-sm);
   }
 }
 
@@ -140,5 +210,34 @@ select {
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+/* هيكل تحميل (skeleton) بلمعة ذهبية هادئة */
+@keyframes skeleton-sweep {
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+@layer components {
+  .skeleton {
+    @apply relative overflow-hidden rounded-xl bg-salon-line/40;
+  }
+  .skeleton::after {
+    content: "";
+    @apply absolute inset-0;
+    transform: translateX(100%);
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+    animation: skeleton-sweep 1.4s ease-in-out infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }

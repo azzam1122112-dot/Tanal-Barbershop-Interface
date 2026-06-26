@@ -1,3 +1,4 @@
+import { BusinessError } from "@/lib/errors";
 import type {
   Campaign,
   Customer,
@@ -52,7 +53,7 @@ const allowedVariables = new Set([
 export function buildWhatsAppUrl(phone: string, message: string) {
   const normalizedPhone = normalizeSaudiPhone(phone);
   if (!message.trim()) {
-    throw new Error("نص الرسالة مطلوب");
+    throw new BusinessError("نص الرسالة مطلوب");
   }
   return `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(message)}`;
 }
@@ -106,7 +107,7 @@ export async function updateWhatsAppTemplate(
   meta: ActorMeta,
 ) {
   const before = await prisma.whatsAppTemplate.findUnique({ where: { id } });
-  if (!before) throw new Error("قالب واتساب غير موجود");
+  if (!before) throw new BusinessError("قالب واتساب غير موجود");
   const template = await prisma.whatsAppTemplate.update({ where: { id }, data: input });
   await writeAuditLog({
     prisma,
@@ -131,9 +132,9 @@ export async function generateWhatsAppMessage(prisma: PrismaClient, input: Gener
       visits: { orderBy: { visitedAt: "desc" }, take: 1 },
     },
   });
-  if (!customer) throw new Error("العميل غير موجود");
+  if (!customer) throw new BusinessError("العميل غير موجود");
   if (!customer.whatsappOptIn) {
-    throw new Error("العميل لا يرغب باستلام رسائل واتساب");
+    throw new BusinessError("العميل لا يرغب باستلام رسائل واتساب");
   }
 
   const phone = normalizeSaudiPhone(customer.phone);
@@ -141,7 +142,7 @@ export async function generateWhatsAppMessage(prisma: PrismaClient, input: Gener
     ? await prisma.whatsAppTemplate.findUnique({ where: { id: input.templateId } })
     : null;
   if (input.templateId && (!template || !template.isActive)) {
-    throw new Error("قالب واتساب غير متاح");
+    throw new BusinessError("قالب واتساب غير متاح");
   }
 
   const [settings, visit, campaign, reward, managerRewards] = await Promise.all([
@@ -159,10 +160,10 @@ export async function generateWhatsAppMessage(prisma: PrismaClient, input: Gener
   const managerReward = managerRewards[0] ?? null;
 
   if (input.visitId && (!visit || visit.customerId !== customer.id)) {
-    throw new Error("الزيارة غير موجودة لهذا العميل");
+    throw new BusinessError("الزيارة غير موجودة لهذا العميل");
   }
   if (input.campaignId && !campaign) {
-    throw new Error("الحملة غير موجودة");
+    throw new BusinessError("الحملة غير موجودة");
   }
 
   const variables = buildVariables({
@@ -333,7 +334,7 @@ export async function getRewardReadyWhatsAppAudience(prisma: WhatsAppPrisma) {
 
 export async function getCampaignWhatsAppAudience(prisma: WhatsAppPrisma, campaignId: string) {
   const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
-  if (!campaign) throw new Error("الحملة غير موجودة");
+  if (!campaign) throw new BusinessError("الحملة غير موجودة");
   const now = new Date();
   const customers = await prisma.customer.findMany({
     include: { loyaltyAccount: true },
@@ -354,7 +355,7 @@ export async function getCampaignWhatsAppAudience(prisma: WhatsAppPrisma, campai
 
 export async function updateCustomerWhatsappPreference(prisma: PrismaClient, customerId: string, whatsappOptIn: boolean, meta: ActorMeta) {
   const before = await prisma.customer.findUnique({ where: { id: customerId } });
-  if (!before) throw new Error("العميل غير موجود");
+  if (!before) throw new BusinessError("العميل غير موجود");
   const customer = await prisma.customer.update({ where: { id: customerId }, data: { whatsappOptIn } });
   await writeAuditLog({
     prisma,

@@ -20,13 +20,15 @@ export async function DashboardShell({
   return (
     <main className="dashboard-page">
       <div className="mx-auto grid max-w-[1680px] gap-0 lg:grid-cols-[320px_1fr]">
-        <aside className="border-b border-white/10 bg-salon-ink px-4 py-4 text-white shadow-2xl shadow-salon-ink/25 lg:sticky lg:top-0 lg:flex lg:min-h-screen lg:flex-col lg:border-b-0 lg:px-5 lg:py-5">
-          <div className="rounded-lg border border-white/10 bg-white/[0.06] p-4">
+        <aside className="relative border-b border-white/5 bg-sidebar-onyx px-4 py-4 text-white shadow-[var(--shadow-sidebar)] lg:sticky lg:top-0 lg:flex lg:min-h-screen lg:flex-col lg:border-b-0 lg:px-5 lg:py-5">
+          <span className="pointer-events-none absolute inset-y-0 left-0 hidden w-px bg-gradient-to-b from-transparent via-salon-gold/40 to-transparent lg:block" aria-hidden="true" />
+          <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.05] p-4">
+            <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-l from-transparent via-salon-gold/70 to-transparent" aria-hidden="true" />
             <div className="flex items-center gap-3">
-              <BrandLogo className="h-12 w-12 ring-1 ring-white/20" priority />
+              <BrandLogo className="h-12 w-12 ring-1 ring-salon-gold/30" priority />
               <div className="min-w-0">
-                <p className="text-xs font-black text-salon-gold">حلاق تنال</p>
-                <p className="mt-1 truncate text-lg font-black">لوحة الإدارة</p>
+                <p className="text-[11px] font-bold uppercase tracking-eyebrow text-salon-goldlight">حلاق تنال</p>
+                <p className="mt-1 truncate text-lg font-bold">لوحة الإدارة</p>
               </div>
             </div>
             <p className="mt-3 text-xs leading-6 text-white/55">إدارة التشغيل، العملاء، الصندوق، الحملات، ورسائل واتساب من مكان واحد.</p>
@@ -36,8 +38,8 @@ export async function DashboardShell({
             <DashboardNav role={role} />
           </div>
 
-          <div className="mt-5 rounded-lg border border-white/10 bg-black/10 p-3">
-            <p className="text-xs font-bold text-white/45">{role === "SUPERVISOR" ? "جلسة مشرف" : "جلسة المدير"}</p>
+          <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-3">
+            <p className="text-[11px] font-bold uppercase tracking-eyebrow text-white/40">{role === "SUPERVISOR" ? "جلسة مشرف" : "جلسة المدير"}</p>
             <LogoutButton className="mt-3 w-full border-white/15 bg-white/10 text-white hover:bg-white/15" />
           </div>
         </aside>
@@ -54,8 +56,8 @@ export function PageHeader({ eyebrow, title, description, actions }: { eyebrow?:
   return (
     <div className="dashboard-panel flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center sm:justify-between lg:px-6">
       <div className="min-w-0">
-        {eyebrow ? <p className="text-xs font-black text-salon-gold">{eyebrow}</p> : null}
-        <h1 className="mt-2 text-3xl font-black leading-tight sm:text-4xl">{title}</h1>
+        {eyebrow ? <p className="text-[11px] font-bold uppercase tracking-eyebrow text-salon-gold">{eyebrow}</p> : null}
+        <h1 className="mt-2 text-3xl font-bold leading-tight tracking-tight sm:text-4xl">{title}</h1>
         {description ? <p className="dashboard-muted mt-3 max-w-3xl">{description}</p> : null}
       </div>
       {actions}
@@ -69,23 +71,23 @@ export function Card({ children, className = "" }: { children: React.ReactNode; 
 
 export function StatCard({ label, value, subValue }: { label: string; value: string; subValue?: string }) {
   return (
-    <Card className="relative overflow-hidden p-4">
-      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-l from-salon-gold via-salon-forest to-salon-ink" />
-      <p className="text-sm font-bold text-salon-charcoal">{label}</p>
-      <p className="mt-2 text-2xl font-black leading-tight">{value}</p>
-      {subValue ? <p className="mt-2 text-sm font-semibold text-salon-charcoal">{subValue}</p> : null}
+    <Card className="lux-hover relative overflow-hidden p-4">
+      <div className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-l from-salon-gold via-salon-forest to-salon-ink" />
+      <p className="text-[13px] font-semibold text-salon-charcoal">{label}</p>
+      <p className="mt-2 text-2xl font-bold leading-tight tracking-tight tabular-nums">{value}</p>
+      {subValue ? <p className="mt-1.5 text-sm font-medium text-salon-charcoal/85">{subValue}</p> : null}
     </Card>
   );
 }
 
 export function Badge({ children, tone = "neutral" }: { children: React.ReactNode; tone?: "neutral" | "success" | "warning" | "danger" }) {
   const toneClass = {
-    neutral: "bg-salon-mist text-salon-charcoal",
-    success: "bg-green-50 text-green-700",
-    warning: "bg-amber-50 text-amber-700",
-    danger: "bg-red-50 text-red-700",
+    neutral: "bg-salon-mist text-salon-charcoal ring-salon-line",
+    success: "bg-green-50 text-green-700 ring-green-200/70",
+    warning: "bg-amber-50 text-amber-700 ring-amber-200/70",
+    danger: "bg-red-50 text-red-700 ring-red-200/70",
   }[tone];
-  return <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${toneClass}`}>{children}</span>;
+  return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${toneClass}`}>{children}</span>;
 }
 
 export function EmptyState({ title, description }: { title: string; description?: string }) {
@@ -108,8 +110,9 @@ export function TablePanel({ children, className = "" }: { children: React.React
 export function SectionPanel({ title, children, className = "" }: { title: string; children: React.ReactNode; className?: string }) {
   return (
     <section className={`dashboard-panel mt-6 overflow-hidden ${className}`}>
-      <div className="border-b border-salon-line px-5 py-4">
-        <h2 className="text-xl font-black">{title}</h2>
+      <div className="flex items-center gap-2.5 border-b border-salon-line/70 px-5 py-4">
+        <span className="h-4 w-1 rounded-full bg-gradient-to-b from-salon-gold to-[#8f6c39]" aria-hidden="true" />
+        <h2 className="text-lg font-bold tracking-tight">{title}</h2>
       </div>
       {children}
     </section>

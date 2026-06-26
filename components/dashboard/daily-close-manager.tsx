@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { formatMoney } from "@/lib/format";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 
 type SummaryRow = {
@@ -147,8 +148,4 @@ function formatDuration(openedAt: string) {
   const hours = Math.max(0, Math.floor((Date.now() - new Date(openedAt).getTime()) / (60 * 60 * 1000)));
   if (hours < 1) return "أقل من ساعة";
   return `${hours.toLocaleString("ar-SA")} ساعة`;
-}
-
-function formatMoney(value: number) {
-  return `${value.toLocaleString("ar-SA", { maximumFractionDigits: 2 })} ريال`;
 }

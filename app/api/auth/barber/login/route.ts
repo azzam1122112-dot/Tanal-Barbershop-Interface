@@ -5,7 +5,7 @@ import { barberLoginSchema } from "@/lib/auth/validation";
 import { createStoredSession } from "@/lib/auth/session";
 import { setSessionCookie, getRequestMeta, parseJsonBody } from "@/lib/auth/http";
 import { writeAuditLog } from "@/lib/audit/audit-log";
-import { clearRateLimit, isRateLimited } from "@/lib/auth/rate-limit";
+import { clearRateLimit, consumeRateLimit } from "@/lib/auth/rate-limit";
 import { canBarberLogin } from "@/lib/auth/login-policy";
 
 const ERROR_MESSAGE = "رقم الجوال أو رمز الدخول غير صحيح";
@@ -20,16 +20,20 @@ export async function POST(request: Request) {
   }
 
   const rateKey = `barber:${parsed.data.phone}`;
-  if (isRateLimited(rateKey)) {
+  const rate = await consumeRateLimit(prisma, rateKey);
+  if (rate.limited) {
     await writeAuditLog({
       prisma,
       actorType: "SYSTEM",
       action: "auth.barber_login_rate_limited",
       entityType: "Barber",
-      after: { phone: parsed.data.phone },
+      after: { phone: parsed.data.phone, retryAfterSeconds: rate.retryAfterSeconds },
       ...meta,
     });
-    return NextResponse.json({ message: ERROR_MESSAGE }, { status: 429 });
+    return NextResponse.json(
+      { message: ERROR_MESSAGE },
+      { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } },
+    );
   }
 
   const barber = await prisma.barber.findUnique({ where: { phone: parsed.data.phone } });
@@ -72,7 +76,7 @@ export async function POST(request: Request) {
     ...meta,
   });
 
-  clearRateLimit(rateKey);
+  await clearRateLimit(prisma, rateKey);
   const response = NextResponse.json({ redirectTo: "/barber" });
   setSessionCookie(response, token);
   return response;

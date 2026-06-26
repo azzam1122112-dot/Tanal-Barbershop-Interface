@@ -1,3 +1,4 @@
+import { BusinessError } from "@/lib/errors";
 import type { Campaign, CampaignDiscountType, CampaignTargetType, Customer, LoyaltyAccount, Prisma, PrismaClient } from "@prisma/client";
 
 type CampaignPrisma = PrismaClient | Prisma.TransactionClient;
@@ -70,12 +71,12 @@ export async function getEligibleCampaignOrThrow({
 }) {
   const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
   if (!campaign) {
-    throw new Error("الحملة غير متاحة");
+    throw new BusinessError("الحملة غير متاحة");
   }
 
   const eligibility = await evaluateCampaignEligibility({ prisma, campaign, customer, grossAmount, now });
   if (!eligibility.eligible) {
-    throw new Error(eligibility.reason);
+    throw new BusinessError(eligibility.reason);
   }
 
   return {

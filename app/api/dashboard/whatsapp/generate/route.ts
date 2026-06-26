@@ -1,3 +1,4 @@
+import { toErrorResponse } from "@/lib/http/error-response";
 import { NextResponse } from "next/server";
 import { getRequestMeta, parseJsonBody, requireDashboardApi } from "@/lib/auth/http";
 import { whatsappGenerateSchema } from "@/lib/auth/validation";
@@ -23,6 +24,6 @@ export async function POST(request: Request) {
     });
     return NextResponse.json(message, { status: 201 });
   } catch (error) {
-    return NextResponse.json({ message: error instanceof Error ? error.message : "تعذر توليد رسالة واتساب" }, { status: 400 });
+    return toErrorResponse(error, "تعذر توليد رسالة واتساب");
   }
 }

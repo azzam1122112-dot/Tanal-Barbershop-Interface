@@ -1,3 +1,4 @@
+import { toErrorResponse } from "@/lib/http/error-response";
 import { NextResponse } from "next/server";
 import { getRequestMeta, parseJsonBody, requireDashboardApi } from "@/lib/auth/http";
 import { customerWhatsappPreferenceSchema } from "@/lib/auth/validation";
@@ -24,6 +25,6 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     });
     return NextResponse.json({ customer });
   } catch (error) {
-    return NextResponse.json({ message: error instanceof Error ? error.message : "تعذر تعديل تفضيل واتساب" }, { status: 400 });
+    return toErrorResponse(error, "تعذر تعديل تفضيل واتساب");
   }
 }

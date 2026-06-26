@@ -1,3 +1,4 @@
+import { toErrorResponse } from "@/lib/http/error-response";
 import { NextResponse } from "next/server";
 import { requireDashboardApi } from "@/lib/auth/http";
 import { prisma } from "@/lib/db/prisma";
@@ -12,6 +13,6 @@ export async function GET(_request: Request, context: { params: Promise<{ campai
     const customers = await getCampaignWhatsAppAudience(prisma, campaignId);
     return NextResponse.json({ customers });
   } catch (error) {
-    return NextResponse.json({ message: error instanceof Error ? error.message : "تعذر جلب جمهور الحملة" }, { status: 400 });
+    return toErrorResponse(error, "تعذر جلب جمهور الحملة");
   }
 }

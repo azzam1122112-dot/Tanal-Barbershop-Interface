@@ -5,7 +5,7 @@ import { dashboardLoginSchema } from "@/lib/auth/validation";
 import { createStoredSession } from "@/lib/auth/session";
 import { setSessionCookie, getRequestMeta, parseJsonBody } from "@/lib/auth/http";
 import { writeAuditLog } from "@/lib/audit/audit-log";
-import { clearRateLimit, isRateLimited } from "@/lib/auth/rate-limit";
+import { clearRateLimit, consumeRateLimit } from "@/lib/auth/rate-limit";
 import { canAdminLogin } from "@/lib/auth/login-policy";
 
 const ERROR_MESSAGE = "بيانات الدخول غير صحيحة";
@@ -20,16 +20,20 @@ export async function POST(request: Request) {
   }
 
   const rateKey = `dashboard:${parsed.data.email}`;
-  if (isRateLimited(rateKey)) {
+  const rate = await consumeRateLimit(prisma, rateKey);
+  if (rate.limited) {
     await writeAuditLog({
       prisma,
       actorType: "SYSTEM",
       action: "auth.dashboard_login_rate_limited",
       entityType: "User",
-      after: { email: parsed.data.email },
+      after: { email: parsed.data.email, retryAfterSeconds: rate.retryAfterSeconds },
       ...meta,
     });
-    return NextResponse.json({ message: ERROR_MESSAGE }, { status: 429 });
+    return NextResponse.json(
+      { message: ERROR_MESSAGE },
+      { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } },
+    );
   }
 
   const user = await prisma.user.findUnique({ where: { email: parsed.data.email } });
@@ -72,7 +76,7 @@ export async function POST(request: Request) {
     ...meta,
   });
 
-  clearRateLimit(rateKey);
+  await clearRateLimit(prisma, rateKey);
   const response = NextResponse.json({ redirectTo: "/dashboard" });
   setSessionCookie(response, token);
   return response;

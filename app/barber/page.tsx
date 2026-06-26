@@ -1,3 +1,4 @@
+import { formatAmount as formatMoney } from "@/lib/format";
 import { redirect } from "next/navigation";
 import { BrandLogo } from "@/components/brand-logo";
 import { canAccessBarberApp } from "@/lib/auth/access";
@@ -85,8 +86,4 @@ function SummaryTile({ label, value, tone }: { label: string; value: string; ton
       <p className="mt-1 text-lg font-black text-salon-ink">{value}</p>
     </div>
   );
-}
-
-function formatMoney(value: number) {
-  return `${value.toLocaleString("ar-SA", { maximumFractionDigits: 2 })}`;
 }

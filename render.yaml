@@ -18,6 +18,12 @@ services:
         value: "1"
       - key: REQUIRE_EXPLICIT_SEED_CREDENTIALS
         value: "true"
+      - key: LOG_LEVEL
+        value: info
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: MAINTENANCE_TOKEN
+        sync: false
       - key: DATABASE_URL
         fromDatabase:
           name: tanal-loyalty-db
@@ -32,6 +38,26 @@ services:
         sync: false
       - key: SEED_BARBER_PIN
         sync: false
+
+  - type: cron
+    name: tanal-loyalty-maintenance
+    runtime: node
+    plan: starter
+    region: oregon
+    repo: https://github.com/azzam1122112-dot/Tanal-Barbershop-Interface
+    branch: main
+    schedule: "0 3 * * *"
+    buildCommand: npm ci && npm run prisma:generate
+    startCommand: npm run maintenance:cleanup
+    envVars:
+      - key: NODE_VERSION
+        value: 22.22.3
+      - key: LOG_LEVEL
+        value: info
+      - key: DATABASE_URL
+        fromDatabase:
+          name: tanal-loyalty-db
+          property: connectionString
 
 databases:
   - name: tanal-loyalty-db

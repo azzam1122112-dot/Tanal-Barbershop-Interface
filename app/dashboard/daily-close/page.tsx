@@ -1,3 +1,4 @@
+import { formatMoney } from "@/lib/format";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { DashboardShell, EmptyState, FilterBar, TablePanel } from "@/components/dashboard/ui";
@@ -105,8 +106,4 @@ export default async function DashboardDailyClosePage({
 
 function toDateInput(date: Date) {
   return date.toISOString().slice(0, 10);
-}
-
-function formatMoney(value: number) {
-  return `${value.toLocaleString("ar-SA", { maximumFractionDigits: 2 })} ريال`;
 }

@@ -1,3 +1,4 @@
+import { toErrorResponse } from "@/lib/http/error-response";
 import { NextResponse } from "next/server";
 import { cashSessionCloseSchema } from "@/lib/auth/validation";
 import { getRequestMeta, parseJsonBody, requireDashboardApi } from "@/lib/auth/http";
@@ -24,6 +25,6 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({ cashSession }, { status: 201 });
   } catch (error) {
-    return NextResponse.json({ message: error instanceof Error ? error.message : "تعذر إغلاق جلسة الصندوق" }, { status: 400 });
+    return toErrorResponse(error, "تعذر إغلاق جلسة الصندوق");
   }
 }

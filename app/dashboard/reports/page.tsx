@@ -1,3 +1,4 @@
+import { formatMoney } from "@/lib/format";
 import { redirect } from "next/navigation";
 import { DashboardShell, SectionPanel, StatCard } from "@/components/dashboard/ui";
 import { canAccessDashboard } from "@/lib/auth/access";
@@ -208,10 +209,6 @@ function Cell({ children }: { children: React.ReactNode }) {
 
 function EmptyRow({ colSpan }: { colSpan: number }) {
   return <tr><td colSpan={colSpan} className="px-4 py-8 text-center text-salon-charcoal">لا توجد بيانات</td></tr>;
-}
-
-function formatMoney(value: number) {
-  return `${value.toLocaleString("ar-SA", { maximumFractionDigits: 2 })} ريال`;
 }
 
 function startOfDay(value: string) {

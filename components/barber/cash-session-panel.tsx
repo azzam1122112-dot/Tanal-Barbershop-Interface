@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { formatAmount as formatMoney } from "@/lib/format";
 
 type CashSession = {
   id: string;
@@ -147,8 +148,4 @@ function MiniStat({ label, value }: { label: string; value: string }) {
       <p className="mt-1 text-sm font-black">{value}</p>
     </div>
   );
-}
-
-function formatMoney(value: number) {
-  return `${value.toLocaleString("ar-SA", { maximumFractionDigits: 2 })}`;
 }

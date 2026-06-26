@@ -1,3 +1,4 @@
+import { formatMoney } from "@/lib/format";
 import { redirect } from "next/navigation";
 import { getRequestSession } from "@/lib/auth/http";
 import { canAccessDashboard } from "@/lib/auth/access";
@@ -53,8 +54,4 @@ export default async function DashboardPage() {
       </SectionPanel>
     </DashboardShell>
   );
-}
-
-function formatMoney(value: number) {
-  return `${value.toLocaleString("ar-SA", { maximumFractionDigits: 2 })} ريال`;
 }

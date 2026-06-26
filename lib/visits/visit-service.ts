@@ -1,3 +1,4 @@
+import { BusinessError } from "@/lib/errors";
 import { Prisma } from "@prisma/client";
 import type { PaymentMethod, PrismaClient } from "@prisma/client";
 import { getAvailableCampaigns, getEligibleCampaignOrThrow } from "@/lib/campaigns/campaign-eligibility";
@@ -28,11 +29,11 @@ export async function buildVisitPreview(prisma: VisitPrisma, input: VisitInput) 
   const serviceIds = [...new Set(input.serviceIds)];
 
   if (input.grossAmount <= 0) {
-    throw new Error("المبلغ يجب أن يكون أكبر من صفر");
+    throw new BusinessError("المبلغ يجب أن يكون أكبر من صفر");
   }
 
   if (serviceIds.length === 0) {
-    throw new Error("اختر خدمة واحدة على الأقل");
+    throw new BusinessError("اختر خدمة واحدة على الأقل");
   }
 
   const [customer, barber, services, settings] = await Promise.all([
@@ -46,15 +47,15 @@ export async function buildVisitPreview(prisma: VisitPrisma, input: VisitInput) 
   ]);
 
   if (!customer) {
-    throw new Error("العميل غير موجود");
+    throw new BusinessError("العميل غير موجود");
   }
 
   if (!barber || !barber.isActive) {
-    throw new Error("الحلاق غير مصرح");
+    throw new BusinessError("الحلاق غير مصرح");
   }
 
   if (services.length !== serviceIds.length) {
-    throw new Error("كل الخدمات المختارة يجب أن تكون نشطة");
+    throw new BusinessError("كل الخدمات المختارة يجب أن تكون نشطة");
   }
 
   const totals = calculateVisitTotals({
@@ -117,7 +118,7 @@ export async function buildVisitPreview(prisma: VisitPrisma, input: VisitInput) 
 }
 
 export async function confirmVisit(prisma: PrismaClient, input: VisitInput) {
-  const maxAttempts = 20;
+  const maxAttempts = 8;
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     try {
       return await confirmVisitOnce(prisma, input);
@@ -130,20 +131,20 @@ export async function confirmVisit(prisma: PrismaClient, input: VisitInput) {
     }
   }
 
-  throw new Error("تعذر حفظ الزيارة بعد إعادة المحاولة");
+  throw new BusinessError("تعذر حفظ الزيارة بعد إعادة المحاولة");
 }
 
 async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
   return prisma.$transaction(async (tx) => {
     if (!input.idempotencyKey) {
-      throw new Error("مفتاح منع التكرار مطلوب");
+      throw new BusinessError("مفتاح منع التكرار مطلوب");
     }
     const selectedDiscounts = [input.rewardRuleId, input.managerRewardId, input.campaignId].filter(Boolean);
     if (selectedDiscounts.length > 1) {
       if (input.rewardRuleId && input.campaignId && !input.managerRewardId) {
-        throw new Error("لا يمكن جمع مكافأة نقاط مع حملة في نفس الزيارة");
+        throw new BusinessError("لا يمكن جمع مكافأة نقاط مع حملة في نفس الزيارة");
       }
-      throw new Error("لا يمكن جمع أكثر من خصم في نفس الزيارة");
+      throw new BusinessError("لا يمكن جمع أكثر من خصم في نفس الزيارة");
     }
 
     const existingVisit = await tx.visit.findFirst({
@@ -176,7 +177,7 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
       include: { loyaltyAccount: true },
     });
     if (!customer) {
-      throw new Error("العميل غير موجود");
+      throw new BusinessError("العميل غير موجود");
     }
     const reward = input.rewardRuleId
       ? await tx.rewardRule.findUnique({ where: { id: input.rewardRuleId } })
@@ -200,7 +201,7 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
       : null;
 
     if (input.rewardRuleId && (!reward || !reward.isActive)) {
-      throw new Error("المكافأة غير متاحة");
+      throw new BusinessError("المكافأة غير متاحة");
     }
 
     const loyaltyAccount = await tx.loyaltyAccount.upsert({
@@ -217,11 +218,11 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
     const discountAmount = reward ? Number(reward.discountAmount) : managerReward ? Number(managerReward.discountAmount) : campaignSelection?.discountAmount ?? 0;
 
     if (reward && startingBalance < reward.requiredPoints) {
-      throw new Error("رصيد النقاط غير كافٍ");
+      throw new BusinessError("رصيد النقاط غير كافٍ");
     }
 
     if ((reward || managerReward || campaignSelection) && discountAmount > input.grossAmount) {
-      throw new Error("قيمة الخصم أكبر من مبلغ الزيارة");
+      throw new BusinessError("قيمة الخصم أكبر من مبلغ الزيارة");
     }
 
     const totals = calculateVisitTotals({
@@ -233,7 +234,7 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
 
     const balanceAfterRedeem = startingBalance - redeemedPoints;
     if (balanceAfterRedeem < 0) {
-      throw new Error("رصيد النقاط لا يمكن أن يكون سالبًا");
+      throw new BusinessError("رصيد النقاط لا يمكن أن يكون سالبًا");
     }
 
     const visit = await tx.visit.create({

@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useCallback, useState } from "react";
+import { useModalDismiss } from "@/components/use-modal-dismiss";
 
 type ServiceOption = {
   id: string;
@@ -52,6 +53,13 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
   const [message, setMessage] = useState("");
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [loadingConfirm, setLoadingConfirm] = useState(false);
+
+  const closePreview = useCallback(() => {
+    setPreview(null);
+    setSelectedDiscount("NONE");
+  }, []);
+
+  useModalDismiss(Boolean(preview), closePreview);
 
   function toggleService(id: string) {
     setPreview(null);
@@ -217,20 +225,17 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
 
       {message ? <p className="rounded-2xl border border-salon-line bg-white px-4 py-3 text-sm font-bold text-salon-charcoal shadow-sm">{message}</p> : null}
 
-      <button disabled={!canPreview} className="barber-primary-button h-14 w-full text-lg">
+      <button disabled={!canPreview} aria-busy={loadingPreview} className="barber-primary-button h-14 w-full text-lg">
         {loadingPreview ? "جاري المعاينة..." : "معاينة العملية"}
       </button>
 
       {preview ? (
-        <div className="fixed inset-0 z-40 flex items-end bg-salon-ink/35 px-3 pb-3 pt-12 backdrop-blur-sm" role="dialog" aria-modal="true">
+        <div className="fixed inset-0 z-40 flex items-end bg-salon-ink/35 px-3 pb-3 pt-12 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="معاينة العملية">
           <button
             type="button"
             aria-label="إغلاق المعاينة"
             className="absolute inset-0 cursor-default"
-            onClick={() => {
-              setPreview(null);
-              setSelectedDiscount("NONE");
-            }}
+            onClick={closePreview}
           />
           <div className="relative mx-auto flex max-h-[92vh] w-full max-w-md flex-col overflow-hidden rounded-[1.75rem] border border-salon-line bg-white shadow-2xl shadow-salon-ink/25">
             <div className="border-b border-salon-line bg-salon-pearl p-4">
@@ -238,10 +243,7 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
                 <div className="h-1.5 w-12 rounded-full bg-salon-line" />
                 <button
                   type="button"
-                  onClick={() => {
-                    setPreview(null);
-                    setSelectedDiscount("NONE");
-                  }}
+                  onClick={closePreview}
                   className="rounded-full border border-salon-line bg-white px-3 py-1 text-sm font-black text-salon-charcoal"
                 >
                   تعديل
@@ -310,6 +312,7 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
                 type="button"
                 onClick={confirmVisit}
                 disabled={loadingConfirm}
+                aria-busy={loadingConfirm}
                 className="barber-gold-button h-14 w-full text-lg"
               >
                 {loadingConfirm ? "جاري الحفظ..." : "تأكيد واستقبال العميل التالي"}

@@ -1,3 +1,4 @@
+import { BusinessError } from "@/lib/errors";
 import { Prisma } from "@prisma/client";
 import type { PaymentMethod, PrismaClient } from "@prisma/client";
 import { computeCampaignDiscount } from "@/lib/campaigns/campaign-eligibility";
@@ -30,7 +31,7 @@ export async function cancelVisit(prisma: PrismaClient, visitId: string, meta: A
   return runSerializableTransaction(prisma, async (tx) => {
     const visit = await getVisitForAdmin(tx, visitId);
     if (visit.status === "CANCELLED") {
-      throw new Error("الزيارة ملغاة مسبقًا");
+      throw new BusinessError("الزيارة ملغاة مسبقًا");
     }
 
     const postCloseAdjustment = await isPostCloseAdjustment(tx, visit);
@@ -42,7 +43,7 @@ export async function cancelVisit(prisma: PrismaClient, visitId: string, meta: A
     const balanceAfterEarnReversal = balanceBefore - pointsEarnedToReverse;
     const balanceAfterRestore = balanceAfterEarnReversal + redeemedPointsToRestore;
     if (balanceAfterEarnReversal < 0) {
-      throw new Error("لا يمكن عكس النقاط لأن رصيد العميل غير كافٍ");
+      throw new BusinessError("لا يمكن عكس النقاط لأن رصيد العميل غير كافٍ");
     }
 
     if (pointsEarnedToReverse > 0) {
@@ -182,7 +183,7 @@ export async function updateVisitAmount(prisma: PrismaClient, visitId: string, g
     const balanceBefore = await getBalance(tx, visit.customerId);
     const balanceAfter = balanceBefore + pointsAdjustment;
     if (balanceAfter < 0) {
-      throw new Error("لا يمكن تعديل المبلغ لأن رصيد العميل لا يكفي لعكس النقاط");
+      throw new BusinessError("لا يمكن تعديل المبلغ لأن رصيد العميل لا يكفي لعكس النقاط");
     }
 
     if (pointsAdjustment !== 0) {
@@ -261,7 +262,7 @@ async function calculateUpdatedDiscount(tx: AdminVisitPrisma, visit: VisitForAdm
     const reward = visit.discountSourceId ? await tx.rewardRule.findUnique({ where: { id: visit.discountSourceId } }) : null;
     const discountAmount = reward ? Number(reward.discountAmount) : Number(visit.discountAmount);
     if (discountAmount > grossAmount) {
-      throw new Error("قيمة خصم المكافأة أكبر من مبلغ الزيارة الجديد");
+      throw new BusinessError("قيمة خصم المكافأة أكبر من مبلغ الزيارة الجديد");
     }
     return discountAmount;
   }
@@ -269,33 +270,33 @@ async function calculateUpdatedDiscount(tx: AdminVisitPrisma, visit: VisitForAdm
     const managerReward = visit.managerReward ?? (visit.discountSourceId ? await tx.managerReward.findUnique({ where: { id: visit.discountSourceId } }) : null);
     const discountAmount = managerReward ? Number(managerReward.discountAmount) : Number(visit.discountAmount);
     if (discountAmount > grossAmount) {
-      throw new Error("قيمة مكافأة الإدارة أكبر من مبلغ الزيارة الجديد");
+      throw new BusinessError("قيمة مكافأة الإدارة أكبر من مبلغ الزيارة الجديد");
     }
     return discountAmount;
   }
   const campaign = visit.campaignRedemption?.campaign ?? (visit.discountSourceId ? await tx.campaign.findUnique({ where: { id: visit.discountSourceId } }) : null);
   if (!campaign) {
     const discountAmount = Number(visit.discountAmount);
-    if (discountAmount > grossAmount) throw new Error("قيمة خصم الحملة أكبر من مبلغ الزيارة الجديد");
+    if (discountAmount > grossAmount) throw new BusinessError("قيمة خصم الحملة أكبر من مبلغ الزيارة الجديد");
     return discountAmount;
   }
   const discountAmount = computeCampaignDiscount(campaign, grossAmount);
   if (discountAmount > grossAmount) {
-    throw new Error("قيمة خصم الحملة أكبر من مبلغ الزيارة الجديد");
+    throw new BusinessError("قيمة خصم الحملة أكبر من مبلغ الزيارة الجديد");
   }
   return discountAmount;
 }
 
 async function getVisitForAdmin(tx: AdminVisitPrisma, visitId: string) {
   const visit = await tx.visit.findUnique({ where: { id: visitId }, include: adminVisitInclude });
-  if (!visit) throw new Error("الزيارة غير موجودة");
+  if (!visit) throw new BusinessError("الزيارة غير موجودة");
   return visit;
 }
 
 async function getCompletedVisitForAdmin(tx: AdminVisitPrisma, visitId: string) {
   const visit = await getVisitForAdmin(tx, visitId);
   if (visit.status !== "COMPLETED") {
-    throw new Error("لا يمكن تعديل زيارة غير مكتملة");
+    throw new BusinessError("لا يمكن تعديل زيارة غير مكتملة");
   }
   return visit;
 }
@@ -411,7 +412,7 @@ async function runSerializableTransaction<T>(prisma: PrismaClient, callback: (tx
       await new Promise((resolve) => setTimeout(resolve, 50 * attempt + Math.floor(Math.random() * 50)));
     }
   }
-  throw new Error("تعذر تنفيذ التصحيح بعد عدة محاولات");
+  throw new BusinessError("تعذر تنفيذ التصحيح بعد عدة محاولات");
 }
 
 function isSerializableWriteConflict(error: unknown) {

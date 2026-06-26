@@ -1,8 +1,9 @@
+import { BusinessError } from "@/lib/errors";
 import { Prisma } from "@prisma/client";
 import type { AuditActorType, PrismaClient } from "@prisma/client";
+import { aggregateVisitTotals, roundMoney } from "@/lib/visits/visit-totals";
 
 type CashSessionPrisma = PrismaClient | Prisma.TransactionClient;
-type SessionVisit = Prisma.VisitGetPayload<{ include: { loyaltyTransactions: true } }>;
 
 export type CashSessionCloseInput = {
   cashSessionId?: string | null;
@@ -29,7 +30,7 @@ export async function getOpenCashSession(prisma: CashSessionPrisma, barberId: st
 export async function assertOpenCashSession(prisma: CashSessionPrisma, barberId: string) {
   const session = await getOpenCashSession(prisma, barberId);
   if (!session) {
-    throw new Error("لا توجد جلسة صندوق مفتوحة لهذا الحلاق");
+    throw new BusinessError("لا توجد جلسة صندوق مفتوحة لهذا الحلاق");
   }
   return session;
 }
@@ -44,7 +45,7 @@ export async function openCashSession(
   return runSerializableTransaction(prisma, async (tx) => {
     const barber = await tx.barber.findUnique({ where: { id: input.barberId } });
     if (!barber || !barber.isActive) {
-      throw new Error("الحلاق غير موجود أو غير فعال");
+      throw new BusinessError("الحلاق غير موجود أو غير فعال");
     }
 
     const existing = await getOpenCashSession(tx, input.barberId);
@@ -93,7 +94,7 @@ export async function closeCashSession(prisma: PrismaClient, input: CashSessionC
     });
 
     if (!session) {
-      throw new Error("لا توجد جلسة صندوق مفتوحة للإغلاق");
+      throw new BusinessError("لا توجد جلسة صندوق مفتوحة للإغلاق");
     }
 
     const totals = await calculateCashSessionSnapshot(tx, session.id);
@@ -192,7 +193,7 @@ export async function calculateCashSessionSnapshot(prisma: CashSessionPrisma, ca
     include: { loyaltyTransactions: true },
   });
 
-  return buildTotals(visits);
+  return aggregateVisitTotals(visits);
 }
 
 async function toCashSessionRow(
@@ -246,40 +247,11 @@ function storedTotals(session: Prisma.CashSessionGetPayload<{ include: { barber:
   };
 }
 
-function buildTotals(visits: SessionVisit[]) {
-  return {
-    visitsCount: visits.length,
-    grossTotal: sum(visits.map((visit) => Number(visit.grossAmount))),
-    discountTotal: sum(visits.map((visit) => Number(visit.discountAmount))),
-    netTotal: sum(visits.map((visit) => Number(visit.netAmount))),
-    cashTotal: sum(visits.filter((visit) => visit.paymentMethod === "CASH").map((visit) => Number(visit.netAmount))),
-    cardTotal: sum(visits.filter((visit) => visit.paymentMethod === "NETWORK").map((visit) => Number(visit.netAmount))),
-    pointsEarnedTotal: intSum(visits.flatMap((visit) => visit.loyaltyTransactions.filter((transaction) => transaction.type === "EARN").map((transaction) => transaction.points))),
-    pointsRedeemedTotal: Math.abs(
-      intSum(visits.flatMap((visit) => visit.loyaltyTransactions.filter((transaction) => transaction.type === "REDEEM").map((transaction) => transaction.points))),
-    ),
-    rewardRedemptionsCount: visits.filter((visit) => visit.discountType === "REWARD").length,
-    campaignRedemptionsCount: visits.filter((visit) => visit.discountType === "CAMPAIGN").length,
-  };
-}
-
 function endOfDay(date: Date | string) {
   const next = new Date(date);
   next.setHours(0, 0, 0, 0);
   next.setDate(next.getDate() + 1);
   return next;
-}
-
-function sum(values: number[]) {
-  return roundMoney(values.reduce((total, value) => total + value, 0));
-}
-
-function intSum(values: number[]) {
-  return values.reduce((total, value) => total + value, 0);
-}
-
-function roundMoney(value: number) {
-  return Math.round(value * 100) / 100;
 }
 
 async function runSerializableTransaction<T>(prisma: PrismaClient, callback: (tx: Prisma.TransactionClient) => Promise<T>) {
@@ -294,7 +266,7 @@ async function runSerializableTransaction<T>(prisma: PrismaClient, callback: (tx
       await new Promise((resolve) => setTimeout(resolve, 25 * attempt));
     }
   }
-  throw new Error("تعذر تنفيذ عملية جلسة الصندوق بعد عدة محاولات");
+  throw new BusinessError("تعذر تنفيذ عملية جلسة الصندوق بعد عدة محاولات");
 }
 
 function isSerializableWriteConflict(error: unknown) {

@@ -1,3 +1,4 @@
+import { toErrorResponse } from "@/lib/http/error-response";
 import { NextResponse } from "next/server";
 import { getRequestMeta, requireBarberApi } from "@/lib/auth/http";
 import { closeCashSession } from "@/lib/cash-sessions/cash-session-service";
@@ -19,6 +20,6 @@ export async function POST() {
     });
     return NextResponse.json({ cashSession }, { status: 200 });
   } catch (error) {
-    return NextResponse.json({ message: error instanceof Error ? error.message : "تعذر إنهاء جلسة الصندوق" }, { status: 400 });
+    return toErrorResponse(error, "تعذر إنهاء جلسة الصندوق");
   }
 }

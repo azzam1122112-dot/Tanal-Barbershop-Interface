@@ -146,16 +146,18 @@ export default function BarberLoginPage() {
         </div>
       ) : null}
       <section className="mx-auto flex min-h-[calc(100vh-2.5rem)] w-full max-w-sm min-w-0 flex-col justify-center">
-        <div className="overflow-hidden rounded-lg border border-salon-ink/10 bg-white shadow-[0_24px_58px_rgba(16,25,22,0.12)]">
-          <div className="bg-salon-ink px-5 py-6 text-white">
-            <div className="flex items-center justify-between gap-3">
+        <div className="overflow-hidden rounded-2xl border border-salon-ink/10 bg-white shadow-[0_30px_70px_-30px_rgba(16,25,22,0.4)]">
+          <div className="relative overflow-hidden bg-sidebar-onyx px-5 py-6 text-white">
+            <span className="absolute inset-x-0 top-0 h-1 bg-gold-sheen" aria-hidden="true" />
+            <span className="pointer-events-none absolute -top-16 left-[-10%] h-40 w-40 rounded-full bg-salon-gold/15 blur-2xl" aria-hidden="true" />
+            <div className="relative flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <BrandLogo className="h-12 w-12 ring-1 ring-white/20" priority />
-                <span className="text-sm font-black text-salon-gold">حلاق تنال</span>
+                <BrandLogo className="h-12 w-12 ring-1 ring-salon-gold/30" priority />
+                <span className="text-[11px] font-bold uppercase tracking-eyebrow text-salon-goldlight">حلاق تنال</span>
               </div>
-              <span className="h-2 w-2 rounded-full bg-salon-gold" />
+              <span className="h-2 w-2 rounded-full bg-salon-gold shadow-[0_0_12px_2px_rgba(169,130,69,0.6)]" />
             </div>
-            <h1 className="mt-10 text-3xl font-black leading-tight">دخول الحلاق</h1>
+            <h1 className="relative mt-10 text-3xl font-bold leading-tight tracking-tight">دخول الحلاق</h1>
           </div>
           <form onSubmit={submit} className="space-y-4 px-5 py-6">
             <label className="block text-sm font-bold">

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { parseJsonBody, requireBarberApi } from "@/lib/auth/http";
 import { visitRequestSchema } from "@/lib/auth/validation";
 import { buildVisitPreview } from "@/lib/visits/visit-service";
+import { toErrorResponse } from "@/lib/http/error-response";
 
 export async function POST(request: Request) {
   const auth = await requireBarberApi();
@@ -31,6 +32,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ preview });
   } catch (error) {
-    return NextResponse.json({ message: error instanceof Error ? error.message : "تعذر حساب المعاينة" }, { status: 400 });
+    return toErrorResponse(error, "تعذر حساب المعاينة");
   }
 }

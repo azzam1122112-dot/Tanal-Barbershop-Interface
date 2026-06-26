@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useState } from "react";
+import { formatMoney } from "@/lib/format";
 import Link from "next/link";
 import { VisitAdminActions } from "@/components/dashboard/visit-admin-actions";
 import type { VisitDashboardRow } from "@/lib/visits/visit-summary";
@@ -137,8 +138,4 @@ function formatDate(value: string) {
 
 function formatTime(value: string) {
   return new Date(value).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" });
-}
-
-function formatMoney(value: number) {
-  return `${value.toLocaleString("ar-SA", { maximumFractionDigits: 2 })} ريال`;
 }

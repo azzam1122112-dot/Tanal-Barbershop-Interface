@@ -1,3 +1,4 @@
+import { BusinessError } from "@/lib/errors";
 import type { ManagerReward, Prisma, PrismaClient, UserRole } from "@prisma/client";
 import { writeAuditLog } from "@/lib/audit/audit-log";
 
@@ -22,7 +23,7 @@ export async function createManagerReward(
   meta: ActorMeta,
 ) {
   const customer = await prisma.customer.findUnique({ where: { id: input.customerId } });
-  if (!customer) throw new Error("العميل غير موجود");
+  if (!customer) throw new BusinessError("العميل غير موجود");
 
   const reward = await prisma.managerReward.create({
     data: {
@@ -75,12 +76,12 @@ export async function getRedeemableManagerRewardOrThrow(
 ) {
   const now = input.now ?? new Date();
   const reward = await prisma.managerReward.findUnique({ where: { id: input.managerRewardId } });
-  if (!reward) throw new Error("مكافأة الإدارة غير موجودة");
-  if (reward.customerId !== input.customerId) throw new Error("مكافأة الإدارة لا تخص هذا العميل");
-  if (reward.redeemedAt || reward.redeemedVisitId) throw new Error("مكافأة الإدارة مستخدمة مسبقًا");
-  if (reward.revokedAt) throw new Error("مكافأة الإدارة ملغاة");
-  if (reward.expiresAt && reward.expiresAt < now) throw new Error("مكافأة الإدارة منتهية");
-  if (Number(reward.discountAmount) > input.grossAmount) throw new Error("قيمة مكافأة الإدارة أكبر من مبلغ الزيارة");
+  if (!reward) throw new BusinessError("مكافأة الإدارة غير موجودة");
+  if (reward.customerId !== input.customerId) throw new BusinessError("مكافأة الإدارة لا تخص هذا العميل");
+  if (reward.redeemedAt || reward.redeemedVisitId) throw new BusinessError("مكافأة الإدارة مستخدمة مسبقًا");
+  if (reward.revokedAt) throw new BusinessError("مكافأة الإدارة ملغاة");
+  if (reward.expiresAt && reward.expiresAt < now) throw new BusinessError("مكافأة الإدارة منتهية");
+  if (Number(reward.discountAmount) > input.grossAmount) throw new BusinessError("قيمة مكافأة الإدارة أكبر من مبلغ الزيارة");
   return reward;
 }
 

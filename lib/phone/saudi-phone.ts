@@ -1,3 +1,4 @@
+import { BusinessError } from "@/lib/errors";
 import { z } from "zod";
 
 export const saudiPhoneInputSchema = z.string().trim().min(1, "رقم الجوال مطلوب");
@@ -14,7 +15,7 @@ export function normalizeSaudiPhone(input: string) {
   } else if (/^9665\d{8}$/.test(digits)) {
     normalized = digits;
   } else {
-    throw new Error("رقم الجوال السعودي غير صحيح");
+    throw new BusinessError("رقم الجوال السعودي غير صحيح");
   }
 
   return normalized;

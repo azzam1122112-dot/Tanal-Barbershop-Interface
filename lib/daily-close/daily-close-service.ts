@@ -1,11 +1,9 @@
+import { BusinessError } from "@/lib/errors";
 import { Prisma } from "@prisma/client";
 import type { AuditActorType, PrismaClient } from "@prisma/client";
+import { aggregateVisitTotals, roundMoney } from "@/lib/visits/visit-totals";
 
 type DailyClosePrisma = PrismaClient | Prisma.TransactionClient;
-
-type CloseVisit = Prisma.VisitGetPayload<{
-  include: { loyaltyTransactions: true };
-}>;
 
 export type DailyCloseInput = {
   barberId: string;
@@ -82,21 +80,21 @@ export async function closeBarberDay(prisma: PrismaClient, input: DailyCloseInpu
         userAgent: input.auditMeta?.userAgent,
       },
     });
-    throw new Error("تم إغلاق هذا اليوم مسبقًا");
+    throw new BusinessError("تم إغلاق هذا اليوم مسبقًا");
   }
 
   return runSerializableTransaction(prisma, async (tx) => {
     const closeDate = requestedCloseDate;
     const barber = await tx.barber.findUnique({ where: { id: input.barberId } });
     if (!barber) {
-      throw new Error("الحلاق غير موجود");
+      throw new BusinessError("الحلاق غير موجود");
     }
 
     const existing = await tx.dailyClose.findUnique({
       where: { barberId_date: { barberId: input.barberId, date: closeDate } },
     });
     if (existing) {
-      throw new Error("تم إغلاق هذا اليوم مسبقًا");
+      throw new BusinessError("تم إغلاق هذا اليوم مسبقًا");
     }
 
     const totals = await calculateDailyCloseSnapshot(tx, input.barberId, closeDate);
@@ -171,24 +169,7 @@ export async function calculateDailyCloseSnapshot(prisma: DailyClosePrisma, barb
     include: { loyaltyTransactions: true },
   });
 
-  return buildDailyCloseTotals(visits);
-}
-
-function buildDailyCloseTotals(visits: CloseVisit[]) {
-  return {
-    visitsCount: visits.length,
-    grossTotal: sum(visits.map((visit) => Number(visit.grossAmount))),
-    discountTotal: sum(visits.map((visit) => Number(visit.discountAmount))),
-    netTotal: sum(visits.map((visit) => Number(visit.netAmount))),
-    cashTotal: sum(visits.filter((visit) => visit.paymentMethod === "CASH").map((visit) => Number(visit.netAmount))),
-    cardTotal: sum(visits.filter((visit) => visit.paymentMethod === "NETWORK").map((visit) => Number(visit.netAmount))),
-    pointsEarnedTotal: intSum(visits.flatMap((visit) => visit.loyaltyTransactions.filter((transaction) => transaction.type === "EARN").map((transaction) => transaction.points))),
-    pointsRedeemedTotal: Math.abs(
-      intSum(visits.flatMap((visit) => visit.loyaltyTransactions.filter((transaction) => transaction.type === "REDEEM").map((transaction) => transaction.points))),
-    ),
-    rewardRedemptionsCount: visits.filter((visit) => visit.discountType === "REWARD").length,
-    campaignRedemptionsCount: visits.filter((visit) => visit.discountType === "CAMPAIGN").length,
-  };
+  return aggregateVisitTotals(visits);
 }
 
 function toDailyCloseRow(
@@ -223,18 +204,6 @@ function toDailyCloseRow(
   };
 }
 
-function sum(values: number[]) {
-  return roundMoney(values.reduce((total, value) => total + value, 0));
-}
-
-function intSum(values: number[]) {
-  return values.reduce((total, value) => total + value, 0);
-}
-
-function roundMoney(value: number) {
-  return Math.round(value * 100) / 100;
-}
-
 async function runSerializableTransaction<T>(prisma: PrismaClient, callback: (tx: Prisma.TransactionClient) => Promise<T>) {
   const maxAttempts = 3;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -247,7 +216,7 @@ async function runSerializableTransaction<T>(prisma: PrismaClient, callback: (tx
       await new Promise((resolve) => setTimeout(resolve, 25 * attempt));
     }
   }
-  throw new Error("تعذر تنفيذ إغلاق اليوم بعد عدة محاولات");
+  throw new BusinessError("تعذر تنفيذ إغلاق اليوم بعد عدة محاولات");
 }
 
 function isSerializableWriteConflict(error: unknown) {

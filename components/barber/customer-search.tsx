@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { FormEvent, useCallback, useState } from "react";
+import { useModalDismiss } from "@/components/use-modal-dismiss";
 
 type CustomerSummary = {
   id: string;
@@ -82,12 +83,14 @@ export function CustomerSearch() {
     setLoading(false);
   }
 
-  function closeSheet() {
+  const closeSheet = useCallback(() => {
     setCustomer(null);
     setNotFoundPhone("");
     setNewName("");
     setMessage("");
-  }
+  }, []);
+
+  useModalDismiss(sheetOpen, closeSheet);
 
   return (
     <div className="mt-5">
@@ -119,7 +122,7 @@ export function CustomerSearch() {
             />
           </label>
           {message && !sheetOpen ? <p className="rounded-2xl border border-salon-line bg-salon-mist px-4 py-3 text-sm font-bold text-salon-charcoal">{message}</p> : null}
-          <button disabled={loading} className="barber-primary-button h-14 w-full text-lg">
+          <button disabled={loading} aria-busy={loading} className="barber-primary-button h-14 w-full text-lg">
             {loading ? "جاري البحث..." : "بحث وفتح الإجراء"}
           </button>
         </div>
@@ -183,7 +186,7 @@ export function CustomerSearch() {
                   placeholder="اسم العميل"
                   className="barber-field h-14 text-lg"
                 />
-                <button disabled={loading} className="barber-gold-button h-14 w-full text-lg">
+                <button disabled={loading} aria-busy={loading} className="barber-gold-button h-14 w-full text-lg">
                   {loading ? "جاري الحفظ..." : "حفظ وفتح تسجيل الزيارة"}
                 </button>
               </form>

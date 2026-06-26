@@ -1,3 +1,4 @@
+import { toErrorResponse } from "@/lib/http/error-response";
 import { NextResponse } from "next/server";
 import { getRequestMeta, parseJsonBody, requireDashboardApi } from "@/lib/auth/http";
 import { systemSettingsUpdateSchema } from "@/lib/auth/validation";
@@ -31,6 +32,6 @@ export async function PATCH(request: Request) {
     });
     return NextResponse.json({ settings });
   } catch (error) {
-    return NextResponse.json({ message: error instanceof Error ? error.message : "تعذر تحديث الإعدادات" }, { status: 400 });
+    return toErrorResponse(error, "تعذر تحديث الإعدادات");
   }
 }

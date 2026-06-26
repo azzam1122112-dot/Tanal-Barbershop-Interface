@@ -4,6 +4,7 @@ import { getRequestMeta, parseJsonBody, requireBarberApi } from "@/lib/auth/http
 import { visitConfirmRequestSchema } from "@/lib/auth/validation";
 import { confirmVisit } from "@/lib/visits/visit-service";
 import { writeAuditLog } from "@/lib/audit/audit-log";
+import { safeErrorMessage } from "@/lib/http/error-response";
 
 export async function POST(request: Request) {
   const auth = await requireBarberApi();
@@ -37,7 +38,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result, { status: result.idempotentReplay ? 200 : 201 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "تعذر حفظ الزيارة";
+    const message = safeErrorMessage(error, "تعذر حفظ الزيارة");
     await writeAuditLog({
       prisma,
       actorType: "BARBER",

@@ -458,6 +458,17 @@ model WhatsAppMessageLog {
   @@index([markedSentByUserId])
 }
 
+model LoginAttempt {
+  id          String    @id @default(cuid())
+  key         String    @unique
+  count       Int       @default(0)
+  windowStart DateTime  @default(now())
+  lockedUntil DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  @@index([lockedUntil])
+}
+
 model AuditLog {
   id            String         @id @default(cuid())
   actorType     AuditActorType

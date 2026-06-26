@@ -1,3 +1,4 @@
+import { toErrorResponse } from "@/lib/http/error-response";
 import { NextResponse } from "next/server";
 import { getRequestMeta, parseJsonBody, requireDashboardApi } from "@/lib/auth/http";
 import { managerRewardCreateSchema } from "@/lib/auth/validation";
@@ -34,6 +35,6 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     );
     return NextResponse.json({ reward }, { status: 201 });
   } catch (error) {
-    return NextResponse.json({ message: error instanceof Error ? error.message : "تعذر إصدار المكافأة" }, { status: 400 });
+    return toErrorResponse(error, "تعذر إصدار المكافأة");
   }
 }

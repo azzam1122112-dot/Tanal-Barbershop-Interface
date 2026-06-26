@@ -1,3 +1,4 @@
+import { toErrorResponse } from "@/lib/http/error-response";
 import { NextResponse } from "next/server";
 import { getRequestMeta, requireBarberApi } from "@/lib/auth/http";
 import { openCashSession } from "@/lib/cash-sessions/cash-session-service";
@@ -16,6 +17,6 @@ export async function POST() {
     });
     return NextResponse.json(result, { status: result.alreadyOpen ? 200 : 201 });
   } catch (error) {
-    return NextResponse.json({ message: error instanceof Error ? error.message : "تعذر فتح جلسة الصندوق" }, { status: 400 });
+    return toErrorResponse(error, "تعذر فتح جلسة الصندوق");
   }
 }

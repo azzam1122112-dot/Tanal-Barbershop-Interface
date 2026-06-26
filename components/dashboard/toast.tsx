@@ -31,14 +31,18 @@ export function DashboardToast({ toast, onClose }: { toast: ToastState | null; o
   }[toast.tone ?? "info"];
 
   return (
-    <div className="fixed left-4 top-4 z-50 w-[calc(100%-2rem)] max-w-sm animate-[toast-in_180ms_ease-out]">
-      <div className={`rounded-lg border px-4 py-3 shadow-2xl shadow-salon-ink/15 backdrop-blur ${toneClass}`}>
+    <div
+      role="status"
+      aria-live={toast.tone === "error" ? "assertive" : "polite"}
+      className="fixed left-4 top-4 z-50 w-[calc(100%-2rem)] max-w-sm animate-[toast-in_180ms_ease-out]"
+    >
+      <div className={`rounded-xl border px-4 py-3 shadow-lux-lg backdrop-blur ${toneClass}`}>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-black">{label}</p>
-            <p className="mt-1 text-sm font-bold leading-6">{toast.message}</p>
+            <p className="text-xs font-bold">{label}</p>
+            <p className="mt-1 text-sm font-semibold leading-6">{toast.message}</p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-md px-2 py-1 text-xs font-black opacity-70 transition hover:bg-black/5 hover:opacity-100">
+          <button type="button" onClick={onClose} aria-label="إغلاق الإشعار" className="rounded-md px-2 py-1 text-xs font-bold opacity-70 transition hover:bg-black/5 hover:opacity-100">
             إغلاق
           </button>
         </div>

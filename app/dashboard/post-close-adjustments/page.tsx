@@ -1,3 +1,4 @@
+import { formatMoney } from "@/lib/format";
 import { redirect } from "next/navigation";
 import { DashboardShell, EmptyState, FilterBar, StatCard, TablePanel } from "@/components/dashboard/ui";
 import { canAccessDashboard } from "@/lib/auth/access";
@@ -106,8 +107,4 @@ function typeLabel(type: string) {
   if (type === "VISIT_PAYMENT_METHOD_UPDATED") return "تعديل طريقة الدفع";
   if (type === "VISIT_AMOUNT_UPDATED") return "تعديل مبلغ";
   return type;
-}
-
-function formatMoney(value: number) {
-  return `${value.toLocaleString("ar-SA", { maximumFractionDigits: 2 })} ريال`;
 }

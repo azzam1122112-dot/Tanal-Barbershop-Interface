@@ -1,3 +1,4 @@
+import { BusinessError } from "@/lib/errors";
 import type { PrismaClient, SystemSettings, UserRole } from "@prisma/client";
 import { writeAuditLog } from "@/lib/audit/audit-log";
 
@@ -28,7 +29,7 @@ export async function updateSystemSettings(
   meta: SettingsMeta,
 ) {
   const before = await prisma.systemSettings.findUnique({ where: { singletonKey: "default" } });
-  if (!before) throw new Error("إعدادات النظام غير موجودة");
+  if (!before) throw new BusinessError("إعدادات النظام غير موجودة");
   const settings = await prisma.systemSettings.update({
     where: { singletonKey: "default" },
     data,

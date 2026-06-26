@@ -21,6 +21,7 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:seed": "tsx prisma/seed.ts",
     "demo:seed": "tsx scripts/demo-seed.ts",
+    "maintenance:cleanup": "tsx scripts/maintenance.ts",
     "db:reset": "prisma migrate reset"
   },
   "overrides": {
