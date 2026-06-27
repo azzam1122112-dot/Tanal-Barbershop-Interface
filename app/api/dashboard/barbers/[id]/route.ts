@@ -25,6 +25,16 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     return NextResponse.json({ message: "الحلاق غير موجود" }, { status: 404 });
   }
 
+  if (parsed.data.salonId && parsed.data.salonId !== before.salonId) {
+    const salon = await prisma.salon.findFirst({
+      where: { id: parsed.data.salonId, organizationId: session.organizationId, isActive: true },
+      select: { id: true },
+    });
+    if (!salon) {
+      return NextResponse.json({ message: "الفرع غير موجود" }, { status: 404 });
+    }
+  }
+
   try {
     const barber = await prisma.barber.update({
       where: { id },

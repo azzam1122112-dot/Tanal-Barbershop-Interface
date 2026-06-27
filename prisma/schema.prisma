@@ -238,7 +238,7 @@ model Barber {
   dailyCloses      DailyClose[]
   cashSessions     CashSession[]
 
-  @@unique([salonId, phone])
+  @@unique([organizationId, phone])
   @@index([salonId, isActive])
   @@index([organizationId])
 }

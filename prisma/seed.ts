@@ -100,7 +100,7 @@ async function main() {
   });
 
   const barber = await prisma.barber.upsert({
-    where: { salonId_phone: { salonId: salon.id, phone: barberPhone } },
+    where: { organizationId_phone: { organizationId: organization.id, phone: barberPhone } },
     update: {
       name: "حلاق تجريبي",
       accessPinHash: await hashBarberPin(barberPin),

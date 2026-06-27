@@ -70,12 +70,14 @@ export const createBarberSchema = z.object({
   name: z.string().trim().min(2, "اسم الحلاق مطلوب"),
   phone: phoneSchema,
   pin: barberPinSchema,
+  salonId: z.string().trim().min(1, "الفرع مطلوب"),
 });
 
 export const updateBarberSchema = z.object({
   name: z.string().trim().min(2, "اسم الحلاق مطلوب").optional(),
   phone: phoneSchema.optional(),
   isActive: z.boolean().optional(),
+  salonId: z.string().trim().min(1, "الفرع مطلوب").optional(),
 });
 
 export const resetBarberPinSchema = z.object({

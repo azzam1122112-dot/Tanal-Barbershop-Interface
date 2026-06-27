@@ -11,11 +11,14 @@ type BarberResponse = {
   message?: string;
 };
 
+type SalonOption = { id: string; name: string };
+
 type BarberDraft = {
   name: string;
   phone: string;
   pin: string;
   isActive: boolean;
+  salonId: string;
 };
 
 type BarberFilter = "all" | "active" | "inactive";
@@ -26,10 +29,21 @@ const dateFormatter = new Intl.DateTimeFormat("ar-SA", {
   day: "numeric",
 });
 
-export function BarberManager({ initialBarbers }: { initialBarbers: SafeBarber[] }) {
+export function BarberManager({
+  initialBarbers,
+  salons,
+  defaultSalonId,
+}: {
+  initialBarbers: SafeBarber[];
+  salons: SalonOption[];
+  defaultSalonId: string | null;
+}) {
   const [barbers, setBarbers] = useState(initialBarbers);
   const [toast, setToast] = useState<ToastState | null>(null);
   const { confirm, confirmDialog } = useConfirm();
+
+  const salonName = (id: string | null | undefined) => salons.find((salon) => salon.id === id)?.name ?? "فرع محذوف";
+  const hasMultipleSalons = salons.length > 1;
   const [loading, setLoading] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -68,6 +82,7 @@ export function BarberManager({ initialBarbers }: { initialBarbers: SafeBarber[]
         name: form.get("name"),
         phone: form.get("phone"),
         pin: form.get("pin"),
+        salonId: form.get("salonId"),
       }),
     });
     const data = (await response.json().catch(() => ({}))) as BarberResponse;
@@ -95,6 +110,7 @@ export function BarberManager({ initialBarbers }: { initialBarbers: SafeBarber[]
         phone: barber.phone,
         pin: "",
         isActive: Boolean(barber.isActive),
+        salonId: barber.salonId ?? "",
       },
     }));
   }
@@ -163,6 +179,7 @@ export function BarberManager({ initialBarbers }: { initialBarbers: SafeBarber[]
     if (draft.name.trim() !== barber.name) updateBody.name = draft.name;
     if (draft.phone.trim() !== barber.phone) updateBody.phone = draft.phone;
     if (draft.isActive !== Boolean(barber.isActive)) updateBody.isActive = draft.isActive;
+    if (draft.salonId && draft.salonId !== (barber.salonId ?? "")) updateBody.salonId = draft.salonId;
 
     const detailsChanged = Object.keys(updateBody).length > 0;
     const pinChanged = draft.pin.trim().length > 0;
@@ -280,6 +297,14 @@ export function BarberManager({ initialBarbers }: { initialBarbers: SafeBarber[]
               <span className="mb-2 block text-xs font-black text-salon-charcoal">رمز الدخول</span>
               <input name="pin" required minLength={4} maxLength={6} inputMode="numeric" placeholder="4 أو 6 أرقام" className="dashboard-field" />
             </label>
+            <label className="block">
+              <span className="mb-2 block text-xs font-black text-salon-charcoal">الفرع</span>
+              <select name="salonId" required defaultValue={defaultSalonId ?? salons[0]?.id ?? ""} className="dashboard-field">
+                {salons.map((salon) => (
+                  <option key={salon.id} value={salon.id}>{salon.name}</option>
+                ))}
+              </select>
+            </label>
             <button disabled={loading} className="dashboard-button w-full">
               {loading ? "جاري الحفظ..." : "حفظ الحلاق"}
             </button>
@@ -371,6 +396,20 @@ export function BarberManager({ initialBarbers }: { initialBarbers: SafeBarber[]
                             className="h-5 w-5 accent-salon-forest"
                           />
                         </label>
+                        {hasMultipleSalons ? (
+                          <label className="block md:col-span-2">
+                            <span className="mb-2 block text-xs font-black text-salon-charcoal">الفرع</span>
+                            <select
+                              value={draft.salonId}
+                              onChange={(event) => updateDraft(barber.id, { salonId: event.target.value })}
+                              className="dashboard-field py-2.5"
+                            >
+                              {salons.map((salon) => (
+                                <option key={salon.id} value={salon.id}>{salon.name}</option>
+                              ))}
+                            </select>
+                          </label>
+                        ) : null}
                       </div>
                     ) : (
                       <div>
@@ -384,6 +423,10 @@ export function BarberManager({ initialBarbers }: { initialBarbers: SafeBarber[]
                           <div>
                             <dt className="text-xs font-black text-salon-charcoal/70">رقم الجوال</dt>
                             <dd className="mt-1 text-salon-ink">{barber.phone}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs font-black text-salon-charcoal/70">الفرع</dt>
+                            <dd className="mt-1 text-salon-ink">{salonName(barber.salonId)}</dd>
                           </div>
                           <div>
                             <dt className="text-xs font-black text-salon-charcoal/70">آخر تحديث</dt>

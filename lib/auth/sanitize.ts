@@ -17,6 +17,7 @@ export type SafeBarber = {
   name: string;
   phone: string;
   role: "BARBER";
+  salonId?: string | null;
   isActive?: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -51,6 +52,7 @@ export function toSafeBarber(barber: Barber, includeManagementFields = false): S
   };
 
   if (includeManagementFields) {
+    safeBarber.salonId = barber.salonId;
     safeBarber.isActive = barber.isActive;
     safeBarber.createdAt = barber.createdAt.toISOString();
     safeBarber.updatedAt = barber.updatedAt.toISOString();

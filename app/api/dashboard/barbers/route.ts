@@ -50,10 +50,18 @@ export async function POST(request: Request) {
       throw new BusinessError(`باقتك تسمح بـ ${maxBarbers} حلاق. رقّ باقتك لإضافة حلاقين أكثر.`);
     }
 
+    const salon = await prisma.salon.findFirst({
+      where: { id: parsed.data.salonId, organizationId: session.organizationId, isActive: true },
+      select: { id: true },
+    });
+    if (!salon) {
+      throw new BusinessError("الفرع غير موجود");
+    }
+
     const barber = await prisma.barber.create({
       data: {
         organizationId: session.organizationId,
-        salonId: session.salonId,
+        salonId: salon.id,
         name: parsed.data.name,
         phone: parsed.data.phone,
         accessPinHash: await hashBarberPin(parsed.data.pin),
