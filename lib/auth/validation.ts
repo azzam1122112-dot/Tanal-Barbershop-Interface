@@ -38,7 +38,8 @@ export const organizationSlugSchema = z
 
 export const signupSchema = z.object({
   organizationName: z.string().trim().min(2, "اسم المؤسسة مطلوب"),
-  slug: organizationSlugSchema,
+  // المعرّف اختياري: يُولَّد تلقائيًا إن لم يُرسَل (الدخول يعتمد على البريد/الجوال لا المعرّف).
+  slug: organizationSlugSchema.optional(),
   salonName: z.string().trim().min(2, "اسم الصالون مطلوب").optional(),
   ownerName: z.string().trim().min(2, "اسم المالك مطلوب"),
   email: emailSchema,

@@ -6,3 +6,7 @@
  ✓ Starting...
  ✓ Ready in 4.6s
  ✓ Compiled /middleware in 175ms (117 modules)
+ ○ Compiling /api/auth/signup ...
+ ✓ Compiled /api/auth/signup in 904ms (333 modules)
+{"level":"info","time":"2026-06-27T22:06:35.265Z","message":"organization.created","context":{"organizationId":"cmqwwtjzu0002jt4ks2igqqvz","slug":"salon-c3n7"}}
+ POST /api/auth/signup 201 in 2052ms

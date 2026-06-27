@@ -5,6 +5,27 @@ import { getDefaultSignupPlan } from "@/lib/plans/subscription-service";
 
 const TRIAL_DAYS = 14;
 
+/** أساس معرّف من اسم لاتيني إن وُجد، وإلا "salon". */
+function slugifyBase(value: string) {
+  const base = value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 24);
+  return base.length >= 2 ? base : "salon";
+}
+
+/** يولّد معرّفًا فريدًا تلقائيًا (asas-xxxx) دون تدخّل المستخدم. */
+async function generateUniqueSlug(prisma: PrismaClient, preferred: string) {
+  const base = slugifyBase(preferred);
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const candidate = `${base}-${Math.random().toString(36).slice(2, 6)}`.slice(0, 40);
+    const existing = await prisma.organization.findUnique({ where: { slug: candidate }, select: { id: true } });
+    if (!existing) return candidate;
+  }
+  return `salon-${Date.now().toString(36)}`;
+}
+
 function defaultSettings(organizationId: string, salonId: string, salonName: string) {
   return {
     organizationId,
@@ -24,7 +45,7 @@ export async function createOrganizationWithOwner(
   prisma: PrismaClient,
   input: {
     organizationName: string;
-    slug: string;
+    slug?: string;
     salonName?: string;
     ownerName: string;
     email: string;
@@ -32,9 +53,14 @@ export async function createOrganizationWithOwner(
     password: string;
   },
 ) {
-  const existing = await prisma.organization.findUnique({ where: { slug: input.slug }, select: { id: true } });
-  if (existing) {
-    throw new BusinessError("هذا المعرّف مستخدم مسبقًا، اختر معرّفًا آخر");
+  let slug = input.slug?.trim().toLowerCase();
+  if (slug) {
+    const existing = await prisma.organization.findUnique({ where: { slug }, select: { id: true } });
+    if (existing) {
+      throw new BusinessError("هذا المعرّف مستخدم مسبقًا، اختر معرّفًا آخر");
+    }
+  } else {
+    slug = await generateUniqueSlug(prisma, input.organizationName);
   }
 
   const plan = await getDefaultSignupPlan(prisma);
@@ -49,7 +75,7 @@ export async function createOrganizationWithOwner(
     const organization = await tx.organization.create({
       data: {
         name: input.organizationName,
-        slug: input.slug,
+        slug,
         status: "ACTIVE",
         planId: plan.id,
         subscriptionStatus: "TRIALING",

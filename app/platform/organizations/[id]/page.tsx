@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { PlatformShell } from "@/components/platform/platform-shell";
 import { OrgSubscriptionManager } from "@/components/platform/org-subscription-manager";
 import { OrgAccessManager } from "@/components/platform/org-access-manager";
+import { OrgDelete } from "@/components/platform/org-delete";
 import { prisma } from "@/lib/db/prisma";
 import { getOrganizationDetail, listPlans } from "@/lib/platform/platform-service";
 import { formatDate, formatDateTime, formatMoney, formatNumber } from "@/lib/format";
@@ -112,6 +113,9 @@ export default async function PlatformOrganizationDetailPage({ params }: { param
           {org.recentAudit.length === 0 ? <p className="px-5 py-6 text-center text-sm text-salon-charcoal">لا يوجد نشاط مسجّل.</p> : null}
         </div>
       </section>
+
+      {/* منطقة الخطر */}
+      {org.slug !== "default" ? <OrgDelete orgId={org.id} name={org.name} slug={org.slug} /> : null}
     </PlatformShell>
   );
 }

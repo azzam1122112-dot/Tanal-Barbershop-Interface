@@ -352,3 +352,50 @@ export async function resetBarberPin(prisma: PrismaClient, organizationId: strin
 
   return { id: barber.id, name: barber.name, phone: barber.phone, pin };
 }
+
+/**
+ * حذف نهائي للمؤسسة وكل بياناتها التابعة.
+ * نحذف يدويًا بالترتيب لأن بعض العلاقات الداخلية تستخدم RESTRICT (زيارة←عميل/حلاق، إلخ)
+ * فلا يكفي cascade المؤسسة وحده. كل العمليات داخل معاملة واحدة (الكل أو لا شيء).
+ */
+export async function deleteOrganizationCascade(prisma: PrismaClient, organizationId: string) {
+  const org = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { id: true, name: true, slug: true },
+  });
+  if (!org) throw new BusinessError("المؤسسة غير موجودة");
+  if (org.slug === "default") throw new BusinessError("لا يمكن حذف المؤسسة الافتراضية");
+
+  const where = { organizationId };
+
+  await prisma.$transaction(
+    async (tx) => {
+      // أبناء الزيارات والخدمات أولًا
+      await tx.visitService.deleteMany({ where: { visit: { organizationId } } });
+      await tx.campaignRedemption.deleteMany({ where });
+      await tx.loyaltyTransaction.deleteMany({ where });
+      await tx.managerReward.deleteMany({ where });
+      await tx.whatsAppMessageLog.deleteMany({ where });
+      await tx.dailyClose.deleteMany({ where });
+      await tx.visit.deleteMany({ where });
+      await tx.cashSession.deleteMany({ where });
+      await tx.loyaltyAccount.deleteMany({ where });
+      // الكيانات المرجعية بعد إزالة كل ما يشير إليها
+      await tx.service.deleteMany({ where });
+      await tx.campaign.deleteMany({ where });
+      await tx.rewardRule.deleteMany({ where });
+      await tx.customer.deleteMany({ where });
+      await tx.barber.deleteMany({ where });
+      await tx.whatsAppTemplate.deleteMany({ where });
+      await tx.systemSettings.deleteMany({ where });
+      await tx.auditLog.deleteMany({ where });
+      await tx.session.deleteMany({ where });
+      await tx.user.deleteMany({ where });
+      await tx.salon.deleteMany({ where });
+      await tx.organization.delete({ where: { id: organizationId } });
+    },
+    { timeout: 30_000, maxWait: 10_000 },
+  );
+
+  return { id: org.id, name: org.name, slug: org.slug };
+}

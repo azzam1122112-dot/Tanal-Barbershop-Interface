@@ -7,12 +7,8 @@ import { BrandLogo } from "@/components/brand-logo";
 export default function SignupPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [slug, setSlug] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [created, setCreated] = useState<{ slug: string; redirectTo: string } | null>(null);
-
-  function onSlug(value: string) {
-    setSlug(value.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 40));
-  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -24,7 +20,6 @@ export default function SignupPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         organizationName: form.get("organizationName"),
-        slug: form.get("slug"),
         salonName: form.get("salonName"),
         ownerName: form.get("ownerName"),
         email: form.get("email"),
@@ -38,7 +33,7 @@ export default function SignupPage() {
       setLoading(false);
       return;
     }
-    setCreated({ slug: data.slug ?? slug, redirectTo: data.redirectTo ?? "/dashboard" });
+    setCreated({ slug: data.slug ?? "", redirectTo: data.redirectTo ?? "/dashboard" });
   }
 
   return (
@@ -61,13 +56,15 @@ export default function SignupPage() {
               <p className="text-[11px] font-bold uppercase tracking-eyebrow text-salon-gold">تم الإنشاء بنجاح</p>
               <h2 className="mt-2 text-2xl font-bold leading-tight">مؤسستك جاهزة 🎉</h2>
               <p className="mt-2 text-sm leading-7 text-salon-charcoal/80">
-                احفظ معرّف مؤسستك — ستحتاجه أنت وفريقك في كل تسجيل دخول.
+                تدخل دائمًا ببريدك وكلمة المرور. هذا معرّف مؤسستك الداخلي (احتفظ به للدعم الفني عند الحاجة).
               </p>
             </div>
-            <div className="rounded-xl border border-salon-line bg-salon-mist px-4 py-4 text-center">
-              <p className="text-xs font-bold text-salon-charcoal/60">معرّف المؤسسة</p>
-              <p dir="ltr" className="mt-1 text-2xl font-black tracking-wide text-salon-ink">{created.slug}</p>
-            </div>
+            {created.slug ? (
+              <div className="rounded-xl border border-salon-line bg-salon-mist px-4 py-4 text-center">
+                <p className="text-xs font-bold text-salon-charcoal/60">معرّف المؤسسة</p>
+                <p dir="ltr" className="mt-1 text-2xl font-black tracking-wide text-salon-ink">{created.slug}</p>
+              </div>
+            ) : null}
             <button
               type="button"
               onClick={() => { window.location.href = created.redirectTo; }}
@@ -96,28 +93,10 @@ export default function SignupPage() {
               <input name="organizationName" required className="dashboard-field mt-2" placeholder="مثال: صالونات تنال" />
             </label>
             <label className="block text-sm font-semibold">
-              اسم أول صالون
+              اسم أول صالون <span className="font-medium text-salon-charcoal/55">(اختياري)</span>
               <input name="salonName" className="dashboard-field mt-2" placeholder="الصالون الرئيسي" />
             </label>
           </div>
-
-          <label className="block text-sm font-semibold">
-            المعرّف (النطاق الفرعي)
-            <div className="mt-2 flex items-center overflow-hidden rounded-xl border border-salon-line bg-white focus-within:border-salon-gold focus-within:ring-4 focus-within:ring-salon-gold/[0.15]">
-              <input
-                name="slug"
-                value={slug}
-                onChange={(event) => onSlug(event.target.value)}
-                required
-                dir="ltr"
-                className="min-w-0 flex-1 bg-transparent px-3 py-3 text-sm font-semibold outline-none"
-                placeholder="my-salon"
-              />
-              <span dir="ltr" className="shrink-0 border-r border-salon-line bg-salon-mist px-3 py-3 text-xs font-bold text-salon-charcoal/70">.tanal.com</span>
-            </div>
-          </label>
-
-          <div className="lux-rule" />
 
           <label className="block text-sm font-semibold">
             اسم المالك
@@ -135,7 +114,24 @@ export default function SignupPage() {
           </div>
           <label className="block text-sm font-semibold">
             كلمة المرور
-            <input name="password" type="password" required autoComplete="new-password" className="dashboard-field mt-2" />
+            <div className="mt-2 flex items-center overflow-hidden rounded-xl border border-salon-line bg-white focus-within:border-salon-gold focus-within:ring-4 focus-within:ring-salon-gold/[0.15]">
+              <input
+                name="password"
+                type={showPassword ? "text" : "password"}
+                required
+                minLength={8}
+                autoComplete="new-password"
+                className="min-w-0 flex-1 bg-transparent px-3 py-3 text-sm font-semibold outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((value) => !value)}
+                className="shrink-0 border-r border-salon-line bg-salon-mist px-3 py-3 text-xs font-bold text-salon-charcoal/70 transition-colors hover:text-salon-ink"
+              >
+                {showPassword ? "إخفاء" : "إظهار"}
+              </button>
+            </div>
+            <span className="mt-1 block text-xs font-medium text-salon-charcoal/60">8 أحرف على الأقل.</span>
           </label>
 
           {error ? <p className="rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{error}</p> : null}
