@@ -2,9 +2,9 @@ import type { PrismaClient } from "@prisma/client";
 import { getCashSessionSummary } from "@/lib/cash-sessions/cash-session-service";
 import { getTodayRange } from "@/lib/reports/dashboard-reports";
 
-export async function getOperationAlerts(prisma: PrismaClient, date: Date | string = new Date(), organizationId?: string) {
-  const summary = await getCashSessionSummary(prisma, organizationId);
-  const orgFilter = organizationId ? { organizationId } : {};
+export async function getOperationAlerts(prisma: PrismaClient, date: Date | string = new Date(), organizationId?: string, salonId?: string | null) {
+  const summary = await getCashSessionSummary(prisma, organizationId, salonId);
+  const orgFilter = { ...(organizationId ? { organizationId } : {}), ...(salonId ? { salonId } : {}) };
   const { from, to } = getTodayRange(new Date(date));
   const zeroNetVisits = await prisma.visit.count({
     where: {

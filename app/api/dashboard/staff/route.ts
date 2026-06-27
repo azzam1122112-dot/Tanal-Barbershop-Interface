@@ -6,6 +6,7 @@ import { getRequestMeta, parseJsonBody, requireAdminApi } from "@/lib/auth/http"
 import { hashAdminPassword } from "@/lib/auth/password";
 import { createStaffSchema } from "@/lib/auth/validation";
 import { toSafeAdminUser } from "@/lib/auth/sanitize";
+import { findUserIdentityConflicts, identityConflictMessage } from "@/lib/auth/user-identity";
 
 export async function GET() {
   const auth = await requireAdminApi();
@@ -32,6 +33,16 @@ export async function POST(request: Request) {
 
   if (!parsed.success) {
     return NextResponse.json({ message: "بيانات الموظف غير صحيحة" }, { status: 400 });
+  }
+
+  // حارس عالمي: لا يتكرر بريد/جوال الموظف عبر كل المؤسسات (قيد القاعدة مقيّد بالمؤسسة فقط).
+  const { emailTaken, phoneTaken } = await findUserIdentityConflicts(prisma, {
+    email: parsed.data.email,
+    phone: parsed.data.phone,
+  });
+  const conflictMessage = identityConflictMessage(emailTaken, phoneTaken);
+  if (conflictMessage) {
+    return NextResponse.json({ message: conflictMessage }, { status: 409 });
   }
 
   try {

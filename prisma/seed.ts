@@ -2,6 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import { hashAdminPassword } from "../lib/auth/password";
 import { hashBarberPin } from "../lib/auth/barber-pin";
 import { normalizeSaudiPhone } from "../lib/phone/saudi-phone";
+import { DEFAULT_WHATSAPP_TEMPLATES } from "../lib/whatsapp/default-templates";
 
 const prisma = new PrismaClient();
 
@@ -158,45 +159,7 @@ async function main() {
     skipDuplicates: true,
   });
 
-  const whatsappTemplates = [
-    {
-      name: "رسالة بعد الزيارة",
-      type: "POST_VISIT" as const,
-      body: `أهلًا {name} 👋
-تم تسجيل زيارتك في {salon_name}.
-المبلغ المدفوع: {visit_net_amount} ريال
-النقاط المكتسبة: {visit_points_earned}
-رصيدك الحالي: {points} نقطة
-شكرًا لزيارتك.`,
-    },
-    {
-      name: "مكافأة جاهزة",
-      type: "REWARD_READY" as const,
-      body: `أهلًا {name} 👋
-لديك مكافأة جاهزة في {salon_name}.
-{manager_reward_title}
-خصم {reward_discount} ريال متاح في زيارتك القادمة.
-رصيدك الحالي: {points} نقطة`,
-    },
-    {
-      name: "عميل منقطع",
-      type: "INACTIVE_CUSTOMER" as const,
-      body: `أهلًا {name} 👋
-اشتقنا لك في {salon_name}.
-مرّ {days_since_last_visit} يوم على آخر زيارة لك.
-نسعد بزيارتك قريبًا.`,
-    },
-    {
-      name: "رسالة حملة",
-      type: "CAMPAIGN" as const,
-      body: `أهلًا {name} 👋
-عرض خاص من {salon_name}: {campaign_name}
-خصم {campaign_discount}
-العرض لفترة محدودة.`,
-    },
-  ];
-
-  for (const template of whatsappTemplates) {
+  for (const template of DEFAULT_WHATSAPP_TEMPLATES) {
     const existing = await prisma.whatsAppTemplate.findFirst({
       where: { organizationId: organization.id, type: template.type, name: template.name },
     });

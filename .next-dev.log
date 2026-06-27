@@ -10,3 +10,5 @@
  ✓ Compiled /api/auth/signup in 904ms (333 modules)
 {"level":"info","time":"2026-06-27T22:06:35.265Z","message":"organization.created","context":{"organizationId":"cmqwwtjzu0002jt4ks2igqqvz","slug":"salon-c3n7"}}
  POST /api/auth/signup 201 in 2052ms
+ ✓ Compiled in 30ms
+ ✓ Compiled in 405ms (312 modules)

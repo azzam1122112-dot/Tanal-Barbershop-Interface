@@ -4,6 +4,7 @@ type AdjustmentType = "VISIT_CANCELLED" | "VISIT_PAYMENT_METHOD_UPDATED" | "VISI
 
 type ReportFilters = {
   organizationId?: string | null;
+  salonId?: string | null;
   from?: Date | string | null;
   to?: Date | string | null;
   barberId?: string | null;
@@ -43,6 +44,7 @@ export async function getPostCloseAdjustmentReport(prisma: PrismaClient, filters
   const visits = await prisma.visit.findMany({
     where: {
       id: { in: visitIds },
+      ...(filters.salonId ? { salonId: filters.salonId } : {}),
       ...(filters.barberId ? { barberId: filters.barberId } : {}),
     },
     include: { customer: true, barber: true },

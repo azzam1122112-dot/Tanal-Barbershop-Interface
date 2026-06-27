@@ -70,6 +70,27 @@ type GeneratedMessage = {
   status: MessageStatus;
 };
 
+const TEMPLATE_TYPE_OPTIONS: { value: TemplateType; label: string }[] = [
+  { value: "POST_VISIT", label: "بعد الزيارة" },
+  { value: "REWARD_READY", label: "مكافأة نقاط جاهزة" },
+  { value: "CAMPAIGN", label: "حملة" },
+  { value: "INACTIVE_CUSTOMER", label: "عميل منقطع" },
+  { value: "CUSTOM", label: "مخصص" },
+];
+
+const TEMPLATE_VARIABLES: { token: string; label: string }[] = [
+  { token: "{name}", label: "اسم العميل" },
+  { token: "{salon_name}", label: "اسم الصالون" },
+  { token: "{points}", label: "رصيد النقاط" },
+  { token: "{reward_discount}", label: "قيمة الخصم" },
+  { token: "{visit_net_amount}", label: "مبلغ الزيارة" },
+  { token: "{visit_points_earned}", label: "نقاط الزيارة" },
+  { token: "{campaign_name}", label: "اسم الحملة" },
+  { token: "{campaign_discount}", label: "خصم الحملة" },
+  { token: "{days_since_last_visit}", label: "أيام الانقطاع" },
+  { token: "{last_visit}", label: "تاريخ آخر زيارة" },
+];
+
 export function WhatsAppDashboard({
   initialTemplates,
   initialMessages,
@@ -98,6 +119,13 @@ export function WhatsAppDashboard({
   const [toast, setToast] = useState<ToastState | null>(null);
   const [selectedCustomerId, setSelectedCustomerId] = useState(prefillCustomerId ?? "");
   const [selectedVisitId, setSelectedVisitId] = useState(prefillVisitId ?? "");
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+  const [templateDraft, setTemplateDraft] = useState<{ name: string; type: TemplateType; body: string }>({
+    name: "",
+    type: "CUSTOM",
+    body: "",
+  });
+  const [restoring, setRestoring] = useState(false);
   const activeTemplates = useMemo(() => templates.filter((template) => template.isActive), [templates]);
   const customerVisits = useMemo(
     () => visits.filter((visit) => visit.customerId === selectedCustomerId),
@@ -140,6 +168,37 @@ export function WhatsAppDashboard({
     } else {
       setToast({ message: data.message ?? "تعذر تحديث القالب", tone: "error" });
     }
+  }
+
+  function startTemplateEdit(template: Template) {
+    setEditingTemplateId(template.id);
+    setTemplateDraft({ name: template.name, type: template.type, body: template.body });
+  }
+
+  async function saveTemplateEdit(id: string) {
+    await updateTemplate(id, {
+      name: templateDraft.name,
+      type: templateDraft.type,
+      body: templateDraft.body,
+    });
+    setEditingTemplateId(null);
+  }
+
+  async function restoreDefaults() {
+    setRestoring(true);
+    setToast(null);
+    const response = await fetch("/api/dashboard/whatsapp/templates/restore-defaults", { method: "POST" });
+    const data = (await response.json().catch(() => ({}))) as { created?: number; templates?: Template[]; message?: string };
+    if (response.ok && data.templates) {
+      setTemplates(data.templates);
+      setToast({
+        message: data.created ? `تمت إضافة ${data.created} قالبًا احترافيًا` : "القوالب الاحترافية موجودة مسبقًا",
+        tone: "success",
+      });
+    } else {
+      setToast({ message: data.message ?? "تعذر استعادة القوالب", tone: "error" });
+    }
+    setRestoring(false);
   }
 
   async function generateMessage(event: FormEvent<HTMLFormElement>) {
@@ -227,48 +286,101 @@ export function WhatsAppDashboard({
 
       <section className="grid gap-6 xl:grid-cols-[420px_1fr]">
         <form onSubmit={createTemplate} className="dashboard-panel space-y-3 p-5">
-          <h2 className="text-xl font-black">القوالب</h2>
+          <h2 className="text-xl font-black">إضافة قالب جديد</h2>
           <input name="name" required placeholder="اسم القالب" className="dashboard-field" />
           <select name="type" defaultValue="CUSTOM" className="dashboard-field">
-            <option value="POST_VISIT">بعد الزيارة</option>
-            <option value="REWARD_READY">مكافأة نقاط جاهزة</option>
-            <option value="CAMPAIGN">حملة</option>
-            <option value="INACTIVE_CUSTOMER">عميل منقطع</option>
-            <option value="CUSTOM">مخصص</option>
+            {TEMPLATE_TYPE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
           </select>
-          <textarea name="body" required rows={7} placeholder="متغيرات: {name} {points} {reward_discount} {manager_reward_title} {manager_reward_discount}" className="dashboard-field" />
-          <button className="dashboard-button w-full">حفظ قالب</button>
+          <textarea name="body" required rows={7} placeholder="اكتب نص الرسالة هنا، واستخدم المتغيّرات بالأسفل…" className="dashboard-field" />
+          <div className="rounded-lg border border-salon-line bg-salon-mist p-3">
+            <p className="mb-2 text-xs font-black text-salon-charcoal">المتغيّرات المتاحة (تُستبدل تلقائيًا):</p>
+            <div className="flex flex-wrap gap-1.5">
+              {TEMPLATE_VARIABLES.map((variable) => (
+                <span key={variable.token} dir="ltr" title={variable.label} className="rounded-md border border-salon-line bg-white px-2 py-1 text-[11px] font-bold text-salon-charcoal">
+                  {variable.token}
+                </span>
+              ))}
+            </div>
+          </div>
+          <button className="dashboard-button w-full">حفظ القالب</button>
         </form>
 
-        <div className="dashboard-panel overflow-x-auto">
-          <table className="dashboard-table min-w-[760px]">
-            <thead>
-              <tr>
-                <th className="px-3 py-3 text-right">القالب</th>
-                <th className="px-3 py-3 text-right">النوع</th>
-                <th className="px-3 py-3 text-right">معاينة</th>
-                <th className="px-3 py-3 text-right">الحالة</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-salon-line">
-              {templates.map((template) => (
-                <tr key={template.id}>
-                  <td className="px-3 py-3 font-bold">{template.name}</td>
-                  <td className="px-3 py-3">{templateTypeLabel(template.type)}</td>
-                  <td className="max-w-[420px] whitespace-pre-wrap px-3 py-3 text-salon-charcoal">{template.body}</td>
-                  <td className="px-3 py-3">
-                    <button
-                      type="button"
-                      onClick={() => updateTemplate(template.id, { isActive: !template.isActive })}
-                      className={`rounded-lg px-3 py-2 font-bold ${template.isActive ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}
-                    >
-                      {template.isActive ? "فعال" : "معطل"}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="dashboard-panel p-5">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-xl font-black">القوالب الحالية</h2>
+            <button
+              type="button"
+              onClick={restoreDefaults}
+              disabled={restoring}
+              className="dashboard-button-soft px-3 py-2 text-sm disabled:opacity-60"
+            >
+              {restoring ? "جاري الاستعادة..." : "استعادة القوالب الاحترافية"}
+            </button>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            {templates.map((template) => {
+              const isEditing = editingTemplateId === template.id;
+              return (
+                <article key={template.id} className="rounded-xl border border-salon-line bg-white p-4">
+                  {isEditing ? (
+                    <div className="space-y-2">
+                      <input
+                        value={templateDraft.name}
+                        onChange={(event) => setTemplateDraft((draft) => ({ ...draft, name: event.target.value }))}
+                        placeholder="اسم القالب"
+                        className="dashboard-field py-2"
+                      />
+                      <select
+                        value={templateDraft.type}
+                        onChange={(event) => setTemplateDraft((draft) => ({ ...draft, type: event.target.value as TemplateType }))}
+                        className="dashboard-field py-2"
+                      >
+                        {TEMPLATE_TYPE_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                      <textarea
+                        value={templateDraft.body}
+                        onChange={(event) => setTemplateDraft((draft) => ({ ...draft, body: event.target.value }))}
+                        rows={8}
+                        className="dashboard-field"
+                      />
+                      <div className="flex gap-2">
+                        <button type="button" onClick={() => saveTemplateEdit(template.id)} className="dashboard-button px-3 py-2 text-sm">حفظ</button>
+                        <button type="button" onClick={() => setEditingTemplateId(null)} className="dashboard-button-soft px-3 py-2 text-sm">إلغاء</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate font-black">{template.name}</p>
+                          <span className="text-xs font-bold text-salon-gold">{templateTypeLabel(template.type)}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => updateTemplate(template.id, { isActive: !template.isActive })}
+                          className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-bold ${template.isActive ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}
+                        >
+                          {template.isActive ? "فعال" : "معطل"}
+                        </button>
+                      </div>
+                      <pre className="mt-3 max-h-44 overflow-auto whitespace-pre-wrap rounded-lg bg-salon-mist p-3 text-sm leading-7 text-salon-charcoal">{template.body}</pre>
+                      <button type="button" onClick={() => startTemplateEdit(template)} className="dashboard-button-soft mt-3 w-full px-3 py-2 text-sm">تعديل القالب</button>
+                    </>
+                  )}
+                </article>
+              );
+            })}
+            {templates.length === 0 ? (
+              <div className="md:col-span-2 rounded-xl border border-dashed border-salon-line bg-salon-mist p-6 text-center">
+                <p className="font-black">لا توجد قوالب بعد</p>
+                <p className="dashboard-muted mt-1 text-sm">اضغط «استعادة القوالب الاحترافية» لإضافة قوالب جاهزة قابلة للتعديل.</p>
+              </div>
+            ) : null}
+          </div>
         </div>
       </section>
 

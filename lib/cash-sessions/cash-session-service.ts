@@ -142,12 +142,12 @@ export async function closeCashSession(prisma: PrismaClient, input: CashSessionC
   });
 }
 
-export async function getCashSessionSummary(prisma: CashSessionPrisma, organizationId?: string) {
-  const orgFilter = organizationId ? { organizationId } : {};
+export async function getCashSessionSummary(prisma: CashSessionPrisma, organizationId?: string, salonId?: string | null) {
+  const scopeFilter = { ...(organizationId ? { organizationId } : {}), ...(salonId ? { salonId } : {}) };
   const [barbers, openSessions] = await Promise.all([
-    prisma.barber.findMany({ where: { isActive: true, ...orgFilter }, orderBy: { name: "asc" } }),
+    prisma.barber.findMany({ where: { isActive: true, ...scopeFilter }, orderBy: { name: "asc" } }),
     prisma.cashSession.findMany({
-      where: { status: "OPEN", ...orgFilter },
+      where: { status: "OPEN", ...scopeFilter },
       include: { barber: true, closedBy: true },
       orderBy: { openedAt: "asc" },
     }),
@@ -168,13 +168,14 @@ export async function getCashSessionSummary(prisma: CashSessionPrisma, organizat
   return rows;
 }
 
-export async function getCashSessionHistory(prisma: CashSessionPrisma, filters: { organizationId?: string | null; from?: Date | string | null; to?: Date | string | null; barberId?: string | null } = {}) {
+export async function getCashSessionHistory(prisma: CashSessionPrisma, filters: { organizationId?: string | null; salonId?: string | null; from?: Date | string | null; to?: Date | string | null; barberId?: string | null } = {}) {
   const from = filters.from ? new Date(filters.from) : undefined;
   const to = filters.to ? endOfDay(filters.to) : undefined;
   const sessions = await prisma.cashSession.findMany({
     where: {
       status: "CLOSED",
       ...(filters.organizationId ? { organizationId: filters.organizationId } : {}),
+      ...(filters.salonId ? { salonId: filters.salonId } : {}),
       ...(filters.barberId ? { barberId: filters.barberId } : {}),
       ...(from || to ? { closedAt: { ...(from ? { gte: from } : {}), ...(to ? { lt: to } : {}) } } : {}),
     },

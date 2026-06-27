@@ -16,7 +16,7 @@ export default async function DashboardBarbersPage() {
   const activeSalonId = session.type === "dashboard" ? session.salonId : null;
   const [barbers, salons] = await Promise.all([
     prisma.barber.findMany({
-      where: { ...(organizationId ? { organizationId } : {}) },
+      where: { ...(organizationId ? { organizationId } : {}), ...(activeSalonId ? { salonId: activeSalonId } : {}) },
       orderBy: [{ isActive: "desc" }, { createdAt: "desc" }],
     }),
     organizationId

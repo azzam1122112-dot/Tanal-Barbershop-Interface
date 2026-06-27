@@ -6,6 +6,7 @@ import { getRequestMeta, parseJsonBody, requireAdminApi } from "@/lib/auth/http"
 import { hashAdminPassword } from "@/lib/auth/password";
 import { updateStaffSchema } from "@/lib/auth/validation";
 import { toSafeAdminUser } from "@/lib/auth/sanitize";
+import { findUserIdentityConflicts, identityConflictMessage } from "@/lib/auth/user-identity";
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const auth = await requireAdminApi();
@@ -44,6 +45,21 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 
     if (activeAdmins === 0) {
       return NextResponse.json({ message: "يجب بقاء مدير نشط واحد على الأقل" }, { status: 400 });
+    }
+  }
+
+  // حارس عالمي عند تغيير البريد/الجوال فقط (يُستثنى الموظف نفسه).
+  const emailToCheck = parsed.data.email && parsed.data.email !== before.email ? parsed.data.email : undefined;
+  const phoneToCheck = parsed.data.phone && parsed.data.phone !== before.phone ? parsed.data.phone : undefined;
+  if (emailToCheck || phoneToCheck) {
+    const { emailTaken, phoneTaken } = await findUserIdentityConflicts(prisma, {
+      email: emailToCheck,
+      phone: phoneToCheck,
+      excludeUserId: id,
+    });
+    const conflictMessage = identityConflictMessage(emailTaken, phoneTaken);
+    if (conflictMessage) {
+      return NextResponse.json({ message: conflictMessage }, { status: 409 });
     }
   }
 

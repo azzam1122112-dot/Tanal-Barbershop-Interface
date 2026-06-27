@@ -1,7 +1,9 @@
 import type { PrismaClient } from "@prisma/client";
 import { BusinessError } from "@/lib/errors";
 import { hashAdminPassword } from "@/lib/auth/password";
+import { findUserIdentityConflicts, identityConflictMessage } from "@/lib/auth/user-identity";
 import { getDefaultSignupPlan } from "@/lib/plans/subscription-service";
+import { seedDefaultWhatsAppTemplates } from "@/lib/whatsapp/default-templates";
 
 const TRIAL_DAYS = 14;
 
@@ -72,6 +74,11 @@ export async function createOrganizationWithOwner(
   const salonName = input.salonName?.trim() || "الصالون الرئيسي";
 
   return prisma.$transaction(async (tx) => {
+    // حارس عالمي: لا يتكرر بريد المالك أو جواله عبر كل المؤسسات (التفرّد في القاعدة مقيّد بالمؤسسة فقط).
+    const { emailTaken, phoneTaken } = await findUserIdentityConflicts(tx, { email: input.email, phone: input.phone });
+    const conflictMessage = identityConflictMessage(emailTaken, phoneTaken);
+    if (conflictMessage) throw new BusinessError(conflictMessage);
+
     const organization = await tx.organization.create({
       data: {
         name: input.organizationName,
@@ -100,6 +107,7 @@ export async function createOrganizationWithOwner(
     });
 
     await tx.systemSettings.create({ data: defaultSettings(organization.id, salon.id, salonName) });
+    await seedDefaultWhatsAppTemplates(tx, organization.id);
 
     await tx.auditLog.create({
       data: {

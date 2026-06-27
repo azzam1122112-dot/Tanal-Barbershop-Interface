@@ -247,7 +247,7 @@ describe("dashboard reports", () => {
     });
     createdVisitIds.push(cancelled.id);
 
-    const summary = await getDashboardSummary(prisma, undefined, reportDate);
+    const summary = await getDashboardSummary(prisma, undefined, null, reportDate);
     expect(summary.netAmount).toBe(205);
     expect(JSON.stringify(summary)).not.toContain("passwordHash");
     expect(JSON.stringify(summary)).not.toContain("accessPinHash");

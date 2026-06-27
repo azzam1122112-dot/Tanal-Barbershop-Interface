@@ -25,8 +25,10 @@ export default async function DashboardVisitsPage({
   const status = params.status === "COMPLETED" || params.status === "CANCELLED" ? params.status : undefined;
   const requestedPage = parsePage(params.page);
   const organizationId = session.type === "dashboard" ? session.organizationId : undefined;
+  const salonId = session.type === "dashboard" ? session.salonId : undefined;
   const where: Prisma.VisitWhereInput = {
     ...(organizationId ? { organizationId } : {}),
+    ...(salonId ? { salonId } : {}),
     ...(paymentMethod ? { paymentMethod } : {}),
     ...(status ? { status } : {}),
     ...(params.barberId ? { barberId: params.barberId } : {}),
@@ -43,7 +45,7 @@ export default async function DashboardVisitsPage({
   const orgFilter = organizationId ? { organizationId } : {};
   const [totalVisits, barbers, rewardRules, campaigns] = await Promise.all([
     prisma.visit.count({ where }),
-    prisma.barber.findMany({ where: orgFilter, orderBy: { name: "asc" } }),
+    prisma.barber.findMany({ where: { ...orgFilter, ...(salonId ? { salonId } : {}) }, orderBy: { name: "asc" } }),
     prisma.rewardRule.findMany({ where: orgFilter }),
     prisma.campaign.findMany({ where: orgFilter }),
   ]);

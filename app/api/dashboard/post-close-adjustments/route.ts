@@ -12,6 +12,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const report = await getPostCloseAdjustmentReport(prisma, {
     organizationId: session.organizationId,
+    salonId: session.salonId,
     from: url.searchParams.get("from"),
     to: url.searchParams.get("to"),
     barberId: url.searchParams.get("barberId"),
