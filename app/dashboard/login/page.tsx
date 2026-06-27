@@ -8,10 +8,14 @@ export default function DashboardLoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [orgSlug, setOrgSlug] = useState("");
+  const [showOrg, setShowOrg] = useState(false);
 
   useEffect(() => {
     const fromUrl = new URLSearchParams(window.location.search).get("org");
-    if (fromUrl) setOrgSlug(fromUrl.toLowerCase());
+    if (fromUrl) {
+      setOrgSlug(fromUrl.toLowerCase());
+      setShowOrg(true);
+    }
   }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -29,9 +33,14 @@ export default function DashboardLoginPage() {
         organizationSlug: form.get("organizationSlug") || undefined,
       }),
     });
-    const data = (await response.json().catch(() => ({}))) as { message?: string; redirectTo?: string };
+    const data = (await response.json().catch(() => ({}))) as {
+      message?: string;
+      redirectTo?: string;
+      needsOrganization?: boolean;
+    };
 
     if (!response.ok) {
+      if (data.needsOrganization) setShowOrg(true);
       setError(data.message ?? "بيانات الدخول غير صحيحة");
       setLoading(false);
       return;
@@ -63,19 +72,23 @@ export default function DashboardLoginPage() {
         </div>
         <form onSubmit={submit} className="sheen-overlay relative space-y-4 rounded-2xl border border-white/10 bg-white/95 p-6 text-salon-ink shadow-[0_40px_90px_-40px_rgba(0,0,0,0.75)] backdrop-blur">
           <span className="absolute inset-x-0 top-0 h-1 bg-royal-gold" aria-hidden="true" />
-          <label className="block text-sm font-semibold">
-            معرّف المؤسسة
-            <input
-              name="organizationSlug"
-              value={orgSlug}
-              onChange={(event) => setOrgSlug(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
-              dir="ltr"
-              autoComplete="organization"
-              placeholder="my-salon"
-              className="dashboard-field mt-2"
-            />
-            <span className="mt-1 block text-xs font-medium text-salon-charcoal/60">معرّف مؤسستك (اتركه فارغًا إن كنت تدخل من نطاق مؤسستك الفرعي).</span>
-          </label>
+          {showOrg ? (
+            <label className="block text-sm font-semibold">
+              معرّف المؤسسة
+              <input
+                name="organizationSlug"
+                value={orgSlug}
+                onChange={(event) => setOrgSlug(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+                dir="ltr"
+                required
+                autoFocus
+                autoComplete="organization"
+                placeholder="my-salon"
+                className="dashboard-field mt-2"
+              />
+              <span className="mt-1 block text-xs font-medium text-salon-charcoal/60">المعرّف الذي اخترته عند إنشاء مؤسستك.</span>
+            </label>
+          ) : null}
           <label className="block text-sm font-semibold">
             البريد الإلكتروني
             <input
@@ -105,6 +118,9 @@ export default function DashboardLoginPage() {
           >
             {loading ? "جاري الدخول..." : "دخول"}
           </button>
+          <p className="text-center text-xs font-medium text-salon-charcoal/70">
+            ليس لديك حساب؟ <Link href="/signup" className="font-bold text-salon-gold hover:underline">أنشئ مؤسستك</Link>
+          </p>
         </form>
       </section>
     </main>

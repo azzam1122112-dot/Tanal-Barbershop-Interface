@@ -1,7 +1,27 @@
+import { randomInt } from "node:crypto";
 import type { OrganizationStatus, Prisma, PrismaClient, SubscriptionStatus } from "@prisma/client";
 import { BusinessError } from "@/lib/errors";
+import { hashAdminPassword } from "@/lib/auth/password";
+import { hashBarberPin } from "@/lib/auth/barber-pin";
 
 const PAGE_SIZE = 20;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// كلمة مرور مؤقتة قابلة للقراءة بدون أحرف ملتبسة (0/O/1/l/I).
+function generateTempPassword() {
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const lower = "abcdefghijkmnpqrstuvwxyz";
+  const digits = "23456789";
+  const all = upper + lower + digits;
+  const pick = (set: string) => set[randomInt(set.length)];
+  const core = Array.from({ length: 7 }, () => pick(all)).join("");
+  return `Tnl-${pick(upper)}${core}${pick(digits)}`;
+}
+
+function generateTempPin() {
+  return String(randomInt(1000, 10000));
+}
 
 const orgInclude = {
   plan: { select: { id: true, name: true, maxSalons: true, maxBarbers: true, maxCustomers: true, priceMonthly: true } },
@@ -112,9 +132,13 @@ export async function updateOrganizationByPlatform(
     trialEndsAt?: string | null;
     currentPeriodEnd?: string | null;
     extendTrialDays?: number;
+    extendPeriodDays?: number;
   },
 ) {
-  const org = await prisma.organization.findUnique({ where: { id: organizationId }, select: { id: true, trialEndsAt: true } });
+  const org = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { id: true, trialEndsAt: true, currentPeriodEnd: true },
+  });
   if (!org) throw new BusinessError("المؤسسة غير موجودة");
 
   if (input.planId) {
@@ -122,12 +146,22 @@ export async function updateOrganizationByPlatform(
     if (!plan) throw new BusinessError("الباقة غير موجودة");
   }
 
+  const now = new Date();
+
   let trialEndsAt: Date | null | undefined;
   if (input.extendTrialDays && input.extendTrialDays > 0) {
-    const base = org.trialEndsAt && org.trialEndsAt > new Date() ? org.trialEndsAt : new Date();
-    trialEndsAt = new Date(base.getTime() + input.extendTrialDays * 24 * 60 * 60 * 1000);
+    const base = org.trialEndsAt && org.trialEndsAt > now ? org.trialEndsAt : now;
+    trialEndsAt = new Date(base.getTime() + input.extendTrialDays * DAY_MS);
   } else if (input.trialEndsAt !== undefined) {
     trialEndsAt = input.trialEndsAt ? new Date(input.trialEndsAt) : null;
+  }
+
+  let currentPeriodEnd: Date | null | undefined;
+  if (input.extendPeriodDays && input.extendPeriodDays > 0) {
+    const base = org.currentPeriodEnd && org.currentPeriodEnd > now ? org.currentPeriodEnd : now;
+    currentPeriodEnd = new Date(base.getTime() + input.extendPeriodDays * DAY_MS);
+  } else if (input.currentPeriodEnd !== undefined) {
+    currentPeriodEnd = input.currentPeriodEnd ? new Date(input.currentPeriodEnd) : null;
   }
 
   const updated = await prisma.organization.update({
@@ -137,7 +171,7 @@ export async function updateOrganizationByPlatform(
       ...(input.planId !== undefined ? { planId: input.planId } : {}),
       ...(input.subscriptionStatus ? { subscriptionStatus: input.subscriptionStatus } : {}),
       ...(trialEndsAt !== undefined ? { trialEndsAt } : {}),
-      ...(input.currentPeriodEnd !== undefined ? { currentPeriodEnd: input.currentPeriodEnd ? new Date(input.currentPeriodEnd) : null } : {}),
+      ...(currentPeriodEnd !== undefined ? { currentPeriodEnd } : {}),
     },
   });
 
@@ -215,6 +249,10 @@ export async function getOrganizationDetail(prisma: PrismaClient, organizationId
         orderBy: [{ role: "asc" }, { createdAt: "asc" }],
         select: { id: true, name: true, email: true, phone: true, role: true, isActive: true, lastLoginAt: true },
       },
+      barbers: {
+        orderBy: [{ isActive: "desc" }, { createdAt: "asc" }],
+        select: { id: true, name: true, phone: true, isActive: true, lastLoginAt: true, salon: { select: { name: true } } },
+      },
       _count: { select: { salons: true, barbers: true, customers: true, visits: true } },
     },
   });
@@ -263,6 +301,14 @@ export async function getOrganizationDetail(prisma: PrismaClient, organizationId
       isActive: user.isActive,
       lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
     })),
+    barbers: org.barbers.map((barber) => ({
+      id: barber.id,
+      name: barber.name,
+      phone: barber.phone,
+      salonName: barber.salon?.name ?? null,
+      isActive: barber.isActive,
+      lastLoginAt: barber.lastLoginAt?.toISOString() ?? null,
+    })),
     recentAudit: recentAudit.map((log) => ({
       id: log.id,
       action: log.action,
@@ -271,4 +317,38 @@ export async function getOrganizationDetail(prisma: PrismaClient, organizationId
       createdAt: log.createdAt.toISOString(),
     })),
   };
+}
+
+/** يعيّن كلمة مرور مؤقتة لعضو إدارة في مؤسسة، ويعيدها مرة واحدة لمدير المنصّة. */
+export async function resetMemberPassword(prisma: PrismaClient, organizationId: string, userId: string) {
+  const user = await prisma.user.findFirst({
+    where: { id: userId, organizationId },
+    select: { id: true, name: true, email: true },
+  });
+  if (!user) throw new BusinessError("العضو غير موجود في هذه المؤسسة");
+
+  const password = generateTempPassword();
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash: await hashAdminPassword(password) },
+  });
+
+  return { id: user.id, name: user.name, email: user.email, password };
+}
+
+/** يعيّن رمز دخول مؤقت لحلاق في مؤسسة، ويعيده مرة واحدة لمدير المنصّة. */
+export async function resetBarberPin(prisma: PrismaClient, organizationId: string, barberId: string) {
+  const barber = await prisma.barber.findFirst({
+    where: { id: barberId, organizationId },
+    select: { id: true, name: true, phone: true },
+  });
+  if (!barber) throw new BusinessError("الحلاق غير موجود في هذه المؤسسة");
+
+  const pin = generateTempPin();
+  await prisma.barber.update({
+    where: { id: barber.id },
+    data: { accessPinHash: await hashBarberPin(pin) },
+  });
+
+  return { id: barber.id, name: barber.name, phone: barber.phone, pin };
 }

@@ -13,6 +13,7 @@ const schema = z.object({
   trialEndsAt: z.string().datetime().nullable().optional(),
   currentPeriodEnd: z.string().datetime().nullable().optional(),
   extendTrialDays: z.coerce.number().int().positive().max(365).optional(),
+  extendPeriodDays: z.coerce.number().int().positive().max(365).optional(),
 });
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -36,7 +37,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       action: "platform.organization_updated",
       entityType: "Organization",
       entityId: org.id,
-      after: { status: org.status, planId: org.planId, subscriptionStatus: org.subscriptionStatus, trialEndsAt: org.trialEndsAt, by: session.admin.id },
+      after: { status: org.status, planId: org.planId, subscriptionStatus: org.subscriptionStatus, trialEndsAt: org.trialEndsAt, currentPeriodEnd: org.currentPeriodEnd, by: session.admin.id },
       ...(await getRequestMeta()),
     });
     return NextResponse.json({ organization: org });

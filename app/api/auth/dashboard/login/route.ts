@@ -7,9 +7,13 @@ import { setSessionCookie, getRequestMeta, parseJsonBody } from "@/lib/auth/http
 import { writeAuditLog } from "@/lib/audit/audit-log";
 import { clearRateLimit, consumeRateLimit } from "@/lib/auth/rate-limit";
 import { canAdminLogin } from "@/lib/auth/login-policy";
-import { resolveOrganizationForLogin } from "@/lib/tenant/request-org";
+import { getKnownLoginOrgSlug } from "@/lib/tenant/request-org";
 
 const ERROR_MESSAGE = "بيانات الدخول غير صحيحة";
+const ORG_NOT_FOUND_MESSAGE = "لم نجد مؤسسة بهذا المعرّف. تأكد من كتابة معرّف مؤسستك كما اخترته عند التسجيل.";
+const RATE_LIMITED_MESSAGE = "محاولات كثيرة. يرجى المحاولة بعد قليل.";
+const NEEDS_ORG_MESSAGE = "بريدك مسجّل في أكثر من مؤسسة. أدخل معرّف المؤسسة للمتابعة.";
+const ADMIN_LOGIN_ROLES = ["OWNER", "ADMIN", "SUPERVISOR"] as const;
 
 export async function POST(request: Request) {
   const body = await parseJsonBody(request);
@@ -20,12 +24,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: ERROR_MESSAGE }, { status: 401 });
   }
 
-  const organization = await resolveOrganizationForLogin(parsed.data.organizationSlug);
-  if (!organization) {
-    return NextResponse.json({ message: ERROR_MESSAGE }, { status: 401 });
-  }
-
-  const rateKey = `dashboard:${organization.id}:${parsed.data.email}`;
+  const email = parsed.data.email;
+  const rateKey = `dashboard:${email}`;
   const rate = await consumeRateLimit(prisma, rateKey);
   if (rate.limited) {
     await writeAuditLog({
@@ -33,19 +33,43 @@ export async function POST(request: Request) {
       actorType: "SYSTEM",
       action: "auth.dashboard_login_rate_limited",
       entityType: "User",
-      after: { email: parsed.data.email, retryAfterSeconds: rate.retryAfterSeconds },
+      after: { email, retryAfterSeconds: rate.retryAfterSeconds },
       ...meta,
     });
     return NextResponse.json(
-      { message: ERROR_MESSAGE },
+      { message: RATE_LIMITED_MESSAGE },
       { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } },
     );
   }
 
-  const user = await prisma.user.findFirst({ where: { email: parsed.data.email, organizationId: organization.id } });
+  // المؤسسة معروفة من النطاق الفرعي أو المعرّف المُدخل؛ وإلا نحلّها من البريد نفسه.
+  const knownSlug = await getKnownLoginOrgSlug(parsed.data.organizationSlug);
+  let organization = null;
+  if (knownSlug) {
+    organization = await prisma.organization.findUnique({ where: { slug: knownSlug } });
+    if (!organization) {
+      return NextResponse.json({ message: ORG_NOT_FOUND_MESSAGE }, { status: 404 });
+    }
+  } else {
+    const candidates = await prisma.user.findMany({
+      where: { email, isActive: true, role: { in: [...ADMIN_LOGIN_ROLES] }, organizationId: { not: null } },
+      select: { organizationId: true },
+      distinct: ["organizationId"],
+    });
+    if (candidates.length > 1) {
+      return NextResponse.json({ message: NEEDS_ORG_MESSAGE, needsOrganization: true }, { status: 409 });
+    }
+    organization = candidates[0]?.organizationId
+      ? await prisma.organization.findUnique({ where: { id: candidates[0].organizationId } })
+      : null;
+  }
+
+  const user = organization
+    ? await prisma.user.findFirst({ where: { email, organizationId: organization.id } })
+    : null;
   const passwordOk = user ? await verifyAdminPassword(parsed.data.password, user.passwordHash) : false;
 
-  if (!user || !canAdminLogin(user, passwordOk)) {
+  if (!user || !organization || !canAdminLogin(user, passwordOk)) {
     await writeAuditLog({
       prisma,
       actorType: "SYSTEM",

@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PlatformShell } from "@/components/platform/platform-shell";
+import { OrgSubscriptionManager } from "@/components/platform/org-subscription-manager";
+import { OrgAccessManager } from "@/components/platform/org-access-manager";
 import { prisma } from "@/lib/db/prisma";
-import { getOrganizationDetail } from "@/lib/platform/platform-service";
+import { getOrganizationDetail, listPlans } from "@/lib/platform/platform-service";
 import { formatDate, formatDateTime, formatMoney, formatNumber } from "@/lib/format";
 
 const SUB_LABELS: Record<string, string> = { TRIALING: "تجربة", ACTIVE: "نشط", PAST_DUE: "متأخر", CANCELED: "ملغى" };
-const ROLE_LABELS: Record<string, string> = { OWNER: "مالك", ADMIN: "مدير", SUPERVISOR: "مشرف" };
 
 function usageText(used: number, limit: number | null) {
   return limit === null ? `${formatNumber(used)} / ∞` : `${formatNumber(used)} / ${formatNumber(limit)}`;
@@ -14,7 +15,7 @@ function usageText(used: number, limit: number | null) {
 
 export default async function PlatformOrganizationDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const org = await getOrganizationDetail(prisma, id);
+  const [org, plans] = await Promise.all([getOrganizationDetail(prisma, id), listPlans(prisma)]);
   if (!org) notFound();
 
   return (
@@ -27,7 +28,16 @@ export default async function PlatformOrganizationDetailPage({ params }: { param
       <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[
           { label: "الحالة", value: org.status === "ACTIVE" ? "نشطة" : "موقوفة", danger: org.status !== "ACTIVE" },
-          { label: "الاشتراك", value: SUB_LABELS[org.subscriptionStatus] ?? org.subscriptionStatus },
+          {
+            label: "الاشتراك",
+            value: SUB_LABELS[org.subscriptionStatus] ?? org.subscriptionStatus,
+            sub:
+              org.subscriptionStatus === "ACTIVE"
+                ? `ينتهي ${formatDate(org.currentPeriodEnd)}`
+                : org.subscriptionStatus === "TRIALING"
+                  ? `التجربة حتى ${formatDate(org.trialEndsAt)}`
+                  : undefined,
+          },
           { label: "الباقة", value: org.plan?.name ?? "بلا باقة", sub: org.plan ? formatMoney(org.plan.priceMonthly) : undefined },
           { label: "تاريخ الإنشاء", value: formatDate(org.createdAt) },
         ].map((card) => (
@@ -40,6 +50,19 @@ export default async function PlatformOrganizationDetailPage({ params }: { param
         ))}
       </div>
 
+      {/* إدارة الاشتراك */}
+      <OrgSubscriptionManager
+        orgId={org.id}
+        initial={{
+          status: org.status,
+          subscriptionStatus: org.subscriptionStatus,
+          planId: org.plan?.id ?? null,
+          trialEndsAt: org.trialEndsAt,
+          currentPeriodEnd: org.currentPeriodEnd,
+        }}
+        plans={plans.map((plan) => ({ id: plan.id, name: plan.name, priceMonthly: plan.priceMonthly, maxSalons: plan.maxSalons, maxBarbers: plan.maxBarbers }))}
+      />
+
       {/* الاستهلاك مقابل الحدود */}
       <section className="dashboard-panel mt-6 p-5">
         <h2 className="text-lg font-bold tracking-tight">الاستهلاك مقابل حدود الباقة</h2>
@@ -51,45 +74,30 @@ export default async function PlatformOrganizationDetailPage({ params }: { param
         <div className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
           <Info label="إجمالي الزيارات" value={formatNumber(org.usage.visits)} />
           <Info label="نهاية التجربة" value={formatDate(org.trialEndsAt)} />
-          <Info label="نهاية الفترة" value={formatDate(org.currentPeriodEnd)} />
+          <Info label="نهاية الاشتراك" value={formatDate(org.currentPeriodEnd)} />
         </div>
       </section>
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-2">
-        {/* الفروع */}
-        <section className="dashboard-panel overflow-hidden">
-          <div className="border-b border-salon-line/70 px-5 py-4"><h2 className="text-lg font-bold tracking-tight">الفروع ({org.salons.length})</h2></div>
-          <div className="divide-y divide-salon-line/70">
-            {org.salons.map((salon) => (
-              <div key={salon.id} className="flex items-center justify-between gap-3 px-5 py-3.5">
-                <div className="min-w-0">
-                  <p className="font-bold text-salon-ink">{salon.name}</p>
-                  <p className="text-xs font-medium text-salon-charcoal/70" dir="ltr">{salon.slug} · {salon.barbersCount} حلاق</p>
-                </div>
-                <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${salon.isActive ? "bg-green-50 text-green-700 ring-green-200/70" : "bg-red-50 text-red-700 ring-red-200/70"}`}>
-                  {salon.isActive ? "نشط" : "معطل"}
-                </span>
-              </div>
-            ))}
-          </div>
-        </section>
+      {/* بيانات الدخول وإعادة التعيين */}
+      <OrgAccessManager orgId={org.id} members={org.members} barbers={org.barbers} />
 
-        {/* الفريق */}
-        <section className="dashboard-panel overflow-hidden">
-          <div className="border-b border-salon-line/70 px-5 py-4"><h2 className="text-lg font-bold tracking-tight">الفريق ({org.members.length})</h2></div>
-          <div className="divide-y divide-salon-line/70">
-            {org.members.map((member) => (
-              <div key={member.id} className="flex items-center justify-between gap-3 px-5 py-3.5">
-                <div className="min-w-0">
-                  <p className="font-bold text-salon-ink">{member.name} <span className="text-xs font-semibold text-salon-gold">{ROLE_LABELS[member.role] ?? member.role}</span></p>
-                  <p className="text-xs font-medium text-salon-charcoal/70" dir="ltr">{member.email ?? member.phone}</p>
-                </div>
-                <span className="shrink-0 text-xs font-medium text-salon-charcoal/60">{member.lastLoginAt ? `آخر دخول ${formatDate(member.lastLoginAt)}` : "لم يدخل بعد"}</span>
+      {/* الفروع */}
+      <section className="dashboard-panel mt-6 overflow-hidden">
+        <div className="border-b border-salon-line/70 px-5 py-4"><h2 className="text-lg font-bold tracking-tight">الفروع ({org.salons.length})</h2></div>
+        <div className="divide-y divide-salon-line/70">
+          {org.salons.map((salon) => (
+            <div key={salon.id} className="flex items-center justify-between gap-3 px-5 py-3.5">
+              <div className="min-w-0">
+                <p className="font-bold text-salon-ink">{salon.name}</p>
+                <p className="text-xs font-medium text-salon-charcoal/70" dir="ltr">{salon.slug} · {salon.barbersCount} حلاق</p>
               </div>
-            ))}
-          </div>
-        </section>
-      </div>
+              <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${salon.isActive ? "bg-green-50 text-green-700 ring-green-200/70" : "bg-red-50 text-red-700 ring-red-200/70"}`}>
+                {salon.isActive ? "نشط" : "معطل"}
+              </span>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* سجل التدقيق */}
       <section className="dashboard-panel mt-6 overflow-hidden">

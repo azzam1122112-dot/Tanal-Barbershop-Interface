@@ -8,6 +8,7 @@ export default function SignupPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [slug, setSlug] = useState("");
+  const [created, setCreated] = useState<{ slug: string; redirectTo: string } | null>(null);
 
   function onSlug(value: string) {
     setSlug(value.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 40));
@@ -31,13 +32,13 @@ export default function SignupPage() {
         password: form.get("password"),
       }),
     });
-    const data = (await response.json().catch(() => ({}))) as { message?: string; redirectTo?: string };
+    const data = (await response.json().catch(() => ({}))) as { message?: string; redirectTo?: string; slug?: string };
     if (!response.ok) {
       setError(data.message ?? "تعذر إنشاء الحساب");
       setLoading(false);
       return;
     }
-    window.location.href = data.redirectTo ?? "/dashboard";
+    setCreated({ slug: data.slug ?? slug, redirectTo: data.redirectTo ?? "/dashboard" });
   }
 
   return (
@@ -53,6 +54,30 @@ export default function SignupPage() {
       </Link>
 
       <section className="relative mx-auto flex min-h-[calc(100vh-7rem)] max-w-lg flex-col justify-center">
+        {created ? (
+          <div className="sheen-overlay relative space-y-5 rounded-2xl border border-white/10 bg-white/95 p-7 text-salon-ink shadow-[0_40px_90px_-40px_rgba(0,0,0,0.75)]">
+            <span className="absolute inset-x-0 top-0 h-1 bg-royal-gold" aria-hidden="true" />
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-eyebrow text-salon-gold">تم الإنشاء بنجاح</p>
+              <h2 className="mt-2 text-2xl font-bold leading-tight">مؤسستك جاهزة 🎉</h2>
+              <p className="mt-2 text-sm leading-7 text-salon-charcoal/80">
+                احفظ معرّف مؤسستك — ستحتاجه أنت وفريقك في كل تسجيل دخول.
+              </p>
+            </div>
+            <div className="rounded-xl border border-salon-line bg-salon-mist px-4 py-4 text-center">
+              <p className="text-xs font-bold text-salon-charcoal/60">معرّف المؤسسة</p>
+              <p dir="ltr" className="mt-1 text-2xl font-black tracking-wide text-salon-ink">{created.slug}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => { window.location.href = created.redirectTo; }}
+              className="dashboard-button-gold sheen-overlay w-full py-3.5 text-base"
+            >
+              متابعة إلى لوحة الإدارة
+            </button>
+          </div>
+        ) : (
+        <>
         <div className="mb-7">
           <BrandLogo className="animate-float mb-6 h-20 w-20 ring-1 ring-salon-gold/30" priority />
           <p className="text-[11px] font-bold uppercase tracking-eyebrow text-salon-goldlight">ابدأ مجانًا</p>
@@ -122,6 +147,8 @@ export default function SignupPage() {
             لديك حساب؟ <Link href="/dashboard/login" className="font-bold text-salon-gold hover:underline">دخول الإدارة</Link>
           </p>
         </form>
+        </>
+        )}
       </section>
     </main>
   );

@@ -13,6 +13,7 @@ export default function BarberLoginPage() {
   const [loading, setLoading] = useState(false);
   const [phone, setPhone] = useState("");
   const [orgSlug, setOrgSlug] = useState("");
+  const [showOrg, setShowOrg] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
   const [isIosInstall, setIsIosInstall] = useState(false);
@@ -56,7 +57,10 @@ export default function BarberLoginPage() {
 
   useEffect(() => {
     const fromUrl = new URLSearchParams(window.location.search).get("org");
-    if (fromUrl) setOrgSlug(fromUrl.toLowerCase());
+    if (fromUrl) {
+      setOrgSlug(fromUrl.toLowerCase());
+      setShowOrg(true);
+    }
   }, []);
 
   function updatePhone(value: string) {
@@ -85,9 +89,14 @@ export default function BarberLoginPage() {
         organizationSlug: form.get("organizationSlug") || undefined,
       }),
     });
-    const data = (await response.json().catch(() => ({}))) as { message?: string; redirectTo?: string };
+    const data = (await response.json().catch(() => ({}))) as {
+      message?: string;
+      redirectTo?: string;
+      needsOrganization?: boolean;
+    };
 
     if (!response.ok) {
+      if (data.needsOrganization) setShowOrg(true);
       setError(data.message ?? "رقم الجوال أو رمز الدخول غير صحيح");
       setLoading(false);
       return;
@@ -163,18 +172,23 @@ export default function BarberLoginPage() {
             </h1>
           </div>
           <form onSubmit={submit} className="space-y-4 px-5 py-6">
-            <label className="block text-sm font-bold">
-              معرّف المؤسسة
-              <input
-                name="organizationSlug"
-                value={orgSlug}
-                onChange={(event) => setOrgSlug(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
-                dir="ltr"
-                autoComplete="organization"
-                placeholder="معرّف صالونك"
-                className="barber-field mt-2 h-12 text-center text-base"
-              />
-            </label>
+            {showOrg ? (
+              <label className="block text-sm font-bold">
+                معرّف المؤسسة
+                <input
+                  name="organizationSlug"
+                  value={orgSlug}
+                  onChange={(event) => setOrgSlug(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+                  dir="ltr"
+                  required
+                  autoFocus
+                  autoComplete="organization"
+                  placeholder="معرّف صالونك"
+                  className="barber-field mt-2 h-12 text-center text-base"
+                />
+                <span className="mt-1 block text-center text-xs font-medium text-salon-charcoal/60">اطلبه من مدير صالونك إن لم تكن تعرفه.</span>
+              </label>
+            ) : null}
             <label className="block text-sm font-bold">
               رقم الجوال
               <input

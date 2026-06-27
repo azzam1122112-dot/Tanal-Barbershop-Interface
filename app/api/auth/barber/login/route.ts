@@ -7,9 +7,12 @@ import { setSessionCookie, getRequestMeta, parseJsonBody } from "@/lib/auth/http
 import { writeAuditLog } from "@/lib/audit/audit-log";
 import { clearRateLimit, consumeRateLimit } from "@/lib/auth/rate-limit";
 import { canBarberLogin } from "@/lib/auth/login-policy";
-import { resolveOrganizationForLogin } from "@/lib/tenant/request-org";
+import { getKnownLoginOrgSlug } from "@/lib/tenant/request-org";
 
 const ERROR_MESSAGE = "رقم الجوال أو رمز الدخول غير صحيح";
+const ORG_NOT_FOUND_MESSAGE = "لم نجد مؤسسة بهذا المعرّف. تأكد من كتابة معرّف صالونك بشكل صحيح.";
+const RATE_LIMITED_MESSAGE = "محاولات كثيرة. يرجى المحاولة بعد قليل.";
+const NEEDS_ORG_MESSAGE = "رقمك مسجّل في أكثر من مؤسسة. أدخل معرّف صالونك للمتابعة.";
 
 export async function POST(request: Request) {
   const body = await parseJsonBody(request);
@@ -20,12 +23,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: ERROR_MESSAGE }, { status: 401 });
   }
 
-  const organization = await resolveOrganizationForLogin(parsed.data.organizationSlug);
-  if (!organization) {
-    return NextResponse.json({ message: ERROR_MESSAGE }, { status: 401 });
-  }
-
-  const rateKey = `barber:${organization.id}:${parsed.data.phone}`;
+  const phone = parsed.data.phone;
+  const rateKey = `barber:${phone}`;
   const rate = await consumeRateLimit(prisma, rateKey);
   if (rate.limited) {
     await writeAuditLog({
@@ -33,25 +32,49 @@ export async function POST(request: Request) {
       actorType: "SYSTEM",
       action: "auth.barber_login_rate_limited",
       entityType: "Barber",
-      after: { phone: parsed.data.phone, retryAfterSeconds: rate.retryAfterSeconds },
+      after: { phone, retryAfterSeconds: rate.retryAfterSeconds },
       ...meta,
     });
     return NextResponse.json(
-      { message: ERROR_MESSAGE },
+      { message: RATE_LIMITED_MESSAGE },
       { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } },
     );
   }
 
-  const barber = await prisma.barber.findFirst({ where: { phone: parsed.data.phone, organizationId: organization.id } });
+  // المؤسسة معروفة من النطاق الفرعي أو المعرّف المُدخل؛ وإلا نحلّها من رقم الجوال نفسه.
+  const knownSlug = await getKnownLoginOrgSlug(parsed.data.organizationSlug);
+  let organization = null;
+  if (knownSlug) {
+    organization = await prisma.organization.findUnique({ where: { slug: knownSlug } });
+    if (!organization) {
+      return NextResponse.json({ message: ORG_NOT_FOUND_MESSAGE }, { status: 404 });
+    }
+  } else {
+    const candidates = await prisma.barber.findMany({
+      where: { phone, isActive: true, organizationId: { not: null } },
+      select: { organizationId: true },
+      distinct: ["organizationId"],
+    });
+    if (candidates.length > 1) {
+      return NextResponse.json({ message: NEEDS_ORG_MESSAGE, needsOrganization: true }, { status: 409 });
+    }
+    organization = candidates[0]?.organizationId
+      ? await prisma.organization.findUnique({ where: { id: candidates[0].organizationId } })
+      : null;
+  }
+
+  const barber = organization
+    ? await prisma.barber.findFirst({ where: { phone, organizationId: organization.id } })
+    : null;
   const pinOk = barber ? await verifyBarberPin(parsed.data.pin, barber.accessPinHash) : false;
 
-  if (!barber || !canBarberLogin(barber, pinOk)) {
+  if (!barber || !organization || !canBarberLogin(barber, pinOk)) {
     await writeAuditLog({
       prisma,
       actorType: "SYSTEM",
       action: "auth.barber_login_failed",
       entityType: "Barber",
-      after: { phone: parsed.data.phone },
+      after: { phone },
       ...meta,
     });
     return NextResponse.json({ message: ERROR_MESSAGE }, { status: 401 });
