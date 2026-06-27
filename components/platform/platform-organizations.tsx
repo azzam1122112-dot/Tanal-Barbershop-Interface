@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 type PlanOption = { id: string; name: string; maxSalons: number; maxBarbers: number | null; maxCustomers: number | null };
 
@@ -38,6 +39,7 @@ export function PlatformOrganizations({
 }) {
   const [orgs, setOrgs] = useState(initialOrganizations);
   const [toast, setToast] = useState<ToastState | null>(null);
+  const { confirm, confirmDialog } = useConfirm();
 
   async function patch(id: string, body: Record<string, unknown>, successMessage: string) {
     const response = await fetch(`/api/platform/organizations/${id}`, {
@@ -66,13 +68,20 @@ export function PlatformOrganizations({
     }
   }
 
-  function suspend(org: OrgRow) {
-    if (!window.confirm(`إيقاف «${org.name}» سيقطع وصول كل مستخدميها فورًا. متابعة؟`)) return;
+  async function suspend(org: OrgRow) {
+    const confirmed = await confirm({
+      title: `إيقاف «${org.name}»؟`,
+      description: "سيقطع وصول كل مستخدميها فورًا.",
+      confirmLabel: "إيقاف المؤسسة",
+      tone: "danger",
+    });
+    if (!confirmed) return;
     patch(org.id, { status: "SUSPENDED" }, "تم إيقاف المؤسسة");
   }
 
   return (
     <div className="mt-4">
+      {confirmDialog}
       <DashboardToast toast={toast} onClose={() => setToast(null)} />
       <div className="dashboard-panel overflow-x-auto">
         <table className="dashboard-table min-w-[1080px]">

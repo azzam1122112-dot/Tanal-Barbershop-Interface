@@ -2,6 +2,7 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import type { SafeBarber } from "@/lib/auth/sanitize";
 
 type BarberResponse = {
@@ -28,6 +29,7 @@ const dateFormatter = new Intl.DateTimeFormat("ar-SA", {
 export function BarberManager({ initialBarbers }: { initialBarbers: SafeBarber[] }) {
   const [barbers, setBarbers] = useState(initialBarbers);
   const [toast, setToast] = useState<ToastState | null>(null);
+  const { confirm, confirmDialog } = useConfirm();
   const [loading, setLoading] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -201,7 +203,12 @@ export function BarberManager({ initialBarbers }: { initialBarbers: SafeBarber[]
   }
 
   async function deleteBarber(barber: SafeBarber) {
-    const confirmed = window.confirm(`هل تريد حذف ${barber.name} نهائيًا؟ لا يمكن التراجع عن هذا الإجراء.`);
+    const confirmed = await confirm({
+      title: `حذف ${barber.name} نهائيًا؟`,
+      description: "لا يمكن التراجع عن هذا الإجراء.",
+      confirmLabel: "حذف",
+      tone: "danger",
+    });
     if (!confirmed) return;
 
     setPendingId(barber.id);
@@ -223,6 +230,7 @@ export function BarberManager({ initialBarbers }: { initialBarbers: SafeBarber[]
 
   return (
     <div className="mt-8 space-y-6">
+      {confirmDialog}
       <DashboardToast toast={toast} onClose={() => setToast(null)} />
 
       <section className="grid gap-4 md:grid-cols-3">

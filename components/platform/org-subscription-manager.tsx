@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 type PlanOption = { id: string; name: string; priceMonthly: number; maxSalons: number; maxBarbers: number | null };
 
@@ -41,6 +42,17 @@ export function OrgSubscriptionManager({
   const [state, setState] = useState(initial);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [busy, setBusy] = useState(false);
+  const { confirm, confirmDialog } = useConfirm();
+
+  async function suspendOrg() {
+    const confirmed = await confirm({
+      title: "إيقاف المؤسسة؟",
+      description: "سيقطع وصول كل مستخدميها فورًا.",
+      confirmLabel: "إيقاف المؤسسة",
+      tone: "danger",
+    });
+    if (confirmed) patch({ status: "SUSPENDED" }, "تم إيقاف المؤسسة");
+  }
 
   async function patch(body: Record<string, unknown>, successMessage: string) {
     setBusy(true);
@@ -77,6 +89,7 @@ export function OrgSubscriptionManager({
 
   return (
     <section className="dashboard-panel mt-6 p-5">
+      {confirmDialog}
       <DashboardToast toast={toast} onClose={() => setToast(null)} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-bold tracking-tight">إدارة الاشتراك والباقة</h2>
@@ -122,9 +135,7 @@ export function OrgSubscriptionManager({
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => {
-                  if (window.confirm("إيقاف المؤسسة يقطع وصول كل مستخدميها فورًا. متابعة؟")) patch({ status: "SUSPENDED" }, "تم إيقاف المؤسسة");
-                }}
+                onClick={suspendOrg}
                 className="dashboard-danger-button px-3 py-2 text-xs"
               >
                 إيقاف المؤسسة

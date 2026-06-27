@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 type VisitRow = {
   id: string;
@@ -21,15 +22,25 @@ type ActionResponse = {
 export function VisitAdminActions({ visit }: { visit: VisitRow }) {
   const [toast, setToast] = useState<ToastState | null>(null);
   const [loading, setLoading] = useState("");
+  const { confirm, confirmDialog } = useConfirm();
 
   async function submit(event: FormEvent<HTMLFormElement>, action: "cancel" | "payment" | "amount") {
     event.preventDefault();
-    if (action === "cancel" && !window.confirm("هل تريد إلغاء هذه الزيارة؟ سيتم عكس أثرها المالي والنقاطي.")) {
+    const formElement = event.currentTarget;
+    if (
+      action === "cancel" &&
+      !(await confirm({
+        title: "إلغاء هذه الزيارة؟",
+        description: "سيتم عكس أثرها المالي والنقاطي.",
+        confirmLabel: "إلغاء الزيارة",
+        tone: "danger",
+      }))
+    ) {
       return;
     }
     setToast(null);
     setLoading(action);
-    const form = new FormData(event.currentTarget);
+    const form = new FormData(formElement);
     const reason = String(form.get("reason") ?? "");
     const endpoint =
       action === "cancel"
@@ -75,6 +86,7 @@ export function VisitAdminActions({ visit }: { visit: VisitRow }) {
 
   return (
     <div className="grid min-w-[320px] gap-3">
+      {confirmDialog}
       <DashboardToast toast={toast} onClose={() => setToast(null)} />
       <form onSubmit={(event) => submit(event, "payment")} className="grid grid-cols-[1fr_1fr] gap-2">
         <select name="paymentMethod" defaultValue={visit.paymentMethod === "CASH" ? "NETWORK" : "CASH"} className="dashboard-field py-2">

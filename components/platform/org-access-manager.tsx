@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 type Member = { id: string; name: string; email: string | null; phone: string | null; role: string; isActive: boolean; lastLoginAt: string | null };
 type Barber = { id: string; name: string; phone: string; salonName: string | null; isActive: boolean; lastLoginAt: string | null };
@@ -18,11 +19,18 @@ export function OrgAccessManager({ orgId, members, barbers }: { orgId: string; m
   const [toast, setToast] = useState<ToastState | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [issued, setIssued] = useState<Issued | null>(null);
+  const { confirm, confirmDialog } = useConfirm();
   const [copied, setCopied] = useState(false);
 
   async function reset(type: "user" | "barber", targetId: string, name: string) {
     const label = type === "user" ? "كلمة مرور" : "رمز دخول";
-    if (!window.confirm(`إعادة تعيين ${label} «${name}»؟ ستُلغى بيانات الدخول الحالية فورًا.`)) return;
+    const confirmed = await confirm({
+      title: `إعادة تعيين ${label} «${name}»؟`,
+      description: "ستُلغى بيانات الدخول الحالية فورًا.",
+      confirmLabel: "إعادة التعيين",
+      tone: "danger",
+    });
+    if (!confirmed) return;
     setBusyId(targetId);
     try {
       const response = await fetch(`/api/platform/organizations/${orgId}/credentials`, {
@@ -55,6 +63,7 @@ export function OrgAccessManager({ orgId, members, barbers }: { orgId: string; m
 
   return (
     <section className="dashboard-panel mt-6 overflow-hidden">
+      {confirmDialog}
       <DashboardToast toast={toast} onClose={() => setToast(null)} />
       <div className="border-b border-salon-line/70 px-5 py-4">
         <h2 className="text-lg font-bold tracking-tight">بيانات الدخول وإعادة التعيين</h2>

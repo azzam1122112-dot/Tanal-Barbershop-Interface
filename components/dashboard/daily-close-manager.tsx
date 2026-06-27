@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { formatMoney } from "@/lib/format";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 type SummaryRow = {
   barberId: string;
@@ -42,16 +43,24 @@ export function DailyCloseManager({ initialSummary }: { initialSummary: SummaryR
   const [summary, setSummary] = useState(initialSummary);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [loadingSessionId, setLoadingSessionId] = useState("");
+  const { confirm, confirmDialog } = useConfirm();
 
   async function closeSession(event: FormEvent<HTMLFormElement>, row: SummaryRow) {
     event.preventDefault();
     if (!row.openSession) return;
-    if (!window.confirm(`تأكيد إغلاق جلسة صندوق ${row.barberName} واستلام الكاش؟`)) {
+    const formElement = event.currentTarget;
+    if (
+      !(await confirm({
+        title: `إغلاق جلسة صندوق ${row.barberName}؟`,
+        description: "سيتم تأكيد استلام الكاش وإغلاق الجلسة.",
+        confirmLabel: "إغلاق واستلام",
+      }))
+    ) {
       return;
     }
     setToast(null);
     setLoadingSessionId(row.openSession.id);
-    const form = new FormData(event.currentTarget);
+    const form = new FormData(formElement);
     const response = await fetch("/api/dashboard/cash-sessions/close", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -74,6 +83,7 @@ export function DailyCloseManager({ initialSummary }: { initialSummary: SummaryR
 
   return (
     <div className="mt-6 space-y-4">
+      {confirmDialog}
       <DashboardToast toast={toast} onClose={() => setToast(null)} />
       <div className="dashboard-panel overflow-x-auto">
         <table className="dashboard-table min-w-[1160px]">

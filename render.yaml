@@ -16,6 +16,10 @@ services:
         value: 22.22.3
       - key: NEXT_TELEMETRY_DISABLED
         value: "1"
+      # المضيف الكامل لنطاق واحد: يمنع تفسير اسم الخدمة (tanal-loyalty-web) كنطاق فرعي لمؤسسة.
+      # عند تفعيل نطاقات المؤسسات لاحقًا، اضبطه على النطاق الجذر (مثل tanal.com) مع wildcard DNS.
+      - key: ROOT_DOMAIN
+        value: tanal-loyalty-web.onrender.com
       - key: REQUIRE_EXPLICIT_SEED_CREDENTIALS
         value: "true"
       - key: LOG_LEVEL

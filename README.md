@@ -217,7 +217,7 @@ npm run start:render
 npm run maintenance:cleanup
 ```
 
-- على باقة Render المجانية اترك `ROOT_DOMAIN` غير مضبوط، وسيعمل النظام على النطاق الواحد ويرجع للمؤسسة الافتراضية. لتفعيل نطاقات المؤسسات الفرعية لاحقًا، اضبط `ROOT_DOMAIN=tanal.com` في Render، ثم أضف custom domain wildcard مثل `*.tanal.com` ووجّه DNS wildcard من مزود النطاق إلى Render.
+- على باقة Render المجانية **اضبط `ROOT_DOMAIN` على المضيف الكامل** للخدمة (مثل `tanal-loyalty-web.onrender.com`). هذا ضروري: مضيف onrender.com يتكوّن من ثلاثة مقاطع، فإن تُرك `ROOT_DOMAIN` فارغًا سيُفسَّر اسم الخدمة (`tanal-loyalty-web`) خطأً كنطاق فرعي لمؤسسة وتفشل **كل** عمليات الدخول برسالة «لم نجد مؤسسة بهذا المعرّف». مع ضبطه على المضيف الكامل، يُحلّ المستأجر من البريد/الجوال على نطاق واحد. لتفعيل نطاقات المؤسسات الفرعية لاحقًا، اضبط `ROOT_DOMAIN=tanal.com`، ثم أضف custom domain wildcard مثل `*.tanal.com` ووجّه DNS wildcard من مزود النطاق إلى Render.
 
 ## فحص قاعدة جديدة من الصفر
 

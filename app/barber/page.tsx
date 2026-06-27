@@ -14,7 +14,16 @@ export default async function BarberHomePage() {
 
   if (!session) redirect("/barber/login");
   if (!canAccessBarberApp(session)) redirect("/dashboard");
-  const summary = await getBarberTodaySummary(prisma, session.barber.id);
+  const [summary, organization, salon] = await Promise.all([
+    getBarberTodaySummary(prisma, session.barber.id),
+    session.organizationId
+      ? prisma.organization.findUnique({ where: { id: session.organizationId }, select: { name: true } })
+      : null,
+    session.salonId
+      ? prisma.salon.findUnique({ where: { id: session.salonId }, select: { name: true } })
+      : null,
+  ]);
+  const workplace = [organization?.name, salon?.name].filter(Boolean).join(" · ");
 
   return (
     <main className="barber-shell pb-8 pt-[max(1rem,env(safe-area-inset-top))]">
@@ -24,7 +33,7 @@ export default async function BarberHomePage() {
             <div className="flex min-w-0 items-center gap-3">
               <BrandLogo className="h-12 w-12 border border-salon-line shadow-sm" priority />
               <div className="min-w-0">
-                <p className="text-xs font-black text-salon-forest">واجهة تنال</p>
+                <p className="truncate text-xs font-black text-salon-forest">{workplace || "واجهة تنال"}</p>
                 <h1 className="mt-1 truncate text-2xl font-black text-salon-ink">مرحبًا {session.barber.name}</h1>
               </div>
             </div>

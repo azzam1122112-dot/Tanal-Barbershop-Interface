@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { formatAmount as formatMoney } from "@/lib/format";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 type CashSession = {
   id: string;
@@ -17,6 +18,7 @@ export function CashSessionPanel({ initialSession }: { initialSession: CashSessi
   const [loading, setLoading] = useState(false);
   const [closing, setClosing] = useState(false);
   const [message, setMessage] = useState("");
+  const { confirm, confirmDialog } = useConfirm();
 
   async function openSession() {
     setLoading(true);
@@ -53,9 +55,13 @@ export function CashSessionPanel({ initialSession }: { initialSession: CashSessi
 
   async function closeSession() {
     if (!cashSession) return;
-    const confirmed = window.confirm("هل تريد إنهاء جلسة الصندوق؟ بعد الإنهاء لن تستطيع تسجيل زيارة حتى تفتح جلسة جديدة.");
+    const confirmed = await confirm({
+      title: "إنهاء جلسة الصندوق؟",
+      description: "بعد الإنهاء لن تستطيع تسجيل زيارة حتى تفتح جلسة جديدة.",
+      confirmLabel: "إنهاء الجلسة",
+      tone: "danger",
+    });
     if (!confirmed) return;
-
     setClosing(true);
     setMessage("");
     const response = await fetch("/api/barber/cash-session/close", { method: "POST" });
@@ -137,6 +143,7 @@ export function CashSessionPanel({ initialSession }: { initialSession: CashSessi
         <p className="mt-2 text-center text-xs font-semibold text-salon-charcoal/65">استخدمها عند التوقف عن استقبال العملاء أو تسليم الكاش.</p>
       </div>
       {message ? <p className="mx-4 mb-4 rounded-2xl bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900">{message}</p> : null}
+      {confirmDialog}
     </div>
   );
 }
