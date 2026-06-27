@@ -7,7 +7,7 @@ import { setSessionCookie, getRequestMeta, parseJsonBody } from "@/lib/auth/http
 import { writeAuditLog } from "@/lib/audit/audit-log";
 import { clearRateLimit, consumeRateLimit } from "@/lib/auth/rate-limit";
 import { canAdminLogin } from "@/lib/auth/login-policy";
-import { resolveRequestOrganization } from "@/lib/tenant/request-org";
+import { resolveOrganizationForLogin } from "@/lib/tenant/request-org";
 
 const ERROR_MESSAGE = "بيانات الدخول غير صحيحة";
 
@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: ERROR_MESSAGE }, { status: 401 });
   }
 
-  const organization = await resolveRequestOrganization();
+  const organization = await resolveOrganizationForLogin(parsed.data.organizationSlug);
   if (!organization) {
     return NextResponse.json({ message: ERROR_MESSAGE }, { status: 401 });
   }

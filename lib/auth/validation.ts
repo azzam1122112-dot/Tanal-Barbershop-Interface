@@ -24,6 +24,7 @@ export const phoneSchema = z
 export const dashboardLoginSchema = z.object({
   email: emailSchema,
   password: z.string().min(1, "كلمة المرور مطلوبة"),
+  organizationSlug: z.string().trim().max(60).optional(),
 });
 
 const RESERVED_SLUGS = new Set(["www", "app", "api", "admin", "dashboard", "platform", "default", "tanal", "main"]);
@@ -62,6 +63,7 @@ export const salonUpdateSchema = z.object({
 export const barberLoginSchema = z.object({
   phone: phoneSchema,
   pin: barberPinSchema,
+  organizationSlug: z.string().trim().max(60).optional(),
 });
 
 export const createBarberSchema = z.object({
