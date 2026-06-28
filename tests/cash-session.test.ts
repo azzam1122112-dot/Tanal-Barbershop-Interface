@@ -24,7 +24,7 @@ describe("cash sessions", () => {
       data: {
         name: `cash-session-barber-${Date.now()}`,
         phone: randomSaudiPhone(),
-        accessPinHash: await hashBarberPin("1234"),
+        accessPinHash: await hashBarberPin("Tanal@123"),
         isActive: true,
       },
     });

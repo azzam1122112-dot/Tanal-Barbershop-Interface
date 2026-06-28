@@ -20,7 +20,12 @@ function generateTempPassword() {
 }
 
 function generateTempPin() {
-  return String(randomInt(1000, 10000));
+  // رمز دخول مؤقت من 8 خانات: أحرف وأرقام بدون أحرف ملتبسة (0/O/1/l) لتسهيل القراءة.
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const lower = "abcdefghijkmnpqrstuvwxyz";
+  const digits = "23456789";
+  const all = upper + lower + digits;
+  return Array.from({ length: 8 }, () => all[randomInt(all.length)]).join("");
 }
 
 const orgInclude = {

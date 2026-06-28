@@ -39,7 +39,7 @@ describe("dashboard reports", () => {
       data: {
         name: `حلاق تقارير أساسي ${Date.now()}`,
         phone: `9665${Math.floor(10000000 + Math.random() * 89999999)}`,
-        accessPinHash: await hashBarberPin("1234"),
+        accessPinHash: await hashBarberPin("Tanal@123"),
         isActive: true,
       },
     });
@@ -50,7 +50,7 @@ describe("dashboard reports", () => {
       data: {
         name: `حلاق تقارير ${Date.now()}`,
         phone: `9665${Math.floor(10000000 + Math.random() * 89999999)}`,
-        accessPinHash: await hashBarberPin("1234"),
+        accessPinHash: await hashBarberPin("Tanal@123"),
         isActive: true,
       },
     });

@@ -209,13 +209,13 @@ export default function BarberLoginPage() {
               رمز الدخول
               <input
                 name="pin"
-                inputMode="numeric"
+                type="password"
                 required
-                minLength={4}
-                maxLength={6}
-                autoComplete="one-time-code"
-                placeholder="••••"
-                className="barber-field mt-2 h-14 text-center text-2xl"
+                minLength={8}
+                maxLength={64}
+                autoComplete="current-password"
+                placeholder="8 خانات على الأقل"
+                className="barber-field mt-2 h-14 text-center text-xl"
               />
             </label>
             {error ? <p className="rounded-lg border border-red-100 bg-red-50 px-3 py-3 text-sm font-semibold text-red-700">{error}</p> : null}

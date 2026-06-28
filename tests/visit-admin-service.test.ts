@@ -41,7 +41,7 @@ describe("admin visit corrections", () => {
       data: {
         name: `حلاق تصحيحات ${Date.now()}`,
         phone: `9665${Date.now().toString().slice(-8)}`,
-        accessPinHash: await hashBarberPin("1234"),
+        accessPinHash: await hashBarberPin("Tanal@123"),
         isActive: true,
       },
     });

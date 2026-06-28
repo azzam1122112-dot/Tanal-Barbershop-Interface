@@ -78,8 +78,8 @@ export function RewardRuleManager({ initialRules }: { initialRules: RewardRule[]
         </button>
       </form>
 
-      <div className="dashboard-panel overflow-hidden">
-        <div className="grid grid-cols-[1fr_130px_130px_120px] gap-3 border-b border-salon-line px-4 py-3 text-sm font-bold text-salon-charcoal">
+      <div className="dashboard-panel overflow-x-auto">
+        <div className="hidden grid-cols-[1fr_130px_130px_120px] gap-3 border-b border-salon-line px-4 py-3 text-sm font-bold text-salon-charcoal md:grid">
           <span>المكافأة</span>
           <span>النقاط</span>
           <span>الخصم</span>
@@ -87,34 +87,46 @@ export function RewardRuleManager({ initialRules }: { initialRules: RewardRule[]
         </div>
         <div className="divide-y divide-salon-line">
           {rules.map((rule) => (
-            <div key={rule.id} className="grid grid-cols-[1fr_130px_130px_120px] gap-3 px-4 py-4 text-sm">
-              <input
-                defaultValue={rule.name}
-                onBlur={(event) => event.currentTarget.value !== rule.name && updateRule(rule.id, { name: event.currentTarget.value })}
-                className="dashboard-field py-2 font-bold"
-              />
-              <input
-                defaultValue={rule.pointsRequired}
-                type="number"
-                min={1}
-                onBlur={(event) => Number(event.currentTarget.value) !== rule.pointsRequired && updateRule(rule.id, { requiredPoints: event.currentTarget.value })}
-                className="dashboard-field py-2"
-              />
-              <input
-                defaultValue={rule.discountAmount}
-                type="number"
-                min={0.01}
-                step="0.01"
-                onBlur={(event) => Number(event.currentTarget.value) !== rule.discountAmount && updateRule(rule.id, { discountAmount: event.currentTarget.value })}
-                className="dashboard-field py-2"
-              />
-              <button
-                type="button"
-                onClick={() => updateRule(rule.id, { isActive: !rule.isActive })}
-                className={`rounded-lg px-3 py-2 font-bold ${rule.isActive ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}
-              >
-                {rule.isActive ? "فعالة" : "معطلة"}
-              </button>
+            <div key={rule.id} className="grid grid-cols-2 items-start gap-3 px-4 py-4 text-sm md:grid-cols-[1fr_130px_130px_120px] md:items-center">
+              <label className="col-span-2 grid gap-1 md:col-span-1 md:block">
+                <span className="text-xs font-bold text-salon-charcoal md:hidden">المكافأة</span>
+                <input
+                  defaultValue={rule.name}
+                  onBlur={(event) => event.currentTarget.value !== rule.name && updateRule(rule.id, { name: event.currentTarget.value })}
+                  className="dashboard-field py-2 font-bold"
+                />
+              </label>
+              <label className="grid gap-1 md:block">
+                <span className="text-xs font-bold text-salon-charcoal md:hidden">النقاط</span>
+                <input
+                  defaultValue={rule.pointsRequired}
+                  type="number"
+                  min={1}
+                  onBlur={(event) => Number(event.currentTarget.value) !== rule.pointsRequired && updateRule(rule.id, { requiredPoints: event.currentTarget.value })}
+                  className="dashboard-field py-2"
+                />
+              </label>
+              <label className="grid gap-1 md:block">
+                <span className="text-xs font-bold text-salon-charcoal md:hidden">الخصم</span>
+                <input
+                  defaultValue={rule.discountAmount}
+                  type="number"
+                  min={0.01}
+                  step="0.01"
+                  onBlur={(event) => Number(event.currentTarget.value) !== rule.discountAmount && updateRule(rule.id, { discountAmount: event.currentTarget.value })}
+                  className="dashboard-field py-2"
+                />
+              </label>
+              <div className="grid gap-1 md:block">
+                <span className="text-xs font-bold text-salon-charcoal md:hidden">الحالة</span>
+                <button
+                  type="button"
+                  onClick={() => updateRule(rule.id, { isActive: !rule.isActive })}
+                  className={`w-full rounded-lg px-3 py-2 font-bold md:w-auto ${rule.isActive ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}
+                >
+                  {rule.isActive ? "فعالة" : "معطلة"}
+                </button>
+              </div>
             </div>
           ))}
         </div>

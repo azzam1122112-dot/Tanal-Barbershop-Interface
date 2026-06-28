@@ -48,7 +48,7 @@ describe("whatsapp templates and message logs", () => {
       data: {
         name: `whatsapp-barber-${Date.now()}`,
         phone: randomSaudiPhone(),
-        accessPinHash: await hashBarberPin("1234"),
+        accessPinHash: await hashBarberPin("Tanal@123"),
         isActive: true,
       },
     });

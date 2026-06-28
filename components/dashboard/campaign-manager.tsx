@@ -119,51 +119,61 @@ export function CampaignManager({ initialCampaigns }: { initialCampaigns: Campai
       </form>
 
       <div className="dashboard-panel overflow-x-auto">
-        <table className="dashboard-table min-w-[980px]">
-          <thead>
-            <tr>
-              <th className="px-3 py-3 text-right">الحملة</th>
-              <th className="px-3 py-3 text-right">الخصم</th>
-              <th className="px-3 py-3 text-right">الاستهداف</th>
-              <th className="px-3 py-3 text-right">الفترة</th>
-              <th className="px-3 py-3 text-right">لكل عميل</th>
-              <th className="px-3 py-3 text-right">الحالة</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-salon-line">
-            {campaigns.map((campaign) => (
-              <tr key={campaign.id}>
-                <td className="px-3 py-3">
-                  <input
-                    defaultValue={campaign.name}
-                    onBlur={(event) => event.currentTarget.value !== campaign.name && updateCampaign(campaign.id, { name: event.currentTarget.value })}
-                    className="dashboard-field py-2 font-bold"
-                  />
-                  <p className="mt-1 text-xs text-salon-charcoal">{campaign.description || "بدون وصف"}</p>
-                </td>
-                <td className="px-3 py-3">
-                  {campaign.discountType === "PERCENTAGE" ? "نسبة" : "مبلغ"}: {campaign.discountValue}
-                </td>
-                <td className="px-3 py-3">{targetLabel(campaign)}</td>
-                <td className="px-3 py-3">
-                  {new Date(campaign.startAt).toLocaleDateString("ar-SA")} - {new Date(campaign.endAt).toLocaleDateString("ar-SA")}
-                </td>
-                <td className="px-3 py-3">{campaign.maxUsesPerCustomer}</td>
-                <td className="px-3 py-3">
-                  <button
-                    type="button"
-                    onClick={() => updateCampaign(campaign.id, { isActive: !campaign.isActive })}
-                    className={`rounded-lg px-3 py-2 font-bold ${campaign.isActive ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}
-                  >
-                    {campaign.isActive ? "فعالة" : "معطلة"}
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {campaigns.length === 0 ? <tr><td colSpan={6} className="px-4 py-8 text-center text-salon-charcoal">لا توجد حملات</td></tr> : null}
-          </tbody>
-        </table>
+        <div className="hidden grid-cols-[1fr_130px_150px_180px_100px_120px] gap-3 border-b border-salon-line px-4 py-3 text-sm font-bold text-salon-charcoal lg:grid">
+          <span>الحملة</span>
+          <span>الخصم</span>
+          <span>الاستهداف</span>
+          <span>الفترة</span>
+          <span>لكل عميل</span>
+          <span>الحالة</span>
+        </div>
+        <div className="divide-y divide-salon-line">
+          {campaigns.map((campaign) => (
+            <div
+              key={campaign.id}
+              className="grid grid-cols-2 gap-x-4 gap-y-3 px-4 py-4 text-sm lg:grid-cols-[1fr_130px_150px_180px_100px_120px] lg:items-center lg:gap-3"
+            >
+              <div className="col-span-2 grid gap-1 lg:col-span-1">
+                <span className="text-xs font-bold text-salon-charcoal lg:hidden">الحملة</span>
+                <input
+                  defaultValue={campaign.name}
+                  onBlur={(event) => event.currentTarget.value !== campaign.name && updateCampaign(campaign.id, { name: event.currentTarget.value })}
+                  className="dashboard-field py-2 font-bold"
+                />
+                <p className="mt-1 text-xs text-salon-charcoal">{campaign.description || "بدون وصف"}</p>
+              </div>
+              <CampaignCell label="الخصم">
+                {campaign.discountType === "PERCENTAGE" ? "نسبة" : "مبلغ"}: {campaign.discountValue}
+              </CampaignCell>
+              <CampaignCell label="الاستهداف">{targetLabel(campaign)}</CampaignCell>
+              <CampaignCell label="الفترة">
+                {new Date(campaign.startAt).toLocaleDateString("ar-SA")} - {new Date(campaign.endAt).toLocaleDateString("ar-SA")}
+              </CampaignCell>
+              <CampaignCell label="لكل عميل">{campaign.maxUsesPerCustomer}</CampaignCell>
+              <div className="grid gap-1 lg:block">
+                <span className="text-xs font-bold text-salon-charcoal lg:hidden">الحالة</span>
+                <button
+                  type="button"
+                  onClick={() => updateCampaign(campaign.id, { isActive: !campaign.isActive })}
+                  className={`w-full rounded-lg px-3 py-2 font-bold lg:w-auto ${campaign.isActive ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}
+                >
+                  {campaign.isActive ? "فعالة" : "معطلة"}
+                </button>
+              </div>
+            </div>
+          ))}
+          {campaigns.length === 0 ? <p className="px-4 py-8 text-center text-salon-charcoal">لا توجد حملات</p> : null}
+        </div>
       </div>
+    </div>
+  );
+}
+
+function CampaignCell({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="grid gap-1 lg:block">
+      <span className="text-xs font-bold text-salon-charcoal lg:hidden">{label}</span>
+      <span>{children}</span>
     </div>
   );
 }

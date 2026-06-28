@@ -4,25 +4,34 @@ import { Icon, type IconName } from "@/components/icons";
 import { Reveal } from "@/components/reveal";
 
 const features: { icon: IconName; title: string; description: string }[] = [
-  { icon: "visits", title: "تسجيل الزيارات", description: "تطبيق حلاق موبايل أولًا يسجّل الزيارة والخدمات والدفع في ثوانٍ معدودة." },
-  { icon: "cash", title: "جلسات الصندوق", description: "فتح وإغلاق الصندوق وتحصيل الكاش والشبكة مع كشف دقيق للفروقات." },
-  { icon: "loyalty", title: "برنامج الولاء", description: "نقاط ومكافآت تُحتسب وتُستبدل تلقائيًا، مشتركة بين فروع المؤسسة." },
-  { icon: "campaigns", title: "الحملات التسويقية", description: "عروض موجّهة لشرائح العملاء بنسبة أو مبلغ ثابت ومدة محددة." },
-  { icon: "whatsapp", title: "واتساب يدوي", description: "روابط جاهزة للإرسال اليدوي الآمن — دون إرسال تلقائي أو جماعي." },
-  { icon: "reports", title: "تقارير وتدقيق", description: "مؤشرات مالية يومية وسجل تدقيق كامل لكل عملية حساسة." },
+  { icon: "visits", title: "تسجيل الزيارات في ثوانٍ", description: "تطبيق حلاق موبايل أولًا: الخدمة والمبلغ وطريقة الدفع بثلاث لمسات — بلا تأخير ولا طوابير على الكرسي." },
+  { icon: "cash", title: "صندوق محكم بلا تسريب", description: "افتح وأغلق جلسة الصندوق وقت ما تشاء، مع كشف فوري لأي فرق بين الكاش والشبكة قبل أن يتراكم." },
+  { icon: "loyalty", title: "ولاء يُعيد عملاءك", description: "نقاط ومكافآت تُحتسب وتُستبدل تلقائيًا ومشتركة بين كل فروعك — لترفع تكرار الزيارة ومتوسط الإنفاق." },
+  { icon: "campaigns", title: "حملات تملأ الكراسي", description: "عروض موجّهة لشريحة محددة — عملاء جدد، منقطعون، أو أصحاب نقاط — بنسبة أو مبلغ ومدة تحدّدها أنت." },
+  { icon: "whatsapp", title: "واتساب يحترم عميلك", description: "رسائل جاهزة تُرسلها يدويًا وقت تريد، بلا إرسال تلقائي أو إزعاج جماعي يعرّض رقمك للحظر." },
+  { icon: "reports", title: "قرارات مبنية على أرقام", description: "مؤشرات مالية يومية وسجل تدقيق كامل لكل عملية حساسة، فتعرف أين تربح وأين تُحكم رقابتك." },
 ];
 
 const steps: { title: string; description: string }[] = [
-  { title: "أنشئ مؤسستك", description: "سجّل صالونك الأول، أضف الحلاقين والخدمات وقواعد الولاء في دقائق." },
-  { title: "شغّل يومك", description: "يسجّل الحلاق الزيارات من الجوال، وتُدار جلسات الصندوق والتحصيل بسلاسة." },
-  { title: "انمُ بثقة", description: "تابع التقارير، أطلق الحملات، وأضف فروعًا جديدة تحت مظلة مؤسسة واحدة." },
+  { title: "أنشئ مؤسستك", description: "سجّل صالونك، وأضف الحلاقين والخدمات وقواعد الولاء — في دقائق وبدون أي خبرة تقنية." },
+  { title: "شغّل يومك", description: "يسجّل الحلاق الزيارات من جواله، وتنساب جلسات الصندوق والتحصيل بسلاسة طوال اليوم." },
+  { title: "انمُ بثقة", description: "راقب التقارير، أطلق الحملات، وأضِف فروعًا جديدة تحت مظلة مؤسسة واحدة بعزل تام." },
 ];
 
 const stats: { value: string; label: string }[] = [
-  { value: "24/7", label: "تشغيل بلا ورديات" },
-  { value: "متعدد", label: "فروع تحت مؤسسة" },
-  { value: "كامل", label: "سجل تدقيق" },
-  { value: "يدوي", label: "واتساب آمن" },
+  { value: "دقائق", label: "لإطلاق صالونك بالكامل" },
+  { value: "24/7", label: "تشغيل يناسب صالونًا بلا ورديات" },
+  { value: "متعدد", label: "فروع تحت مؤسسة واحدة" },
+  { value: "صفر", label: "رسائل واتساب تلقائية مزعجة" },
+];
+
+const faqs: { question: string; answer: string }[] = [
+  { question: "هل أحتاج خبرة تقنية لتشغيل تنال؟", answer: "لا. الواجهة عربية بالكامل ومصمّمة لتكون بديهية. تنشئ مؤسستك وتضيف حلاقيك وخدماتك خلال دقائق، ويبدأ الحلاق العمل من جواله مباشرة." },
+  { question: "هل يدعم النظام أكثر من فرع؟", answer: "نعم. تدير عدة فروع تحت مؤسسة واحدة ببرنامج ولاء مشترك، وفي الوقت نفسه عزل تام لبيانات كل مؤسسة عن غيرها." },
+  { question: "كيف يعمل إرسال واتساب؟", answer: "يجهّز النظام نص الرسالة ورابطها فقط، وأنت من يرسلها يدويًا وقت تشاء. لا إرسال تلقائي ولا رسائل جماعية — احترامًا لخصوصية عميلك وتجنّبًا لحظر رقمك." },
+  { question: "هل يناسب صالونًا يعمل 24 ساعة؟", answer: "تمامًا. التشغيل يقوم على جلسة الصندوق التي تُفتح وتُغلق وقت ما تشاء، لا على تاريخ يوم ثابت — فيناسب الورديات الممتدة والعمل المتواصل." },
+  { question: "هل بياناتي ومبالغي آمنة؟", answer: "كل عملية حساسة تُسجَّل في سجل تدقيق كامل (من نفّذها ومتى)، والمبالغ تُحسب من مصدر واحد موثوق، والصلاحيات مضبوطة بدقة لكل دور." },
+  { question: "كيف أبدأ وكم التكلفة؟", answer: "أنشئ مؤسستك الآن وجرّب النظام بنفسك، وللاستفسار عن باقات الاشتراك تواصل معنا مباشرة على واتساب وسنساعدك في اختيار ما يناسب صالونك." },
 ];
 
 const comparison: { traditional: string; tanal: string }[] = [
@@ -56,6 +65,7 @@ export default function HomePage() {
           <nav className="hidden items-center gap-7 text-sm font-bold text-salon-charcoal md:flex">
             <a href="#features" className="transition-colors hover:text-salon-ink">المزايا</a>
             <a href="#how" className="transition-colors hover:text-salon-ink">كيف يعمل</a>
+            <a href="#faq" className="transition-colors hover:text-salon-ink">الأسئلة الشائعة</a>
           </nav>
           <div className="flex items-center gap-2">
             <Link href="/dashboard/login" className="dashboard-button-soft px-3 py-2 text-xs sm:px-4 sm:text-sm">دخول</Link>
@@ -77,24 +87,24 @@ export default function HomePage() {
           <div>
             <Reveal as="p" className="inline-flex items-center gap-2 rounded-full border border-salon-gold/30 bg-white/[0.04] px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-eyebrow text-salon-goldlight">
               <span className="h-1.5 w-1.5 rounded-full bg-salon-gold shadow-[0_0_12px_2px_rgba(169,130,69,0.7)]" />
-              منصّة SaaS للولاء وتشغيل الصالونات
+              نظام تشغيل وولاء للصالونات الرجالية
             </Reveal>
 
             <Reveal as="h1" delay={80} className="mt-6 text-4xl font-bold leading-[1.08] tracking-tight md:text-6xl">
-              أدِر صالونك الرجالي
+              أدِر صالونك باحتراف،
               <br />
-              <span className="text-gold-sheen">بفخامةٍ ملكية</span>
+              <span className="text-gold-sheen">واربح أكثر مع كل زيارة</span>
             </Reveal>
 
             <Reveal as="p" delay={160} className="mt-6 max-w-xl text-lg leading-8 text-white/70">
-              نظام متكامل لتسجيل الزيارات، إدارة الصندوق، الولاء والمكافآت، الحملات،
-              ورسائل واتساب — بواجهة عربية أنيقة وتطبيق حلاق سريع، يخدم مؤسستك وكل فروعها.
+              تنال يجمع تسجيل الزيارات، إدارة الصندوق، برنامج الولاء، والحملات في منصّة عربية واحدة —
+              تُعيد عملاءك، تُحكم رقابتك على التحصيل، وتنمو بفروعك بثقة من أول يوم.
             </Reveal>
 
             <Reveal delay={240} className="mt-9 flex flex-col gap-3 sm:flex-row">
               <Link href="/signup" className="dashboard-button-gold sheen-overlay px-7 py-4 text-base">
                 <Icon name="loyalty" className="h-5 w-5" />
-                أنشئ مؤسستك مجانًا
+                ابدأ مجانًا الآن
               </Link>
               <Link href="/barber/login" className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.06] px-7 py-4 text-base font-bold text-white backdrop-blur transition-[transform,background-color] duration-200 hover:bg-white/[0.12] active:scale-[0.99]">
                 <Icon name="scissors" className="h-5 w-5" />
@@ -102,8 +112,10 @@ export default function HomePage() {
               </Link>
             </Reveal>
 
-            <Reveal as="p" delay={320} className="mt-5 text-sm font-medium text-white/45">
-              صالون يعمل 24 ساعة · لا إرسال واتساب تلقائي · عزل تام بين المؤسسات
+            <Reveal as="p" delay={320} className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm font-medium text-white/45">
+              <span className="inline-flex items-center gap-1.5"><Icon name="check" className="h-4 w-4 text-salon-goldlight" /> جاهز خلال دقائق</span>
+              <span className="inline-flex items-center gap-1.5"><Icon name="check" className="h-4 w-4 text-salon-goldlight" /> بلا إرسال واتساب تلقائي</span>
+              <span className="inline-flex items-center gap-1.5"><Icon name="check" className="h-4 w-4 text-salon-goldlight" /> عزل تام بين المؤسسات</span>
             </Reveal>
           </div>
 
@@ -252,6 +264,35 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ===== FAQ ===== */}
+      <section id="faq" className="border-t border-salon-line/60 bg-gradient-to-b from-[#f6f3ec] to-[#efe9dd]">
+        <div className="mx-auto max-w-3xl px-5 py-20">
+          <Reveal className="text-center">
+            <p className="text-[11px] font-bold uppercase tracking-eyebrow text-salon-gold">قبل أن تبدأ</p>
+            <h2 className="mt-3 text-3xl font-bold tracking-tight text-salon-ink md:text-4xl">أسئلة شائعة</h2>
+            <p className="mx-auto mt-4 max-w-xl text-base leading-8 text-salon-charcoal">
+              كل ما تريد معرفته قبل تشغيل تنال في صالونك. لم تجد إجابتك؟ راسلنا على واتساب.
+            </p>
+          </Reveal>
+
+          <div className="mt-10 space-y-3">
+            {faqs.map((faq, index) => (
+              <Reveal key={faq.question} delay={index * 60}>
+                <details className="dashboard-panel group overflow-hidden p-0 [&_summary::-webkit-details-marker]:hidden">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-base font-bold text-salon-ink sm:px-6">
+                    {faq.question}
+                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-salon-ink text-salon-gold transition-transform duration-300 group-open:rotate-45">
+                      <Icon name="close" className="h-3.5 w-3.5 rotate-45" />
+                    </span>
+                  </summary>
+                  <p className="px-5 pb-5 text-sm leading-8 text-salon-charcoal sm:px-6">{faq.answer}</p>
+                </details>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ===== CTA + WhatsApp ===== */}
       <section className="mx-auto max-w-6xl px-5 py-20">
         <Reveal className="relative overflow-hidden rounded-3xl bg-sidebar-onyx px-6 py-14 text-center text-white shadow-lux-lg sm:px-12">
@@ -260,8 +301,8 @@ export default function HomePage() {
             <span className="absolute inset-x-0 top-0 h-px bg-gradient-to-l from-transparent via-salon-gold/70 to-transparent" />
           </div>
           <div className="relative">
-            <h2 className="text-3xl font-bold tracking-tight md:text-4xl">جاهز لترقية صالونك؟</h2>
-            <p className="mx-auto mt-4 max-w-xl text-white/70">ابدأ التشغيل اليوم بواجهة فاخرة وأدوات تدير كل تفاصيل يومك.</p>
+            <h2 className="text-3xl font-bold tracking-tight md:text-4xl">صالونك يستحق نظامًا بمستواه</h2>
+            <p className="mx-auto mt-4 max-w-xl text-white/70">أنشئ مؤسستك اليوم مجانًا، وابدأ تسجيل أول زيارة خلال دقائق — بدون تعقيد وبدون التزام.</p>
 
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <a

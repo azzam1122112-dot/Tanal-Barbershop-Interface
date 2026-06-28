@@ -37,7 +37,7 @@ async function main() {
   const adminEmail = readSeedEnv("SEED_ADMIN_EMAIL", "admin@tanal.local");
   const adminPassword = readSeedEnv("SEED_ADMIN_PASSWORD", "Admin@12345");
   const barberPhone = normalizeSeedPhone(readSeedEnv("SEED_BARBER_PHONE", "0500000002"));
-  const barberPin = readSeedEnv("SEED_BARBER_PIN", "1234");
+  const barberPin = readSeedEnv("SEED_BARBER_PIN", "Tanal@123");
 
   // الباقة الافتراضية
   await prisma.plan.upsert({

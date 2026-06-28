@@ -246,7 +246,7 @@ dropdb -h localhost -p 55432 -U tanal_user tanal_loyalty_fresh_check
   - كلمة المرور: `Admin@12345`
 - الحلاق:
   - الجوال: `0500000002`
-  - رمز الدخول: `1234`
+  - رمز الدخول: `Tanal@123`
 
 ## روابط الصفحات الأساسية
 

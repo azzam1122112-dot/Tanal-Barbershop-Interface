@@ -41,7 +41,7 @@ describe("daily close and operation alerts", () => {
       data: {
         name: `حلاق إغلاق ${Date.now()}`,
         phone: randomSaudiPhone(),
-        accessPinHash: await hashBarberPin("1234"),
+        accessPinHash: await hashBarberPin("Tanal@123"),
         isActive: true,
       },
     });
@@ -52,7 +52,7 @@ describe("daily close and operation alerts", () => {
       data: {
         name: `حلاق مفتوح ${Date.now()}`,
         phone: randomSaudiPhone(),
-        accessPinHash: await hashBarberPin("1234"),
+        accessPinHash: await hashBarberPin("Tanal@123"),
         isActive: true,
       },
     });
@@ -63,7 +63,7 @@ describe("daily close and operation alerts", () => {
       data: {
         name: `حلاق خصم مرتفع ${Date.now()}`,
         phone: randomSaudiPhone(),
-        accessPinHash: await hashBarberPin("1234"),
+        accessPinHash: await hashBarberPin("Tanal@123"),
         isActive: true,
       },
     });

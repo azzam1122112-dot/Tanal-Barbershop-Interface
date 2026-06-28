@@ -15,7 +15,7 @@ async function main() {
     data: {
       name: `${demoPrefix} حلاق تجربة`,
       phone: "0599990000",
-      accessPinHash: await hashBarberPin("1234"),
+      accessPinHash: await hashBarberPin("Tanal@123"),
       isActive: true,
     },
   });

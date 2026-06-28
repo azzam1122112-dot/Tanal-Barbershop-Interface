@@ -66,8 +66,8 @@ export default async function DashboardCustomersPage({
           <button className="dashboard-button">تصفية</button>
         </FilterBar>
 
-        <TablePanel className="overflow-hidden">
-          <div className="grid grid-cols-[1fr_150px_90px_90px_120px_120px_130px_130px] gap-3 border-b border-salon-line px-4 py-3 text-sm font-bold text-salon-charcoal">
+        <TablePanel>
+          <div className="hidden grid-cols-[1fr_150px_90px_90px_120px_120px_130px_130px] gap-3 border-b border-salon-line px-4 py-3 text-sm font-bold text-salon-charcoal lg:grid">
             <span>الاسم</span>
             <span>الجوال</span>
             <span>النقاط</span>
@@ -79,20 +79,32 @@ export default async function DashboardCustomersPage({
           </div>
           <div className="divide-y divide-salon-line">
             {rows.map((customer) => (
-              <div key={customer.id} className="grid grid-cols-[1fr_150px_90px_90px_120px_120px_130px_130px] items-center gap-3 px-4 py-3 text-sm">
-                <span className="font-bold">{customer.name}</span>
-                <span>{customer.phone}</span>
-                <span>{customer.pointsBalance}</span>
-                <span>{customer.visitsCount}</span>
-                <span>{customer.activeManagerRewards}</span>
-                <span><CustomerWhatsAppToggle customerId={customer.id} initialOptIn={customer.whatsappOptIn} /></span>
-                <span>{new Date(customer.createdAt).toLocaleDateString("ar-SA")}</span>
-                <span><ManagerRewardButton customerId={customer.id} customerName={customer.name} /></span>
+              <div
+                key={customer.id}
+                className="grid grid-cols-2 gap-x-4 gap-y-3 px-4 py-4 text-sm lg:grid-cols-[1fr_150px_90px_90px_120px_120px_130px_130px] lg:items-center lg:gap-3 lg:py-3"
+              >
+                <Cell label="الاسم" className="col-span-2 lg:col-span-1"><span className="font-bold">{customer.name}</span></Cell>
+                <Cell label="الجوال">{customer.phone}</Cell>
+                <Cell label="النقاط">{customer.pointsBalance}</Cell>
+                <Cell label="الزيارات">{customer.visitsCount}</Cell>
+                <Cell label="مكافآت الإدارة">{customer.activeManagerRewards}</Cell>
+                <Cell label="واتساب"><CustomerWhatsAppToggle customerId={customer.id} initialOptIn={customer.whatsappOptIn} /></Cell>
+                <Cell label="تاريخ الإنشاء">{new Date(customer.createdAt).toLocaleDateString("ar-SA")}</Cell>
+                <Cell label="إجراء" className="col-span-2 lg:col-span-1"><ManagerRewardButton customerId={customer.id} customerName={customer.name} /></Cell>
               </div>
             ))}
             {rows.length === 0 ? <div className="p-5"><EmptyState title="لا توجد نتائج" description="جرّب تغيير كلمة البحث أو حالة العميل." /></div> : null}
           </div>
         </TablePanel>
     </DashboardShell>
+  );
+}
+
+function Cell({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`grid gap-1 lg:block ${className}`}>
+      <span className="text-xs font-bold text-salon-charcoal lg:hidden">{label}</span>
+      <span className="font-semibold lg:font-normal">{children}</span>
+    </div>
   );
 }

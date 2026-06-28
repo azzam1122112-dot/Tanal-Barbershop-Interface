@@ -295,7 +295,7 @@ export function BarberManager({
             </label>
             <label className="block">
               <span className="mb-2 block text-xs font-black text-salon-charcoal">رمز الدخول</span>
-              <input name="pin" required minLength={4} maxLength={6} inputMode="numeric" placeholder="4 أو 6 أرقام" className="dashboard-field" />
+              <input name="pin" required minLength={8} maxLength={64} placeholder="8 خانات على الأقل (أحرف وأرقام ورموز)" className="dashboard-field" />
             </label>
             <label className="block">
               <span className="mb-2 block text-xs font-black text-salon-charcoal">الفرع</span>
@@ -380,10 +380,9 @@ export function BarberManager({
                             data-pin-input={barber.id}
                             value={draft.pin}
                             onChange={(event) => updateDraft(barber.id, { pin: event.target.value })}
-                            minLength={4}
-                            maxLength={6}
-                            inputMode="numeric"
-                            placeholder="اتركه فارغًا إذا لم يتغير"
+                            minLength={8}
+                            maxLength={64}
+                            placeholder="8 خانات على الأقل، اتركه فارغًا إذا لم يتغير"
                             className="dashboard-field py-2.5"
                           />
                         </label>

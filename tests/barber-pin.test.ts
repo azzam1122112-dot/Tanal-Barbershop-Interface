@@ -1,24 +1,30 @@
 import { describe, expect, it } from "vitest";
 import { hashBarberPin, validateBarberPin, verifyBarberPin } from "../lib/auth/barber-pin";
 
-describe("barber PIN validation", () => {
-  it("accepts 4 or 6 numeric digits", () => {
-    expect(validateBarberPin("1234")).toBe("1234");
-    expect(validateBarberPin("123456")).toBe("123456");
+describe("barber access code validation", () => {
+  it("accepts 8+ characters with letters, digits, and symbols", () => {
+    expect(validateBarberPin("Tanal@123")).toBe("Tanal@123");
+    expect(validateBarberPin("aB3$xYz!")).toBe("aB3$xYz!");
+    expect(validateBarberPin("رمز-سري-123")).toBe("رمز-سري-123");
   });
 
-  it("rejects values shorter than 4, longer than 6, or non-numeric", () => {
-    expect(() => validateBarberPin("123")).toThrow();
-    expect(() => validateBarberPin("12345")).toThrow();
-    expect(() => validateBarberPin("1234567")).toThrow();
-    expect(() => validateBarberPin("12a4")).toThrow();
+  it("rejects values shorter than 8 or containing whitespace", () => {
+    expect(() => validateBarberPin("1234")).toThrow();
+    expect(() => validateBarberPin("Tanal@1")).toThrow();
+    expect(() => validateBarberPin("Tanal 123")).toThrow();
+    expect(() => validateBarberPin("a".repeat(65))).toThrow();
   });
 
-  it("stores PINs as hashes and verifies without exposing plaintext", async () => {
-    const hash = await hashBarberPin("1234");
+  it("stores codes as hashes and verifies without exposing plaintext", async () => {
+    const hash = await hashBarberPin("Tanal@123");
 
-    expect(hash).not.toBe("1234");
-    await expect(verifyBarberPin("1234", hash)).resolves.toBe(true);
-    await expect(verifyBarberPin("4321", hash)).resolves.toBe(false);
+    expect(hash).not.toBe("Tanal@123");
+    await expect(verifyBarberPin("Tanal@123", hash)).resolves.toBe(true);
+    await expect(verifyBarberPin("Wrong@123", hash)).resolves.toBe(false);
+  });
+
+  it("returns false (not throws) when the submitted code is malformed", async () => {
+    const hash = await hashBarberPin("Tanal@123");
+    await expect(verifyBarberPin("123", hash)).resolves.toBe(false);
   });
 });

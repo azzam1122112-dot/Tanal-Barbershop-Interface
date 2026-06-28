@@ -462,34 +462,36 @@ export function WhatsAppDashboard({
         <div className="border-b border-salon-line p-5">
           <h2 className="text-xl font-black">سجل الرسائل</h2>
         </div>
-        <table className="dashboard-table min-w-[960px]">
-          <thead>
-            <tr>
-              <th className="px-3 py-3 text-right">التاريخ</th>
-              <th className="px-3 py-3 text-right">العميل</th>
-              <th className="px-3 py-3 text-right">القالب</th>
-              <th className="px-3 py-3 text-right">الحالة</th>
-              <th className="px-3 py-3 text-right">إجراء</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-salon-line">
-            {messages.map((message) => (
-              <tr key={message.id}>
-                <td className="px-3 py-3">{new Date(message.createdAt).toLocaleString("ar-SA")}</td>
-                <td className="px-3 py-3">{message.customer.name}<br /><span className="text-salon-charcoal">{message.customer.phone}</span></td>
-                <td className="px-3 py-3">{message.template?.name ?? "مخصص"}</td>
-                <td className="px-3 py-3">{statusLabel(message.status)}</td>
-                <td className="px-3 py-3">
-                  <div className="flex flex-wrap gap-2">
-                    <button onClick={() => openWhatsApp({ messageLogId: message.id, waUrl: message.waUrl })} className="rounded-lg bg-salon-forest px-3 py-2 font-bold text-white">فتح</button>
-                    <button onClick={() => markSent(message.id)} className="dashboard-button px-3 py-2">تم الإرسال</button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {messages.length === 0 ? <tr><td colSpan={5} className="px-4 py-8 text-center text-salon-charcoal">لا توجد رسائل</td></tr> : null}
-          </tbody>
-        </table>
+        <div className="hidden grid-cols-[180px_1fr_140px_140px_200px] gap-3 border-b border-salon-line px-4 py-3 text-sm font-bold text-salon-charcoal lg:grid">
+          <span>التاريخ</span>
+          <span>العميل</span>
+          <span>القالب</span>
+          <span>الحالة</span>
+          <span>إجراء</span>
+        </div>
+        <div className="divide-y divide-salon-line">
+          {messages.map((message) => (
+            <div
+              key={message.id}
+              className="grid grid-cols-2 gap-x-4 gap-y-3 px-4 py-4 text-sm lg:grid-cols-[180px_1fr_140px_140px_200px] lg:items-center lg:gap-3"
+            >
+              <MessageCell label="التاريخ">{new Date(message.createdAt).toLocaleString("ar-SA")}</MessageCell>
+              <MessageCell label="العميل">
+                {message.customer.name}<br /><span className="text-salon-charcoal">{message.customer.phone}</span>
+              </MessageCell>
+              <MessageCell label="القالب">{message.template?.name ?? "مخصص"}</MessageCell>
+              <MessageCell label="الحالة">{statusLabel(message.status)}</MessageCell>
+              <div className="col-span-2 grid gap-1 lg:col-span-1 lg:block">
+                <span className="text-xs font-bold text-salon-charcoal lg:hidden">إجراء</span>
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={() => openWhatsApp({ messageLogId: message.id, waUrl: message.waUrl })} className="rounded-lg bg-salon-forest px-3 py-2 font-bold text-white">فتح</button>
+                  <button onClick={() => markSent(message.id)} className="dashboard-button px-3 py-2">تم الإرسال</button>
+                </div>
+              </div>
+            </div>
+          ))}
+          {messages.length === 0 ? <p className="px-4 py-8 text-center text-salon-charcoal">لا توجد رسائل</p> : null}
+        </div>
       </section>
     </div>
   );
@@ -531,6 +533,15 @@ function AudienceList({ customers, onToggle }: { customers: AudienceCustomer[]; 
         </div>
       ))}
       {customers.length === 0 ? <p className="py-6 text-center text-sm text-salon-charcoal">لا توجد نتائج</p> : null}
+    </div>
+  );
+}
+
+function MessageCell({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="grid gap-1 lg:block">
+      <span className="text-xs font-bold text-salon-charcoal lg:hidden">{label}</span>
+      <span>{children}</span>
     </div>
   );
 }

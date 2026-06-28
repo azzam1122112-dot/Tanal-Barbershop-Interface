@@ -33,7 +33,7 @@ describe("visit preview and confirm", () => {
       data: {
         name: `visit-service-barber-${Date.now()}`,
         phone: `9665${Math.floor(10000000 + Math.random() * 89999999)}`,
-        accessPinHash: await hashBarberPin("1234"),
+        accessPinHash: await hashBarberPin("Tanal@123"),
         isActive: true,
       },
     });

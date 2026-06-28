@@ -80,8 +80,8 @@ export function ServiceManager({ initialServices }: { initialServices: ManagedSe
         </button>
       </form>
 
-      <div className="dashboard-panel overflow-hidden">
-        <div className="grid grid-cols-[1fr_120px_100px_120px] gap-3 border-b border-salon-line px-4 py-3 text-sm font-bold text-salon-charcoal">
+      <div className="dashboard-panel overflow-x-auto">
+        <div className="hidden grid-cols-[1fr_120px_100px_120px] gap-3 border-b border-salon-line px-4 py-3 text-sm font-bold text-salon-charcoal md:grid">
           <span>الخدمة</span>
           <span>السعر</span>
           <span>الترتيب</span>
@@ -89,34 +89,46 @@ export function ServiceManager({ initialServices }: { initialServices: ManagedSe
         </div>
         <div className="divide-y divide-salon-line">
           {services.map((service) => (
-            <div key={service.id} className="grid grid-cols-[1fr_120px_100px_120px] gap-3 px-4 py-4 text-sm">
-              <input
-                defaultValue={service.name}
-                onBlur={(event) => event.currentTarget.value !== service.name && updateService(service.id, { name: event.currentTarget.value })}
-                className="dashboard-field py-2 font-bold"
-              />
-              <input
-                defaultValue={service.defaultPrice}
-                type="number"
-                min={0}
-                step="0.01"
-                onBlur={(event) => Number(event.currentTarget.value) !== service.defaultPrice && updateService(service.id, { defaultPrice: event.currentTarget.value })}
-                className="dashboard-field py-2"
-              />
-              <input
-                defaultValue={service.sortOrder ?? 0}
-                type="number"
-                step={1}
-                onBlur={(event) => Number(event.currentTarget.value) !== (service.sortOrder ?? 0) && updateService(service.id, { sortOrder: event.currentTarget.value })}
-                className="dashboard-field py-2"
-              />
-              <button
-                type="button"
-                onClick={() => updateService(service.id, { isActive: !service.isActive })}
-                className={`rounded-lg px-3 py-2 font-bold ${service.isActive ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}
-              >
-                {service.isActive ? "نشطة" : "معطلة"}
-              </button>
+            <div key={service.id} className="grid grid-cols-2 items-start gap-3 px-4 py-4 text-sm md:grid-cols-[1fr_120px_100px_120px] md:items-center">
+              <label className="col-span-2 grid gap-1 md:col-span-1 md:block">
+                <span className="text-xs font-bold text-salon-charcoal md:hidden">الخدمة</span>
+                <input
+                  defaultValue={service.name}
+                  onBlur={(event) => event.currentTarget.value !== service.name && updateService(service.id, { name: event.currentTarget.value })}
+                  className="dashboard-field py-2 font-bold"
+                />
+              </label>
+              <label className="grid gap-1 md:block">
+                <span className="text-xs font-bold text-salon-charcoal md:hidden">السعر</span>
+                <input
+                  defaultValue={service.defaultPrice}
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  onBlur={(event) => Number(event.currentTarget.value) !== service.defaultPrice && updateService(service.id, { defaultPrice: event.currentTarget.value })}
+                  className="dashboard-field py-2"
+                />
+              </label>
+              <label className="grid gap-1 md:block">
+                <span className="text-xs font-bold text-salon-charcoal md:hidden">الترتيب</span>
+                <input
+                  defaultValue={service.sortOrder ?? 0}
+                  type="number"
+                  step={1}
+                  onBlur={(event) => Number(event.currentTarget.value) !== (service.sortOrder ?? 0) && updateService(service.id, { sortOrder: event.currentTarget.value })}
+                  className="dashboard-field py-2"
+                />
+              </label>
+              <div className="grid gap-1 md:block">
+                <span className="text-xs font-bold text-salon-charcoal md:hidden">الحالة</span>
+                <button
+                  type="button"
+                  onClick={() => updateService(service.id, { isActive: !service.isActive })}
+                  className={`w-full rounded-lg px-3 py-2 font-bold md:w-auto ${service.isActive ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}
+                >
+                  {service.isActive ? "نشطة" : "معطلة"}
+                </button>
+              </div>
             </div>
           ))}
           {services.length === 0 ? <p className="px-4 py-8 text-center text-salon-charcoal">لا توجد خدمات بعد</p> : null}
