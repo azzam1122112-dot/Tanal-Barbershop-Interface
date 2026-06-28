@@ -11,7 +11,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "start:render": "next start -p $PORT",
+    "start:render": "prisma migrate deploy && next start -p $PORT",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
