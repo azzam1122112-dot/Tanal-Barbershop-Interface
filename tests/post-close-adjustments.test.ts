@@ -82,7 +82,7 @@ describe("post-close adjustment report", () => {
     expect(report.adjustments.every((adjustment) => adjustment.postCloseAdjustment)).toBe(true);
     expect(canAccessDashboard(null)).toBe(false);
     expect(canAccessDashboard({ type: "barber", id: "b", role: "BARBER", organizationId: "org_default", salonId: "salon_default", barber: { id: barberId, name: "حلاق", phone: "966500000001", role: "BARBER" } })).toBe(false);
-    expect(canAccessDashboard({ type: "dashboard", id: "a", role: "ADMIN", organizationId: "org_default", salonId: null, user: { id: adminUserId, name: "مدير", email: "admin@tanal.local", role: "ADMIN" } })).toBe(true);
+    expect(canAccessDashboard({ type: "dashboard", id: "a", role: "ADMIN", organizationId: "org_default", salonId: null, scopedSalonIds: null, user: { id: adminUserId, name: "مدير", email: "admin@tanal.local", role: "ADMIN" } })).toBe(true);
   });
 
   it("calculates payment method financial impact from cash to network", async () => {

@@ -4,8 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon, type IconName } from "@/components/icons";
 
-type NavItem = { href: string; label: string; description: string; icon: IconName };
-type NavGroup = { title: string; adminOnly?: boolean; ownerOnly?: boolean; items: NavItem[] };
+type NavItem = { href: string; label: string; description: string; icon: IconName; hideFromSupervisor?: boolean };
+type NavGroup = { title: string; adminOnly?: boolean; ownerOnly?: boolean; hideFromSupervisor?: boolean; items: NavItem[] };
 
 const navGroups: NavGroup[] = [
   {
@@ -21,13 +21,14 @@ const navGroups: NavGroup[] = [
     title: "التشغيل",
     items: [
       { href: "/dashboard/visits", label: "الزيارات", description: "سجل الخدمات", icon: "visits" },
-      { href: "/dashboard/barbers", label: "الحلاقون", description: "الحسابات والصلاحية", icon: "barbers" },
-      { href: "/dashboard/services", label: "الخدمات", description: "القائمة والأسعار", icon: "services" },
-      { href: "/dashboard/customers", label: "العملاء", description: "البيانات والولاء", icon: "customers" },
+      { href: "/dashboard/barbers", label: "الحلاقون", description: "الحسابات والصلاحية", icon: "barbers", hideFromSupervisor: true },
+      { href: "/dashboard/services", label: "الخدمات", description: "القائمة والأسعار", icon: "services", hideFromSupervisor: true },
+      { href: "/dashboard/customers", label: "العملاء", description: "البيانات والولاء", icon: "customers", hideFromSupervisor: true },
     ],
   },
   {
     title: "التسويق",
+    hideFromSupervisor: true,
     items: [
       { href: "/dashboard/loyalty", label: "الولاء", description: "النقاط والمكافآت", icon: "loyalty" },
       { href: "/dashboard/campaigns", label: "الحملات", description: "العروض والاستهداف", icon: "campaigns" },
@@ -54,11 +55,18 @@ const navGroups: NavGroup[] = [
 
 export function DashboardNav({ role }: { role: "OWNER" | "ADMIN" | "SUPERVISOR" | null }) {
   const pathname = usePathname();
-  const visibleGroups = navGroups.filter((group) => {
-    if (group.ownerOnly) return role === "OWNER";
-    if (group.adminOnly) return role === "OWNER" || role === "ADMIN";
-    return true;
-  });
+  const visibleGroups = navGroups
+    .filter((group) => {
+      if (group.ownerOnly) return role === "OWNER";
+      if (group.adminOnly) return role === "OWNER" || role === "ADMIN";
+      if (group.hideFromSupervisor && role === "SUPERVISOR") return false;
+      return true;
+    })
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => !(item.hideFromSupervisor && role === "SUPERVISOR")),
+    }))
+    .filter((group) => group.items.length > 0);
 
   return (
     <nav className="mt-2 space-y-6 lg:mt-6">

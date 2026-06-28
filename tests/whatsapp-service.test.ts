@@ -250,7 +250,7 @@ describe("whatsapp templates and message logs", () => {
     await updateCustomerWhatsappPreference(prisma, customerId, true, adminMeta());
     expect(canAccessDashboard(null)).toBe(false);
     expect(canAccessDashboard({ type: "barber", id: "wa-b", role: "BARBER", organizationId: "org_default", salonId: "salon_default", barber: { id: barberId, name: "حلاق", phone: "0500000001", role: "BARBER" } })).toBe(false);
-    expect(canAccessDashboard({ type: "dashboard", id: "wa-a", role: "ADMIN", organizationId: "org_default", salonId: null, user: { id: adminUserId, name: "مدير", email: "admin@tanal.local", role: "ADMIN" } })).toBe(true);
+    expect(canAccessDashboard({ type: "dashboard", id: "wa-a", role: "ADMIN", organizationId: "org_default", salonId: null, scopedSalonIds: null, user: { id: adminUserId, name: "مدير", email: "admin@tanal.local", role: "ADMIN" } })).toBe(true);
   });
 });
 

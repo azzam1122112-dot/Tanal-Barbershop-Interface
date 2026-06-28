@@ -119,7 +119,7 @@ describe("pwa and settings polish", () => {
     expect(updated.salonName).toBe("صالون تانال اختبار");
     expect(JSON.stringify(updated)).not.toContain("passwordHash");
     expect(canAccessDashboard({ type: "barber", id: "pwa-b", role: "BARBER", organizationId: "org_default", salonId: "salon_default", barber: { id: barberId, name: "حلاق", phone: "966500000001", role: "BARBER" } })).toBe(false);
-    expect(canAccessDashboard({ type: "dashboard", id: "pwa-a", role: "ADMIN", organizationId: "org_default", salonId: null, user: { id: adminUserId, name: "مدير", email: "admin@tanal.local", role: "ADMIN" } })).toBe(true);
+    expect(canAccessDashboard({ type: "dashboard", id: "pwa-a", role: "ADMIN", organizationId: "org_default", salonId: null, scopedSalonIds: null, user: { id: adminUserId, name: "مدير", email: "admin@tanal.local", role: "ADMIN" } })).toBe(true);
   });
 });
 

@@ -10,6 +10,8 @@ type AdminMeta = {
   actorUserId: string;
   actorType: "OWNER" | "ADMIN" | "SUPERVISOR";
   organizationId?: string;
+  // نطاق فروع المشرف؛ undefined = بلا قيد فرع (مالك/مدير).
+  salonIds?: string[];
   reason: string;
   ipAddress?: string | null;
   userAgent?: string | null;
@@ -30,7 +32,7 @@ type VisitForAdmin = Prisma.VisitGetPayload<{
 
 export async function cancelVisit(prisma: PrismaClient, visitId: string, meta: AdminMeta) {
   return runSerializableTransaction(prisma, async (tx) => {
-    const visit = await getVisitForAdmin(tx, visitId, meta.organizationId);
+    const visit = await getVisitForAdmin(tx, visitId, meta.organizationId, meta.salonIds);
     if (visit.status === "CANCELLED") {
       throw new BusinessError("الزيارة ملغاة مسبقًا");
     }
@@ -135,7 +137,7 @@ export async function cancelVisit(prisma: PrismaClient, visitId: string, meta: A
 
 export async function updateVisitPaymentMethod(prisma: PrismaClient, visitId: string, paymentMethod: PaymentMethod, meta: AdminMeta) {
   return runSerializableTransaction(prisma, async (tx) => {
-    const visit = await getCompletedVisitForAdmin(tx, visitId, meta.organizationId);
+    const visit = await getCompletedVisitForAdmin(tx, visitId, meta.organizationId, meta.salonIds);
     const postCloseAdjustment = await isPostCloseAdjustment(tx, visit);
     const updated = await tx.visit.update({
       where: { id: visit.id },
@@ -171,7 +173,7 @@ export async function updateVisitPaymentMethod(prisma: PrismaClient, visitId: st
 
 export async function updateVisitAmount(prisma: PrismaClient, visitId: string, grossAmount: number, meta: AdminMeta) {
   return runSerializableTransaction(prisma, async (tx) => {
-    const visit = await getCompletedVisitForAdmin(tx, visitId, meta.organizationId);
+    const visit = await getCompletedVisitForAdmin(tx, visitId, meta.organizationId, meta.salonIds);
     const postCloseAdjustment = await isPostCloseAdjustment(tx, visit);
     const settings = visit.salonId ? await tx.systemSettings.findFirst({ where: { salonId: visit.salonId } }) : await tx.systemSettings.findFirst({});
     const discountAmount = await calculateUpdatedDiscount(tx, visit, grossAmount);
@@ -291,17 +293,22 @@ async function calculateUpdatedDiscount(tx: AdminVisitPrisma, visit: VisitForAdm
   return discountAmount;
 }
 
-async function getVisitForAdmin(tx: AdminVisitPrisma, visitId: string, organizationId?: string) {
+async function getVisitForAdmin(tx: AdminVisitPrisma, visitId: string, organizationId?: string, salonIds?: string[]) {
   const visit = await tx.visit.findFirst({
-    where: { id: visitId, ...(organizationId ? { organizationId } : {}) },
+    where: {
+      id: visitId,
+      ...(organizationId ? { organizationId } : {}),
+      // قصر التعديل على فروع المشرف المسندة (المالك/المدير بلا قيد).
+      ...(salonIds && salonIds.length ? { salonId: { in: salonIds } } : {}),
+    },
     include: adminVisitInclude,
   });
   if (!visit) throw new BusinessError("الزيارة غير موجودة");
   return visit;
 }
 
-async function getCompletedVisitForAdmin(tx: AdminVisitPrisma, visitId: string, organizationId?: string) {
-  const visit = await getVisitForAdmin(tx, visitId, organizationId);
+async function getCompletedVisitForAdmin(tx: AdminVisitPrisma, visitId: string, organizationId?: string, salonIds?: string[]) {
+  const visit = await getVisitForAdmin(tx, visitId, organizationId, salonIds);
   if (visit.status !== "COMPLETED") {
     throw new BusinessError("لا يمكن تعديل زيارة غير مكتملة");
   }

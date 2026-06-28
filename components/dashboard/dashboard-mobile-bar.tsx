@@ -75,7 +75,7 @@ export function DashboardMobileBar({
             </div>
 
             <div className="mt-4">
-              <SalonSwitcher salons={salons} activeSalonId={activeSalonId} />
+              <SalonSwitcher salons={salons} activeSalonId={activeSalonId} allowAll={role !== "SUPERVISOR"} />
             </div>
 
             <div className="mt-4 min-h-0 flex-1 overflow-y-auto">

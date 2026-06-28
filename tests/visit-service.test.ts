@@ -698,6 +698,7 @@ describe("visit preview and confirm", () => {
         role: "ADMIN",
         organizationId: "org_default",
         salonId: null,
+        scopedSalonIds: null,
         user: { id: "admin", name: "مدير", email: "admin@tanal.local", role: "ADMIN" },
       }),
     ).toBe(true);

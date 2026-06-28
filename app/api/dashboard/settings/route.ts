@@ -1,12 +1,12 @@
 import { toErrorResponse } from "@/lib/http/error-response";
 import { NextResponse } from "next/server";
-import { getRequestMeta, parseJsonBody, requireDashboardApi } from "@/lib/auth/http";
+import { getRequestMeta, parseJsonBody, requireAdminApi } from "@/lib/auth/http";
 import { systemSettingsUpdateSchema } from "@/lib/auth/validation";
 import { prisma } from "@/lib/db/prisma";
 import { toSafeSystemSettings, updateSystemSettings } from "@/lib/settings/system-settings";
 
 export async function GET() {
-  const auth = await requireDashboardApi();
+  const auth = await requireAdminApi();
   if (auth.response) return auth.response;
   const session = auth.session;
   if (!session || session.type !== "dashboard") return NextResponse.json({ message: "غير مصرح" }, { status: 401 });
@@ -18,7 +18,7 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
-  const auth = await requireDashboardApi();
+  const auth = await requireAdminApi();
   if (auth.response) return auth.response;
   const session = auth.session;
   if (!session || session.type !== "dashboard") return NextResponse.json({ message: "غير مصرح" }, { status: 401 });

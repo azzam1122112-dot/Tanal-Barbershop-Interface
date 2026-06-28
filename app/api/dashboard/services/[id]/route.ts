@@ -1,13 +1,13 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { getRequestMeta, parseJsonBody, requireDashboardApi } from "@/lib/auth/http";
+import { getRequestMeta, parseJsonBody, requireAdminApi } from "@/lib/auth/http";
 import { serviceUpdateSchema } from "@/lib/auth/validation";
 import { writeAuditLog } from "@/lib/audit/audit-log";
 import { toSafeService } from "@/lib/services/service-summary";
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
-  const auth = await requireDashboardApi();
+  const auth = await requireAdminApi();
   if (auth.response) return auth.response;
   const session = auth.session;
   if (!session || session.type !== "dashboard") {

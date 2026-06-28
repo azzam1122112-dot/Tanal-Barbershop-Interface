@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { DashboardShell } from "@/components/dashboard/ui";
 import { SettingsForm } from "@/components/dashboard/settings-form";
-import { canAccessDashboard } from "@/lib/auth/access";
+import { canAccessDashboard, canManageStaff } from "@/lib/auth/access";
 import { getRequestSession } from "@/lib/auth/http";
 import { prisma } from "@/lib/db/prisma";
 import { toSafeSystemSettings } from "@/lib/settings/system-settings";
@@ -10,6 +10,7 @@ export default async function DashboardSettingsPage() {
   const session = await getRequestSession();
   if (!session) redirect("/dashboard/login");
   if (!canAccessDashboard(session)) redirect("/barber");
+  if (!canManageStaff(session)) redirect("/dashboard");
 
   const settings = await prisma.systemSettings.findFirst({});
   if (!settings) redirect("/dashboard");

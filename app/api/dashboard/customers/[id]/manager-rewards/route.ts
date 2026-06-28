@@ -1,12 +1,12 @@
 import { toErrorResponse } from "@/lib/http/error-response";
 import { NextResponse } from "next/server";
-import { getRequestMeta, parseJsonBody, requireDashboardApi } from "@/lib/auth/http";
+import { getRequestMeta, parseJsonBody, requireAdminApi } from "@/lib/auth/http";
 import { managerRewardCreateSchema } from "@/lib/auth/validation";
 import { prisma } from "@/lib/db/prisma";
 import { createManagerReward } from "@/lib/manager-rewards/manager-reward-service";
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
-  const auth = await requireDashboardApi();
+  const auth = await requireAdminApi();
   if (auth.response) return auth.response;
   const session = auth.session;
   if (!session || session.type !== "dashboard") return NextResponse.json({ message: "غير مصرح" }, { status: 401 });

@@ -24,6 +24,7 @@ describe("service management rules", () => {
         role: "ADMIN",
         organizationId: "org_default",
         salonId: null,
+        scopedSalonIds: null,
         user: { id: "admin-1", name: "مدير", email: "admin@tanal.local", role: "ADMIN" },
       }),
     ).toBe(false);

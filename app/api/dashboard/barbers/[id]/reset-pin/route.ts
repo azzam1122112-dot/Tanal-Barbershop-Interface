@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { hashBarberPin } from "@/lib/auth/barber-pin";
 import { resetBarberPinSchema } from "@/lib/auth/validation";
-import { requireDashboardApi, getRequestMeta, parseJsonBody } from "@/lib/auth/http";
+import { requireAdminApi, getRequestMeta, parseJsonBody } from "@/lib/auth/http";
 import { toSafeBarber } from "@/lib/auth/sanitize";
 import { writeAuditLog } from "@/lib/audit/audit-log";
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
-  const auth = await requireDashboardApi();
+  const auth = await requireAdminApi();
   if (auth.response) return auth.response;
   const session = auth.session;
   if (!session || session.type !== "dashboard") return NextResponse.json({ message: "غير مصرح" }, { status: 401 });

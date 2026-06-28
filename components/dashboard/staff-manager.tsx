@@ -10,6 +10,8 @@ type StaffResponse = {
   message?: string;
 };
 
+type SalonOption = { id: string; name: string };
+
 type StaffDraft = {
   name: string;
   email: string;
@@ -17,7 +19,14 @@ type StaffDraft = {
   role: "OWNER" | "ADMIN" | "SUPERVISOR";
   isActive: boolean;
   password: string;
+  salonIds: string[];
 };
+
+function sameIdSet(a: string[], b: string[]) {
+  if (a.length !== b.length) return false;
+  const set = new Set(a);
+  return b.every((id) => set.has(id));
+}
 
 type StaffFilter = "all" | "ADMIN" | "SUPERVISOR" | "inactive";
 
@@ -27,7 +36,7 @@ const dateFormatter = new Intl.DateTimeFormat("ar-SA", {
   day: "numeric",
 });
 
-export function StaffManager({ initialUsers, currentUserId }: { initialUsers: SafeAdminUser[]; currentUserId: string }) {
+export function StaffManager({ initialUsers, salons, currentUserId }: { initialUsers: SafeAdminUser[]; salons: SalonOption[]; currentUserId: string }) {
   const [users, setUsers] = useState(initialUsers);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -36,6 +45,9 @@ export function StaffManager({ initialUsers, currentUserId }: { initialUsers: Sa
   const [drafts, setDrafts] = useState<Record<string, StaffDraft>>({});
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<StaffFilter>("all");
+  const [createRole, setCreateRole] = useState<"ADMIN" | "SUPERVISOR">("SUPERVISOR");
+  const [createSalonIds, setCreateSalonIds] = useState<string[]>([]);
+  const salonName = (id: string) => salons.find((salon) => salon.id === id)?.name ?? "فرع محذوف";
 
   const adminCount = users.filter((user) => user.role === "ADMIN" && user.isActive).length;
   const supervisorCount = users.filter((user) => user.role === "SUPERVISOR" && user.isActive).length;
@@ -65,6 +77,12 @@ export function StaffManager({ initialUsers, currentUserId }: { initialUsers: Sa
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
 
+    if (createRole === "SUPERVISOR" && createSalonIds.length === 0) {
+      setToast({ message: "اختر فرعًا واحدًا على الأقل للمشرف", tone: "error" });
+      setLoading(false);
+      return;
+    }
+
     const response = await fetch("/api/dashboard/staff", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -73,7 +91,8 @@ export function StaffManager({ initialUsers, currentUserId }: { initialUsers: Sa
         email: form.get("email"),
         phone: form.get("phone"),
         password: form.get("password"),
-        role: form.get("role"),
+        role: createRole,
+        salonIds: createRole === "SUPERVISOR" ? createSalonIds : undefined,
       }),
     });
     const data = (await response.json().catch(() => ({}))) as StaffResponse;
@@ -81,6 +100,8 @@ export function StaffManager({ initialUsers, currentUserId }: { initialUsers: Sa
     if (response.ok && data.user) {
       setUsers((current) => [data.user!, ...current]);
       formElement.reset();
+      setCreateRole("SUPERVISOR");
+      setCreateSalonIds([]);
       setToast({ message: "تم إنشاء حساب الموظف", tone: "success" });
     } else {
       setToast({ message: data.message ?? "تعذر إنشاء حساب الموظف", tone: "error" });
@@ -104,6 +125,7 @@ export function StaffManager({ initialUsers, currentUserId }: { initialUsers: Sa
         role: user.role,
         isActive: Boolean(user.isActive),
         password: "",
+        salonIds: (user.assignedSalons ?? []).map((salon) => salon.id),
       },
     }));
   }
@@ -155,6 +177,18 @@ export function StaffManager({ initialUsers, currentUserId }: { initialUsers: Sa
     if (draft.role !== user.role) body.role = draft.role;
     if (draft.isActive !== Boolean(user.isActive)) body.isActive = draft.isActive;
     if (draft.password.trim()) body.password = draft.password;
+
+    // إسناد فروع المشرف: أرسلها عند التحويل لمشرف أو عند تغيّر الفروع.
+    if (draft.role === "SUPERVISOR") {
+      if (draft.salonIds.length === 0) {
+        setToast({ message: "اختر فرعًا واحدًا على الأقل للمشرف", tone: "error" });
+        return;
+      }
+      const currentSalonIds = (user.assignedSalons ?? []).map((salon) => salon.id);
+      if (user.role !== "SUPERVISOR" || !sameIdSet(draft.salonIds, currentSalonIds)) {
+        body.salonIds = draft.salonIds;
+      }
+    }
 
     if (Object.keys(body).length === 0) {
       cancelEdit(user.id);
@@ -219,11 +253,21 @@ export function StaffManager({ initialUsers, currentUserId }: { initialUsers: Sa
               />
             </Field>
             <Field label="الصلاحية">
-              <select name="role" defaultValue="SUPERVISOR" className="dashboard-field">
+              <select
+                value={createRole}
+                onChange={(event) => setCreateRole(event.target.value as "ADMIN" | "SUPERVISOR")}
+                className="dashboard-field"
+              >
                 <option value="SUPERVISOR">مشرف</option>
                 <option value="ADMIN">مدير النظام</option>
               </select>
             </Field>
+            {createRole === "SUPERVISOR" ? (
+              <Field label="فروع الإشراف">
+                <BranchPicker salons={salons} selected={createSalonIds} onChange={setCreateSalonIds} />
+                <span className="mt-1 block text-xs font-bold text-salon-charcoal/70">المشرف يتابع ويغلق صناديق هذه الفروع فقط.</span>
+              </Field>
+            ) : null}
             <Field label="كلمة المرور">
               <input name="password" type="password" required minLength={8} autoComplete="new-password" placeholder="8 أحرف على الأقل" className="dashboard-field" />
             </Field>
@@ -331,6 +375,12 @@ export function StaffManager({ initialUsers, currentUserId }: { initialUsers: Sa
                             className="h-5 w-5 accent-salon-forest disabled:opacity-50"
                           />
                         </label>
+                        {draft.role === "SUPERVISOR" ? (
+                          <div className="md:col-span-2">
+                            <span className="mb-2 block text-xs font-black text-salon-charcoal">فروع الإشراف</span>
+                            <BranchPicker salons={salons} selected={draft.salonIds} onChange={(ids) => updateDraft(user.id, { salonIds: ids })} />
+                          </div>
+                        ) : null}
                       </div>
                     ) : (
                       <div>
@@ -347,6 +397,20 @@ export function StaffManager({ initialUsers, currentUserId }: { initialUsers: Sa
                           <Info label="رقم الجوال" value={user.phone ?? "-"} />
                           <Info label="آخر دخول" value={user.lastLoginAt ? dateFormatter.format(new Date(user.lastLoginAt)) : "لم يسجل دخولًا"} />
                           <Info label="آخر تحديث" value={user.updatedAt ? dateFormatter.format(new Date(user.updatedAt)) : "-"} />
+                          {user.role === "SUPERVISOR" ? (
+                            <div className="md:col-span-2">
+                              <dt className="text-xs font-black text-salon-charcoal/70">فروع الإشراف</dt>
+                              <dd className="mt-1.5 flex flex-wrap gap-1.5">
+                                {(user.assignedSalons ?? []).length === 0 ? (
+                                  <span className="text-salon-ruby">لا توجد فروع مسندة</span>
+                                ) : (
+                                  (user.assignedSalons ?? []).map((salon) => (
+                                    <span key={salon.id} className="rounded-full bg-salon-steel/10 px-2.5 py-1 text-xs font-bold text-salon-steel">{salonName(salon.id)}</span>
+                                  ))
+                                )}
+                              </dd>
+                            </div>
+                          ) : null}
                         </dl>
                       </div>
                     )}
@@ -355,7 +419,9 @@ export function StaffManager({ initialUsers, currentUserId }: { initialUsers: Sa
                   <div className="rounded-lg border border-salon-line bg-salon-pearl px-4 py-3">
                     <p className="text-xs font-black text-salon-charcoal">صلاحية الوصول</p>
                     <p className="mt-2 text-sm font-bold text-salon-charcoal/75">
-                      {user.role === "ADMIN" ? "مدير كامل الصلاحيات" : "مشرف يدخل اللوحة ولا يدير الموظفين"}
+                      {user.role === "ADMIN"
+                        ? "مدير كامل الصلاحيات على كل الفروع"
+                        : "مشرف على فروعه: متابعة وإغلاق الصناديق واستلام الكاش"}
                     </p>
                     <button
                       type="button"
@@ -398,6 +464,35 @@ export function StaffManager({ initialUsers, currentUserId }: { initialUsers: Sa
           </div>
         </div>
       </section>
+    </div>
+  );
+}
+
+function BranchPicker({ salons, selected, onChange }: { salons: SalonOption[]; selected: string[]; onChange: (ids: string[]) => void }) {
+  function toggle(id: string) {
+    onChange(selected.includes(id) ? selected.filter((value) => value !== id) : [...selected, id]);
+  }
+
+  if (salons.length === 0) {
+    return <p className="rounded-lg border border-salon-line bg-salon-pearl px-3 py-2.5 text-xs font-bold text-salon-ruby">لا توجد فروع نشطة. أضِف فرعًا أولًا من «الفروع».</p>;
+  }
+
+  return (
+    <div className="grid gap-2 rounded-xl border border-salon-line bg-salon-pearl p-2 sm:grid-cols-2">
+      {salons.map((salon) => {
+        const checked = selected.includes(salon.id);
+        return (
+          <label
+            key={salon.id}
+            className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold transition ${
+              checked ? "border-salon-forest/40 bg-white text-salon-ink" : "border-transparent bg-white/70 text-salon-charcoal hover:bg-white"
+            }`}
+          >
+            <input type="checkbox" checked={checked} onChange={() => toggle(salon.id)} className="h-4 w-4 accent-salon-forest" />
+            <span className="truncate">{salon.name}</span>
+          </label>
+        );
+      })}
     </div>
   );
 }

@@ -12,6 +12,9 @@ export type DailyCloseInput = {
   receivedByActorType?: AuditActorType;
   cashReceivedAmount?: number | null;
   notes?: string | null;
+  // نطاق الأمان: المؤسسة (عزل المستأجرين) + فروع المشرف المسندة.
+  organizationId?: string | null;
+  salonIds?: string[];
   auditMeta?: {
     ipAddress?: string | null;
     userAgent?: string | null;
@@ -62,6 +65,19 @@ export async function getDailyCloseSummary(prisma: DailyClosePrisma, date: Date 
 
 export async function closeBarberDay(prisma: PrismaClient, input: DailyCloseInput) {
   const requestedCloseDate = normalizeCloseDate(input.date);
+
+  // تحقّق النطاق مبكرًا: عزل المؤسسة + قصر المشرف على فروعه المسندة.
+  const scopeBarber = await prisma.barber.findUnique({
+    where: { id: input.barberId },
+    select: { organizationId: true, salonId: true },
+  });
+  if (!scopeBarber || (input.organizationId && scopeBarber.organizationId !== input.organizationId)) {
+    throw new BusinessError("الحلاق غير موجود", 404);
+  }
+  if (input.salonIds && input.salonIds.length && !(scopeBarber.salonId && input.salonIds.includes(scopeBarber.salonId))) {
+    throw new BusinessError("لا تملك صلاحية على هذا الفرع", 403);
+  }
+
   const existingBeforeTransaction = await prisma.dailyClose.findUnique({
     where: { barberId_date: { barberId: input.barberId, date: requestedCloseDate } },
   });

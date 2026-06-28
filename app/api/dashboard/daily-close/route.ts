@@ -27,6 +27,8 @@ export async function POST(request: Request) {
       notes: parsed.data.notes,
       receivedByUserId: session.user.id,
       receivedByActorType: session.role,
+      organizationId: session.organizationId,
+      salonIds: session.scopedSalonIds ?? undefined,
       auditMeta: await getRequestMeta(),
     });
 

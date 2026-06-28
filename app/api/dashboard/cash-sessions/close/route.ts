@@ -21,6 +21,8 @@ export async function POST(request: Request) {
       ...parsed.data,
       closedByUserId: session.user.id,
       closedByActorType: session.role,
+      organizationId: session.organizationId,
+      salonIds: session.scopedSalonIds ?? undefined,
       auditMeta: await getRequestMeta(),
     });
     return NextResponse.json({ cashSession }, { status: 201 });

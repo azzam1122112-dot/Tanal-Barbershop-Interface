@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { getRequestMeta, parseJsonBody, requireDashboardApi } from "@/lib/auth/http";
+import { getRequestMeta, parseJsonBody, requireAdminApi } from "@/lib/auth/http";
 import { campaignCreateSchema } from "@/lib/auth/validation";
 import { writeAuditLog } from "@/lib/audit/audit-log";
 import { toSafeCampaign } from "@/lib/campaigns/campaign-summary";
 import { prisma } from "@/lib/db/prisma";
 
 export async function GET() {
-  const auth = await requireDashboardApi();
+  const auth = await requireAdminApi();
   if (auth.response) return auth.response;
   const session = auth.session;
   if (!session || session.type !== "dashboard") {
@@ -21,7 +21,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const auth = await requireDashboardApi();
+  const auth = await requireAdminApi();
   if (auth.response) return auth.response;
   const session = auth.session;
   if (!session || session.type !== "dashboard") {

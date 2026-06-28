@@ -285,6 +285,7 @@ describe("daily close and operation alerts", () => {
         role: "ADMIN",
         organizationId: "org_default",
         salonId: null,
+        scopedSalonIds: null,
         user: { id: adminUserId, name: "مدير", email: "admin@tanal.local", role: "ADMIN" },
       }),
     ).toBe(true);

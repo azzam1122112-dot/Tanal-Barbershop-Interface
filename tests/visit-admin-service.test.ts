@@ -93,7 +93,7 @@ describe("admin visit corrections", () => {
     expect(visitAmountUpdateSchema.safeParse({ grossAmount: 100, reason: "bad" }).success).toBe(false);
     expect(canAccessDashboard(null)).toBe(false);
     expect(canAccessDashboard({ type: "barber", id: "s", role: "BARBER", organizationId: "org_default", salonId: "salon_default", barber: { id: barberId, name: "حلاق", phone: "966500000000", role: "BARBER" } })).toBe(false);
-    expect(canAccessDashboard({ type: "dashboard", id: "s2", role: "ADMIN", organizationId: "org_default", salonId: null, user: { id: adminUserId, name: "مدير", email: "admin@tanal.local", role: "ADMIN" } })).toBe(true);
+    expect(canAccessDashboard({ type: "dashboard", id: "s2", role: "ADMIN", organizationId: "org_default", salonId: null, scopedSalonIds: null, user: { id: adminUserId, name: "مدير", email: "admin@tanal.local", role: "ADMIN" } })).toBe(true);
   });
 
   it("cancels a normal visit, reverses earned points, keeps services, and excludes it from reports", async () => {

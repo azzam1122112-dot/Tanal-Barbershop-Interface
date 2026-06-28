@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { DashboardShell } from "@/components/dashboard/ui";
 import { BarberManager } from "@/components/dashboard/barber-manager";
-import { canAccessDashboard } from "@/lib/auth/access";
+import { canAccessDashboard, canManageStaff } from "@/lib/auth/access";
 import { getRequestSession } from "@/lib/auth/http";
 import { prisma } from "@/lib/db/prisma";
 import { toSafeBarber } from "@/lib/auth/sanitize";
@@ -11,6 +11,7 @@ export default async function DashboardBarbersPage() {
 
   if (!session) redirect("/dashboard/login");
   if (!canAccessDashboard(session)) redirect("/barber");
+  if (!canManageStaff(session)) redirect("/dashboard");
 
   const organizationId = session.type === "dashboard" ? session.organizationId : undefined;
   const activeSalonId = session.type === "dashboard" ? session.salonId : null;

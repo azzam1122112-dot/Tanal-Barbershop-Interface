@@ -13,6 +13,9 @@ export type CashSessionCloseInput = {
   closedByActorType?: AuditActorType;
   cashReceivedAmount?: number | null;
   notes?: string | null;
+  // نطاق الأمان: المؤسسة (عزل المستأجرين) + فروع المشرف المسندة.
+  organizationId?: string | null;
+  salonIds?: string[];
   auditMeta?: {
     ipAddress?: string | null;
     userAgent?: string | null;
@@ -86,6 +89,9 @@ export async function closeCashSession(prisma: PrismaClient, input: CashSessionC
     const session = await tx.cashSession.findFirst({
       where: {
         status: "OPEN",
+        // عزل المؤسسة + قصر المشرف على فروعه المسندة.
+        ...(input.organizationId ? { organizationId: input.organizationId } : {}),
+        ...(input.salonIds && input.salonIds.length ? { salonId: { in: input.salonIds } } : {}),
         ...(input.cashSessionId ? { id: input.cashSessionId } : {}),
         ...(input.barberId ? { barberId: input.barberId } : {}),
       },

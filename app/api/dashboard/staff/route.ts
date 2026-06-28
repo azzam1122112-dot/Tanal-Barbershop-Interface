@@ -7,6 +7,8 @@ import { hashAdminPassword } from "@/lib/auth/password";
 import { createStaffSchema } from "@/lib/auth/validation";
 import { toSafeAdminUser } from "@/lib/auth/sanitize";
 import { findUserIdentityConflicts, identityConflictMessage } from "@/lib/auth/user-identity";
+import { assertSalonsInOrg, replaceStaffSalonAssignments, staffWithSalonsInclude } from "@/lib/staff/staff-salon";
+import { toErrorResponse } from "@/lib/http/error-response";
 
 export async function GET() {
   const auth = await requireAdminApi();
@@ -17,6 +19,7 @@ export async function GET() {
   const users = await prisma.user.findMany({
     where: { organizationId: session.organizationId, role: { in: ["OWNER", "ADMIN", "SUPERVISOR"] } },
     orderBy: [{ isActive: "desc" }, { role: "asc" }, { createdAt: "desc" }],
+    include: staffWithSalonsInclude,
   });
 
   return NextResponse.json({ users: users.map((user) => toSafeAdminUser(user, true)) });
@@ -46,16 +49,27 @@ export async function POST(request: Request) {
   }
 
   try {
-    const user = await prisma.user.create({
-      data: {
-        organizationId: session.organizationId,
-        name: parsed.data.name,
-        email: parsed.data.email,
-        phone: parsed.data.phone,
-        passwordHash: await hashAdminPassword(parsed.data.password),
-        role: parsed.data.role,
-        isActive: true,
-      },
+    // المشرف يُسند لفروعه؛ المدير على كل الفروع فلا فروع مسندة له.
+    const salonIds =
+      parsed.data.role === "SUPERVISOR"
+        ? await assertSalonsInOrg(prisma, session.organizationId, parsed.data.salonIds ?? [])
+        : [];
+    const passwordHash = await hashAdminPassword(parsed.data.password);
+
+    const user = await prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: {
+          organizationId: session.organizationId,
+          name: parsed.data.name,
+          email: parsed.data.email,
+          phone: parsed.data.phone,
+          passwordHash,
+          role: parsed.data.role,
+          isActive: true,
+        },
+      });
+      await replaceStaffSalonAssignments(tx, session.organizationId, created.id, salonIds);
+      return tx.user.findUniqueOrThrow({ where: { id: created.id }, include: staffWithSalonsInclude });
     });
 
     const meta = await getRequestMeta();
@@ -77,6 +91,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "البريد الإلكتروني أو رقم الجوال مستخدم مسبقًا" }, { status: 409 });
     }
 
-    throw error;
+    return toErrorResponse(error, "تعذر إنشاء حساب الموظف");
   }
 }

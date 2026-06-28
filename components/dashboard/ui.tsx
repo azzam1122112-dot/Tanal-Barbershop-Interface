@@ -21,9 +21,11 @@ export async function DashboardShell({
   const role = session?.type === "dashboard" ? session.role : null;
   const organizationId = session?.type === "dashboard" ? session.organizationId : null;
   const activeSalonId = session?.type === "dashboard" ? session.salonId : null;
+  // المشرف يرى فروعه المسندة فقط في مبدّل الفروع؛ المالك/المدير يرون كل الفروع.
+  const scopedSalonIds = session?.type === "dashboard" ? session.scopedSalonIds : null;
   const salons = organizationId
     ? await prisma.salon.findMany({
-        where: { organizationId, isActive: true },
+        where: { organizationId, isActive: true, ...(scopedSalonIds ? { id: { in: scopedSalonIds } } : {}) },
         orderBy: { name: "asc" },
         select: { id: true, name: true },
       })
@@ -48,7 +50,7 @@ export async function DashboardShell({
           </div>
 
           <div className="mt-4">
-            <SalonSwitcher salons={salons} activeSalonId={activeSalonId} />
+            <SalonSwitcher salons={salons} activeSalonId={activeSalonId} allowAll={scopedSalonIds === null} />
           </div>
 
           <div className="mt-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">

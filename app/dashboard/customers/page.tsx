@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { canAccessDashboard } from "@/lib/auth/access";
+import { canAccessDashboard, canManageStaff } from "@/lib/auth/access";
 import { getRequestSession } from "@/lib/auth/http";
 import { prisma } from "@/lib/db/prisma";
 import { toCustomerDashboardRow } from "@/lib/customers/customer-summary";
@@ -15,6 +15,7 @@ export default async function DashboardCustomersPage({
   const session = await getRequestSession();
   if (!session) redirect("/dashboard/login");
   if (!canAccessDashboard(session)) redirect("/barber");
+  if (!canManageStaff(session)) redirect("/dashboard");
 
   const organizationId = session.type === "dashboard" ? session.organizationId : undefined;
   const params = await searchParams;

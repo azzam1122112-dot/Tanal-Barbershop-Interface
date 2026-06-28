@@ -15,11 +15,20 @@ export async function POST(request: Request) {
 
   // قيمة فارغة/null/"all" تعني عرض كل الفروع مجتمعة (إلغاء الفرع النشط).
   if (!salonId || salonId === "all") {
+    // المشرف مقيّد بفروعه المسندة فلا يُسمح له بعرض كل الفروع مجتمعة.
+    if (session.scopedSalonIds !== null) {
+      return NextResponse.json({ message: "اختر فرعًا من فروعك المسندة" }, { status: 403 });
+    }
     await prisma.session.update({
       where: { id: session.id },
       data: { activeSalonId: null },
     });
     return NextResponse.json({ salon: null });
+  }
+
+  // المشرف لا يبدّل إلا إلى فرع من فروعه المسندة.
+  if (session.scopedSalonIds !== null && !session.scopedSalonIds.includes(salonId)) {
+    return NextResponse.json({ message: "لا تملك صلاحية على هذا الفرع" }, { status: 403 });
   }
 
   const salon = await prisma.salon.findFirst({

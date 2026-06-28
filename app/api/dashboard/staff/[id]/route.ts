@@ -7,6 +7,8 @@ import { hashAdminPassword } from "@/lib/auth/password";
 import { updateStaffSchema } from "@/lib/auth/validation";
 import { toSafeAdminUser } from "@/lib/auth/sanitize";
 import { findUserIdentityConflicts, identityConflictMessage } from "@/lib/auth/user-identity";
+import { assertSalonsInOrg, replaceStaffSalonAssignments, staffWithSalonsInclude } from "@/lib/staff/staff-salon";
+import { toErrorResponse } from "@/lib/http/error-response";
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const auth = await requireAdminApi();
@@ -63,16 +65,40 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     }
   }
 
-  const { password, ...profileData } = parsed.data;
+  const { password, salonIds, ...profileData } = parsed.data;
   const data: Prisma.UserUpdateInput = {
     ...profileData,
     ...(password ? { passwordHash: await hashAdminPassword(password) } : {}),
   };
 
+  // فروع المشرف: null = لا تغيير على الإسناد؛ مصفوفة = استبدال كامل.
+  let salonIdsToSet: string[] | null = null;
+  if (nextRole === "SUPERVISOR") {
+    if (salonIds !== undefined) {
+      try {
+        salonIdsToSet = await assertSalonsInOrg(prisma, session.organizationId, salonIds);
+      } catch (error) {
+        return toErrorResponse(error, "بعض الفروع المختارة غير صحيحة");
+      }
+    }
+    // التحويل إلى مشرف يتطلب فرعًا واحدًا على الأقل؛ ولا يُسمح بإفراغ فروع مشرف قائم.
+    const willHaveNone = salonIdsToSet !== null && salonIdsToSet.length === 0;
+    const becomingSupervisorWithoutSalons = before.role !== "SUPERVISOR" && (salonIdsToSet === null || salonIdsToSet.length === 0);
+    if (willHaveNone || becomingSupervisorWithoutSalons) {
+      return NextResponse.json({ message: "اختر فرعًا واحدًا على الأقل للمشرف" }, { status: 400 });
+    }
+  } else {
+    // مدير/مالك على كل الفروع: امسح أي إسناد سابق.
+    salonIdsToSet = [];
+  }
+
   try {
-    const user = await prisma.user.update({
-      where: { id },
-      data,
+    const user = await prisma.$transaction(async (tx) => {
+      const updated = await tx.user.update({ where: { id }, data });
+      if (salonIdsToSet !== null) {
+        await replaceStaffSalonAssignments(tx, session.organizationId, updated.id, salonIdsToSet);
+      }
+      return tx.user.findUniqueOrThrow({ where: { id: updated.id }, include: staffWithSalonsInclude });
     });
 
     const meta = await getRequestMeta();
@@ -99,6 +125,6 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       return NextResponse.json({ message: "الموظف غير موجود" }, { status: 404 });
     }
 
-    throw error;
+    return toErrorResponse(error, "تعذر تحديث الموظف");
   }
 }

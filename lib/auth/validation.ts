@@ -89,13 +89,23 @@ export const staffRoleSchema = z.enum(["ADMIN", "SUPERVISOR"], {
   message: "صلاحية الموظف غير صحيحة",
 });
 
-export const createStaffSchema = z.object({
-  name: z.string().trim().min(2, "اسم الموظف مطلوب"),
-  email: emailSchema,
-  phone: phoneSchema,
-  password: adminPasswordSchema,
-  role: staffRoleSchema,
-});
+// فروع المشرف المسندة (المالك/المدير على كل الفروع فلا يُرسلونها).
+const staffSalonIdsSchema = z.array(z.string().trim().min(1)).max(100);
+
+export const createStaffSchema = z
+  .object({
+    name: z.string().trim().min(2, "اسم الموظف مطلوب"),
+    email: emailSchema,
+    phone: phoneSchema,
+    password: adminPasswordSchema,
+    role: staffRoleSchema,
+    salonIds: staffSalonIdsSchema.optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.role === "SUPERVISOR" && (!data.salonIds || data.salonIds.length === 0)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["salonIds"], message: "اختر فرعًا واحدًا على الأقل للمشرف" });
+    }
+  });
 
 export const updateStaffSchema = z.object({
   name: z.string().trim().min(2, "اسم الموظف مطلوب").optional(),
@@ -104,6 +114,7 @@ export const updateStaffSchema = z.object({
   role: staffRoleSchema.optional(),
   isActive: z.boolean().optional(),
   password: adminPasswordSchema.optional(),
+  salonIds: staffSalonIdsSchema.optional(),
 });
 
 export const customerCreateSchema = z.object({

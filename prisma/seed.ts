@@ -38,6 +38,9 @@ async function main() {
   const adminPassword = readSeedEnv("SEED_ADMIN_PASSWORD", "Admin@12345");
   const barberPhone = normalizeSeedPhone(readSeedEnv("SEED_BARBER_PHONE", "0500000002"));
   const barberPin = readSeedEnv("SEED_BARBER_PIN", "Tanal@123");
+  const supervisorPhone = normalizeSeedPhone(readSeedEnv("SEED_SUPERVISOR_PHONE", "0500000003"));
+  const supervisorEmail = readSeedEnv("SEED_SUPERVISOR_EMAIL", "supervisor@tanal.local");
+  const supervisorPassword = readSeedEnv("SEED_SUPERVISOR_PASSWORD", "Super@12345");
 
   // الباقة الافتراضية
   await prisma.plan.upsert({
@@ -115,6 +118,33 @@ async function main() {
       accessPinHash: await hashBarberPin(barberPin),
       isActive: true,
     },
+  });
+
+  // مشرف تجريبي مسند للصالون الافتراضي (يتابع ويغلق صناديق هذا الفرع فقط).
+  const supervisor = await prisma.user.upsert({
+    where: { organizationId_phone: { organizationId: organization.id, phone: supervisorPhone } },
+    update: {
+      name: "مشرف الفرع",
+      email: supervisorEmail,
+      passwordHash: await hashAdminPassword(supervisorPassword),
+      role: "SUPERVISOR",
+      isActive: true,
+    },
+    create: {
+      organizationId: organization.id,
+      name: "مشرف الفرع",
+      email: supervisorEmail,
+      phone: supervisorPhone,
+      passwordHash: await hashAdminPassword(supervisorPassword),
+      role: "SUPERVISOR",
+      isActive: true,
+    },
+  });
+
+  await prisma.staffSalon.upsert({
+    where: { userId_salonId: { userId: supervisor.id, salonId: salon.id } },
+    update: {},
+    create: { organizationId: organization.id, userId: supervisor.id, salonId: salon.id },
   });
 
   await prisma.systemSettings.upsert({

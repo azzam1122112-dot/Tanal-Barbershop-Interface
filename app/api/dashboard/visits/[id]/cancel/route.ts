@@ -25,6 +25,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       actorUserId: session.user.id,
       actorType: session.role,
       organizationId: session.organizationId,
+      salonIds: session.scopedSalonIds ?? undefined,
       reason: parsed.data.reason,
       ...(await getRequestMeta()),
     });

@@ -10,6 +10,8 @@ export type SafeAdminUser = {
   createdAt?: string;
   updatedAt?: string;
   lastLoginAt?: string | null;
+  // فروع المشرف المسندة (تظهر فقط عند طلب حقول الإدارة وللمشرفين).
+  assignedSalons?: { id: string; name: string }[];
 };
 
 export type SafeBarber = {
@@ -24,7 +26,10 @@ export type SafeBarber = {
   lastLoginAt?: string | null;
 };
 
-export function toSafeAdminUser(user: User, includeManagementFields = false): SafeAdminUser {
+export function toSafeAdminUser(
+  user: User & { salonAssignments?: { salon: { id: string; name: string } }[] },
+  includeManagementFields = false,
+): SafeAdminUser {
   const safeUser: SafeAdminUser = {
     id: user.id,
     name: user.name,
@@ -38,6 +43,9 @@ export function toSafeAdminUser(user: User, includeManagementFields = false): Sa
     safeUser.createdAt = user.createdAt.toISOString();
     safeUser.updatedAt = user.updatedAt.toISOString();
     safeUser.lastLoginAt = user.lastLoginAt?.toISOString() ?? null;
+    if (user.salonAssignments) {
+      safeUser.assignedSalons = user.salonAssignments.map((assignment) => assignment.salon);
+    }
   }
 
   return safeUser;

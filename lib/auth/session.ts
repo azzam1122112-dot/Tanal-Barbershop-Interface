@@ -9,7 +9,10 @@ export type AuthSession =
       id: string;
       role: "OWNER" | "ADMIN" | "SUPERVISOR";
       organizationId: string;
+      // الفرع النشط (فلتر العرض). للمشرف يكون دائمًا أحد فروعه المسندة.
       salonId: string | null;
+      // نطاق الفروع المسموح بها: null = كل الفروع (مالك/مدير)، مصفوفة = فروع المشرف المسندة.
+      scopedSalonIds: string[] | null;
       user: ReturnType<typeof toSafeAdminUser>;
     }
   | {
@@ -123,12 +126,39 @@ export async function getAuthSession(prisma: PrismaClient, token?: string | null
   ) {
     const organizationId = session.organizationId ?? session.user.organizationId;
     if (!organizationId) return null;
+
+    // المالك والمدير على مستوى المؤسسة (كل الفروع). المشرف مقيّد بفروعه المسندة فقط.
+    if (session.role === "SUPERVISOR") {
+      const assignments = await prisma.staffSalon.findMany({
+        where: { userId: session.user.id, salon: { isActive: true, organizationId } },
+        select: { salonId: true },
+      });
+      const scopedSalonIds = assignments.map((row) => row.salonId);
+      // مشرف بلا فروع مسندة (أو حُذفت فروعه) لا يملك أي نطاق تشغيلي — امنع الوصول.
+      if (scopedSalonIds.length === 0) return null;
+      // اضمن أن الفرع النشط دائمًا أحد فروعه المسندة (لا يتسرّب عرض كل الفروع).
+      const salonId =
+        session.activeSalonId && scopedSalonIds.includes(session.activeSalonId)
+          ? session.activeSalonId
+          : scopedSalonIds[0];
+      return {
+        type: "dashboard",
+        id: session.id,
+        role: session.role,
+        organizationId,
+        salonId,
+        scopedSalonIds,
+        user: toSafeAdminUser(session.user),
+      } satisfies AuthSession;
+    }
+
     return {
       type: "dashboard",
       id: session.id,
       role: session.role,
       organizationId,
       salonId: session.activeSalonId ?? null,
+      scopedSalonIds: null,
       user: toSafeAdminUser(session.user),
     } satisfies AuthSession;
   }

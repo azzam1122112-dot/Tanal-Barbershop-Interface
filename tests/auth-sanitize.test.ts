@@ -88,6 +88,7 @@ describe("auth sanitization and access rules", () => {
         role: "ADMIN",
         organizationId: "org_default",
         salonId: null,
+        scopedSalonIds: null,
         user: { id: "admin-1", name: "مدير", email: "admin@tanal.local", role: "ADMIN" },
       }),
     ).toBe(true);
@@ -98,6 +99,7 @@ describe("auth sanitization and access rules", () => {
         role: "SUPERVISOR",
         organizationId: "org_default",
         salonId: null,
+        scopedSalonIds: null,
         user: { id: "supervisor-1", name: "مشرف", email: "supervisor@tanal.local", role: "SUPERVISOR" },
       }),
     ).toBe(false);

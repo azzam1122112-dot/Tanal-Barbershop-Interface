@@ -19,6 +19,7 @@ describe("phase 13 hardening docs and access gates", () => {
       role: "ADMIN" as const,
       organizationId: "org_default",
       salonId: null,
+      scopedSalonIds: null,
       user: { id: "admin-1", name: "مدير", email: "admin@tanal.local", role: "ADMIN" as const },
     };
 

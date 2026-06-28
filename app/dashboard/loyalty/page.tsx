@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { DashboardShell, StatCard } from "@/components/dashboard/ui";
 import { RewardRuleManager } from "@/components/dashboard/reward-rule-manager";
-import { canAccessDashboard } from "@/lib/auth/access";
+import { canAccessDashboard, canManageStaff } from "@/lib/auth/access";
 import { getRequestSession } from "@/lib/auth/http";
 import { prisma } from "@/lib/db/prisma";
 import { toSafeRewardRule } from "@/lib/loyalty/reward-summary";
@@ -10,6 +10,7 @@ export default async function DashboardLoyaltyPage() {
   const session = await getRequestSession();
   if (!session) redirect("/dashboard/login");
   if (!canAccessDashboard(session)) redirect("/barber");
+  if (!canManageStaff(session)) redirect("/dashboard");
 
   const organizationId = session.type === "dashboard" ? session.organizationId : undefined;
   const salonId = session.type === "dashboard" ? session.salonId : null;

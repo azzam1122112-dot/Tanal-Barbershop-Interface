@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { getRequestMeta, parseJsonBody, requireDashboardApi } from "@/lib/auth/http";
+import { getRequestMeta, parseJsonBody, requireAdminApi } from "@/lib/auth/http";
 import { campaignUpdateSchema } from "@/lib/auth/validation";
 import { writeAuditLog } from "@/lib/audit/audit-log";
 import { toSafeCampaign } from "@/lib/campaigns/campaign-summary";
 import { prisma } from "@/lib/db/prisma";
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
-  const auth = await requireDashboardApi();
+  const auth = await requireAdminApi();
   if (auth.response) return auth.response;
   const session = auth.session;
   if (!session || session.type !== "dashboard") {

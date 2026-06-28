@@ -25,6 +25,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       actorUserId: session.user.id,
       actorType: session.role,
       organizationId: session.organizationId,
+      salonIds: session.scopedSalonIds ?? undefined,
       reason: parsed.data.reason,
       ...(await getRequestMeta()),
     });
