@@ -2,6 +2,8 @@
 
 import { FormEvent, useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { InlineEmpty } from "@/components/dashboard/ui";
 
 type Salon = {
   id: string;
@@ -15,6 +17,8 @@ export function SalonsManager({ initialSalons }: { initialSalons: Salon[] }) {
   const [salons, setSalons] = useState(initialSalons);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [pending, setPending] = useState(false);
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const { confirm, confirmDialog } = useConfirm();
 
   async function createSalon(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -53,8 +57,33 @@ export function SalonsManager({ initialSalons }: { initialSalons: Salon[] }) {
     }
   }
 
+  async function deleteSalon(salon: Salon) {
+    const confirmed = await confirm({
+      title: `حذف فرع ${salon.name} نهائيًا؟`,
+      description:
+        "الحذف متاح فقط للفرع الذي لا يملك أي سجل تشغيلي. إن كان للفرع زيارات أو جلسات صندوق، عطّله بدل حذفه للحفاظ على تقاريره.",
+      confirmLabel: "حذف الفرع",
+      tone: "danger",
+    });
+    if (!confirmed) return;
+
+    setPendingId(salon.id);
+    setToast(null);
+    const response = await fetch(`/api/dashboard/salons/${salon.id}`, { method: "DELETE" });
+    const data = (await response.json().catch(() => ({}))) as { message?: string };
+
+    if (response.ok) {
+      setSalons((current) => current.filter((item) => item.id !== salon.id));
+      setToast({ message: "تم حذف الفرع", tone: "success" });
+    } else {
+      setToast({ message: data.message ?? "تعذر حذف الفرع", tone: "error" });
+    }
+    setPendingId(null);
+  }
+
   return (
-    <div className="mt-8 grid gap-6 xl:grid-cols-[380px_1fr]">
+    <div className="mt-8 grid items-start gap-6 xl:grid-cols-[380px_1fr]">
+      {confirmDialog}
       <DashboardToast toast={toast} onClose={() => setToast(null)} />
 
       <form onSubmit={createSalon} className="dashboard-panel space-y-3 p-5">
@@ -93,15 +122,25 @@ export function SalonsManager({ initialSalons }: { initialSalons: Salon[] }) {
                 </span>
                 <button
                   type="button"
+                  disabled={pendingId === salon.id}
                   onClick={() => toggleActive(salon)}
-                  className="dashboard-button-soft px-3 py-2 text-xs"
+                  className="dashboard-button-soft px-3 py-2 text-xs disabled:opacity-55"
                 >
                   {salon.isActive ? "تعطيل" : "تفعيل"}
+                </button>
+                <button
+                  type="button"
+                  disabled={pendingId === salon.id || salons.length <= 1}
+                  onClick={() => void deleteSalon(salon)}
+                  title={salons.length <= 1 ? "لا يمكن حذف الفرع الوحيد" : "حذف الفرع نهائيًا"}
+                  className="dashboard-danger-button px-3 py-2 text-xs disabled:opacity-45"
+                >
+                  {pendingId === salon.id ? "..." : "حذف"}
                 </button>
               </div>
             </div>
           ))}
-          {salons.length === 0 ? <p className="px-5 py-8 text-center text-sm text-salon-charcoal">لا توجد فروع بعد.</p> : null}
+          {salons.length === 0 ? <div className="p-5"><InlineEmpty icon="🏠" title="لا توجد فروع بعد" hint="أضف فرعك الأول من النموذج المجاور." /></div> : null}
         </div>
       </div>
     </div>

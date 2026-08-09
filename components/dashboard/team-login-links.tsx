@@ -27,7 +27,7 @@ function CopyRow({ label, href, display }: { label: string; href: string; displa
       <button
         type="button"
         onClick={copy}
-        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-salon-line bg-white px-3 py-2 text-xs font-bold text-salon-ink transition-colors hover:border-salon-gold/60"
+        className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-salon-line bg-white px-3 py-2 text-xs font-bold text-salon-ink transition-colors hover:border-salon-gold/60"
       >
         <Icon name={copied ? "check" : "services"} className="h-4 w-4" />
         {copied ? "تم النسخ" : "نسخ"}

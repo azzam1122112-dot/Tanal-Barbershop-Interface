@@ -37,6 +37,8 @@ describe("dashboard reports", () => {
   beforeAll(async () => {
     const barber = await prisma.barber.create({
       data: {
+        organizationId: "org_default",
+        salonId: "salon_default",
         name: `حلاق تقارير أساسي ${Date.now()}`,
         phone: `9665${Math.floor(10000000 + Math.random() * 89999999)}`,
         accessPinHash: await hashBarberPin("Tanal@123"),
@@ -48,6 +50,8 @@ describe("dashboard reports", () => {
     createdCashSessionIds.push((await openCashSession(prisma, { barberId })).cashSession.id);
     const secondBarber = await prisma.barber.create({
       data: {
+        organizationId: "org_default",
+        salonId: "salon_default",
         name: `حلاق تقارير ${Date.now()}`,
         phone: `9665${Math.floor(10000000 + Math.random() * 89999999)}`,
         accessPinHash: await hashBarberPin("Tanal@123"),
@@ -59,10 +63,14 @@ describe("dashboard reports", () => {
     createdCashSessionIds.push((await openCashSession(prisma, { barberId: secondBarberId })).cashSession.id);
 
     const service = await prisma.service.create({
-      data: { name: `خدمة تقارير ${Date.now()}`, defaultPrice: 50, isActive: true, sortOrder: 20 },
+      data: {
+        organizationId: "org_default",
+        salonId: "salon_default", name: `خدمة تقارير ${Date.now()}`, defaultPrice: 50, isActive: true, sortOrder: 20 },
     });
     const secondService = await prisma.service.create({
-      data: { name: `خدمة تقارير ثانية ${Date.now()}`, defaultPrice: 30, isActive: true, sortOrder: 21 },
+      data: {
+        organizationId: "org_default",
+        salonId: "salon_default", name: `خدمة تقارير ثانية ${Date.now()}`, defaultPrice: 30, isActive: true, sortOrder: 21 },
     });
     serviceId = service.id;
     secondServiceId = secondService.id;

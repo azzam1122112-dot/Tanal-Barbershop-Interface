@@ -21,8 +21,8 @@ export function ErrorView({
   }, [error]);
 
   return (
-    <main className="barber-shell grid min-h-screen place-items-center px-4 py-10">
-      <section className="barber-container">
+    <main className="barber-shell grid place-items-center">
+      <section className="mx-auto w-full max-w-md">
         <div className="barber-card p-6 text-center">
           <BrandLogo className="mx-auto mb-4 h-20 w-20 shadow-lux ring-1 ring-salon-gold/20" priority />
           <p className="text-[11px] font-bold uppercase tracking-eyebrow text-salon-ruby">حدث خطأ غير متوقع</p>
@@ -31,11 +31,11 @@ export function ErrorView({
             حدث خطأ مؤقت. يمكنك إعادة المحاولة الآن، وإذا تكرر الأمر عُد للشاشة الرئيسية وتابع العمل.
           </p>
           {error.digest ? <p className="mt-2 text-[11px] font-medium text-salon-charcoal/55">رمز الخطأ: {error.digest}</p> : null}
-          <div className="mt-5 grid grid-cols-2 gap-2">
-            <button type="button" onClick={reset} className="barber-gold-button py-3">
+          <div className="mt-5 grid gap-2 sm:grid-cols-2">
+            <button type="button" onClick={reset} className="barber-gold-button min-h-12 py-3">
               إعادة المحاولة
             </button>
-            <Link href={homeHref} className="barber-ghost-button py-3 text-center">
+            <Link href={homeHref} className="barber-ghost-button min-h-12 py-3 text-center">
               {homeLabel}
             </Link>
           </div>

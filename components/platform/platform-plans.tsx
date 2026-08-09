@@ -100,7 +100,7 @@ export function PlatformPlans({ initialPlans }: { initialPlans: PlanRow[] }) {
   }
 
   return (
-    <div className="mt-6 grid gap-6 xl:grid-cols-[360px_1fr]">
+    <div className="mt-6 grid items-start gap-6 xl:grid-cols-[360px_1fr]">
       <DashboardToast toast={toast} onClose={() => setToast(null)} />
 
       <form onSubmit={createPlan} className="dashboard-panel space-y-3 p-5">
@@ -108,15 +108,16 @@ export function PlatformPlans({ initialPlans }: { initialPlans: PlanRow[] }) {
         <label className="block text-sm font-semibold">الاسم<input name="name" required className="dashboard-field mt-2" placeholder="مثال: احترافية" /></label>
         <label className="block text-sm font-semibold">المعرّف<input name="slug" required dir="ltr" className="dashboard-field mt-2" placeholder="pro" /></label>
         <div className="grid grid-cols-2 gap-3">
-          <label className="block text-sm font-semibold">السعر/شهر<input name="priceMonthly" type="number" min={0} defaultValue={0} className="dashboard-field mt-2" /></label>
-          <label className="block text-sm font-semibold">حد الصالونات<input name="maxSalons" type="number" min={1} defaultValue={1} required className="dashboard-field mt-2" /></label>
+          <label className="block text-sm font-semibold">السعر/شهر<input lang="en" name="priceMonthly" type="number" min={0} defaultValue={0} className="dashboard-field mt-2" /></label>
+          <label className="block text-sm font-semibold">حد الصالونات<input lang="en" name="maxSalons" type="number" min={1} defaultValue={1} required className="dashboard-field mt-2" /></label>
         </div>
-        <label className="block text-sm font-semibold">حد الحلاقين (اختياري)<input name="maxBarbers" type="number" min={1} className="dashboard-field mt-2" placeholder="بلا حد" /></label>
-        <label className="block text-sm font-semibold">حد العملاء (اختياري)<input name="maxCustomers" type="number" min={1} className="dashboard-field mt-2" placeholder="بلا حد" /></label>
+        <label className="block text-sm font-semibold">حد الحلاقين (اختياري)<input lang="en" name="maxBarbers" type="number" min={1} className="dashboard-field mt-2" placeholder="بلا حد" /></label>
+        <label className="block text-sm font-semibold">حد العملاء (اختياري)<input lang="en" name="maxCustomers" type="number" min={1} className="dashboard-field mt-2" placeholder="بلا حد" /></label>
         <button disabled={pending} aria-busy={pending} className="dashboard-button-gold w-full">{pending ? "جاري الإضافة..." : "إضافة الباقة"}</button>
       </form>
 
-      <div className="dashboard-panel overflow-x-auto">
+      <div className="dashboard-panel table-scroll-wrap overflow-hidden">
+        <div className="table-scroll">
         <table className="dashboard-table min-w-[760px]">
           <thead>
             <tr>
@@ -134,10 +135,10 @@ export function PlatformPlans({ initialPlans }: { initialPlans: PlanRow[] }) {
                   <td colSpan={5} className="px-3 py-3">
                     <form onSubmit={(event) => saveEdit(event, plan)} className="grid grid-cols-2 items-end gap-2 sm:grid-cols-6">
                       <label className="col-span-2 block text-xs font-semibold sm:col-span-1">الاسم<input name="name" defaultValue={plan.name} required className="dashboard-field mt-1 py-2 text-xs" /></label>
-                      <label className="block text-xs font-semibold">السعر<input name="priceMonthly" type="number" min={0} defaultValue={plan.priceMonthly} className="dashboard-field mt-1 py-2 text-xs" /></label>
-                      <label className="block text-xs font-semibold">الصالونات<input name="maxSalons" type="number" min={1} defaultValue={plan.maxSalons} required className="dashboard-field mt-1 py-2 text-xs" /></label>
-                      <label className="block text-xs font-semibold">الحلاقون<input name="maxBarbers" type="number" min={1} defaultValue={plan.maxBarbers ?? ""} placeholder="∞" className="dashboard-field mt-1 py-2 text-xs" /></label>
-                      <label className="block text-xs font-semibold">العملاء<input name="maxCustomers" type="number" min={1} defaultValue={plan.maxCustomers ?? ""} placeholder="∞" className="dashboard-field mt-1 py-2 text-xs" /></label>
+                      <label className="block text-xs font-semibold">السعر<input lang="en" name="priceMonthly" type="number" min={0} defaultValue={plan.priceMonthly} className="dashboard-field mt-1 py-2 text-xs" /></label>
+                      <label className="block text-xs font-semibold">الصالونات<input lang="en" name="maxSalons" type="number" min={1} defaultValue={plan.maxSalons} required className="dashboard-field mt-1 py-2 text-xs" /></label>
+                      <label className="block text-xs font-semibold">الحلاقون<input lang="en" name="maxBarbers" type="number" min={1} defaultValue={plan.maxBarbers ?? ""} placeholder="∞" className="dashboard-field mt-1 py-2 text-xs" /></label>
+                      <label className="block text-xs font-semibold">العملاء<input lang="en" name="maxCustomers" type="number" min={1} defaultValue={plan.maxCustomers ?? ""} placeholder="∞" className="dashboard-field mt-1 py-2 text-xs" /></label>
                       <div className="col-span-2 flex gap-2 sm:col-span-1">
                         <button className="dashboard-button-gold flex-1 px-2 py-2 text-xs">حفظ</button>
                         <button type="button" onClick={() => setEditingId(null)} className="dashboard-button-soft px-2 py-2 text-xs">إلغاء</button>
@@ -172,6 +173,7 @@ export function PlatformPlans({ initialPlans }: { initialPlans: PlanRow[] }) {
             {plans.length === 0 ? <tr><td colSpan={5} className="px-4 py-8 text-center text-salon-charcoal">لا توجد باقات</td></tr> : null}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

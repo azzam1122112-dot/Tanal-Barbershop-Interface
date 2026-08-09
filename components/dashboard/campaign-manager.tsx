@@ -2,6 +2,8 @@
 
 import { FormEvent, useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
+import { formatDate } from "@/lib/format";
+import { InlineEmpty } from "@/components/dashboard/ui";
 
 type Campaign = {
   id: string;
@@ -79,10 +81,10 @@ export function CampaignManager({ initialCampaigns }: { initialCampaigns: Campai
   }
 
   return (
-    <div className="mt-8 grid gap-6 xl:grid-cols-[380px_1fr]">
+    <div className="mt-8 grid items-start gap-6 xl:grid-cols-[380px_1fr]">
       <DashboardToast toast={toast} onClose={() => setToast(null)} />
       <form onSubmit={createCampaign} className="dashboard-panel space-y-4 p-5">
-        <h2 className="text-xl font-black">إضافة حملة</h2>
+        <h2 className="text-xl font-bold">إضافة حملة</h2>
         <input name="name" required placeholder="اسم الحملة" className="dashboard-field" />
         <textarea name="description" placeholder="وصف مختصر" rows={2} className="dashboard-field" />
         <div className="grid grid-cols-2 gap-2">
@@ -90,7 +92,7 @@ export function CampaignManager({ initialCampaigns }: { initialCampaigns: Campai
             <option value="FIXED_AMOUNT">مبلغ ثابت</option>
             <option value="PERCENTAGE">نسبة</option>
           </select>
-          <input name="discountValue" required type="number" min={0.01} step="0.01" placeholder="قيمة الخصم" className="dashboard-field" />
+          <input lang="en" name="discountValue" required type="number" min={0.01} step="0.01" placeholder="قيمة الخصم" className="dashboard-field" />
         </div>
         <select name="targetType" defaultValue="ALL_CUSTOMERS" className="dashboard-field">
           <option value="ALL_CUSTOMERS">كل العملاء</option>
@@ -99,20 +101,20 @@ export function CampaignManager({ initialCampaigns }: { initialCampaigns: Campai
           <option value="CUSTOMERS_WITH_MIN_POINTS">حسب رصيد النقاط</option>
         </select>
         <div className="grid grid-cols-2 gap-2">
-          <input name="inactiveDays" type="number" min={1} placeholder="أيام الانقطاع" className="dashboard-field" />
-          <input name="minPoints" type="number" min={1} placeholder="أقل رصيد نقاط" className="dashboard-field" />
+          <input lang="en" name="inactiveDays" type="number" min={1} placeholder="أيام الانقطاع" className="dashboard-field" />
+          <input lang="en" name="minPoints" type="number" min={1} placeholder="أقل رصيد نقاط" className="dashboard-field" />
         </div>
         <div className="grid grid-cols-2 gap-2">
           <label className="text-sm font-bold text-salon-charcoal">
             البداية
-            <input name="startAt" required type="datetime-local" className="dashboard-field mt-1" />
+            <input lang="en" name="startAt" required type="datetime-local" className="dashboard-field mt-1" />
           </label>
           <label className="text-sm font-bold text-salon-charcoal">
             النهاية
-            <input name="endAt" required type="datetime-local" className="dashboard-field mt-1" />
+            <input lang="en" name="endAt" required type="datetime-local" className="dashboard-field mt-1" />
           </label>
         </div>
-        <input name="maxUsesPerCustomer" required type="number" min={1} defaultValue={1} placeholder="الاستخدام لكل عميل" className="dashboard-field" />
+        <input lang="en" name="maxUsesPerCustomer" required type="number" min={1} defaultValue={1} placeholder="الاستخدام لكل عميل" className="dashboard-field" />
         <button disabled={loading} className="dashboard-button w-full">
           {loading ? "جاري الحفظ..." : "حفظ الحملة"}
         </button>
@@ -147,7 +149,7 @@ export function CampaignManager({ initialCampaigns }: { initialCampaigns: Campai
               </CampaignCell>
               <CampaignCell label="الاستهداف">{targetLabel(campaign)}</CampaignCell>
               <CampaignCell label="الفترة">
-                {new Date(campaign.startAt).toLocaleDateString("ar-SA")} - {new Date(campaign.endAt).toLocaleDateString("ar-SA")}
+                {formatDate(campaign.startAt)} - {formatDate(campaign.endAt)}
               </CampaignCell>
               <CampaignCell label="لكل عميل">{campaign.maxUsesPerCustomer}</CampaignCell>
               <div className="grid gap-1 lg:block">
@@ -162,7 +164,7 @@ export function CampaignManager({ initialCampaigns }: { initialCampaigns: Campai
               </div>
             </div>
           ))}
-          {campaigns.length === 0 ? <p className="px-4 py-8 text-center text-salon-charcoal">لا توجد حملات</p> : null}
+          {campaigns.length === 0 ? <div className="p-4"><InlineEmpty icon="🎯" title="لا توجد حملات بعد" hint="أنشئ حملة موسمية واستهدف شريحة عملاء محددة من النموذج المجاور." /></div> : null}
         </div>
       </div>
     </div>

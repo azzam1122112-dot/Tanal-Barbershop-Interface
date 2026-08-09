@@ -74,6 +74,9 @@ enum AuditActorType {
   ADMIN
   SUPERVISOR
   BARBER
+  // العميل نفسه من بوابته (حجز أو إلغاء موعد). فاعل حقيقي بلا حساب في النظام،
+  // فلا يصح وسمه SYSTEM وإلا ضاع الفرق بين فعل العميل وفعل آلي.
+  CUSTOMER
   SYSTEM
 }
 
@@ -93,6 +96,77 @@ enum WhatsAppMessageStatus {
   FAILED
 }
 
+enum WhatsAppMessageCategory {
+  TRANSACTIONAL
+  MARKETING
+  SERVICE
+}
+
+enum WhatsAppConsentSource {
+  IN_PERSON
+  WEBSITE
+  WHATSAPP
+  PHONE
+  IMPORTED
+  OTHER
+}
+
+enum WhatsAppSafetyMode {
+  STRICT
+  BALANCED
+  CUSTOM
+}
+
+enum ExpenseCategory {
+  SUPPLIES
+  MAINTENANCE
+  UTILITIES
+  STAFF_ADVANCE
+  REFUND
+  OTHER
+}
+
+enum AppointmentStatus {
+  BOOKED
+  ARRIVED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum AppointmentSource {
+  STAFF
+  CUSTOMER
+}
+
+enum StockMovementType {
+  PURCHASE
+  SALE
+  ADJUSTMENT
+  WASTE
+  RETURN
+}
+
+enum AttendanceSource {
+  SELF
+  MANAGER
+}
+
+// طريقة تحصيل الاشتراك. حاليًا يدوي (تحويل بنكي/نقدًا) يسجّله مدير المنصة.
+// إضافة بوابة لاحقًا = قيمة جديدة هنا + محوّل يكتب نفس `BillingInvoice`.
+enum PaymentProvider {
+  MANUAL_TRANSFER
+  MANUAL_CASH
+}
+
+enum BillingInvoiceStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
 // ===== Platform / Tenancy =====
 
 // مدير المنصة (super-admin) — يدير كل المؤسسات والباقات. خارج أي مستأجر.
@@ -110,19 +184,20 @@ model PlatformAdmin {
 
 // الباقة — يضبطها السوبر-آدمن من لوحة المنصة (بلا بوابة دفع حاليًا).
 model Plan {
-  id            String         @id @default(cuid())
-  name          String         @unique
-  slug          String         @unique
-  description   String?
-  priceMonthly  Decimal        @default(0) @db.Decimal(10, 2)
-  maxSalons     Int            @default(1)
-  maxBarbers    Int? // null = غير محدود
-  maxCustomers  Int?
-  isActive      Boolean        @default(true)
-  sortOrder     Int            @default(0)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  organizations Organization[]
+  id              String           @id @default(cuid())
+  name            String           @unique
+  slug            String           @unique
+  description     String?
+  priceMonthly    Decimal          @default(0) @db.Decimal(10, 2)
+  maxSalons       Int              @default(1)
+  maxBarbers      Int? // null = غير محدود
+  maxCustomers    Int?
+  isActive        Boolean          @default(true)
+  sortOrder       Int              @default(0)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  organizations   Organization[]
+  billingInvoices BillingInvoice[]
 
   @@index([isActive, sortOrder])
 }
@@ -140,27 +215,35 @@ model Organization {
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
-  plan                 Plan?                @relation(fields: [planId], references: [id])
-  salons               Salon[]
-  users                User[]
-  barbers              Barber[]
-  customers            Customer[]
-  services             Service[]
-  visits               Visit[]
-  loyaltyAccounts      LoyaltyAccount[]
-  loyaltyTransactions  LoyaltyTransaction[]
-  rewardRules          RewardRule[]
-  campaigns            Campaign[]
-  campaignRedemptions  CampaignRedemption[]
-  managerRewards       ManagerReward[]
-  dailyCloses          DailyClose[]
-  cashSessions         CashSession[]
-  systemSettings       SystemSettings[]
-  whatsappTemplates    WhatsAppTemplate[]
-  whatsappMessages     WhatsAppMessageLog[]
-  auditLogs            AuditLog[]
-  sessions             Session[]
-  staffSalons          StaffSalon[]
+  plan                    Plan?                    @relation(fields: [planId], references: [id])
+  salons                  Salon[]
+  users                   User[]
+  barbers                 Barber[]
+  customers               Customer[]
+  services                Service[]
+  visits                  Visit[]
+  loyaltyAccounts         LoyaltyAccount[]
+  loyaltyTransactions     LoyaltyTransaction[]
+  rewardRules             RewardRule[]
+  campaigns               Campaign[]
+  campaignRedemptions     CampaignRedemption[]
+  managerRewards          ManagerReward[]
+  dailyCloses             DailyClose[]
+  cashSessions            CashSession[]
+  systemSettings          SystemSettings[]
+  whatsappTemplates       WhatsAppTemplate[]
+  whatsappMessages        WhatsAppMessageLog[]
+  whatsappSafetySettings  WhatsAppSafetySettings?
+  auditLogs               AuditLog[]
+  sessions                Session[]
+  staffSalons             StaffSalon[]
+  cashExpenses            CashExpense[]
+  appointments            Appointment[]
+  products                Product[]
+  stockMovements          StockMovement[]
+  attendance              AttendanceRecord[]
+  billingInvoices         BillingInvoice[]
+  barberPushSubscriptions BarberPushSubscription[]
 
   @@index([status])
   @@index([planId])
@@ -176,7 +259,7 @@ model Salon {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization     Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization     Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   barbers          Barber[]
   services         Service[]
   visits           Visit[]
@@ -185,6 +268,11 @@ model Salon {
   settings         SystemSettings?
   sessions         Session[]
   staffAssignments StaffSalon[]
+  cashExpenses     CashExpense[]
+  appointments     Appointment[]
+  products         Product[]
+  stockMovements   StockMovement[]
+  attendance       AttendanceRecord[]
 
   @@unique([organizationId, slug])
   @@index([organizationId, isActive])
@@ -239,25 +327,31 @@ model User {
 }
 
 model Barber {
-  id               String        @id @default(cuid())
-  organizationId   String?
-  salonId          String?
-  name             String
-  phone            String
-  accessPinHash    String
-  role             UserRole      @default(BARBER)
-  isActive         Boolean       @default(true)
-  lastLoginAt      DateTime?
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-  organization     Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  salon            Salon?        @relation(fields: [salonId], references: [id], onDelete: Cascade)
-  createdCustomers Customer[]    @relation("CustomerCreatedByBarber")
-  visits           Visit[]
-  auditLogs        AuditLog[]    @relation("BarberAuditLogs")
-  sessions         Session[]
-  dailyCloses      DailyClose[]
-  cashSessions     CashSession[]
+  id                String                   @id @default(cuid())
+  organizationId    String?
+  salonId           String?
+  name              String
+  phone             String
+  accessPinHash     String
+  role              UserRole                 @default(BARBER)
+  isActive          Boolean                  @default(true)
+  // نسبة عمولة الحلاق %. null = استخدم النسبة الافتراضية للفرع.
+  commissionRate    Decimal?                 @db.Decimal(5, 2)
+  lastLoginAt       DateTime?
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  organization      Organization?            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  salon             Salon?                   @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  createdCustomers  Customer[]               @relation("CustomerCreatedByBarber")
+  visits            Visit[]
+  auditLogs         AuditLog[]               @relation("BarberAuditLogs")
+  sessions          Session[]
+  dailyCloses       DailyClose[]
+  cashSessions      CashSession[]
+  expenses          CashExpense[]            @relation("CashExpenseBarber")
+  appointments      Appointment[]
+  attendance        AttendanceRecord[]
+  pushSubscriptions BarberPushSubscription[]
 
   @@unique([organizationId, phone])
   @@index([salonId, isActive])
@@ -265,26 +359,27 @@ model Barber {
 }
 
 model Session {
-  id             String         @id @default(cuid())
-  tokenHash      String         @unique
-  actorType      AuditActorType
-  organizationId String?
-  activeSalonId  String?
-  userId         String?
-  barberId        String?
-  platformAdminId String?
-  role            UserRole?
-  createdAt       DateTime       @default(now())
-  expiresAt       DateTime
-  lastUsedAt      DateTime?
-  revokedAt       DateTime?
-  userAgent       String?
-  ipAddress       String?
-  user            User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  barber          Barber?        @relation(fields: [barberId], references: [id], onDelete: Cascade)
-  organization    Organization?  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  activeSalon     Salon?         @relation(fields: [activeSalonId], references: [id], onDelete: SetNull)
-  platformAdmin   PlatformAdmin? @relation(fields: [platformAdminId], references: [id], onDelete: Cascade)
+  id                     String                  @id @default(cuid())
+  tokenHash              String                  @unique
+  actorType              AuditActorType
+  organizationId         String?
+  activeSalonId          String?
+  userId                 String?
+  barberId               String?
+  platformAdminId        String?
+  role                   UserRole?
+  createdAt              DateTime                @default(now())
+  expiresAt              DateTime
+  lastUsedAt             DateTime?
+  revokedAt              DateTime?
+  userAgent              String?
+  ipAddress              String?
+  user                   User?                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  barber                 Barber?                 @relation(fields: [barberId], references: [id], onDelete: Cascade)
+  organization           Organization?           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  activeSalon            Salon?                  @relation(fields: [activeSalonId], references: [id], onDelete: SetNull)
+  platformAdmin          PlatformAdmin?          @relation(fields: [platformAdminId], references: [id], onDelete: Cascade)
+  barberPushSubscription BarberPushSubscription?
 
   @@index([tokenHash])
   @@index([userId, revokedAt])
@@ -294,47 +389,89 @@ model Session {
   @@index([platformAdminId])
 }
 
+// اشتراك Web Push مرتبط بجلسة حلاق بعينها. حذف/إلغاء الجلسة يوقف وصول
+// بيانات المواعيد إلى جهاز خرج منه الحلاق، بينما يسمح للحلاق بأكثر من جهاز.
+model BarberPushSubscription {
+  id             String    @id @default(cuid())
+  organizationId String
+  barberId       String
+  sessionId      String    @unique
+  endpoint       String    @unique
+  p256dh         String
+  auth           String
+  userAgent      String?
+  lastSuccessAt  DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  barber       Barber       @relation(fields: [barberId], references: [id], onDelete: Cascade)
+  session      Session      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([barberId, updatedAt])
+  @@index([organizationId])
+}
+
 model Customer {
-  id                  String               @id @default(cuid())
-  organizationId      String?
-  name                String
-  phone               String
-  whatsappOptIn       Boolean              @default(true)
-  visitCount          Int                  @default(0)
-  totalPaid           Decimal              @default(0) @db.Decimal(12, 2)
-  lastVisitAt         DateTime?
-  lastBarberId        String?
-  createdByBarberId   String?
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  organization        Organization?        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  createdByBarber     Barber?              @relation("CustomerCreatedByBarber", fields: [createdByBarberId], references: [id])
-  visits              Visit[]
-  loyaltyAccount      LoyaltyAccount?
-  loyaltyTransactions LoyaltyTransaction[]
-  campaignRedemptions CampaignRedemption[]
-  managerRewards      ManagerReward[]
-  whatsappMessages    WhatsAppMessageLog[]
+  id                             String                 @id @default(cuid())
+  organizationId                 String?
+  name                           String
+  phone                          String
+  // المفتاح العام مشتق من وجود موافقة واحدة على الأقل، ويُبقى للتوافق مع الواجهات القديمة.
+  whatsappOptIn                  Boolean                @default(false)
+  whatsappTransactionalOptIn     Boolean                @default(false)
+  whatsappMarketingOptIn         Boolean                @default(false)
+  whatsappConsentSource          WhatsAppConsentSource?
+  whatsappTransactionalConsentAt DateTime?
+  whatsappMarketingConsentAt     DateTime?
+  whatsappOptOutAt               DateTime?
+  whatsappOptOutReason           String?
+  whatsappLastContactedAt        DateTime?
+  whatsappLastMarketingAt        DateTime?
+  // رمز بوابة العميل — سرّ يُرسل في رابط واتساب ليطّلع العميل على رصيده. قابل للتدوير.
+  portalToken                    String?                @unique
+  visitCount                     Int                    @default(0)
+  totalPaid                      Decimal                @default(0) @db.Decimal(12, 2)
+  lastVisitAt                    DateTime?
+  lastBarberId                   String?
+  createdByBarberId              String?
+  createdAt                      DateTime               @default(now())
+  updatedAt                      DateTime               @updatedAt
+  organization                   Organization?          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdByBarber                Barber?                @relation("CustomerCreatedByBarber", fields: [createdByBarberId], references: [id])
+  visits                         Visit[]
+  loyaltyAccount                 LoyaltyAccount?
+  loyaltyTransactions            LoyaltyTransaction[]
+  campaignRedemptions            CampaignRedemption[]
+  managerRewards                 ManagerReward[]
+  whatsappMessages               WhatsAppMessageLog[]
+  appointments                   Appointment[]
 
   @@unique([organizationId, phone])
   @@index([organizationId, lastVisitAt])
   @@index([organizationId, whatsappOptIn])
+  @@index([organizationId, whatsappMarketingOptIn])
+  @@index([organizationId, whatsappLastMarketingAt])
   @@index([createdByBarberId])
 }
 
 model Service {
-  id             String         @id @default(cuid())
-  organizationId String?
-  salonId        String?
-  name           String
-  defaultPrice   Decimal        @db.Decimal(10, 2)
-  isActive       Boolean        @default(true)
-  sortOrder      Int            @default(0)
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  organization   Organization?  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  salon          Salon?         @relation(fields: [salonId], references: [id], onDelete: Cascade)
-  visitServices  VisitService[]
+  id              String         @id @default(cuid())
+  organizationId  String?
+  salonId         String?
+  name            String
+  defaultPrice    Decimal        @db.Decimal(10, 2)
+  isActive        Boolean        @default(true)
+  sortOrder       Int            @default(0)
+  // مدة الخدمة بالدقائق — تُستخدم لحساب نهاية الموعد.
+  durationMinutes Int            @default(30)
+  // نسبة عمولة خاصة بهذه الخدمة %. null = استخدم نسبة الحلاق ثم الفرع.
+  commissionRate  Decimal?       @db.Decimal(5, 2)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  organization    Organization?  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  salon           Salon?         @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  visitServices   VisitService[]
 
   @@unique([salonId, name])
   @@index([salonId, isActive, sortOrder])
@@ -350,7 +487,15 @@ model Visit {
   status              VisitStatus          @default(COMPLETED)
   grossAmount         Decimal              @db.Decimal(10, 2)
   discountAmount      Decimal              @default(0) @db.Decimal(10, 2)
+  // netAmount = المبلغ المدفوع فعليًا (شامل الضريبة إن وُجدت) — أساس كل التجميعات المالية.
   netAmount           Decimal              @db.Decimal(10, 2)
+  // تفصيل الضريبة: subtotalAmount + vatAmount = netAmount. تبقى صفرًا إن كانت الضريبة معطّلة.
+  subtotalAmount      Decimal              @default(0) @db.Decimal(10, 2)
+  vatAmount           Decimal              @default(0) @db.Decimal(10, 2)
+  vatRate             Decimal              @default(0) @db.Decimal(5, 2)
+  invoiceNumber       String?
+  // عمولة الحلاق محسوبة وقت الزيارة على المبلغ قبل الضريبة — لا تتأثر بتغيير النسب لاحقًا.
+  commissionAmount    Decimal              @default(0) @db.Decimal(10, 2)
   paymentMethod       PaymentMethod
   discountType        DiscountType         @default(NONE)
   discountSourceId    String?
@@ -376,8 +521,12 @@ model Visit {
   cashSessionId       String?
   cashSession         CashSession?         @relation(fields: [cashSessionId], references: [id])
   whatsappMessages    WhatsAppMessageLog[]
+  appointment         Appointment?
+  productLines        VisitProduct[]
+  stockMovements      StockMovement[]
 
   @@unique([barberId, idempotencyKey])
+  @@unique([salonId, invoiceNumber])
   @@index([organizationId, visitedAt])
   @@index([salonId, visitedAt])
   @@index([visitedAt])
@@ -389,15 +538,17 @@ model Visit {
 }
 
 model VisitService {
-  id          String  @id @default(cuid())
-  visitId     String
-  serviceId   String
-  serviceName String
-  unitPrice   Decimal @db.Decimal(10, 2)
-  quantity    Int     @default(1)
-  lineTotal   Decimal @db.Decimal(10, 2)
-  visit       Visit   @relation(fields: [visitId], references: [id], onDelete: Cascade)
-  service     Service @relation(fields: [serviceId], references: [id])
+  id               String  @id @default(cuid())
+  visitId          String
+  serviceId        String
+  serviceName      String
+  unitPrice        Decimal @db.Decimal(10, 2)
+  quantity         Int     @default(1)
+  lineTotal        Decimal @db.Decimal(10, 2)
+  commissionRate   Decimal @default(0) @db.Decimal(5, 2)
+  commissionAmount Decimal @default(0) @db.Decimal(10, 2)
+  visit            Visit   @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  service          Service @relation(fields: [serviceId], references: [id])
 
   @@index([visitId])
   @@index([serviceId])
@@ -576,6 +727,8 @@ model CashSession {
   rewardRedemptionsCount   Int               @default(0)
   campaignRedemptionsCount Int               @default(0)
   cashReceivedAmount       Decimal?          @db.Decimal(12, 2)
+  // مصروفات نثرية خرجت من الدرج خلال الجلسة — تُخصم من الكاش المتوقع.
+  expensesTotal            Decimal           @default(0) @db.Decimal(12, 2)
   notes                    String?
   createdAt                DateTime          @default(now())
   updatedAt                DateTime          @updatedAt
@@ -584,6 +737,7 @@ model CashSession {
   barber                   Barber            @relation(fields: [barberId], references: [id])
   closedBy                 User?             @relation("CashSessionClosedBy", fields: [closedByUserId], references: [id])
   visits                   Visit[]
+  expenses                 CashExpense[]
 
   @@index([organizationId, status])
   @@index([salonId, status])
@@ -605,11 +759,51 @@ model SystemSettings {
   allowMultipleDiscounts        Boolean       @default(false)
   whatsappDefaultCountryCode    String        @default("966")
   whatsappEnabled               Boolean       @default(true)
+  // ضريبة القيمة المضافة — اختيارية بالكامل، يفعّلها المالك لكل فرع.
+  vatEnabled                    Boolean       @default(false)
+  vatRate                       Decimal       @default(15) @db.Decimal(5, 2)
+  // true = الأسعار المعروضة شاملة الضريبة (المعتاد في التجزئة السعودية).
+  vatInclusive                  Boolean       @default(true)
+  vatNumber                     String?
+  // الاسم النظامي للمنشأة كما في الشهادة الضريبية (يظهر في الفاتورة و QR).
+  legalName                     String?
+  // نسبة العمولة الافتراضية للفرع %. تُستخدم إن لم تُحدَّد للحلاق أو الخدمة.
+  defaultCommissionRate         Decimal       @default(0) @db.Decimal(5, 2)
+  // الحجز الذاتي من بوابة العميل — معطّل افتراضيًا حتى يفعّله المالك صراحةً.
+  // تعطيله يعيد سلوك النظام السابق حرفيًا: الحجز من الموظفين فقط.
+  bookingEnabled                Boolean       @default(false)
+  // ساعات استقبال الحجز كدقائق من منتصف الليل (0..1439) بتوقيت الصالون المحلي.
+  // دقائق لا نص: تُقارن وتُولَّد حسابيًا بلا تحليل نصوص في كل فترة.
+  bookingOpenMinute             Int           @default(960)
+  bookingCloseMinute            Int           @default(1380)
+  // طول الفترة المعروضة للعميل بالدقائق (هي أيضًا مدة الموعد الافتراضية).
+  bookingSlotMinutes            Int           @default(30)
+  // أيام الإغلاق الأسبوعية: 0=الأحد .. 6=السبت.
+  bookingClosedWeekdays         Int[]         @default([])
+  // أقل مهلة بين الآن وبداية الموعد — تمنع حجزًا بعد دقيقتين والحلاق على الكرسي.
+  bookingLeadMinutes            Int           @default(60)
+  // مدى الحجز المستقبلي بالأيام.
+  bookingHorizonDays            Int           @default(14)
+  // أقصى عدد مواعيد قائمة للعميل الواحد — يمنع حجز مقاعد وهمية.
+  bookingMaxActivePerCustomer   Int           @default(2)
   createdAt                     DateTime      @default(now())
   updatedAt                     DateTime      @updatedAt
   organization                  Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   salon                         Salon?        @relation(fields: [salonId], references: [id], onDelete: Cascade)
 
+  @@index([organizationId])
+}
+
+// عدّاد تسلسلي للفواتير لكل فرع لكل سنة. يُزاد داخل معاملة تأكيد الزيارة.
+model InvoiceCounter {
+  id             String   @id @default(cuid())
+  organizationId String
+  salonId        String
+  year           Int
+  lastNumber     Int      @default(0)
+  updatedAt      DateTime @updatedAt
+
+  @@unique([salonId, year])
   @@index([organizationId])
 }
 
@@ -629,7 +823,7 @@ model WhatsAppTemplate {
 }
 
 model WhatsAppMessageLog {
-  id                 String                @id @default(cuid())
+  id                 String                  @id @default(cuid())
   organizationId     String?
   customerId         String
   templateId         String?
@@ -638,23 +832,26 @@ model WhatsAppMessageLog {
   phone              String
   message            String
   waUrl              String
-  status             WhatsAppMessageStatus @default(DRAFTED)
+  status             WhatsAppMessageStatus   @default(DRAFTED)
+  category           WhatsAppMessageCategory @default(SERVICE)
+  policySnapshot     Json?
   openedByUserId     String?
   openedAt           DateTime?
   markedSentByUserId String?
   markedSentAt       DateTime?
   skippedReason      String?
-  createdAt          DateTime              @default(now())
-  updatedAt          DateTime              @updatedAt
-  organization       Organization?         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  customer           Customer              @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  template           WhatsAppTemplate?     @relation(fields: [templateId], references: [id])
-  campaign           Campaign?             @relation(fields: [campaignId], references: [id])
-  visit              Visit?                @relation(fields: [visitId], references: [id])
-  openedBy           User?                 @relation("WhatsAppOpenedBy", fields: [openedByUserId], references: [id])
-  markedSentBy       User?                 @relation("WhatsAppMarkedSentBy", fields: [markedSentByUserId], references: [id])
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  organization       Organization?           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer           Customer                @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  template           WhatsAppTemplate?       @relation(fields: [templateId], references: [id])
+  campaign           Campaign?               @relation(fields: [campaignId], references: [id])
+  visit              Visit?                  @relation(fields: [visitId], references: [id])
+  openedBy           User?                   @relation("WhatsAppOpenedBy", fields: [openedByUserId], references: [id])
+  markedSentBy       User?                   @relation("WhatsAppMarkedSentBy", fields: [markedSentByUserId], references: [id])
 
   @@index([customerId, createdAt])
+  @@index([organizationId, category, createdAt])
   @@index([templateId])
   @@index([campaignId])
   @@index([visitId])
@@ -662,6 +859,210 @@ model WhatsAppMessageLog {
   @@index([openedByUserId])
   @@index([markedSentByUserId])
   @@index([organizationId])
+}
+
+model WhatsAppSafetySettings {
+  id                            String             @id @default(cuid())
+  organizationId                String             @unique
+  mode                          WhatsAppSafetyMode @default(STRICT)
+  marketingCooldownHours        Int                @default(168)
+  maxMarketingPerCustomer30Days Int                @default(4)
+  maxMessagesPerCustomer24Hours Int                @default(2)
+  dailyOrganizationDraftLimit   Int                @default(100)
+  appendOptOutInstructions      Boolean            @default(true)
+  optOutText                    String             @default("لإيقاف العروض اكتب إيقاف")
+  marketingPaused               Boolean            @default(false)
+  createdAt                     DateTime           @default(now())
+  updatedAt                     DateTime           @updatedAt
+  organization                  Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([mode])
+}
+
+// مصروف نثري من درج الكاش. يُخصم من الكاش المتوقع عند إغلاق الجلسة
+// حتى يصبح فرق الصندوق قابلًا للتفسير بدل أن يظهر كعجز.
+model CashExpense {
+  id                 String          @id @default(cuid())
+  organizationId     String
+  salonId            String
+  cashSessionId      String?
+  barberId           String?
+  amount             Decimal         @db.Decimal(10, 2)
+  category           ExpenseCategory @default(OTHER)
+  note               String
+  recordedByUserId   String?
+  recordedByBarberId String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  salon        Salon        @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  cashSession  CashSession? @relation(fields: [cashSessionId], references: [id], onDelete: Cascade)
+  barber       Barber?      @relation("CashExpenseBarber", fields: [barberId], references: [id])
+
+  @@index([organizationId, createdAt])
+  @@index([salonId, createdAt])
+  @@index([cashSessionId])
+  @@index([barberId])
+}
+
+// موعد حجز. الصالون walk-in أصلًا، فالموعد اختياري ولا يمنع تسجيل زيارة بدونه.
+model Appointment {
+  id              String            @id @default(cuid())
+  organizationId  String
+  salonId         String
+  barberId        String?
+  customerId      String?
+  customerName    String
+  customerPhone   String
+  startAt         DateTime
+  durationMinutes Int               @default(30)
+  status          AppointmentStatus @default(BOOKED)
+  source          AppointmentSource @default(STAFF)
+  notes           String?
+  // الزيارة الناتجة عن الموعد عند وصول العميل وإتمام الخدمة.
+  visitId         String?           @unique
+  cancelledAt     DateTime?
+  cancelReason    String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  salon        Salon        @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  barber       Barber?      @relation(fields: [barberId], references: [id], onDelete: SetNull)
+  customer     Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  visit        Visit?       @relation(fields: [visitId], references: [id], onDelete: SetNull)
+
+  @@index([salonId, startAt])
+  @@index([organizationId, startAt])
+  @@index([barberId, startAt])
+  @@index([status, startAt])
+  @@index([customerId])
+}
+
+// منتج للبيع (شمع، شامبو...). المخزون رقم صحيح بسيط — لا دفعات ولا صلاحيات.
+model Product {
+  id                String   @id @default(cuid())
+  organizationId    String
+  salonId           String
+  name              String
+  sku               String?
+  price             Decimal  @db.Decimal(10, 2)
+  costPrice         Decimal? @db.Decimal(10, 2)
+  stockQuantity     Int      @default(0)
+  lowStockThreshold Int      @default(3)
+  commissionRate    Decimal? @db.Decimal(5, 2)
+  isActive          Boolean  @default(true)
+  sortOrder         Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  organization  Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  salon         Salon           @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  visitProducts VisitProduct[]
+  movements     StockMovement[]
+
+  @@unique([salonId, name])
+  @@index([salonId, isActive, sortOrder])
+  @@index([organizationId])
+}
+
+// سطر منتج مباع ضمن زيارة — نسخة من الاسم والسعر وقت البيع.
+model VisitProduct {
+  id               String  @id @default(cuid())
+  visitId          String
+  productId        String
+  productName      String
+  unitPrice        Decimal @db.Decimal(10, 2)
+  quantity         Int     @default(1)
+  lineTotal        Decimal @db.Decimal(10, 2)
+  commissionRate   Decimal @default(0) @db.Decimal(5, 2)
+  commissionAmount Decimal @default(0) @db.Decimal(10, 2)
+
+  visit   Visit   @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([visitId])
+  @@index([productId])
+}
+
+// حركة مخزون. كل تغيير في الكمية يمرّ من هنا — المخزون قابل للتدقيق لا رقم يُكتب فوقه.
+model StockMovement {
+  id                 String            @id @default(cuid())
+  organizationId     String
+  salonId            String
+  productId          String
+  type               StockMovementType
+  quantity           Int
+  balanceAfter       Int
+  reason             String?
+  visitId            String?
+  recordedByUserId   String?
+  recordedByBarberId String?
+  createdAt          DateTime          @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  salon        Salon        @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  product      Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  visit        Visit?       @relation(fields: [visitId], references: [id], onDelete: SetNull)
+
+  @@index([productId, createdAt])
+  @@index([salonId, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([visitId])
+}
+
+// حضور وانصراف الحلاق. سجل مستقل عن جلسة الصندوق: الجلسة أداة مالية والحضور أداة إدارية.
+model AttendanceRecord {
+  id             String           @id @default(cuid())
+  organizationId String
+  salonId        String
+  barberId       String
+  checkInAt      DateTime         @default(now())
+  checkOutAt     DateTime?
+  source         AttendanceSource @default(SELF)
+  notes          String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  salon        Salon        @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  barber       Barber       @relation(fields: [barberId], references: [id], onDelete: Cascade)
+
+  @@index([barberId, checkInAt])
+  @@index([salonId, checkInAt])
+  @@index([organizationId, checkInAt])
+}
+
+// فاتورة اشتراك المؤسسة في المنصّة (مقابل فاتورة الزيارة للعميل).
+// مصدر الحقيقة لما دُفع فعلًا؛ حالة الاشتراك على `Organization` مشتقّة منها.
+model BillingInvoice {
+  id                        String               @id @default(cuid())
+  organizationId            String
+  planId                    String?
+  provider                  PaymentProvider      @default(MANUAL_TRANSFER)
+  status                    BillingInvoiceStatus @default(PAID)
+  // بالريال. يُخزَّن كما حُصِّل فعلًا لا كما هو في الباقة اليوم.
+  amount                    Decimal              @db.Decimal(10, 2)
+  currency                  String               @default("SAR")
+  periodMonths              Int                  @default(1)
+  // مرجع العملية (رقم الحوالة/الإيصال) — فريد لمنع تسجيل الدفعة مرتين.
+  reference                 String?              @unique
+  note                      String?
+  paidAt                    DateTime?
+  periodStart               DateTime?
+  periodEnd                 DateTime?
+  // مدير المنصة الذي سجّل الدفعة — الفوترة من اختصاصه لا اختصاص المستأجر.
+  recordedByPlatformAdminId String?
+  createdAt                 DateTime             @default(now())
+  updatedAt                 DateTime             @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan         Plan?        @relation(fields: [planId], references: [id])
+
+  @@index([organizationId, createdAt])
+  @@index([status, createdAt])
+  @@index([planId])
 }
 
 model LoginAttempt {

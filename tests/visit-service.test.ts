@@ -31,6 +31,8 @@ describe("visit preview and confirm", () => {
   beforeAll(async () => {
     const barber = await prisma.barber.create({
       data: {
+        organizationId: "org_default",
+        salonId: "salon_default",
         name: `visit-service-barber-${Date.now()}`,
         phone: `9665${Math.floor(10000000 + Math.random() * 89999999)}`,
         accessPinHash: await hashBarberPin("Tanal@123"),
@@ -43,10 +45,14 @@ describe("visit preview and confirm", () => {
     createdCashSessionIds.push(cashSession.cashSession.id);
 
     const activeService = await prisma.service.create({
-      data: { name: `visit-active-${Date.now()}`, defaultPrice: 25, sortOrder: 1, isActive: true },
+      data: {
+        organizationId: "org_default",
+        salonId: "salon_default", name: `visit-active-${Date.now()}`, defaultPrice: 25, sortOrder: 1, isActive: true },
     });
     const inactiveService = await prisma.service.create({
-      data: { name: `visit-inactive-${Date.now()}`, defaultPrice: 35, sortOrder: 2, isActive: false },
+      data: {
+        organizationId: "org_default",
+        salonId: "salon_default", name: `visit-inactive-${Date.now()}`, defaultPrice: 35, sortOrder: 2, isActive: false },
     });
     createdServiceIds.push(activeService.id, inactiveService.id);
     activeServiceId = activeService.id;

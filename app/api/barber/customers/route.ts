@@ -27,6 +27,9 @@ export async function POST(request: Request) {
     name: parsed.data.name,
     phone: parsed.data.phone,
     createdByBarberId: session.barber.id,
+    whatsappTransactionalOptIn: parsed.data.whatsappTransactionalOptIn,
+    whatsappMarketingOptIn: parsed.data.whatsappMarketingOptIn,
+    whatsappConsentSource: "IN_PERSON",
   });
   const meta = await getRequestMeta();
 

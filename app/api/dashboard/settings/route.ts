@@ -3,16 +3,17 @@ import { NextResponse } from "next/server";
 import { getRequestMeta, parseJsonBody, requireAdminApi } from "@/lib/auth/http";
 import { systemSettingsUpdateSchema } from "@/lib/auth/validation";
 import { prisma } from "@/lib/db/prisma";
-import { toSafeSystemSettings, updateSystemSettings } from "@/lib/settings/system-settings";
+import { getEffectiveSettings, toSafeSystemSettings, updateSystemSettings } from "@/lib/settings/system-settings";
 
 export async function GET() {
   const auth = await requireAdminApi();
   if (auth.response) return auth.response;
   const session = auth.session;
   if (!session || session.type !== "dashboard") return NextResponse.json({ message: "غير مصرح" }, { status: 401 });
-  const settings = session.salonId
-    ? await prisma.systemSettings.findFirst({ where: { salonId: session.salonId } })
-    : await prisma.systemSettings.findFirst({ where: { organizationId: session.organizationId } });
+  const settings = await getEffectiveSettings(prisma, {
+    organizationId: session.organizationId,
+    salonId: session.salonId,
+  });
   if (!settings) return NextResponse.json({ message: "إعدادات النظام غير موجودة" }, { status: 404 });
   return NextResponse.json({ settings: toSafeSystemSettings(settings) });
 }

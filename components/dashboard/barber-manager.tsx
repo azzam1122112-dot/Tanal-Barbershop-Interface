@@ -4,6 +4,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import type { SafeBarber } from "@/lib/auth/sanitize";
+import { InlineEmpty } from "@/components/dashboard/ui";
 
 type BarberResponse = {
   barber?: SafeBarber;
@@ -19,6 +20,8 @@ type BarberDraft = {
   pin: string;
   isActive: boolean;
   salonId: string;
+  /** فارغ = استخدم النسبة الافتراضية للفرع. */
+  commissionRate: string;
 };
 
 type BarberFilter = "all" | "active" | "inactive";
@@ -33,11 +36,15 @@ export function BarberManager({
   initialBarbers,
   salons,
   defaultSalonId,
+  mode = "full",
 }: {
   initialBarbers: SafeBarber[];
   salons: SalonOption[];
   defaultSalonId: string | null;
+  /** `full` = مالك/مدير (إضافة وتعديل وحذف). `transfer` = مشرف (نقل بين فروعه فقط). */
+  mode?: "full" | "transfer";
 }) {
+  const canManage = mode === "full";
   const [barbers, setBarbers] = useState(initialBarbers);
   const [toast, setToast] = useState<ToastState | null>(null);
   const { confirm, confirmDialog } = useConfirm();
@@ -111,6 +118,7 @@ export function BarberManager({
         pin: "",
         isActive: Boolean(barber.isActive),
         salonId: barber.salonId ?? "",
+        commissionRate: barber.commissionRate == null ? "" : String(barber.commissionRate),
       },
     }));
   }
@@ -180,6 +188,9 @@ export function BarberManager({
     if (draft.phone.trim() !== barber.phone) updateBody.phone = draft.phone;
     if (draft.isActive !== Boolean(barber.isActive)) updateBody.isActive = draft.isActive;
     if (draft.salonId && draft.salonId !== (barber.salonId ?? "")) updateBody.salonId = draft.salonId;
+    const draftRate = draft.commissionRate.trim();
+    const currentRate = barber.commissionRate == null ? "" : String(barber.commissionRate);
+    if (draftRate !== currentRate) updateBody.commissionRate = draftRate === "" ? null : Number(draftRate);
 
     const detailsChanged = Object.keys(updateBody).length > 0;
     const pinChanged = draft.pin.trim().length > 0;
@@ -210,6 +221,25 @@ export function BarberManager({
     setPendingId(null);
     cancelEdit(barber.id);
     setToast({ message: pinChanged ? "تم حفظ البيانات وتحديث رمز الدخول" : "تم حفظ بيانات الحلاق", tone: "success" });
+  }
+
+  async function transferBarber(barber: SafeBarber, salonId: string) {
+    if (!salonId || salonId === barber.salonId) return;
+
+    const confirmed = await confirm({
+      title: `نقل ${barber.name} إلى ${salonName(salonId)}؟`,
+      description: "ستُسجَّل الزيارات الجديدة على الفرع الجديد. الزيارات السابقة تبقى في سجل الفرع القديم.",
+      confirmLabel: "نقل",
+    });
+    if (!confirmed) return;
+
+    setPendingId(barber.id);
+    setToast(null);
+    const result = await patchBarber(barber.id, { salonId });
+    if (result.ok) {
+      setToast({ message: `تم نقل ${barber.name} إلى ${salonName(salonId)}`, tone: "success" });
+    }
+    setPendingId(null);
   }
 
   async function toggleStatus(barber: SafeBarber) {
@@ -252,32 +282,33 @@ export function BarberManager({
 
       <section className="grid gap-4 md:grid-cols-3">
         <div className="dashboard-soft-panel p-4">
-          <p className="text-xs font-black text-salon-charcoal">إجمالي الحلاقين</p>
-          <p className="mt-2 text-3xl font-black">{barbers.length}</p>
+          <p className="text-xs font-bold text-salon-charcoal">إجمالي الحلاقين</p>
+          <p className="mt-2 text-3xl font-bold">{barbers.length}</p>
         </div>
         <div className="dashboard-soft-panel p-4">
-          <p className="text-xs font-black text-salon-charcoal">حسابات نشطة</p>
-          <p className="mt-2 text-3xl font-black text-green-700">{activeCount}</p>
+          <p className="text-xs font-bold text-salon-charcoal">حسابات نشطة</p>
+          <p className="mt-2 text-3xl font-bold text-green-700">{activeCount}</p>
         </div>
         <div className="dashboard-soft-panel p-4">
-          <p className="text-xs font-black text-salon-charcoal">حسابات معطلة</p>
-          <p className="mt-2 text-3xl font-black text-salon-ruby">{inactiveCount}</p>
+          <p className="text-xs font-bold text-salon-charcoal">حسابات معطلة</p>
+          <p className="mt-2 text-3xl font-bold text-salon-ruby">{inactiveCount}</p>
         </div>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[380px_1fr]">
+      <section className={`grid gap-6 ${canManage ? "xl:grid-cols-[380px_1fr]" : ""}`}>
+        {canManage ? (
         <form onSubmit={createBarber} className="dashboard-panel h-fit overflow-hidden">
           <div className="border-b border-salon-line bg-salon-ink px-5 py-4 text-white">
-            <p className="text-xs font-black text-salon-gold">حساب جديد</p>
-            <h2 className="mt-2 text-2xl font-black">إضافة حلاق</h2>
+            <p className="text-xs font-bold text-salon-gold">حساب جديد</p>
+            <h2 className="mt-2 text-2xl font-bold">إضافة حلاق</h2>
           </div>
           <div className="space-y-4 p-5">
             <label className="block">
-              <span className="mb-2 block text-xs font-black text-salon-charcoal">اسم الحلاق</span>
+              <span className="mb-2 block text-xs font-bold text-salon-charcoal">اسم الحلاق</span>
               <input name="name" required placeholder="مثال: عبدالله الغامدي" className="dashboard-field" />
             </label>
             <label className="block">
-              <span className="mb-2 block text-xs font-black text-salon-charcoal">رقم الجوال</span>
+              <span className="mb-2 block text-xs font-bold text-salon-charcoal">رقم الجوال</span>
               <input
                 name="phone"
                 required
@@ -294,11 +325,11 @@ export function BarberManager({
               />
             </label>
             <label className="block">
-              <span className="mb-2 block text-xs font-black text-salon-charcoal">رمز الدخول</span>
+              <span className="mb-2 block text-xs font-bold text-salon-charcoal">رمز الدخول</span>
               <input name="pin" required minLength={8} maxLength={64} placeholder="8 خانات على الأقل (أحرف وأرقام ورموز)" className="dashboard-field" />
             </label>
             <label className="block">
-              <span className="mb-2 block text-xs font-black text-salon-charcoal">الفرع</span>
+              <span className="mb-2 block text-xs font-bold text-salon-charcoal">الفرع</span>
               <select name="salonId" required defaultValue={defaultSalonId ?? salons[0]?.id ?? ""} className="dashboard-field">
                 {salons.map((salon) => (
                   <option key={salon.id} value={salon.id}>{salon.name}</option>
@@ -310,13 +341,14 @@ export function BarberManager({
             </button>
           </div>
         </form>
+        ) : null}
 
         <div className="dashboard-panel overflow-hidden">
           <div className="border-b border-salon-line px-5 py-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <p className="text-xs font-black text-salon-gold">قائمة الحلاقين</p>
-                <h2 className="mt-2 text-2xl font-black">التحكم الكامل بالحسابات</h2>
+                <p className="text-xs font-bold text-salon-gold">قائمة الحلاقين</p>
+                <h2 className="mt-2 text-2xl font-bold">{canManage ? "التحكم الكامل بالحسابات" : "فريق فروعك"}</h2>
               </div>
               <div className="grid gap-2 sm:grid-cols-[220px_1fr]">
                 <input
@@ -325,7 +357,7 @@ export function BarberManager({
                   placeholder="بحث بالاسم أو الجوال"
                   className="dashboard-field py-2.5"
                 />
-                <div className="grid grid-cols-3 rounded-lg border border-salon-line bg-white p-1 text-xs font-black">
+                <div className="grid grid-cols-3 rounded-xl border border-salon-line bg-white p-1 text-xs font-bold">
                   {[
                     ["all", "الكل"],
                     ["active", "نشط"],
@@ -352,16 +384,19 @@ export function BarberManager({
               const isPending = pendingId === barber.id;
 
               return (
-                <article key={barber.id} className="grid gap-4 px-5 py-5 xl:grid-cols-[1fr_180px_260px] xl:items-start">
+                <article
+                  key={barber.id}
+                  className={`grid gap-4 px-5 py-5 xl:items-start ${canManage ? "xl:grid-cols-[1fr_180px_260px]" : "xl:grid-cols-[1fr_320px]"}`}
+                >
                   <div className="min-w-0">
                     {isEditing && draft ? (
                       <div className="grid gap-3 md:grid-cols-2">
                         <label className="block">
-                          <span className="mb-2 block text-xs font-black text-salon-charcoal">اسم الحلاق</span>
+                          <span className="mb-2 block text-xs font-bold text-salon-charcoal">اسم الحلاق</span>
                           <input value={draft.name} onChange={(event) => updateDraft(barber.id, { name: event.target.value })} className="dashboard-field py-2.5" />
                         </label>
                         <label className="block">
-                          <span className="mb-2 block text-xs font-black text-salon-charcoal">رقم الجوال</span>
+                          <span className="mb-2 block text-xs font-bold text-salon-charcoal">رقم الجوال</span>
                           <input
                             value={draft.phone}
                             onChange={(event) => updateDraft(barber.id, { phone: sanitizePhone(event.target.value) })}
@@ -375,7 +410,7 @@ export function BarberManager({
                           />
                         </label>
                         <label className="block">
-                          <span className="mb-2 block text-xs font-black text-salon-charcoal">رمز دخول جديد</span>
+                          <span className="mb-2 block text-xs font-bold text-salon-charcoal">رمز دخول جديد</span>
                           <input
                             data-pin-input={barber.id}
                             value={draft.pin}
@@ -386,8 +421,21 @@ export function BarberManager({
                             className="dashboard-field py-2.5"
                           />
                         </label>
-                        <label className="flex items-center justify-between gap-3 rounded-lg border border-salon-line bg-salon-pearl px-3 py-2.5">
-                          <span className="text-sm font-black text-salon-charcoal">الحساب نشط</span>
+                        <label className="block">
+                          <span className="mb-2 block text-xs font-bold text-salon-charcoal">نسبة العمولة %</span>
+                          <input
+                            value={draft.commissionRate}
+                            onChange={(event) => updateDraft(barber.id, { commissionRate: event.target.value })}
+                            type="number"
+                            min={0}
+                            max={100}
+                            step={0.5}
+                            placeholder="اتركه فارغًا لاستخدام نسبة الفرع"
+                            className="dashboard-field py-2.5"
+                          />
+                        </label>
+                        <label className="flex items-center justify-between gap-3 rounded-xl border border-salon-line bg-salon-pearl px-3 py-2.5">
+                          <span className="text-sm font-bold text-salon-charcoal">الحساب نشط</span>
                           <input
                             type="checkbox"
                             checked={draft.isActive}
@@ -397,7 +445,7 @@ export function BarberManager({
                         </label>
                         {hasMultipleSalons ? (
                           <label className="block md:col-span-2">
-                            <span className="mb-2 block text-xs font-black text-salon-charcoal">الفرع</span>
+                            <span className="mb-2 block text-xs font-bold text-salon-charcoal">الفرع</span>
                             <select
                               value={draft.salonId}
                               onChange={(event) => updateDraft(barber.id, { salonId: event.target.value })}
@@ -413,22 +461,28 @@ export function BarberManager({
                     ) : (
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-xl font-black">{barber.name}</h3>
-                          <span className={`rounded-full px-3 py-1 text-xs font-black ${barber.isActive ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+                          <h3 className="text-xl font-bold">{barber.name}</h3>
+                          <span className={`rounded-full px-3 py-1 text-xs font-bold ${barber.isActive ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
                             {barber.isActive ? "نشط" : "معطل"}
                           </span>
                         </div>
                         <dl className="mt-3 grid gap-2 text-sm font-bold text-salon-charcoal md:grid-cols-2">
                           <div>
-                            <dt className="text-xs font-black text-salon-charcoal/70">رقم الجوال</dt>
+                            <dt className="text-xs font-bold text-salon-charcoal/70">رقم الجوال</dt>
                             <dd className="mt-1 text-salon-ink">{barber.phone}</dd>
                           </div>
                           <div>
-                            <dt className="text-xs font-black text-salon-charcoal/70">الفرع</dt>
+                            <dt className="text-xs font-bold text-salon-charcoal/70">الفرع</dt>
                             <dd className="mt-1 text-salon-ink">{salonName(barber.salonId)}</dd>
                           </div>
                           <div>
-                            <dt className="text-xs font-black text-salon-charcoal/70">آخر تحديث</dt>
+                            <dt className="text-xs font-bold text-salon-charcoal/70">نسبة العمولة</dt>
+                            <dd className="mt-1 text-salon-ink">
+                              {barber.commissionRate == null ? "نسبة الفرع الافتراضية" : `${barber.commissionRate}%`}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs font-bold text-salon-charcoal/70">آخر تحديث</dt>
                             <dd className="mt-1 text-salon-ink">{barber.updatedAt ? dateFormatter.format(new Date(barber.updatedAt)) : "غير متاح"}</dd>
                           </div>
                         </dl>
@@ -436,20 +490,52 @@ export function BarberManager({
                     )}
                   </div>
 
-                  <div className="rounded-lg border border-salon-line bg-salon-pearl px-4 py-3">
-                    <p className="text-xs font-black text-salon-charcoal">حالة الوصول</p>
+                  {!canManage ? (
+                    <div className="rounded-xl border border-salon-line bg-salon-pearl px-4 py-3">
+                      <p className="text-xs font-bold text-salon-charcoal">نقل بين فروعك</p>
+                      {hasMultipleSalons ? (
+                        <>
+                          <select
+                            value={barber.salonId ?? ""}
+                            disabled={isPending}
+                            onChange={(event) => void transferBarber(barber, event.target.value)}
+                            className="dashboard-field mt-3 py-2.5 disabled:opacity-55"
+                          >
+                            {salons.map((salon) => (
+                              <option key={salon.id} value={salon.id}>
+                                {salon.name}
+                              </option>
+                            ))}
+                          </select>
+                          <p className="mt-2 text-xs font-semibold text-salon-charcoal/70">
+                            {isPending ? "جاري النقل..." : "اختر الفرع لنقل الحلاق مباشرة"}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="mt-3 text-sm font-semibold text-salon-charcoal/75">
+                          النقل يحتاج فرعين مسندين لك على الأقل.
+                        </p>
+                      )}
+                    </div>
+                  ) : null}
+
+                  {canManage ? (
+                  <div className="rounded-xl border border-salon-line bg-salon-pearl px-4 py-3">
+                    <p className="text-xs font-bold text-salon-charcoal">حالة الوصول</p>
                     <button
                       type="button"
                       disabled={isPending || isEditing}
                       onClick={() => void toggleStatus(barber)}
-                      className={`mt-3 w-full rounded-lg px-3 py-2 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-55 ${
+                      className={`mt-3 w-full rounded-lg px-3 py-2 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-55 ${
                         barber.isActive ? "bg-green-50 text-green-700 hover:bg-green-100" : "bg-red-50 text-red-700 hover:bg-red-100"
                       }`}
                     >
                       {barber.isActive ? "تعطيل الحساب" : "تفعيل الحساب"}
                     </button>
                   </div>
+                  ) : null}
 
+                  {canManage ? (
                   <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-1">
                     {isEditing ? (
                       <>
@@ -487,15 +573,13 @@ export function BarberManager({
                       </>
                     )}
                   </div>
+                  ) : null}
                 </article>
               );
             })}
 
             {filteredBarbers.length === 0 ? (
-              <div className="px-5 py-12 text-center">
-                <p className="text-lg font-black">لا توجد نتائج مطابقة</p>
-                <p className="dashboard-muted mt-2">غيّر البحث أو الفلتر لعرض الحلاقين.</p>
-              </div>
+              <div className="p-5"><InlineEmpty icon="🔎" title="لا توجد نتائج مطابقة" hint="غيّر كلمة البحث أو الفلتر لعرض حلاقين آخرين." /></div>
             ) : null}
           </div>
         </div>

@@ -61,6 +61,8 @@ describe("service management rules", () => {
   it("writes audit log when a service is created or updated", async () => {
     const service = await prisma.service.create({
       data: {
+        organizationId: "org_default",
+        salonId: "salon_default",
         name: `خدمة اختبار ${Date.now()}`,
         defaultPrice: 10,
         sortOrder: 99,
@@ -86,6 +88,8 @@ describe("service management rules", () => {
   it("does not expose sensitive fields in service responses", async () => {
     const service = await prisma.service.create({
       data: {
+        organizationId: "org_default",
+        salonId: "salon_default",
         name: `خدمة آمنة ${Date.now()}`,
         defaultPrice: 15,
         sortOrder: 100,

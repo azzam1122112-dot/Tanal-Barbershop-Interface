@@ -62,7 +62,7 @@ export default function SignupPage() {
             {created.slug ? (
               <div className="rounded-xl border border-salon-line bg-salon-mist px-4 py-4 text-center">
                 <p className="text-xs font-bold text-salon-charcoal/60">معرّف المؤسسة</p>
-                <p dir="ltr" className="mt-1 text-2xl font-black tracking-wide text-salon-ink">{created.slug}</p>
+                <p dir="ltr" className="mt-1 text-2xl font-bold tracking-wide text-salon-ink">{created.slug}</p>
               </div>
             ) : null}
             <button
@@ -90,7 +90,7 @@ export default function SignupPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block text-sm font-semibold">
               اسم المؤسسة
-              <input name="organizationName" required className="dashboard-field mt-2" placeholder="مثال: صالونات تنال" />
+              <input name="organizationName" required className="dashboard-field mt-2" placeholder="مثال: صالونات الرؤية" />
             </label>
             <label className="block text-sm font-semibold">
               اسم أول صالون <span className="font-medium text-salon-charcoal/55">(اختياري)</span>

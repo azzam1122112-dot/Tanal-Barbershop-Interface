@@ -62,7 +62,7 @@ function ConfirmDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-end justify-center bg-salon-ink/55 px-4 py-5 backdrop-blur-sm sm:items-center"
+      className="fixed inset-0 z-[100] flex items-end justify-center bg-salon-ink/55 px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] backdrop-blur-sm sm:items-center"
       onClick={onCancel}
     >
       <section
@@ -76,14 +76,14 @@ function ConfirmDialog({
         <div className="flex items-start gap-3">
           <span
             aria-hidden="true"
-            className={`grid h-11 w-11 shrink-0 place-items-center rounded-full text-xl font-black ${
+            className={`grid h-11 w-11 shrink-0 place-items-center rounded-full text-xl font-bold ${
               danger ? "bg-salon-ruby/10 text-salon-ruby" : "bg-salon-gold/15 text-salon-gold"
             }`}
           >
             {danger ? "!" : "؟"}
           </span>
           <div className="min-w-0">
-            <h2 id="confirm-dialog-title" className="text-lg font-black leading-tight">
+            <h2 id="confirm-dialog-title" className="text-lg font-bold leading-tight">
               {options.title}
             </h2>
             {options.description ? (
@@ -95,7 +95,7 @@ function ConfirmDialog({
           <button
             type="button"
             onClick={onCancel}
-            className="h-12 w-full rounded-xl border border-salon-line bg-white font-black text-salon-charcoal transition active:scale-[0.99]"
+            className="h-12 w-full rounded-xl border border-salon-line bg-white font-bold text-salon-charcoal transition active:scale-[0.99]"
           >
             {options.cancelLabel ?? "إلغاء"}
           </button>
@@ -103,7 +103,7 @@ function ConfirmDialog({
             ref={confirmRef}
             type="button"
             onClick={onConfirm}
-            className={`h-12 w-full rounded-xl font-black text-white shadow-sm transition active:scale-[0.99] ${
+            className={`h-12 w-full rounded-xl font-bold text-white shadow-sm transition active:scale-[0.99] ${
               danger ? "bg-salon-ruby" : "bg-salon-gold"
             }`}
           >

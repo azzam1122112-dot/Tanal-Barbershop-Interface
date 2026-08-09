@@ -2,12 +2,13 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { updateBarberSchema } from "@/lib/auth/validation";
-import { requireAdminApi, getRequestMeta, parseJsonBody } from "@/lib/auth/http";
+import { requireBarberAdminApi, requireBarberOversightApi, getRequestMeta, parseJsonBody } from "@/lib/auth/http";
+import { isSalonAllowed } from "@/lib/auth/salon-scope";
 import { toSafeBarber } from "@/lib/auth/sanitize";
 import { writeAuditLog } from "@/lib/audit/audit-log";
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
-  const auth = await requireAdminApi();
+  const auth = await requireBarberOversightApi();
   if (auth.response) return auth.response;
   const session = auth.session;
   if (!session || session.type !== "dashboard") return NextResponse.json({ message: "غير مصرح" }, { status: 401 });
@@ -25,6 +26,27 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     return NextResponse.json({ message: "الحلاق غير موجود" }, { status: 404 });
   }
 
+  // المشرف: نقل بين فروعه المسندة فقط — لا تعديل اسم/جوال/تفعيل.
+  const isScoped = session.scopedSalonIds !== null;
+  if (isScoped) {
+    if (!isSalonAllowed(session, before.salonId)) {
+      return NextResponse.json({ message: "هذا الحلاق خارج فروعك المسندة" }, { status: 403 });
+    }
+
+    const changedFields = Object.keys(parsed.data).filter((key) => key !== "salonId");
+    if (changedFields.length > 0) {
+      return NextResponse.json({ message: "صلاحيتك تسمح بنقل الحلاق بين فروعك فقط" }, { status: 403 });
+    }
+
+    if (!parsed.data.salonId) {
+      return NextResponse.json({ message: "اختر الفرع المراد نقل الحلاق إليه" }, { status: 400 });
+    }
+
+    if (!isSalonAllowed(session, parsed.data.salonId)) {
+      return NextResponse.json({ message: "لا يمكنك النقل إلا إلى أحد فروعك المسندة" }, { status: 403 });
+    }
+  }
+
   if (parsed.data.salonId && parsed.data.salonId !== before.salonId) {
     const salon = await prisma.salon.findFirst({
       where: { id: parsed.data.salonId, organizationId: session.organizationId, isActive: true },
@@ -33,7 +55,21 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     if (!salon) {
       return NextResponse.json({ message: "الفرع غير موجود" }, { status: 404 });
     }
+
+    // النقل مع جلسة صندوق مفتوحة يترك كاشًا معلّقًا في الفرع القديم.
+    const openSession = await prisma.cashSession.findFirst({
+      where: { barberId: id, status: "OPEN" },
+      select: { id: true },
+    });
+    if (openSession) {
+      return NextResponse.json(
+        { message: "لا يمكن نقل الحلاق ولديه جلسة صندوق مفتوحة. أغلق الجلسة أولًا ثم انقله." },
+        { status: 409 },
+      );
+    }
   }
+
+  const isTransfer = Boolean(parsed.data.salonId && parsed.data.salonId !== before.salonId);
 
   try {
     const barber = await prisma.barber.update({
@@ -47,7 +83,11 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       organizationId: session.organizationId,
       actorType: session.role,
       actorUserId: session.user.id,
-      action: before.isActive && parsed.data.isActive === false ? "barber.disabled" : "barber.updated",
+      action: isTransfer
+        ? "barber.transferred"
+        : before.isActive && parsed.data.isActive === false
+          ? "barber.disabled"
+          : "barber.updated",
       entityType: "Barber",
       entityId: barber.id,
       before: toSafeBarber(before, true),
@@ -66,7 +106,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 }
 
 export async function DELETE(_request: Request, context: { params: Promise<{ id: string }> }) {
-  const auth = await requireAdminApi();
+  const auth = await requireBarberAdminApi();
   if (auth.response) return auth.response;
   const session = auth.session;
   if (!session || session.type !== "dashboard") return NextResponse.json({ message: "غير مصرح" }, { status: 401 });

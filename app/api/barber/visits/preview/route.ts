@@ -27,6 +27,7 @@ export async function POST(request: Request) {
       customerId: parsed.data.customerId,
       barberId: session.barber.id,
       serviceIds: parsed.data.serviceIds,
+      products: parsed.data.products,
       grossAmount: parsed.data.grossAmount,
       paymentMethod: parsed.data.paymentMethod,
       campaignId: parsed.data.campaignId,

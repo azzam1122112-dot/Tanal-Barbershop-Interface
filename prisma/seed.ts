@@ -57,7 +57,14 @@ async function main() {
   // المؤسسة الافتراضية + الصالون الافتراضي
   const organization = await prisma.organization.upsert({
     where: { id: DEFAULT_ORG_ID },
-    update: {},
+    // المؤسسة الافتراضية مؤسسة تشغيل لا تجربة: نثبّت اشتراكها فعّالًا ونمسح
+    // تاريخ التجربة، وإلا بقيت قواعد قديمة عالقة على تجربة منتهية فيتوقف التشغيل.
+    update: {
+      status: "ACTIVE",
+      planId: DEFAULT_PLAN_ID,
+      subscriptionStatus: "ACTIVE",
+      trialEndsAt: null,
+    },
     create: {
       id: DEFAULT_ORG_ID,
       name: "صالون تانال",

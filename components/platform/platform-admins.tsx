@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
+import { formatDate } from "@/lib/format";
 
 type AdminRow = {
   id: string;
@@ -74,7 +75,7 @@ export function PlatformAdmins({ initialAdmins, currentAdminId }: { initialAdmin
   }
 
   return (
-    <div className="mt-6 grid gap-6 xl:grid-cols-[360px_1fr]">
+    <div className="mt-6 grid items-start gap-6 xl:grid-cols-[360px_1fr]">
       <DashboardToast toast={toast} onClose={() => setToast(null)} />
 
       <div className="space-y-6">
@@ -94,7 +95,8 @@ export function PlatformAdmins({ initialAdmins, currentAdminId }: { initialAdmin
         </form>
       </div>
 
-      <div className="dashboard-panel overflow-x-auto">
+      <div className="dashboard-panel table-scroll-wrap overflow-hidden">
+        <div className="table-scroll">
         <table className="dashboard-table min-w-[560px]">
           <thead>
             <tr>
@@ -110,7 +112,7 @@ export function PlatformAdmins({ initialAdmins, currentAdminId }: { initialAdmin
                   <p className="font-bold text-salon-ink">{admin.name} {admin.id === currentAdminId ? <span className="text-xs font-semibold text-salon-gold">(أنت)</span> : null}</p>
                   <p className="text-xs font-medium text-salon-charcoal/70" dir="ltr">{admin.email}</p>
                 </td>
-                <td className="text-xs text-salon-charcoal/70">{admin.lastLoginAt ? new Date(admin.lastLoginAt).toLocaleDateString("ar-SA") : "—"}</td>
+                <td className="text-xs text-salon-charcoal/70">{admin.lastLoginAt ? formatDate(admin.lastLoginAt) : "—"}</td>
                 <td>
                   <button
                     type="button"
@@ -125,6 +127,7 @@ export function PlatformAdmins({ initialAdmins, currentAdminId }: { initialAdmin
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

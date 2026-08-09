@@ -14,26 +14,29 @@ const navGroups: NavGroup[] = [
       { href: "/dashboard", label: "الرئيسية", description: "ملخص الأداء", icon: "home" },
       { href: "/dashboard/reports", label: "التقارير", description: "أرقام ومؤشرات", icon: "reports" },
       { href: "/dashboard/daily-close", label: "جلسات الصندوق", description: "الإغلاق والتحصيل", icon: "cash" },
+      { href: "/dashboard/commissions", label: "المستحقات", description: "عمولات الحلاقين", icon: "billing" },
+      { href: "/dashboard/salons-compare", label: "مقارنة الفروع", description: "أي فرع يتفوّق", icon: "reports" },
       { href: "/dashboard/post-close-adjustments", label: "تصحيحات الإغلاق", description: "مراجعة الفروقات", icon: "adjustments" },
     ],
   },
   {
     title: "التشغيل",
     items: [
+      { href: "/dashboard/appointments", label: "المواعيد", description: "حجوزات اليوم", icon: "visits" },
       { href: "/dashboard/visits", label: "الزيارات", description: "سجل الخدمات", icon: "visits" },
-      { href: "/dashboard/barbers", label: "الحلاقون", description: "الحسابات والصلاحية", icon: "barbers", hideFromSupervisor: true },
+      { href: "/dashboard/barbers", label: "الحلاقون", description: "الفريق والنقل بين الفروع", icon: "barbers" },
+      { href: "/dashboard/customers", label: "العملاء", description: "البيانات والولاء", icon: "customers" },
+      { href: "/dashboard/attendance", label: "الحضور", description: "دوام الحلاقين", icon: "staff" },
       { href: "/dashboard/services", label: "الخدمات", description: "القائمة والأسعار", icon: "services", hideFromSupervisor: true },
-      { href: "/dashboard/customers", label: "العملاء", description: "البيانات والولاء", icon: "customers", hideFromSupervisor: true },
+      { href: "/dashboard/products", label: "المنتجات", description: "الكتالوج والمخزون", icon: "services", hideFromSupervisor: true },
     ],
   },
   {
-    title: "التسويق",
-    hideFromSupervisor: true,
+    title: "الولاء والتسويق",
     items: [
       { href: "/dashboard/loyalty", label: "الولاء", description: "النقاط والمكافآت", icon: "loyalty" },
       { href: "/dashboard/campaigns", label: "الحملات", description: "العروض والاستهداف", icon: "campaigns" },
       { href: "/dashboard/whatsapp", label: "واتساب", description: "قوالب ورسائل", icon: "whatsapp" },
-      { href: "/dashboard/settings", label: "الإعدادات", description: "النظام والتفضيلات", icon: "settings" },
     ],
   },
   {
@@ -49,6 +52,7 @@ const navGroups: NavGroup[] = [
     adminOnly: true,
     items: [
       { href: "/dashboard/staff", label: "الموظفون", description: "المدراء والمشرفون", icon: "staff" },
+      { href: "/dashboard/settings", label: "الإعدادات", description: "النظام والتفضيلات", icon: "settings" },
     ],
   },
 ];
@@ -72,7 +76,7 @@ export function DashboardNav({ role }: { role: "OWNER" | "ADMIN" | "SUPERVISOR" 
     <nav className="mt-2 space-y-6 lg:mt-6">
       {visibleGroups.map((group) => (
         <section key={group.title}>
-          <p className="px-3 text-[11px] font-black uppercase tracking-[0.08em] text-white/42">{group.title}</p>
+          <p className="px-3 text-[11px] font-bold uppercase tracking-[0.08em] text-white/42">{group.title}</p>
           <div className="mt-2 space-y-1">
             {group.items.map((item) => {
               const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`));
@@ -102,7 +106,7 @@ export function DashboardNav({ role }: { role: "OWNER" | "ADMIN" | "SUPERVISOR" 
                     <Icon name={item.icon} className="h-[18px] w-[18px]" />
                   </span>
                   <span className="min-w-0">
-                    <span className="block truncate font-black">{item.label}</span>
+                    <span className="block truncate font-bold">{item.label}</span>
                     <span className={`mt-0.5 block truncate text-xs font-bold ${isActive ? "text-salon-charcoal" : "text-white/45"}`}>
                       {item.description}
                     </span>

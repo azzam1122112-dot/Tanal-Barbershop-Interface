@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { requireAdminApi } from "@/lib/auth/http";
+import { requireLoyaltyOperatorApi } from "@/lib/auth/http";
 import { toSafeRewardRule } from "@/lib/loyalty/reward-summary";
 
 export async function GET() {
-  const auth = await requireAdminApi();
+  const auth = await requireLoyaltyOperatorApi();
   if (auth.response) return auth.response;
   const session = auth.session;
   if (!session || session.type !== "dashboard") {

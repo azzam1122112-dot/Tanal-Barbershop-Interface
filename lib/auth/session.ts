@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import type { AuditActorType, PrismaClient, UserRole } from "@prisma/client";
-import { getSessionExpiresAt } from "./config";
+import { SESSION_LAST_USED_REFRESH_MS, getSessionExpiresAt } from "./config";
 import { toSafeAdminUser, toSafeBarber } from "./sanitize";
 
 export type AuthSession =
@@ -9,7 +9,8 @@ export type AuthSession =
       id: string;
       role: "OWNER" | "ADMIN" | "SUPERVISOR";
       organizationId: string;
-      // الفرع النشط (فلتر العرض). للمشرف يكون دائمًا أحد فروعه المسندة.
+      // الفرع النشط (فلتر العرض). `null` = عرض مجمّع: كل الفروع للمالك/المدير،
+      // وكل الفروع المسندة للمشرف. استخدم `salonScopeWhere` دائمًا للاستعلام.
       salonId: string | null;
       // نطاق الفروع المسموح بها: null = كل الفروع (مالك/مدير)، مصفوفة = فروع المشرف المسندة.
       scopedSalonIds: string[] | null;
@@ -101,10 +102,15 @@ export async function getAuthSession(prisma: PrismaClient, token?: string | null
     return null;
   }
 
-  await prisma.session.update({
-    where: { id: session.id },
-    data: { lastUsedAt: new Date() },
-  });
+  // `lastUsedAt` مؤشر نشاط للصيانة فقط، ولا يُقرأ في أي مسار تشغيلي.
+  // تحديثه في كل طلب كان يعني كتابة في DB مع كل صفحة ونداء API — نُخفّفه لفاصل ثابت.
+  const now = new Date();
+  if (!session.lastUsedAt || now.getTime() - session.lastUsedAt.getTime() >= SESSION_LAST_USED_REFRESH_MS) {
+    await prisma.session.update({
+      where: { id: session.id },
+      data: { lastUsedAt: now },
+    });
+  }
 
   if (session.platformAdmin && session.platformAdmin.isActive) {
     return {
@@ -136,11 +142,10 @@ export async function getAuthSession(prisma: PrismaClient, token?: string | null
       const scopedSalonIds = assignments.map((row) => row.salonId);
       // مشرف بلا فروع مسندة (أو حُذفت فروعه) لا يملك أي نطاق تشغيلي — امنع الوصول.
       if (scopedSalonIds.length === 0) return null;
-      // اضمن أن الفرع النشط دائمًا أحد فروعه المسندة (لا يتسرّب عرض كل الفروع).
+      // الفرع النشط إما أحد فروعه المسندة، أو null بمعنى «كل فروعي مجتمعة».
+      // القيد الحقيقي يبقى `scopedSalonIds` عبر `salonScopeWhere` — لا يتسرّب فرع خارجه أبدًا.
       const salonId =
-        session.activeSalonId && scopedSalonIds.includes(session.activeSalonId)
-          ? session.activeSalonId
-          : scopedSalonIds[0];
+        session.activeSalonId && scopedSalonIds.includes(session.activeSalonId) ? session.activeSalonId : null;
       return {
         type: "dashboard",
         id: session.id,

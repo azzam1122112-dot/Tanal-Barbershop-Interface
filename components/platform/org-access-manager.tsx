@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { formatDate } from "@/lib/format";
 
 type Member = { id: string; name: string; email: string | null; phone: string | null; role: string; isActive: boolean; lastLoginAt: string | null };
 type Barber = { id: string; name: string; phone: string; salonName: string | null; isActive: boolean; lastLoginAt: string | null };
@@ -12,7 +13,7 @@ const ROLE_LABELS: Record<string, string> = { OWNER: "مالك", ADMIN: "مدي�
 type Issued = { name: string; login: string; secret: string; kind: "password" | "pin" };
 
 function lastLoginText(iso: string | null) {
-  return iso ? `آخر دخول ${new Date(iso).toLocaleDateString("ar-SA")}` : "لم يدخل بعد";
+  return iso ? `آخر دخول ${formatDate(iso)}` : "لم يدخل بعد";
 }
 
 export function OrgAccessManager({ orgId, members, barbers }: { orgId: string; members: Member[]; barbers: Barber[] }) {
@@ -78,7 +79,7 @@ export function OrgAccessManager({ orgId, members, barbers }: { orgId: string; m
                 {issued.kind === "password" ? "كلمة مرور مؤقتة" : "رمز دخول مؤقت"} · {issued.name}
               </p>
               {issued.login ? <p className="mt-0.5 text-xs font-medium text-salon-charcoal/70" dir="ltr">{issued.login}</p> : null}
-              <p className="mt-2 select-all rounded-lg border border-salon-line bg-white px-3 py-2 font-mono text-lg font-bold tracking-wider text-salon-ink" dir="ltr">{issued.secret}</p>
+              <p className="mt-2 select-all rounded-xl border border-salon-line bg-white px-3 py-2 font-mono text-lg font-bold tracking-wider text-salon-ink" dir="ltr">{issued.secret}</p>
               <p className="mt-2 text-xs font-medium text-salon-charcoal/70">لن تظهر مرة أخرى. على المستخدم تغييرها بعد أول دخول.</p>
             </div>
             <div className="flex shrink-0 flex-col gap-2">

@@ -34,9 +34,17 @@ export function getCloseDateRange(date: Date | string) {
   return { from, to };
 }
 
-export async function getDailyCloseSummary(prisma: DailyClosePrisma, date: Date | string = new Date(), organizationId?: string) {
+export async function getDailyCloseSummary(
+  prisma: DailyClosePrisma,
+  date: Date | string = new Date(),
+  organizationId?: string,
+  salonIds?: string[] | null,
+) {
   const closeDate = normalizeCloseDate(date);
-  const orgFilter = organizationId ? { organizationId } : {};
+  const orgFilter = {
+    ...(organizationId ? { organizationId } : {}),
+    ...(salonIds && salonIds.length > 0 ? { salonId: { in: salonIds } } : {}),
+  };
   const [barbers, closes] = await Promise.all([
     prisma.barber.findMany({ where: { isActive: true, ...orgFilter }, orderBy: { name: "asc" } }),
     prisma.dailyClose.findMany({
@@ -159,7 +167,7 @@ export async function closeBarberDay(prisma: PrismaClient, input: DailyCloseInpu
   });
 }
 
-export async function getDailyCloseHistory(prisma: DailyClosePrisma, filters: { organizationId?: string | null; from?: Date | string | null; to?: Date | string | null; barberId?: string | null } = {}) {
+export async function getDailyCloseHistory(prisma: DailyClosePrisma, filters: { organizationId?: string | null; salonIds?: string[] | null; from?: Date | string | null; to?: Date | string | null; barberId?: string | null } = {}) {
   const fallback = getCloseDateRange(new Date());
   const from = filters.from ? normalizeCloseDate(filters.from) : fallback.from;
   const to = filters.to ? getCloseDateRange(filters.to).to : fallback.to;
@@ -168,6 +176,7 @@ export async function getDailyCloseHistory(prisma: DailyClosePrisma, filters: { 
     where: {
       date: { gte: from, lt: to },
       ...(filters.organizationId ? { organizationId: filters.organizationId } : {}),
+      ...(filters.salonIds && filters.salonIds.length > 0 ? { salonId: { in: filters.salonIds } } : {}),
       ...(filters.barberId ? { barberId: filters.barberId } : {}),
     },
     include: { barber: true, receivedBy: true },

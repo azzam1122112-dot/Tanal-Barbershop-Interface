@@ -33,11 +33,13 @@ export function DashboardMobileBar({
 
   return (
     <div className="lg:hidden">
-      <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-white/5 bg-sidebar-onyx px-4 py-3 text-white shadow-lux">
+      {/* حشو علوي بمنطقة الأمان: `viewport-fit=cover` يمدّ الصفحة تحت شريط الحالة
+          والنتوء، فبدونه يختفي الشعار وزر القائمة خلف حافة الجهاز. */}
+      <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-white/5 bg-sidebar-onyx px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] text-white shadow-lux">
         <div className="flex min-w-0 items-center gap-3">
           <BrandLogo className="h-10 w-10 ring-1 ring-salon-gold/30" priority />
           <div className="min-w-0 leading-tight">
-            <p className="text-[10px] font-bold uppercase tracking-eyebrow text-salon-goldlight">واجهة تنال</p>
+            <p className="text-[10px] font-bold uppercase tracking-eyebrow text-salon-goldlight">منصة XMANSX</p>
             <p className="truncate text-sm font-bold">لوحة الإدارة</p>
           </div>
         </div>
@@ -55,12 +57,12 @@ export function DashboardMobileBar({
       {open ? (
         <div className="fixed inset-0 z-50">
           <button type="button" aria-label="إغلاق القائمة" className="absolute inset-0 cursor-default bg-black/50 backdrop-blur-sm" onClick={close} />
-          <aside className="absolute inset-y-0 right-0 flex w-[300px] max-w-[86vw] flex-col bg-sidebar-onyx px-4 py-4 text-white shadow-[var(--shadow-sidebar)]">
+          <aside className="absolute inset-y-0 right-0 flex w-[320px] max-w-[86vw] flex-col bg-sidebar-onyx px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] text-white shadow-[var(--shadow-sidebar)]">
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
                 <BrandLogo className="h-11 w-11 ring-1 ring-salon-gold/30" />
                 <div className="min-w-0">
-                  <p className="text-[10px] font-bold uppercase tracking-eyebrow text-salon-goldlight">واجهة تنال</p>
+                  <p className="text-[10px] font-bold uppercase tracking-eyebrow text-salon-goldlight">منصة XMANSX</p>
                   <p className="truncate text-sm font-bold">لوحة الإدارة</p>
                 </div>
               </div>
@@ -68,14 +70,14 @@ export function DashboardMobileBar({
                 type="button"
                 onClick={close}
                 aria-label="إغلاق"
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.06] text-white transition-colors hover:bg-white/[0.12]"
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.06] text-white transition-colors hover:bg-white/[0.12]"
               >
                 <Icon name="close" className="h-5 w-5" />
               </button>
             </div>
 
             <div className="mt-4">
-              <SalonSwitcher salons={salons} activeSalonId={activeSalonId} allowAll={role !== "SUPERVISOR"} />
+              <SalonSwitcher salons={salons} activeSalonId={activeSalonId} allLabel={role === "SUPERVISOR" ? "كل فروعي" : "كل الفروع"} />
             </div>
 
             <div className="mt-4 min-h-0 flex-1 overflow-y-auto">

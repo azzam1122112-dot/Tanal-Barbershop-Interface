@@ -13,12 +13,9 @@ export async function POST(request: Request) {
 
   const { salonId } = await parseJsonBody<{ salonId?: string | null }>(request);
 
-  // قيمة فارغة/null/"all" تعني عرض كل الفروع مجتمعة (إلغاء الفرع النشط).
+  // قيمة فارغة/null/"all" تعني العرض المجمّع: كل الفروع للمالك/المدير،
+  // وكل الفروع المسندة للمشرف — القيد يبقى مطبّقًا عبر `salonScopeWhere`.
   if (!salonId || salonId === "all") {
-    // المشرف مقيّد بفروعه المسندة فلا يُسمح له بعرض كل الفروع مجتمعة.
-    if (session.scopedSalonIds !== null) {
-      return NextResponse.json({ message: "اختر فرعًا من فروعك المسندة" }, { status: 403 });
-    }
     await prisma.session.update({
       where: { id: session.id },
       data: { activeSalonId: null },

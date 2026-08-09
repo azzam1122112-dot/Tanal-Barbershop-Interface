@@ -3,7 +3,72 @@ import { Prisma } from "@prisma/client";
 import type { PaymentMethod, PrismaClient } from "@prisma/client";
 import { getAvailableCampaigns, getEligibleCampaignOrThrow } from "@/lib/campaigns/campaign-eligibility";
 import { assertOpenCashSession } from "@/lib/cash-sessions/cash-session-service";
-import { calculateVisitTotals } from "@/lib/loyalty/calculations";
+import { calculateVisitTotals, readVatSettings } from "@/lib/loyalty/calculations";
+import { getEffectiveSettings } from "@/lib/settings/system-settings";
+import { issueInvoiceNumber } from "@/lib/invoicing/invoice-number";
+import { assertSubscriptionActive } from "@/lib/plans/subscription-guard";
+import { calculateVisitCommission } from "@/lib/commissions/commission";
+import { recordStockMovement } from "@/lib/products/product-service";
+import { roundMoney } from "@/lib/visits/visit-totals";
+
+/** يحوّل قيمة Decimal اختيارية إلى رقم، أو null إن كانت غائبة. */
+function numberOrNull(value: { toString(): string } | number | null | undefined) {
+  return value == null ? null : Number(value);
+}
+
+type ResolvedProductLine = {
+  productId: string;
+  productName: string;
+  unitPrice: number;
+  quantity: number;
+  lineTotal: number;
+  commissionRate: number | null;
+  stockQuantity: number;
+};
+
+/**
+ * يحوّل طلب المنتجات إلى سطور بأسعار الكتالوج ويتحقق من التوفر.
+ * الأسعار **لا تُقبل من العميل** — تُقرأ من قاعدة البيانات دائمًا.
+ */
+async function resolveProductLines(prisma: VisitPrisma, input: VisitInput): Promise<ResolvedProductLine[]> {
+  const requested = (input.products ?? []).filter((line) => line.quantity > 0);
+  if (requested.length === 0) return [];
+
+  const merged = new Map<string, number>();
+  for (const line of requested) {
+    merged.set(line.productId, (merged.get(line.productId) ?? 0) + Math.trunc(line.quantity));
+  }
+
+  const products = await prisma.product.findMany({
+    where: {
+      id: { in: [...merged.keys()] },
+      organizationId: input.organizationId,
+      salonId: input.salonId,
+      isActive: true,
+    },
+  });
+
+  if (products.length !== merged.size) {
+    throw new BusinessError("أحد المنتجات المختارة غير متاح في هذا الفرع");
+  }
+
+  return products.map((product) => {
+    const quantity = merged.get(product.id) ?? 0;
+    if (quantity > product.stockQuantity) {
+      throw new BusinessError(`الكمية المتاحة من ${product.name} هي ${product.stockQuantity} فقط`, 409);
+    }
+    const unitPrice = Number(product.price);
+    return {
+      productId: product.id,
+      productName: product.name,
+      unitPrice,
+      quantity,
+      lineTotal: roundMoney(unitPrice * quantity),
+      commissionRate: numberOrNull(product.commissionRate),
+      stockQuantity: product.stockQuantity,
+    };
+  });
+}
 import { getActiveManagerRewards, getRedeemableManagerRewardOrThrow } from "@/lib/manager-rewards/manager-reward-service";
 import { toSafeService } from "@/lib/services/service-summary";
 
@@ -15,6 +80,8 @@ type VisitInput = {
   customerId: string;
   barberId: string;
   serviceIds: string[];
+  /** منتجات تُباع مع الزيارة. أسعارها من الكتالوج وتُضاف فوق مبلغ الخدمات. */
+  products?: { productId: string; quantity: number }[];
   grossAmount: number;
   paymentMethod: PaymentMethod;
   rewardRuleId?: string;
@@ -39,13 +106,17 @@ export async function buildVisitPreview(prisma: VisitPrisma, input: VisitInput) 
   }
 
   const [customer, barber, services, settings] = await Promise.all([
-    prisma.customer.findUnique({ where: { id: input.customerId }, include: { loyaltyAccount: true } }),
-    prisma.barber.findUnique({ where: { id: input.barberId } }),
+    // مقيّد بالمؤسسة: لا تُسجَّل زيارة لعميل مستأجر آخر حتى لو عُرف معرّفه.
+    prisma.customer.findFirst({
+      where: { id: input.customerId, organizationId: input.organizationId },
+      include: { loyaltyAccount: true },
+    }),
+    prisma.barber.findFirst({ where: { id: input.barberId, organizationId: input.organizationId } }),
     prisma.service.findMany({
-      where: { id: { in: serviceIds }, isActive: true },
+      where: { id: { in: serviceIds }, isActive: true, organizationId: input.organizationId, salonId: input.salonId },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     }),
-    prisma.systemSettings.findFirst({}),
+    getEffectiveSettings(prisma, { organizationId: input.organizationId, salonId: input.salonId }),
   ]);
 
   if (!customer) {
@@ -60,11 +131,16 @@ export async function buildVisitPreview(prisma: VisitPrisma, input: VisitInput) 
     throw new BusinessError("كل الخدمات المختارة يجب أن تكون نشطة");
   }
 
+  const productLines = await resolveProductLines(prisma, input);
+  const productsTotal = roundMoney(productLines.reduce((total, line) => total + line.lineTotal, 0));
+
   const totals = calculateVisitTotals({
-    grossAmount: input.grossAmount,
+    // المنتجات تُضاف فوق مبلغ الخدمات بأسعار الكتالوج، فلا يُخطئ الحلاق في جمعها.
+    grossAmount: roundMoney(input.grossAmount + productsTotal),
     discountAmount: 0,
     pointsPerCurrencyUnit: settings ? Number(settings.pointsPerCurrencyUnit) : 1,
     pointsCalculatedAfterDiscount: settings?.pointsCalculatedAfterDiscount ?? true,
+    ...readVatSettings(settings),
   });
   const pointsBalance = customer.loyaltyAccount?.points ?? 0;
   const rewards = await prisma.rewardRule.findMany({
@@ -96,10 +172,28 @@ export async function buildVisitPreview(prisma: VisitPrisma, input: VisitInput) 
       name: barber.name,
     },
     services: services.map((service) => toSafeService(service)),
+    products: productLines.map((line) => ({
+      id: line.productId,
+      name: line.productName,
+      unitPrice: line.unitPrice,
+      quantity: line.quantity,
+      lineTotal: line.lineTotal,
+    })),
+    productsTotal,
+    servicesAmount: roundMoney(input.grossAmount),
     grossAmount: totals.grossAmount,
     discountAmount: 0,
+    subtotalAmount: totals.subtotalAmount,
+    vatAmount: totals.vatAmount,
+    vatRate: totals.vatRate,
+    vatEnabled: totals.vatRate > 0,
+    vatInclusive: settings?.vatInclusive ?? true,
     netAmount: totals.netAmount,
     paymentMethod: input.paymentMethod,
+    // تُمرَّر للواجهة لتحسب المعاينة بنفس دالة الخادم `calculateVisitTotals`
+    // بدل تكرار منطق المال في العميل.
+    pointsPerCurrencyUnit: settings ? Number(settings.pointsPerCurrencyUnit) : 1,
+    pointsCalculatedAfterDiscount: settings?.pointsCalculatedAfterDiscount ?? true,
     expectedPointsEarned: totals.pointsEarned,
     pointsBalance,
     availableRewards: rewards.map((reward) => ({
@@ -172,11 +266,16 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
     }
 
     const now = new Date();
+    // الاشتراك المنتهي يوقف تسجيل الزيارات — أول بوابة قبل أي كتابة.
+    await assertSubscriptionActive(tx, input.organizationId, now);
     const cashSession = await assertOpenCashSession(tx, input.barberId);
     const preview = await buildVisitPreview(tx, input);
-    const settings = await tx.systemSettings.findFirst({});
-    const customer = await tx.customer.findUnique({
-      where: { id: input.customerId },
+    const settings = await getEffectiveSettings(tx, {
+      organizationId: input.organizationId,
+      salonId: input.salonId,
+    });
+    const customer = await tx.customer.findFirst({
+      where: { id: input.customerId, organizationId: input.organizationId },
       include: { loyaltyAccount: true },
     });
     if (!customer) {
@@ -234,12 +333,61 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
       discountAmount,
       pointsPerCurrencyUnit: settings ? Number(settings.pointsPerCurrencyUnit) : 1,
       pointsCalculatedAfterDiscount: settings?.pointsCalculatedAfterDiscount ?? true,
+      ...readVatSettings(settings),
     });
 
     const balanceAfterRedeem = startingBalance - redeemedPoints;
     if (balanceAfterRedeem < 0) {
       throw new BusinessError("رصيد النقاط لا يمكن أن يكون سالبًا");
     }
+
+    // العمولة تُحسب وقت الزيارة على المبلغ بعد الخصم وقبل الضريبة، وتُخزَّن
+    // مع نسبتها فلا يتغيّر المستحق التاريخي عند تعديل النسب لاحقًا.
+    const barberRecord = await tx.barber.findUnique({
+      where: { id: input.barberId },
+      select: { commissionRate: true },
+    });
+    const serviceRates = await tx.service.findMany({
+      where: { id: { in: preview.services.map((service) => service.id) } },
+      select: { id: true, commissionRate: true },
+    });
+    const rateByService = new Map(serviceRates.map((row) => [row.id, row.commissionRate]));
+    // المنتجات تدخل وعاء العمولة كسطور مثل الخدمات، بنسبتها الخاصة إن وُجدت.
+    const soldProducts = await resolveProductLines(tx, input);
+    const commission = calculateVisitCommission({
+      lines: [
+        ...preview.services.map((service) => ({
+          serviceId: service.id,
+          serviceName: service.name,
+          unitPrice: service.defaultPrice,
+          quantity: 1,
+          lineTotal: service.defaultPrice,
+          kind: "SERVICE" as const,
+          serviceRate: numberOrNull(rateByService.get(service.id)),
+        })),
+        ...soldProducts.map((product) => ({
+          serviceId: product.productId,
+          serviceName: product.productName,
+          unitPrice: product.unitPrice,
+          quantity: product.quantity,
+          lineTotal: product.lineTotal,
+          kind: "PRODUCT" as const,
+          serviceRate: product.commissionRate,
+        })),
+      ],
+      commissionBase: totals.subtotalAmount,
+      barberRate: numberOrNull(barberRecord?.commissionRate),
+      defaultRate: numberOrNull(settings?.defaultCommissionRate),
+    });
+    const serviceCommissionLines = commission.lines.filter((line) => line.kind === "SERVICE");
+    const productCommissionLines = commission.lines.filter((line) => line.kind === "PRODUCT");
+
+    // رقم فاتورة تسلسلي لكل زيارة — داخل المعاملة نفسها فلا يتكرر ولا ينكسر التسلسل.
+    const invoiceNumber = await issueInvoiceNumber(tx, {
+      organizationId: input.organizationId,
+      salonId: input.salonId,
+      date: now,
+    });
 
     const visit = await tx.visit.create({
       data: {
@@ -250,6 +398,11 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
         status: "COMPLETED",
         grossAmount: totals.grossAmount,
         discountAmount: totals.discountAmount,
+        subtotalAmount: totals.subtotalAmount,
+        vatAmount: totals.vatAmount,
+        vatRate: totals.vatRate,
+        invoiceNumber,
+        commissionAmount: commission.totalCommission,
         netAmount: totals.netAmount,
         paymentMethod: input.paymentMethod,
         discountType: reward ? "REWARD" : managerReward ? "MANAGER_REWARD" : campaignSelection ? "CAMPAIGN" : "NONE",
@@ -259,12 +412,25 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
         pointsEarned: totals.pointsEarned,
         visitedAt: now,
         services: {
-          create: preview.services.map((service) => ({
-            serviceId: service.id,
-            serviceName: service.name,
-            unitPrice: service.defaultPrice,
+          create: serviceCommissionLines.map((line) => ({
+            serviceId: line.serviceId,
+            serviceName: line.serviceName,
+            unitPrice: line.unitPrice,
             quantity: 1,
-            lineTotal: service.defaultPrice,
+            lineTotal: line.lineTotal,
+            commissionRate: line.commissionRate,
+            commissionAmount: line.commissionAmount,
+          })),
+        },
+        productLines: {
+          create: productCommissionLines.map((line) => ({
+            productId: line.serviceId,
+            productName: line.serviceName,
+            unitPrice: line.unitPrice,
+            quantity: line.quantity,
+            lineTotal: line.lineTotal,
+            commissionRate: line.commissionRate,
+            commissionAmount: line.commissionAmount,
           })),
         },
       },
@@ -276,6 +442,19 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
         campaignRedemption: true,
       },
     });
+
+    // خصم المخزون داخل المعاملة نفسها: إما تُحفظ الزيارة ويُخصم المخزون معًا، أو لا شيء.
+    for (const line of productCommissionLines) {
+      await recordStockMovement(tx, {
+        productId: line.serviceId,
+        organizationId: input.organizationId,
+        type: "SALE",
+        quantity: -line.quantity,
+        reason: `بيع ضمن زيارة`,
+        visitId: visit.id,
+        recordedByBarberId: input.barberId,
+      });
+    }
 
     const campaignRedemption = campaignSelection
       ? await tx.campaignRedemption.create({
@@ -368,7 +547,10 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
           cashSessionId: cashSession.id,
           grossAmount: totals.grossAmount,
           discountAmount: totals.discountAmount,
+          vatAmount: totals.vatAmount,
           netAmount: totals.netAmount,
+          commissionAmount: commission.totalCommission,
+          invoiceNumber,
           paymentMethod: input.paymentMethod,
           serviceIds: input.serviceIds,
           rewardRuleId: reward?.id ?? null,
@@ -485,6 +667,10 @@ function toConfirmedVisitSummary(visit: ConfirmedVisit) {
     })),
     grossAmount: Number(visit.grossAmount),
     discountAmount: Number(visit.discountAmount),
+    subtotalAmount: Number(visit.subtotalAmount),
+    vatAmount: Number(visit.vatAmount),
+    vatRate: Number(visit.vatRate),
+    invoiceNumber: visit.invoiceNumber,
     netAmount: Number(visit.netAmount),
     paymentMethod: visit.paymentMethod,
     discountType: visit.discountType,

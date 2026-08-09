@@ -2,11 +2,20 @@
 
 import { FormEvent, useCallback, useState } from "react";
 import { useModalDismiss } from "@/components/use-modal-dismiss";
+import { calculateVisitTotals } from "@/lib/loyalty/calculations";
+import { formatDate } from "@/lib/format";
 
 type ServiceOption = {
   id: string;
   name: string;
   defaultPrice: number;
+};
+
+type ProductOption = {
+  id: string;
+  name: string;
+  price: number;
+  stockQuantity: number;
 };
 
 type VisitPreview = {
@@ -19,6 +28,13 @@ type VisitPreview = {
   paymentMethod: "CASH" | "NETWORK";
   expectedPointsEarned: number;
   pointsBalance: number;
+  vatEnabled: boolean;
+  vatRate: number;
+  vatInclusive: boolean;
+  pointsPerCurrencyUnit: number;
+  pointsCalculatedAfterDiscount: boolean;
+  productsTotal: number;
+  servicesAmount: number;
   availableRewards: Array<{
     id: string;
     pointsRequired: number;
@@ -43,8 +59,18 @@ type VisitPreview = {
   }>;
 };
 
-export function VisitForm({ customerId, services }: { customerId: string; services: ServiceOption[] }) {
+export function VisitForm({
+  customerId,
+  services,
+  products = [],
+}: {
+  customerId: string;
+  services: ServiceOption[];
+  products?: ProductOption[];
+}) {
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  // كمية كل منتج مباع مع الزيارة؛ الأسعار تُحسب في الخادم لا هنا.
+  const [productQuantities, setProductQuantities] = useState<Record<string, number>>({});
   const [grossAmount, setGrossAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"CASH" | "NETWORK">("CASH");
   const [preview, setPreview] = useState<VisitPreview | null>(null);
@@ -53,6 +79,7 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
   const [message, setMessage] = useState("");
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [loadingConfirm, setLoadingConfirm] = useState(false);
+  const [confirmedVisitId, setConfirmedVisitId] = useState<string | null>(null);
 
   const closePreview = useCallback(() => {
     setPreview(null);
@@ -67,6 +94,21 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
     setSelectedServices((current) => (current.includes(id) ? current.filter((serviceId) => serviceId !== id) : [...current, id]));
   }
 
+  function changeProductQuantity(product: ProductOption, delta: number) {
+    setPreview(null);
+    setSelectedDiscount("NONE");
+    setProductQuantities((current) => {
+      const next = Math.max(0, Math.min(product.stockQuantity, (current[product.id] ?? 0) + delta));
+      const updated = { ...current, [product.id]: next };
+      if (next === 0) delete updated[product.id];
+      return updated;
+    });
+  }
+
+  const selectedProducts = Object.entries(productQuantities)
+    .filter(([, quantity]) => quantity > 0)
+    .map(([productId, quantity]) => ({ productId, quantity }));
+
   async function submitPreview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage("");
@@ -78,6 +120,7 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
       body: JSON.stringify({
         customerId,
         serviceIds: selectedServices,
+        products: selectedProducts,
         grossAmount,
         paymentMethod,
       }),
@@ -104,6 +147,7 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
       body: JSON.stringify({
         customerId,
         serviceIds: selectedServices,
+        products: selectedProducts,
         grossAmount,
         paymentMethod,
         rewardRuleId: selectedDiscount.startsWith("REWARD:") ? selectedDiscount.replace("REWARD:", "") : undefined,
@@ -115,8 +159,9 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
     const data = (await response.json().catch(() => ({}))) as { visit?: { id: string; customer: { id: string } }; message?: string };
 
     if (response.ok && data.visit) {
-      setMessage("تم حفظ الزيارة بنجاح");
-      window.location.href = "/barber";
+      // لا نعود للرئيسية مباشرة: الحلاق يحتاج خيار تسليم الإيصال للعميل أولًا.
+      setConfirmedVisitId(data.visit.id);
+      setLoadingConfirm(false);
       return;
     }
 
@@ -134,22 +179,65 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
     ? preview?.availableCampaigns.find((campaign) => campaign.id === selectedDiscount.replace("CAMPAIGN:", ""))
     : undefined;
   const displayDiscount = selectedReward?.discountAmount ?? selectedManagerReward?.discountAmount ?? selectedCampaign?.discountAmount ?? 0;
-  const displayNetAmount = preview ? Math.max(0, preview.grossAmount - displayDiscount) : 0;
-  const displayExpectedPoints = Math.floor(displayNetAmount);
+  // نستدعي دالة الخادم نفسها (نقية، بلا قاعدة بيانات) فلا ينحرف المعروض عن المحفوظ.
+  const displayTotals = preview
+    ? calculateVisitTotals({
+        grossAmount: preview.grossAmount,
+        discountAmount: displayDiscount,
+        pointsPerCurrencyUnit: preview.pointsPerCurrencyUnit,
+        pointsCalculatedAfterDiscount: preview.pointsCalculatedAfterDiscount,
+        vatEnabled: preview.vatEnabled,
+        vatRate: preview.vatRate,
+        vatInclusive: preview.vatInclusive,
+      })
+    : null;
+  const displayNetAmount = displayTotals?.netAmount ?? 0;
+  const displayExpectedPoints = displayTotals?.pointsEarned ?? 0;
   const selectedServicesTotal = services
     .filter((service) => selectedServices.includes(service.id))
     .reduce((total, service) => total + service.defaultPrice, 0);
+  const productsSubtotal = products.reduce(
+    (total, product) => total + product.price * (productQuantities[product.id] ?? 0),
+    0,
+  );
   const canPreview = selectedServices.length > 0 && Number(grossAmount) > 0 && !loadingPreview;
+
+  if (confirmedVisitId) {
+    return (
+      <div className="barber-card mt-4 p-6 text-center">
+        <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-salon-forest/10 text-3xl text-salon-forest">
+          ✓
+        </div>
+        <h2 className="mt-4 text-2xl font-bold">تم حفظ الزيارة</h2>
+        <p className="mt-2 text-lg font-black text-salon-forest">{displayNetAmount} ريال</p>
+        <p className="mt-1 text-sm font-semibold text-salon-charcoal/70">
+          {displayExpectedPoints > 0 ? `أضيفت ${displayExpectedPoints} نقطة لرصيد العميل` : "بلا نقاط لهذه الزيارة"}
+        </p>
+
+        <div className="mt-6 grid gap-3">
+          <a href={`/receipt/${confirmedVisitId}`} className="barber-primary-button block py-4 text-center text-lg">
+            عرض وطباعة الإيصال
+          </a>
+          <a
+            href="/barber"
+            className="block rounded-2xl border border-salon-line bg-white py-4 text-center text-lg font-bold text-salon-charcoal"
+          >
+            العودة للرئيسية
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={submitPreview} className="space-y-4">
       <div className="barber-card p-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-lg font-black">الخدمات</h2>
+            <h2 className="text-lg font-bold">الخدمات</h2>
             <p className="mt-1 text-xs font-semibold text-salon-charcoal/70">اختر خدمة واحدة أو أكثر</p>
           </div>
-          <span className="rounded-full bg-salon-mist px-3 py-1 text-xs font-black text-salon-charcoal">{selectedServices.length} مختارة</span>
+          <span className="rounded-full bg-salon-mist px-3 py-1 text-xs font-bold text-salon-charcoal">{selectedServices.length} مختارة</span>
         </div>
         <div className="mt-4 grid gap-2">
           {services.map((service) => (
@@ -159,7 +247,7 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
                 selectedServices.includes(service.id) ? "border-salon-forest bg-salon-forest/10 shadow-sm shadow-salon-forest/10" : "border-salon-line bg-salon-pearl"
               }`}
             >
-              <span className="flex items-center gap-3 font-black">
+              <span className="flex items-center gap-3 font-bold">
                 <input
                   type="checkbox"
                   checked={selectedServices.includes(service.id)}
@@ -168,7 +256,7 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
                 />
                 {service.name}
               </span>
-              <span className="rounded-full bg-white px-3 py-1 text-sm font-black text-salon-forest">{service.defaultPrice} ريال</span>
+              <span className="rounded-full bg-white px-3 py-1 text-sm font-bold text-salon-forest">{service.defaultPrice} ريال</span>
             </label>
           ))}
         </div>
@@ -178,6 +266,64 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
           </div>
         ) : null}
       </div>
+
+      {products.length > 0 ? (
+        <div className="barber-card p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold">منتجات</h2>
+              <p className="mt-1 text-xs font-semibold text-salon-charcoal/70">تُضاف بأسعارها فوق مبلغ الخدمات</p>
+            </div>
+            {productsSubtotal > 0 ? (
+              <span className="rounded-full bg-salon-gold/15 px-3 py-1 text-sm font-bold text-salon-forest">
+                +{productsSubtotal} ريال
+              </span>
+            ) : null}
+          </div>
+
+          <div className="mt-3 space-y-2">
+            {products.map((product) => {
+              const quantity = productQuantities[product.id] ?? 0;
+              return (
+                <div
+                  key={product.id}
+                  className={`flex items-center justify-between gap-3 rounded-2xl border px-3 py-3 ${
+                    quantity > 0 ? "border-salon-forest bg-salon-forest/10" : "border-salon-line bg-salon-pearl"
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-bold">{product.name}</p>
+                    <p className="mt-0.5 text-xs font-semibold text-salon-charcoal/70">
+                      {product.price} ريال · متوفر {product.stockQuantity}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      aria-label={`إنقاص ${product.name}`}
+                      onClick={() => changeProductQuantity(product, -1)}
+                      disabled={quantity === 0}
+                      className="grid h-10 w-10 place-items-center rounded-xl border border-salon-line bg-white text-lg font-bold disabled:opacity-40"
+                    >
+                      −
+                    </button>
+                    <span className="w-6 text-center text-lg font-bold tabular-nums">{quantity}</span>
+                    <button
+                      type="button"
+                      aria-label={`زيادة ${product.name}`}
+                      onClick={() => changeProductQuantity(product, 1)}
+                      disabled={quantity >= product.stockQuantity}
+                      className="grid h-10 w-10 place-items-center rounded-xl border border-salon-line bg-white text-lg font-bold disabled:opacity-40"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
 
       <div className="barber-card p-4">
         <label className="block text-sm font-bold">
@@ -191,10 +337,13 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
             }}
             required
             type="number"
+            // `inputMode="decimal"` يفتح لوحة أرقام بفاصلة عشرية على iOS —
+            // `type="number"` وحده يعطي لوحة بلا فاصلة في بعض اللغات.
+            inputMode="decimal"
             min={0.01}
             step="0.01"
             placeholder="0"
-            className="barber-field mt-2 h-20 bg-salon-pearl px-3 text-center text-4xl"
+            className="barber-field lux-number mt-2 h-20 bg-salon-pearl px-3 text-center text-4xl"
           />
         </label>
         <div className="mt-4 grid grid-cols-2 gap-2">
@@ -205,7 +354,7 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
               setPreview(null);
               setSelectedDiscount("NONE");
             }}
-            className={`h-14 rounded-2xl border px-3 text-lg font-black transition active:scale-[0.98] ${paymentMethod === "CASH" ? "border-salon-forest bg-salon-forest text-white shadow-sm shadow-salon-forest/20" : "border-salon-line bg-salon-pearl text-salon-ink"}`}
+            className={`h-14 rounded-2xl border px-3 text-lg font-bold transition active:scale-[0.98] ${paymentMethod === "CASH" ? "border-salon-forest bg-salon-forest text-white shadow-sm shadow-salon-forest/20" : "border-salon-line bg-salon-pearl text-salon-ink"}`}
           >
             كاش
           </button>
@@ -216,7 +365,7 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
               setPreview(null);
               setSelectedDiscount("NONE");
             }}
-            className={`h-14 rounded-2xl border px-3 text-lg font-black transition active:scale-[0.98] ${paymentMethod === "NETWORK" ? "border-salon-forest bg-salon-forest text-white shadow-sm shadow-salon-forest/20" : "border-salon-line bg-salon-pearl text-salon-ink"}`}
+            className={`h-14 rounded-2xl border px-3 text-lg font-bold transition active:scale-[0.98] ${paymentMethod === "NETWORK" ? "border-salon-forest bg-salon-forest text-white shadow-sm shadow-salon-forest/20" : "border-salon-line bg-salon-pearl text-salon-ink"}`}
           >
             شبكة
           </button>
@@ -225,26 +374,34 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
 
       {message ? <p className="rounded-2xl border border-salon-line bg-white px-4 py-3 text-sm font-bold text-salon-charcoal shadow-sm">{message}</p> : null}
 
-      <button disabled={!canPreview} aria-busy={loadingPreview} className="barber-primary-button h-14 w-full text-lg">
-        {loadingPreview ? "جاري المعاينة..." : "معاينة العملية"}
-      </button>
+      {/* الزر لاصق أسفل الشاشة: قائمة الخدمات والمنتجات قد تطول، وكان الحلاق
+          يمرّر للأسفل بعد كل تعديل ليصل إلى «معاينة». الآن يبقى تحت إبهامه دائمًا. */}
+      <div className="sticky bottom-[max(0.5rem,env(safe-area-inset-bottom))] z-10 pt-1">
+        <button
+          disabled={!canPreview}
+          aria-busy={loadingPreview}
+          className="barber-primary-button h-14 w-full text-lg shadow-[0_10px_30px_-10px_rgba(23,59,51,0.55)]"
+        >
+          {loadingPreview ? "جاري المعاينة..." : "معاينة العملية"}
+        </button>
+      </div>
 
       {preview ? (
-        <div className="fixed inset-0 z-40 flex items-end bg-salon-ink/35 px-3 pb-3 pt-12 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="معاينة العملية">
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-salon-ink/35 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(3rem,env(safe-area-inset-top))] backdrop-blur-sm sm:items-center sm:pt-4" role="dialog" aria-modal="true" aria-label="معاينة العملية">
           <button
             type="button"
             aria-label="إغلاق المعاينة"
             className="absolute inset-0 cursor-default"
             onClick={closePreview}
           />
-          <div className="relative mx-auto flex max-h-[92vh] w-full max-w-md flex-col overflow-hidden rounded-[1.75rem] border border-salon-line bg-white shadow-2xl shadow-salon-ink/25">
-            <div className="border-b border-salon-line bg-salon-pearl p-4">
+          <div className="barber-card relative mx-auto flex max-h-[92vh] w-full max-w-md flex-col overflow-hidden shadow-[0_28px_70px_-24px_rgba(16,25,22,0.45)]">
+            <div className="barber-card-head">
               <div className="flex items-center justify-between gap-3">
                 <div className="h-1.5 w-12 rounded-full bg-salon-line" />
                 <button
                   type="button"
                   onClick={closePreview}
-                  className="rounded-full border border-salon-line bg-white px-3 py-1 text-sm font-black text-salon-charcoal"
+                  className="rounded-full border border-salon-line bg-white px-3 py-1 text-sm font-bold text-salon-charcoal"
                 >
                   تعديل
                 </button>
@@ -255,7 +412,7 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
             </div>
             <div className="min-h-0 overflow-y-auto p-4">
               <div className="rounded-2xl border border-salon-line bg-salon-pearl p-3">
-                <p className="text-sm font-black">الخصومات المتاحة</p>
+                <p className="text-sm font-bold">الخصومات المتاحة</p>
                 <p className="mt-1 text-xs font-semibold text-salon-charcoal/70">رصيد النقاط: {preview.pointsBalance}</p>
                 <div className="mt-3 grid gap-2">
                   <DiscountButton
@@ -278,7 +435,7 @@ export function VisitForm({ customerId, services }: { customerId: string; servic
                       key={reward.id}
                       selected={selectedDiscount === `MANAGER_REWARD:${reward.id}`}
                       title={reward.label}
-                      subtitle={reward.description ?? (reward.expiresAt ? `تنتهي في ${new Date(reward.expiresAt).toLocaleDateString("ar-SA")}` : "مكافأة من الإدارة")}
+                      subtitle={reward.description ?? (reward.expiresAt ? `تنتهي في ${formatDate(reward.expiresAt)}` : "مكافأة من الإدارة")}
                       onClick={() => setSelectedDiscount(`MANAGER_REWARD:${reward.id}`)}
                     />
                   ))}
@@ -344,7 +501,7 @@ function DiscountButton({
         selected ? "border-salon-forest bg-salon-forest/10 shadow-sm shadow-salon-forest/10" : "border-salon-line bg-white"
       }`}
     >
-      <span className="block text-sm font-black">{title}</span>
+      <span className="block text-sm font-bold">{title}</span>
       <span className="mt-1 block text-xs font-semibold text-salon-charcoal/70">{subtitle}</span>
     </button>
   );
@@ -354,7 +511,7 @@ function SummaryCell({ label, value, strong = false }: { label: string; value: s
   return (
     <div className="rounded-2xl border border-salon-line bg-salon-pearl p-3">
       <dt className="text-xs font-bold text-salon-charcoal/65">{label}</dt>
-      <dd className={`mt-1 break-words text-sm ${strong ? "font-black text-salon-forest" : "font-black"}`}>{value}</dd>
+      <dd className={`mt-1 break-words text-sm ${strong ? "font-bold text-salon-forest" : "font-bold"}`}>{value}</dd>
     </div>
   );
 }

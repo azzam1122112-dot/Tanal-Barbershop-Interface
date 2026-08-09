@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireDashboardApi } from "@/lib/auth/http";
+import { effectiveSalonIds } from "@/lib/auth/salon-scope";
 import { getOperationAlerts } from "@/lib/daily-close/operation-alerts";
 import { prisma } from "@/lib/db/prisma";
 
@@ -10,6 +11,6 @@ export async function GET(request: Request) {
   if (!session || session.type !== "dashboard") return NextResponse.json({ message: "غير مصرح" }, { status: 401 });
 
   const url = new URL(request.url);
-  const alerts = await getOperationAlerts(prisma, url.searchParams.get("date") ?? new Date(), session.organizationId, session.salonId);
+  const alerts = await getOperationAlerts(prisma, url.searchParams.get("date") ?? new Date(), session.organizationId, effectiveSalonIds(session));
   return NextResponse.json({ alerts });
 }

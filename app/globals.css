@@ -5,13 +5,24 @@
 :root {
   color-scheme: light;
   --font-sans: var(--font-arabic), "Segoe UI", "Tahoma";
-  background: #f3f0e9;
+  background: #f5f2fa;
 
-  /* نظام ظلال متدرّج لإحساس فاخر بالعمق */
-  --shadow-sm: 0 1px 2px rgba(16, 25, 22, 0.05), 0 1px 1px rgba(16, 25, 22, 0.04);
-  --shadow-md: 0 10px 24px -12px rgba(16, 25, 22, 0.18), 0 4px 10px -6px rgba(16, 25, 22, 0.1);
-  --shadow-lg: 0 28px 60px -28px rgba(16, 25, 22, 0.32), 0 12px 28px -18px rgba(16, 25, 22, 0.16);
+  /* ===== الظلال =====
+     ظلّان لكل مستوى: واحد قريب ضيّق يرسم الحافة، وآخر بعيد واسع منخفض العتامة
+     يرسم العمق. الظل الواحد العريض يبدو رخيصًا؛ الطبقتان تعطيان إحساس الورق الثقيل. */
+  --shadow-sm: 0 1px 2px rgba(16, 25, 22, 0.04), 0 2px 6px -2px rgba(16, 25, 22, 0.06);
+  --shadow-md: 0 2px 4px -2px rgba(16, 25, 22, 0.06), 0 14px 30px -16px rgba(16, 25, 22, 0.2);
+  --shadow-lg: 0 8px 16px -8px rgba(16, 25, 22, 0.1), 0 34px 66px -32px rgba(16, 25, 22, 0.34);
   --shadow-sidebar: 0 30px 80px -40px rgba(0, 0, 0, 0.55);
+
+  /* ===== الأسطح =====
+     الأبيض المسطّح يبدو كورقة طابعة. تدرّج شعري نحو اللؤلؤي يعطي البطاقة عمقًا
+     ماديًا بلا أي تكلفة تركيب (بخلاف backdrop-filter). */
+  --surface-card: linear-gradient(180deg, #ffffff 0%, #fdfcf9 100%);
+  --surface-raised: linear-gradient(180deg, #ffffff 0%, #faf8f3 100%);
+
+  /* حدّ ذهبي شعري يُستخدم بخِسّة: خط واحد أعلى السطح لا إطار كامل. */
+  --edge-gold: linear-gradient(90deg, transparent, rgba(124, 58, 237, 0.55), transparent);
 }
 
 * {
@@ -25,12 +36,14 @@ html {
 body {
   min-height: 100%;
   margin: 0;
+  /* لا تستخدم background-attachment: fixed — يُبطل الخلفية عند كل بكسل تمرير
+     فيعيد المتصفح رسم الصفحة كاملة في كل إطار (تهنيج ملموس على الجوال). */
   background:
-    radial-gradient(1200px 600px at 100% -10%, rgba(169, 130, 69, 0.08), transparent 60%),
-    radial-gradient(1000px 500px at 0% 0%, rgba(23, 59, 51, 0.06), transparent 55%),
-    linear-gradient(180deg, #faf9f5 0%, #f4f2ec 48%, #ece7dd 100%);
-  background-attachment: fixed;
-  color: #101916;
+    radial-gradient(1200px 600px at 100% -10%, rgba(124, 58, 237, 0.09), transparent 60%),
+    radial-gradient(1000px 500px at 0% 0%, rgba(91, 33, 182, 0.06), transparent 55%),
+    linear-gradient(180deg, #fbfaff 0%, #f5f2fa 48%, #ede8f4 100%);
+  background-repeat: no-repeat;
+  color: #15111f;
   font-family: var(--font-sans), Arial, sans-serif;
   font-feature-settings: "ss01", "kern";
   text-rendering: optimizeLegibility;
@@ -38,35 +51,37 @@ body {
 }
 
 ::selection {
-  background: #a98245;
+  background: #7c3aed;
   color: #fff;
 }
 
+/* وميض لمس خفيف بلون العلامة بدل `transparent`.
+   إلغاؤه كليًا يجعل النقرة التي وصلت فعلًا وتنتظر الخادم تبدو كأنها لم تُسجَّل. */
 button,
 a,
 input,
 textarea,
 select {
-  -webkit-tap-highlight-color: transparent;
+  -webkit-tap-highlight-color: rgba(124, 58, 237, 0.18);
 }
 
 /* شريط تمرير راقٍ */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(169, 130, 69, 0.45) transparent;
+  scrollbar-color: rgba(124, 58, 237, 0.45) transparent;
 }
 *::-webkit-scrollbar {
   width: 9px;
   height: 9px;
 }
 *::-webkit-scrollbar-thumb {
-  background: rgba(169, 130, 69, 0.4);
+  background: rgba(124, 58, 237, 0.4);
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: rgba(169, 130, 69, 0.65);
+  background: rgba(124, 58, 237, 0.65);
   background-clip: padding-box;
 }
 
@@ -76,59 +91,112 @@ select {
     @apply min-h-screen text-salon-ink;
   }
 
-  /* لوح فاتح فاخر بحد ذهبي خفيف وعمق متدرّج */
+  /* لوح فاتح فاخر: تدرّج شعري + حدّ ناعم + خط علوي أبيض يحاكي انكسار الضوء
+     على حافة الورق السميك.
+     بلا backdrop-blur عمدًا: هذا الصنف يتكرر ~56 مرة في صفحة لوحة واحدة،
+     وكل نسخة منه طبقة تركيب تُعاد ضبابيتها في كل إطار تمرير. */
   .dashboard-panel {
-    @apply rounded-2xl border border-salon-line/70 bg-white/90 backdrop-blur;
-    box-shadow: var(--shadow-md);
+    @apply rounded-2xl border border-salon-line/60;
+    background: var(--surface-card);
+    box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255, 255, 255, 0.85);
   }
 
   .dashboard-soft-panel {
-    @apply rounded-2xl border border-salon-line/70 bg-salon-pearl/95;
+    @apply rounded-2xl border border-salon-line/60;
+    background: var(--surface-raised);
     box-shadow: var(--shadow-sm);
   }
 
   /* بطاقة قابلة للتفاعل ترتفع قليلًا عند المرور (حركة هادئة) */
   .lux-hover {
-    @apply transition-[transform,box-shadow] duration-200 ease-out;
+    @apply transition-[transform,box-shadow,border-color] duration-200 ease-out;
   }
   .lux-hover:hover {
     transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
+    border-color: rgba(169, 130, 69, 0.35);
+    box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255, 255, 255, 0.9);
   }
 
   /* خط ذهبي شعري فاصل */
   .lux-rule {
     @apply h-px w-full;
-    background: linear-gradient(90deg, transparent, rgba(169, 130, 69, 0.45), transparent);
+    background: var(--edge-gold);
   }
 
-  /* ===== Fields ===== */
+  /* حدّ ذهبي علوي داخل سطح موجود. يتطلّب `relative` و`overflow-hidden` على العنصر.
+     يُستخدم للأسطح البطولية فقط (ترويسة صفحة، بطاقة مميّزة) — الذهب على كل شيء
+     يُفقده قيمته. */
+  .lux-edge {
+    @apply relative overflow-hidden;
+  }
+  .lux-edge::before {
+    content: "";
+    @apply pointer-events-none absolute inset-x-0 top-0 z-[1] h-px;
+    background: var(--edge-gold);
+  }
+
+  /* ===== الطباعة =====
+     سياسة الأوزان: 700 للعناوين، 600 للتسميات والنص، و800+ للأرقام وحدها.
+     كل شيء بوزن 900 يصرخ ولا يُنشئ تراتبًا — الثِقَل يجب أن يعني «هذا هو الرقم». */
+  .lux-eyebrow {
+    @apply text-[11px] font-bold uppercase tracking-eyebrow text-salon-gold;
+  }
+
+  .lux-title {
+    @apply text-2xl font-bold leading-tight tracking-tight text-salon-ink sm:text-3xl;
+  }
+
+  .lux-section-title {
+    @apply text-lg font-bold tracking-tight text-salon-ink;
+  }
+
+  /* الأرقام المالية: أرقام لاتينية بعرض ثابت حتى تتراصف الخانات عموديًا في القوائم. */
+  .lux-number {
+    @apply font-extrabold tabular-nums tracking-tight;
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+
+  /* ===== Fields =====
+     الحدّ الداخلي العلوي (inset) يعطي الحقل إحساس التجويف بدل المربع المسطّح،
+     وحلقة التركيز ذهبية شفافة لا زرقاء المتصفح. */
   .dashboard-field {
-    @apply w-full rounded-xl border border-salon-line bg-white px-3.5 py-3 text-sm font-semibold text-salon-ink outline-none transition-[border-color,box-shadow] duration-200 placeholder:font-medium placeholder:text-salon-charcoal/50 focus:border-salon-gold focus:ring-4 focus:ring-salon-gold/[0.15] disabled:bg-salon-mist disabled:text-salon-charcoal;
+    @apply w-full rounded-xl border border-salon-line bg-white px-3.5 py-3 text-sm font-semibold text-salon-ink outline-none transition-[border-color,box-shadow] duration-200 placeholder:font-medium placeholder:text-salon-charcoal/45 focus:border-salon-gold focus:ring-4 focus:ring-salon-gold/[0.15] disabled:bg-salon-mist disabled:text-salon-charcoal;
+    box-shadow: inset 0 1px 2px rgba(16, 25, 22, 0.05);
   }
 
-  /* ===== Buttons ===== */
+  /* ===== Buttons =====
+     كل زر: تدرّج عمودي (لا لون مسطّح) + خط ضوء علوي داخلي + ظل ملوّن بلون الزر.
+     الظل الملوّن هو ما يجعل الزر يبدو مضيئًا لا ملصقًا. */
   .dashboard-button {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white transition-[transform,filter,background-color] duration-200 hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55;
-    background: linear-gradient(180deg, #1b2b25 0%, #101916 100%);
-    box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white transition-[transform,filter,box-shadow] duration-200 hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55;
+    background: linear-gradient(180deg, #2b1c44 0%, #110c1b 100%);
+    box-shadow:
+      0 1px 2px rgba(16, 25, 22, 0.2),
+      0 8px 18px -10px rgba(16, 25, 22, 0.55),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
   }
 
   .dashboard-button-gold {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white transition-[transform,filter] duration-200 hover:brightness-[1.07] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55;
-    background: linear-gradient(180deg, #c19a55 0%, #a98245 55%, #8f6c39 100%);
-    box-shadow: 0 8px 20px -10px rgba(169, 130, 69, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white transition-[transform,filter,box-shadow] duration-200 hover:brightness-[1.06] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55;
+    background: linear-gradient(180deg, #9f7aea 0%, #7c3aed 52%, #5b21b6 100%);
+    box-shadow:
+      0 1px 2px rgba(120, 88, 40, 0.25),
+      0 10px 22px -10px rgba(124, 58, 237, 0.65),
+      inset 0 1px 0 rgba(255, 255, 255, 0.32);
   }
 
   .dashboard-button-soft {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-salon-line bg-white px-4 py-3 text-sm font-bold text-salon-ink transition-[transform,border-color,background-color] duration-200 hover:border-salon-gold/60 hover:bg-salon-pearl active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55;
-    box-shadow: var(--shadow-sm);
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-salon-line bg-white px-4 py-3 text-sm font-bold text-salon-ink transition-[transform,border-color,background-color,box-shadow] duration-200 hover:border-salon-gold/60 hover:bg-salon-pearl active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55;
+    box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.9);
   }
 
   .dashboard-danger-button {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white transition-[transform,filter] duration-200 hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55;
-    background: linear-gradient(180deg, #8f3540 0%, #7f2d35 100%);
-    box-shadow: var(--shadow-sm);
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white transition-[transform,filter,box-shadow] duration-200 hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55;
+    background: linear-gradient(180deg, #9b3f49 0%, #7f2d35 100%);
+    box-shadow:
+      0 1px 2px rgba(127, 45, 53, 0.25),
+      0 10px 22px -12px rgba(127, 45, 53, 0.55),
+      inset 0 1px 0 rgba(255, 255, 255, 0.16);
   }
 
   /* ===== Tables ===== */
@@ -161,44 +229,170 @@ select {
     @apply text-sm leading-7 text-salon-charcoal;
   }
 
+  /* جداول اللوحة أعرض من الجوال بطبيعتها (٨ أعمدة أو أكثر). بدل قصّها،
+     نجعل قابلية السحب مرئية: تلاشٍ عند الحافة اليسرى + تمرير سلس باللمس.
+     التلاشي يختفي على الشاشات التي يظهر فيها الجدول كاملًا. */
+  .table-scroll-wrap {
+    @apply relative;
+  }
+
+  /* تلاشٍ عند الحافة اليسرى يقول للعين «هنا تكملة» — يختفي على xl حيث يتّسع الجدول. */
+  .table-scroll-wrap::after {
+    content: "";
+    @apply pointer-events-none absolute inset-y-0 left-0 z-[2] w-12;
+    background: linear-gradient(270deg, rgba(16, 25, 22, 0.09), transparent);
+  }
+
+  @media (min-width: 1280px) {
+    .table-scroll-wrap::after {
+      content: none;
+    }
+  }
+
+  .table-scroll {
+    @apply overflow-x-auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+
   /* ===== Barber (mobile-first) ===== */
+  /* الحشو يشمل مناطق الأمان: `viewport-fit=cover` يمدّ الصفحة تحت النتوء وشريط
+     الصفحة الرئيسية، والحشو السفلي يترك مكانًا لشريط التطبيق العائم (تحديث/تثبيت/انقطاع). */
   .barber-shell {
-    @apply min-h-screen px-4 font-sans text-salon-ink;
+    @apply min-h-screen px-4 font-sans text-salon-ink sm:px-6;
+    padding-top: max(1rem, env(safe-area-inset-top));
+    padding-bottom: calc(env(safe-area-inset-bottom) + 5.5rem);
   }
 
+  /* عمود واحد على الجوال، ويتّسع على التابلت والديسكتوب بدل شريط ضيّق في المنتصف. */
   .barber-container {
-    @apply mx-auto max-w-md;
+    @apply mx-auto w-full max-w-md md:max-w-3xl lg:max-w-5xl;
   }
 
+  /* عمودان من التابلت فما فوق: العمل والبحث يمينًا، الصندوق والملخص يسارًا.
+     العناصر تبقى بترتيبها الطبيعي على الجوال. */
+  .barber-grid {
+    @apply grid grid-cols-1 items-start gap-4 md:grid-cols-2 md:gap-5;
+  }
+
+  /* بطاقة الحلاق = نفس لغة لوح اللوحة. كانت البطاقات تُكتب يدويًا في كل صفحة
+     (`rounded-3xl border ... bg-white shadow-sm`) فاختلفت الزوايا والظلال بين شاشة
+     وأخرى — كل سطح أبيض في التطبيق يمر من هنا. */
   .barber-card {
-    @apply rounded-2xl border border-salon-line/70 bg-white/90 backdrop-blur;
-    box-shadow: var(--shadow-md);
+    @apply rounded-2xl border border-salon-line/60;
+    background: var(--surface-card);
+    box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255, 255, 255, 0.85);
   }
 
   .barber-soft-card {
-    @apply rounded-2xl border border-salon-line/70 bg-salon-pearl;
+    @apply rounded-2xl border border-salon-line/60;
+    background: var(--surface-raised);
     box-shadow: var(--shadow-sm);
+  }
+
+  /* ترويسة بطاقة: شريط لؤلؤي يفصل العنوان عن المحتوى بدل مسافة فارغة. */
+  .barber-card-head {
+    @apply border-b border-salon-line/70 px-4 py-4;
+    background: linear-gradient(180deg, #fbfaf6 0%, #f6f3ec 100%);
   }
 
   .barber-field {
     @apply w-full rounded-xl border border-salon-line bg-white px-4 font-semibold text-salon-ink outline-none transition-[border-color,box-shadow] duration-200 placeholder:font-medium placeholder:text-salon-charcoal/45 focus:border-salon-forest focus:ring-4 focus:ring-salon-forest/[0.12];
+    box-shadow: inset 0 1px 2px rgba(16, 25, 22, 0.05);
   }
 
   .barber-primary-button {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 font-bold text-white transition-[transform,filter] duration-200 hover:brightness-110 active:scale-[0.98] disabled:opacity-55;
-    background: linear-gradient(180deg, #1e4a40 0%, #173b33 100%);
-    box-shadow: 0 8px 20px -12px rgba(23, 59, 51, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 font-bold text-white transition-[transform,filter,box-shadow] duration-200 hover:brightness-110 active:scale-[0.98] disabled:opacity-55;
+    background: linear-gradient(180deg, #7c3aed 0%, #4c1d95 100%);
+    box-shadow:
+      0 1px 2px rgba(23, 59, 51, 0.25),
+      0 10px 22px -12px rgba(23, 59, 51, 0.7),
+      inset 0 1px 0 rgba(255, 255, 255, 0.12);
   }
 
   .barber-gold-button {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 font-bold text-white transition-[transform,filter] duration-200 hover:brightness-[1.07] active:scale-[0.98] disabled:opacity-55;
-    background: linear-gradient(180deg, #c19a55 0%, #a98245 55%, #8f6c39 100%);
-    box-shadow: 0 8px 20px -10px rgba(169, 130, 69, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 font-bold text-white transition-[transform,filter,box-shadow] duration-200 hover:brightness-[1.06] active:scale-[0.98] disabled:opacity-55;
+    background: linear-gradient(180deg, #9f7aea 0%, #7c3aed 52%, #5b21b6 100%);
+    box-shadow:
+      0 1px 2px rgba(120, 88, 40, 0.25),
+      0 10px 22px -10px rgba(124, 58, 237, 0.6),
+      inset 0 1px 0 rgba(255, 255, 255, 0.32);
   }
 
   .barber-ghost-button {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-salon-line bg-white px-4 font-bold text-salon-ink transition-[transform,border-color] duration-200 hover:border-salon-forest/40 active:scale-[0.98] disabled:opacity-55;
-    box-shadow: var(--shadow-sm);
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-salon-line bg-white px-4 font-bold text-salon-ink transition-[transform,border-color,box-shadow] duration-200 hover:border-salon-forest/40 active:scale-[0.98] disabled:opacity-55;
+    box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  }
+
+  .barber-notification-card {
+    @apply relative overflow-hidden rounded-2xl border border-salon-line/70;
+    background:
+      radial-gradient(circle at 8% 12%, rgba(124, 58, 237, 0.11), transparent 34%),
+      var(--surface-card);
+    box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255, 255, 255, 0.88);
+  }
+
+  .barber-notification-card::after {
+    content: "";
+    @apply pointer-events-none absolute -bottom-16 -left-10 h-32 w-32 rounded-full opacity-40;
+    background: radial-gradient(circle, rgba(124, 58, 237, 0.22), transparent 68%);
+  }
+
+  .barber-notification-card.is-active {
+    @apply border-salon-gold/35;
+    background:
+      radial-gradient(circle at 8% 12%, rgba(124, 58, 237, 0.16), transparent 36%),
+      linear-gradient(180deg, #ffffff 0%, #fbf9ff 100%);
+  }
+
+  .barber-notification-icon {
+    @apply relative grid h-12 w-12 shrink-0 place-items-center rounded-xl text-white;
+    background: linear-gradient(145deg, #17141f 0%, #2e2543 100%);
+    box-shadow:
+      0 10px 22px -12px rgba(28, 19, 52, 0.85),
+      inset 0 1px 0 rgba(255, 255, 255, 0.13);
+  }
+
+  .barber-notification-pulse {
+    @apply absolute -left-1 -top-1 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-500;
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55);
+    animation: push-live-pulse 2.2s ease-out infinite;
+  }
+
+  .push-status-chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold;
+  }
+
+  .push-status-chip > span {
+    @apply h-1.5 w-1.5 rounded-full bg-current;
+  }
+
+  .push-status-active {
+    @apply border-emerald-200 bg-emerald-50 text-emerald-700;
+  }
+
+  .push-status-loading,
+  .push-status-inactive,
+  .push-status-install-ios,
+  .push-status-development {
+    @apply border-salon-gold/25 bg-salon-gold/10 text-salon-forest;
+  }
+
+  .push-status-denied,
+  .push-status-error {
+    @apply border-red-200 bg-red-50 text-red-700;
+  }
+
+  .push-status-unsupported,
+  .push-status-unconfigured {
+    @apply border-salon-line bg-salon-mist text-salon-charcoal;
+  }
+}
+
+@keyframes push-live-pulse {
+  65%,
+  100% {
+    box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
   }
 }
 
@@ -308,7 +502,7 @@ select {
 
 /* نص ذهبي متلألئ متحرك */
 .text-gold-sheen {
-  background: linear-gradient(90deg, #8f6c39 0%, #e9d2a0 45%, #c9a86a 55%, #8f6c39 100%);
+  background: linear-gradient(90deg, #6d28d9 0%, #ddd6fe 45%, #a78bfa 55%, #6d28d9 100%);
   background-size: 220% auto;
   -webkit-background-clip: text;
   background-clip: text;
@@ -318,7 +512,7 @@ select {
 
 /* خلفية ذهبية متحركة للأزرار/الأشرطة الملكية */
 .bg-royal-gold {
-  background: linear-gradient(120deg, #8f6c39, #c9a86a, #e9d2a0, #c9a86a, #8f6c39);
+  background: linear-gradient(120deg, #5b21b6, #8b5cf6, #ddd6fe, #8b5cf6, #5b21b6);
   background-size: 220% 220%;
   animation: gold-pan 8s ease infinite;
 }
@@ -339,6 +533,76 @@ select {
 }
 .sheen-overlay:hover::after {
   animation: sheen 1.1s ease;
+}
+
+/* ===== XMANSX marketing identity ===== */
+.x-site {
+  background:
+    radial-gradient(900px 450px at 100% 20%, rgba(124, 58, 237, 0.06), transparent 65%),
+    #f8f7fb;
+}
+
+.x-hero {
+  background:
+    radial-gradient(700px 400px at 75% 35%, rgba(124, 58, 237, 0.16), transparent 65%),
+    linear-gradient(135deg, #09070f 0%, #100b19 52%, #08060d 100%);
+}
+
+.x-grid {
+  background-image:
+    linear-gradient(rgba(196, 181, 253, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(196, 181, 253, 0.07) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: linear-gradient(to bottom, black, transparent 88%);
+}
+
+.x-eyebrow {
+  color: #7c3aed;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
+.x-gradient-text {
+  background: linear-gradient(90deg, #ffffff 0%, #ddd6fe 35%, #a78bfa 70%, #e879f9 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.x-button-primary,
+.x-button-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  border-radius: 0.8rem;
+  font-weight: 700;
+  transition: transform 180ms ease, border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
+}
+
+.x-button-primary {
+  color: white;
+  border: 1px solid rgba(196, 181, 253, 0.25);
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 52%, #6d28d9 100%);
+  box-shadow: 0 16px 32px -16px rgba(124, 58, 237, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.24);
+}
+
+.x-button-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 20px 38px -15px rgba(124, 58, 237, 0.95), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+.x-button-ghost {
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.x-button-ghost:hover {
+  transform: translateY(-1px);
+  border-color: rgba(196, 181, 253, 0.45);
+  background: rgba(139, 92, 246, 0.12);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -364,6 +628,109 @@ select {
     transform: none !important;
   }
   .text-gold-sheen {
-    color: #a98245;
+    color: #7c3aed;
+  }
+}
+
+/* ===== الإيصال / الفاتورة الضريبية ===== */
+.receipt-qr svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+@media print {
+  @page {
+    size: 80mm auto;
+    margin: 4mm;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  .receipt-page {
+    min-height: 0 !important;
+  }
+
+  .receipt-sheet {
+    width: 100% !important;
+    max-width: none !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* لا تقطع جدول الخدمات أو كتلة الإجماليات بين صفحتين */
+  .receipt-sheet table,
+  .receipt-sheet dl,
+  .receipt-qr {
+    break-inside: avoid;
+  }
+}
+
+/* ===== ملصق التسجيل في برنامج الولاء ===== */
+.join-poster-qr svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+@media print {
+  /* الطباعة تُخرج الملصق وحده: نخفي كل ما عداه بدل بناء صفحة طباعة منفصلة. */
+  body:has(.join-poster) .dashboard-page > div > aside,
+  body:has(.join-poster) .dashboard-panel:not(:has(.join-poster)),
+  body:has(.join-poster) .lg\:hidden {
+    display: none !important;
+  }
+
+  .join-poster {
+    max-width: none !important;
+    border: none !important;
+    transform: scale(1.6);
+    transform-origin: top center;
+  }
+}
+
+/* ===== تلميع الحقول والنماذج ===== */
+@layer components {
+  /* حقول التاريخ/الوقت: نائب Chrome العربي يظهر مشوّهًا (سنة/شهر/يوم مقلوبة).
+     نثبّت الاتجاه LTR داخل الحقل — التاريخ يُقرأ يسارًا لليمين — ونحاذيه لليمين
+     ليبقى منسجمًا مع بقية النموذج، ونجعل أيقونة التقويم بلون العلامة. */
+  input[type="date"],
+  input[type="time"],
+  input[type="datetime-local"] {
+    direction: ltr;
+    text-align: right;
+  }
+
+  input[type="date"]::-webkit-calendar-picker-indicator,
+  input[type="time"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.55;
+    margin-inline-start: 0;
+    margin-inline-end: auto;
+    transition: opacity 0.2s ease;
+  }
+
+  input[type="date"]:hover::-webkit-calendar-picker-indicator,
+  input[type="time"]:hover::-webkit-calendar-picker-indicator {
+    opacity: 1;
+  }
+
+  /* تسمية حقل موحّدة: النماذج كانت تخلط بين حقول بتسمية وأخرى بنائب فقط. */
+  .field-label {
+    @apply mb-2 block text-[12px] font-bold text-salon-charcoal;
+  }
+
+  .field-hint {
+    @apply mt-1.5 block text-[11px] font-medium leading-5 text-salon-charcoal/70;
+  }
+
+  /* تركيز واضح للتنقّل بلوحة المفاتيح — إمكانية وصول لا زينة. */
+  :where(a, button, [role="button"]):focus-visible {
+    outline: 2px solid rgba(124, 58, 237, 0.85);
+    outline-offset: 2px;
+    border-radius: 0.5rem;
   }
 }

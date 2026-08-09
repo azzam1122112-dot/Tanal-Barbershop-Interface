@@ -39,7 +39,9 @@ describe("post-close adjustment report", () => {
     createdCashSessionIds.push((await openCashSession(prisma, { barberId })).cashSession.id);
     createdCashSessionIds.push((await openCashSession(prisma, { barberId: openBarberId })).cashSession.id);
     const service = await prisma.service.create({
-      data: { name: `خدمة تقرير تصحيحات ${Date.now()}`, defaultPrice: 50, isActive: true, sortOrder: 150 },
+      data: {
+        organizationId: "org_default",
+        salonId: "salon_default", name: `خدمة تقرير تصحيحات ${Date.now()}`, defaultPrice: 50, isActive: true, sortOrder: 150 },
     });
     serviceId = service.id;
     createdServiceIds.push(serviceId);
@@ -136,6 +138,8 @@ describe("post-close adjustment report", () => {
 async function createBarber(name: string) {
   const barber = await prisma.barber.create({
     data: {
+        organizationId: "org_default",
+        salonId: "salon_default",
       name: `${name} ${Date.now()} ${Math.random()}`,
       phone: `9665${Math.floor(10000000 + Math.random() * 89999999)}`,
       accessPinHash: await hashBarberPin("Tanal@123"),

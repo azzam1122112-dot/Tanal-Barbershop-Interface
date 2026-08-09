@@ -19,6 +19,7 @@ export type IconName =
   | "search"
   | "scissors"
   | "menu"
+  | "bell"
   | "close"
   | "check";
 
@@ -102,6 +103,12 @@ const PATHS: Record<IconName, ReactElement> = {
     </>
   ),
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
+  bell: (
+    <>
+      <path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 8.5h18C21 16 18 16 18 9Z" />
+      <path d="M10 21h4" />
+    </>
+  ),
   close: <path d="M6 6l12 12M18 6 6 18" />,
   check: <path d="M4 12.5 9 17.5 20 6.5" />,
 };

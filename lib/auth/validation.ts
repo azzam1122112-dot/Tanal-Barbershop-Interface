@@ -24,7 +24,8 @@ export const phoneSchema = z
 export const dashboardLoginSchema = z.object({
   email: emailSchema,
   password: z.string().min(1, "كلمة المرور مطلوبة"),
-  organizationSlug: z.string().trim().max(60).optional(),
+  // يُرسل فقط بعد اختيار المستخدم صالونه من القائمة حين يتكرر البريد بين مؤسستين.
+  organizationId: z.string().trim().min(1).max(60).optional(),
 });
 
 const RESERVED_SLUGS = new Set(["www", "app", "api", "admin", "dashboard", "platform", "default", "tanal", "main"]);
@@ -64,7 +65,8 @@ export const salonUpdateSchema = z.object({
 export const barberLoginSchema = z.object({
   phone: phoneSchema,
   pin: barberPinSchema,
-  organizationSlug: z.string().trim().max(60).optional(),
+  // يُرسل فقط بعد اختيار الحلاق صالونه من القائمة حين يتكرر جواله بين مؤسستين.
+  organizationId: z.string().trim().min(1).max(60).optional(),
 });
 
 export const createBarberSchema = z.object({
@@ -79,6 +81,13 @@ export const updateBarberSchema = z.object({
   phone: phoneSchema.optional(),
   isActive: z.boolean().optional(),
   salonId: z.string().trim().min(1, "الفرع مطلوب").optional(),
+  // null = ارجع للنسبة الافتراضية للفرع.
+  commissionRate: z.coerce
+    .number()
+    .min(0, "نسبة العمولة لا تقل عن صفر")
+    .max(100, "نسبة العمولة لا تتجاوز 100")
+    .nullable()
+    .optional(),
 });
 
 export const resetBarberPinSchema = z.object({
@@ -120,6 +129,8 @@ export const updateStaffSchema = z.object({
 export const customerCreateSchema = z.object({
   name: z.string().trim().min(2, "اسم العميل مطلوب"),
   phone: phoneSchema,
+  whatsappTransactionalOptIn: z.boolean().optional().default(false),
+  whatsappMarketingOptIn: z.boolean().optional().default(false),
 });
 
 export const customerSearchSchema = z.object({
@@ -147,6 +158,16 @@ export const visitPaymentMethodSchema = z.enum(["CASH", "NETWORK"], {
 export const visitRequestSchema = z.object({
   customerId: z.string().trim().min(1, "العميل مطلوب"),
   serviceIds: z.array(z.string().trim().min(1)).min(1, "اختر خدمة واحدة على الأقل"),
+  // المنتجات اختيارية؛ أسعارها من الكتالوج ولا تُقبل من العميل.
+  products: z
+    .array(
+      z.object({
+        productId: z.string().trim().min(1),
+        quantity: z.coerce.number().int().positive().max(99),
+      }),
+    )
+    .max(20)
+    .optional(),
   grossAmount: z.coerce.number().positive("المبلغ يجب أن يكون أكبر من صفر"),
   paymentMethod: visitPaymentMethodSchema,
   rewardRuleId: z.string().trim().min(1).optional(),
@@ -277,6 +298,12 @@ export const whatsappMessageStatusSchema = z.enum(["DRAFTED", "OPENED", "MARKED_
   message: "حالة رسالة واتساب غير صحيحة",
 });
 
+export const whatsappMessageCategorySchema = z.enum(["TRANSACTIONAL", "MARKETING", "SERVICE"], {
+  message: "فئة رسالة واتساب غير صحيحة",
+});
+
+export const whatsappConsentSourceSchema = z.enum(["IN_PERSON", "WEBSITE", "WHATSAPP", "PHONE", "IMPORTED", "OTHER"]);
+
 export const whatsappTemplateCreateSchema = z.object({
   name: z.string().trim().min(2, "اسم القالب مطلوب"),
   type: whatsappTemplateTypeSchema,
@@ -293,6 +320,7 @@ export const whatsappGenerateSchema = z.object({
   visitId: z.string().trim().min(1).optional(),
   campaignId: z.string().trim().min(1).optional(),
   customMessage: z.string().trim().min(1).max(2000).optional(),
+  messageCategory: whatsappMessageCategorySchema.optional(),
 }).refine((data) => data.templateId || data.customMessage, {
   message: "اختر قالبًا أو اكتب رسالة مخصصة",
   path: ["templateId"],
@@ -310,8 +338,28 @@ export const whatsappInactiveAudienceSchema = z.object({
   days: z.coerce.number().int().positive().default(30),
 });
 
-export const customerWhatsappPreferenceSchema = z.object({
-  whatsappOptIn: z.boolean(),
+export const customerWhatsappPreferenceSchema = z
+  .object({
+    whatsappOptIn: z.boolean().optional(),
+    transactionalOptIn: z.boolean().optional(),
+    marketingOptIn: z.boolean().optional(),
+    consentSource: whatsappConsentSourceSchema.optional(),
+    optOutReason: z.string().trim().max(240).optional(),
+  })
+  .refine(
+    (data) => data.whatsappOptIn !== undefined || data.transactionalOptIn !== undefined || data.marketingOptIn !== undefined,
+    { message: "اختر تفضيلًا واحدًا على الأقل" },
+  );
+
+export const whatsappSafetySettingsSchema = z.object({
+  mode: z.enum(["STRICT", "BALANCED", "CUSTOM"]).optional(),
+  marketingCooldownHours: z.coerce.number().int().min(24).max(720).optional(),
+  maxMarketingPerCustomer30Days: z.coerce.number().int().min(1).max(30).optional(),
+  maxMessagesPerCustomer24Hours: z.coerce.number().int().min(1).max(10).optional(),
+  dailyOrganizationDraftLimit: z.coerce.number().int().min(10).max(5000).optional(),
+  appendOptOutInstructions: z.boolean().optional(),
+  optOutText: z.string().trim().min(5).max(160).optional(),
+  marketingPaused: z.boolean().optional(),
 });
 
 export const systemSettingsUpdateSchema = z.object({
@@ -319,4 +367,48 @@ export const systemSettingsUpdateSchema = z.object({
   currency: z.string().trim().min(2).max(8).optional(),
   pointsPerCurrencyUnit: z.coerce.number().positive("قيمة النقاط يجب أن تكون أكبر من صفر").optional(),
   whatsappEnabled: z.boolean().optional(),
+  // ضريبة القيمة المضافة — اختيارية، يفعّلها المالك.
+  vatEnabled: z.boolean().optional(),
+  vatRate: z.coerce.number().min(0, "نسبة الضريبة لا تقل عن صفر").max(100, "نسبة الضريبة لا تتجاوز 100").optional(),
+  vatInclusive: z.boolean().optional(),
+  defaultCommissionRate: z.coerce
+    .number()
+    .min(0, "نسبة العمولة لا تقل عن صفر")
+    .max(100, "نسبة العمولة لا تتجاوز 100")
+    .optional(),
+  vatNumber: z
+    .string()
+    .trim()
+    .regex(/^\d{15}$/, "الرقم الضريبي يجب أن يتكوّن من 15 رقمًا")
+    .or(z.literal(""))
+    .transform((value) => (value === "" ? null : value))
+    .nullable()
+    .optional(),
+  legalName: z
+    .string()
+    .trim()
+    .max(120)
+    .or(z.literal(""))
+    .transform((value) => (value === "" ? null : value))
+    .nullable()
+    .optional(),
+  // الحجز الذاتي من بوابة العميل. الأوقات دقائق من منتصف الليل المحلي.
+  bookingEnabled: z.boolean().optional(),
+  bookingOpenMinute: z.coerce.number().int().min(0).max(1439).optional(),
+  bookingCloseMinute: z.coerce.number().int().min(1).max(1440).optional(),
+  bookingSlotMinutes: z.coerce
+    .number()
+    .int()
+    .min(5, "مدة الفترة لا تقل عن 5 دقائق")
+    .max(240, "مدة الفترة لا تتجاوز 240 دقيقة")
+    .optional(),
+  bookingClosedWeekdays: z.array(z.coerce.number().int().min(0).max(6)).max(7).optional(),
+  bookingLeadMinutes: z.coerce.number().int().min(0).max(10080).optional(),
+  bookingHorizonDays: z.coerce
+    .number()
+    .int()
+    .min(1, "مدى الحجز لا يقل عن يوم")
+    .max(90, "مدى الحجز لا يتجاوز 90 يومًا")
+    .optional(),
+  bookingMaxActivePerCustomer: z.coerce.number().int().min(1).max(20).optional(),
 });

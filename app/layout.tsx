@@ -10,29 +10,34 @@ const arabic = IBM_Plex_Sans_Arabic({
 });
 
 export const metadata: Metadata = {
-  title: "واجهة تنال",
-  description: "نظام تشغيل وولاء فاخر للحلاقة الرجالية وإدارة جلسات الصندوق والعملاء.",
+  title: {
+    default: "XMANSX | منصة إدارة الصالونات",
+    template: "%s · XMANSX",
+  },
+  description: "منصة عربية متكاملة لإدارة وتشغيل صالونات الحلاقة الرجالية: الزيارات والصندوق والحجوزات والعملاء والولاء والفريق والمخزون والتقارير.",
+  applicationName: "XMANSX",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "واجهة تنال",
+    title: "XMANSX",
   },
   icons: {
     icon: [
-      { url: "/icons/tanal-icon-192.png", sizes: "192x192", type: "image/png" },
-      { url: "/icons/tanal-icon-512.png", sizes: "512x512", type: "image/png" },
+      { url: "/icons/xmansx-icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/xmansx-icon-512.png", sizes: "512x512", type: "image/png" },
     ],
-    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    apple: [{ url: "/icons/xmansx-apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
+  // لا `maximumScale` ولا `userScalable: false` — منع التكبير يقطع الوصول عن
+  // ضعاف البصر، وهذه شاشات فيها مبالغ وأرقام جوال تُقرأ ولا تُخمَّن.
   viewportFit: "cover",
-  themeColor: "#101916",
+  themeColor: "#09070f",
 };
 
 export default function RootLayout({

@@ -2,10 +2,14 @@ import Link from "next/link";
 import { PlatformShell } from "@/components/platform/platform-shell";
 import { prisma } from "@/lib/db/prisma";
 import { getPlatformOverview } from "@/lib/platform/platform-service";
+import { getPlatformRevenueSummary } from "@/lib/billing/billing-service";
 import { formatMoney, formatNumber } from "@/lib/format";
 
 export default async function PlatformOverviewPage() {
-  const overview = await getPlatformOverview(prisma);
+  const [overview, revenue] = await Promise.all([
+    getPlatformOverview(prisma),
+    getPlatformRevenueSummary(prisma),
+  ]);
 
   const stats: { label: string; value: string; tone?: "gold" | "danger" | "default" }[] = [
     { label: "المؤسسات", value: formatNumber(overview.totals.organizations) },
@@ -16,6 +20,10 @@ export default async function PlatformOverviewPage() {
     { label: "الحلاقون", value: formatNumber(overview.totals.barbers) },
     { label: "العملاء", value: formatNumber(overview.totals.customers) },
     { label: "الإيراد الشهري التقديري", value: formatMoney(overview.estimatedMrr), tone: "gold" },
+    // المحصّل فعليًا مقابل التقديري — الفرق بينهما هو التحصيل المتعثّر.
+    { label: "محصّل هذا الشهر", value: formatMoney(revenue.collectedThisMonth), tone: "gold" },
+    { label: "إجمالي المحصّل", value: formatMoney(revenue.collectedAllTime) },
+    { label: "اشتراكات تنتهي خلال أسبوعين", value: formatNumber(revenue.expiringSoon), tone: "danger" },
   ];
 
   return (

@@ -1,3 +1,4 @@
+import { formatNumber } from "@/lib/format";
 import Link from "next/link";
 import type { OrganizationStatus } from "@prisma/client";
 import { PlatformShell } from "@/components/platform/platform-shell";
@@ -36,7 +37,7 @@ export default async function PlatformOrganizationsPage({
       </form>
 
       <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-salon-line bg-white/80 px-4 py-3 text-sm font-bold text-salon-charcoal shadow-sm">
-        <span>{result.total.toLocaleString("ar-SA")} مؤسسة</span>
+        <span>{formatNumber(result.total)} مؤسسة</span>
         <span>صفحة {result.page} من {result.totalPages}</span>
       </div>
 
@@ -70,7 +71,7 @@ function PageLink({
   children: React.ReactNode;
 }) {
   if (disabled) {
-    return <span className="rounded-lg border border-salon-line bg-salon-mist px-4 py-2 text-sm font-bold text-salon-charcoal/45">{children}</span>;
+    return <span className="rounded-xl border border-salon-line bg-salon-mist px-4 py-2 text-sm font-bold text-salon-charcoal/45">{children}</span>;
   }
   const search = new URLSearchParams();
   if (params.q) search.set("q", params.q);

@@ -22,6 +22,8 @@ describe("cash sessions", () => {
     adminUserId = (await prisma.user.findFirstOrThrow({ where: { role: "ADMIN", isActive: true } })).id;
     const barber = await prisma.barber.create({
       data: {
+        organizationId: "org_default",
+        salonId: "salon_default",
         name: `cash-session-barber-${Date.now()}`,
         phone: randomSaudiPhone(),
         accessPinHash: await hashBarberPin("Tanal@123"),
@@ -32,7 +34,9 @@ describe("cash sessions", () => {
     createdBarberIds.push(barberId);
 
     const service = await prisma.service.create({
-      data: { name: `خدمة جلسة صندوق ${Date.now()}`, defaultPrice: 50, isActive: true, sortOrder: 700 },
+      data: {
+        organizationId: "org_default",
+        salonId: "salon_default", name: `خدمة جلسة صندوق ${Date.now()}`, defaultPrice: 50, isActive: true, sortOrder: 700 },
     });
     serviceId = service.id;
     createdServiceIds.push(serviceId);

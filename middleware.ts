@@ -27,6 +27,11 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/platform/login", request.url));
   }
 
+  // الإيصالات تحمل بيانات عميل ومبالغ — لا تُفتح بلا جلسة.
+  if (pathname.startsWith("/receipt") && !hasSession) {
+    return NextResponse.redirect(new URL("/dashboard/login", request.url));
+  }
+
   return NextResponse.next();
 }
 
@@ -43,5 +48,5 @@ function getRequestOrigins(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/barber/:path*", "/platform/:path*", "/api/:path*"],
+  matcher: ["/dashboard/:path*", "/barber/:path*", "/platform/:path*", "/receipt/:path*", "/api/:path*"],
 };

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getRequestMeta, parseJsonBody, requireOwnerApi } from "@/lib/auth/http";
 import { salonUpdateSchema } from "@/lib/auth/validation";
-import { updateSalon } from "@/lib/organizations/organization-service";
+import { deleteSalon, updateSalon } from "@/lib/organizations/organization-service";
 import { writeAuditLog } from "@/lib/audit/audit-log";
 import { toErrorResponse } from "@/lib/http/error-response";
 
@@ -34,5 +34,33 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     return NextResponse.json({ salon: { id: salon.id, name: salon.name, slug: salon.slug, isActive: salon.isActive } });
   } catch (error) {
     return toErrorResponse(error, "تعذر تحديث الصالون");
+  }
+}
+
+export async function DELETE(_request: Request, context: { params: Promise<{ id: string }> }) {
+  const auth = await requireOwnerApi();
+  if (auth.response) return auth.response;
+  const session = auth.session;
+  if (!session || session.type !== "dashboard") return NextResponse.json({ message: "غير مصرح" }, { status: 401 });
+
+  const { id } = await context.params;
+
+  try {
+    const salon = await deleteSalon(prisma, session.organizationId, id);
+    await writeAuditLog({
+      prisma,
+      organizationId: session.organizationId,
+      actorType: session.role,
+      actorUserId: session.user.id,
+      action: "salon.deleted",
+      entityType: "Salon",
+      entityId: salon.id,
+      before: { name: salon.name, slug: salon.slug },
+      after: null,
+      ...(await getRequestMeta()),
+    });
+    return NextResponse.json({ message: "تم حذف الفرع" });
+  } catch (error) {
+    return toErrorResponse(error, "تعذر حذف الفرع");
   }
 }

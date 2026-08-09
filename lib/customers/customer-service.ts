@@ -1,4 +1,19 @@
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient, WhatsAppConsentSource } from "@prisma/client";
+import { BusinessError } from "@/lib/errors";
+
+/** يمنع تجاوز حد العملاء في الباقة. `maxCustomers = null` يعني بلا حد. */
+async function assertCustomerQuota(prisma: PrismaClient, organizationId: string) {
+  const organization = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    include: { plan: { select: { maxCustomers: true } }, _count: { select: { customers: true } } },
+  });
+  if (!organization) throw new BusinessError("المؤسسة غير موجودة", 404);
+
+  const maxCustomers = organization.plan?.maxCustomers ?? null;
+  if (maxCustomers !== null && organization._count.customers >= maxCustomers) {
+    throw new BusinessError(`باقتك تسمح بـ ${maxCustomers} عميل. رقّ باقتك لإضافة عملاء أكثر.`, 402);
+  }
+}
 
 export async function createCustomerWithLoyalty({
   prisma,
@@ -6,12 +21,18 @@ export async function createCustomerWithLoyalty({
   name,
   phone,
   createdByBarberId,
+  whatsappTransactionalOptIn = false,
+  whatsappMarketingOptIn = false,
+  whatsappConsentSource,
 }: {
   prisma: PrismaClient;
   organizationId: string;
   name: string;
   phone: string;
   createdByBarberId?: string | null;
+  whatsappTransactionalOptIn?: boolean;
+  whatsappMarketingOptIn?: boolean;
+  whatsappConsentSource?: WhatsAppConsentSource;
 }) {
   const existing = await prisma.customer.findFirst({
     where: { organizationId, phone },
@@ -29,12 +50,20 @@ export async function createCustomerWithLoyalty({
     return { customer: existing, created: false };
   }
 
+  await assertCustomerQuota(prisma, organizationId);
+
   const customer = await prisma.customer.create({
     data: {
       organizationId,
       name,
       phone,
       createdByBarberId,
+      whatsappOptIn: whatsappTransactionalOptIn || whatsappMarketingOptIn,
+      whatsappTransactionalOptIn,
+      whatsappMarketingOptIn,
+      whatsappConsentSource: whatsappTransactionalOptIn || whatsappMarketingOptIn ? whatsappConsentSource : undefined,
+      whatsappTransactionalConsentAt: whatsappTransactionalOptIn ? new Date() : undefined,
+      whatsappMarketingConsentAt: whatsappMarketingOptIn ? new Date() : undefined,
       loyaltyAccount: {
         create: { organizationId },
       },

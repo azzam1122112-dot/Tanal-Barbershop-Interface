@@ -37,6 +37,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "بيانات الخدمة غير صحيحة" }, { status: 400 });
   }
 
+  // الخدمة تخصّ فرعًا محددًا؛ إنشاؤها في العرض المجمّع ينتج خدمة بلا فرع لا يراها أي حلاق.
+  if (!session.salonId) {
+    return NextResponse.json(
+      { message: "اختر فرعًا محددًا من مبدّل الفروع قبل إضافة خدمة" },
+      { status: 400 },
+    );
+  }
+
   try {
     const service = await prisma.service.create({
       data: { ...parsed.data, organizationId: session.organizationId, salonId: session.salonId },

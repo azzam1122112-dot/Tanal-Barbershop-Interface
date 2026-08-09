@@ -29,13 +29,56 @@ export function assertSalonAllowed(session: DashboardSession, salonId: string | 
 
 /**
  * فلتر Prisma لقصر استعلام على فروع الجلسة المسموح بها.
- * - مالك/مدير مع فرع نشط محدد: ذلك الفرع. بدون فرع نشط: كل الفروع (لا قيد).
- * - مشرف: دائمًا فرعه النشط (مضمون ضمن فروعه المسندة).
+ *
+ * **استخدم هذه الدالة بدل `...(salonId ? { salonId } : {})` في كل استعلام.**
+ * النمط اليدوي يتسرّب: عند اختيار «كل الفروع» يصبح بلا قيد إطلاقًا، وهو صحيح
+ * للمالك/المدير وخطأ للمشرف الذي يجب أن يبقى محصورًا في فروعه المسندة.
+ *
+ * - مالك/مدير مع فرع نشط: ذلك الفرع. بدون فرع نشط: كل الفروع (لا قيد).
+ * - مشرف مع فرع نشط: ذلك الفرع (مضمون أنه ضمن فروعه). بدونه: كل فروعه المسندة مجتمعة.
  */
 export function salonScopeWhere(session: DashboardSession): { salonId?: string | { in: string[] } } {
-  if (session.scopedSalonIds === null) {
-    return session.salonId ? { salonId: session.salonId } : {};
+  if (session.salonId) return { salonId: session.salonId };
+  if (session.scopedSalonIds === null) return {};
+  return { salonId: { in: session.scopedSalonIds } };
+}
+
+/**
+ * الفروع الفعّالة للجلسة كمصفوفة معرّفات، أو `null` إن كانت بلا قيد (مالك/مدير على كل الفروع).
+ * تُمرَّر للخدمات التي تستقبل `salonIds` مثل إغلاق الصندوق والإغلاق اليومي.
+ */
+export function effectiveSalonIds(session: DashboardSession): string[] | null {
+  if (session.salonId) return [session.salonId];
+  return session.scopedSalonIds;
+}
+
+/** هل تعرض الجلسة حاليًا أكثر من فرع مجتمعًا؟ (يُستخدم لعناوين الواجهة). */
+export function isAggregateView(session: DashboardSession): boolean {
+  return session.salonId === null;
+}
+
+/**
+ * سياق النطاق الجاهز لصفحات لوحة الإدارة — يغني عن تكرار
+ * `session.type === "dashboard" ? ... : undefined` في كل صفحة.
+ */
+export function dashboardScope(session: AuthSession | null) {
+  if (!session || session.type !== "dashboard") {
+    return {
+      organizationId: undefined,
+      orgWhere: {} as { organizationId?: string },
+      salonWhere: {} as ReturnType<typeof salonScopeWhere>,
+      salonIds: null as string[] | null,
+      activeSalonId: null as string | null,
+      isAggregate: false,
+    };
   }
-  // المشرف: الفرع النشط مضمون أنه أحد فروعه المسندة.
-  return session.salonId ? { salonId: session.salonId } : { salonId: { in: session.scopedSalonIds } };
+
+  return {
+    organizationId: session.organizationId,
+    orgWhere: { organizationId: session.organizationId },
+    salonWhere: salonScopeWhere(session),
+    salonIds: effectiveSalonIds(session),
+    activeSalonId: session.salonId,
+    isAggregate: isAggregateView(session),
+  };
 }
