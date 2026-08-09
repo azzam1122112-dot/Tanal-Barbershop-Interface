@@ -1,5 +1,6 @@
 import type { AppointmentStatus, Prisma, PrismaClient, SystemSettings } from "@prisma/client";
 import { BusinessError } from "@/lib/errors";
+import { effectiveBarberSchedule } from "@/lib/barbers/work-schedule";
 
 /**
  * حساب الفترات المتاحة للحجز الذاتي من بوابة العميل.
@@ -17,6 +18,7 @@ type SlotPrisma = PrismaClient | Prisma.TransactionClient;
 const ACTIVE_STATUSES: AppointmentStatus[] = ["BOOKED", "ARRIVED"];
 
 const MINUTES_IN_DAY = 24 * 60;
+export const MIN_BOOKING_LEAD_MINUTES = 120;
 
 export type BookingConfig = {
   enabled: boolean;
@@ -35,7 +37,7 @@ export const DEFAULT_BOOKING_CONFIG: BookingConfig = {
   closeMinute: 23 * 60,
   slotMinutes: 30,
   closedWeekdays: [],
-  leadMinutes: 60,
+  leadMinutes: MIN_BOOKING_LEAD_MINUTES,
   horizonDays: 14,
   maxActivePerCustomer: 2,
 };
@@ -71,7 +73,12 @@ export function bookingConfigFromSettings(settings: Pick<
     closeMinute,
     slotMinutes,
     closedWeekdays: [...new Set(settings.bookingClosedWeekdays)].filter((day) => day >= 0 && day <= 6),
-    leadMinutes: clamp(settings.bookingLeadMinutes, 0, 7 * MINUTES_IN_DAY, DEFAULT_BOOKING_CONFIG.leadMinutes),
+    leadMinutes: clamp(
+      settings.bookingLeadMinutes,
+      MIN_BOOKING_LEAD_MINUTES,
+      7 * MINUTES_IN_DAY,
+      DEFAULT_BOOKING_CONFIG.leadMinutes,
+    ),
     horizonDays: clamp(settings.bookingHorizonDays, 1, 90, DEFAULT_BOOKING_CONFIG.horizonDays),
     maxActivePerCustomer: clamp(settings.bookingMaxActivePerCustomer, 1, 20, DEFAULT_BOOKING_CONFIG.maxActivePerCustomer),
   };
@@ -110,7 +117,13 @@ export type BookingSlot = {
   startAt: string;
   /** دقائق من منتصف الليل المحلي، لعرض الوقت بلا تحليل تاريخ في الواجهة. */
   minuteOfDay: number;
+  /** الحالة الإجمالية: AVAILABLE إذا كان حلاق واحد على الأقل متاحًا. */
+  status: BookingSlotStatus;
+  /** حالة كل حلاق بلا أي بيانات عميل — لعرض المتاح والمحجوز بأمان. */
+  barbers: { barberId: string; status: BookingSlotStatus }[];
 };
+
+export type BookingSlotStatus = "AVAILABLE" | "BOOKED" | "TOO_SOON" | "OFF_DUTY";
 
 export type BookingDay = {
   /** `YYYY-MM-DD` محلي. */
@@ -124,7 +137,7 @@ export type BookingDay = {
 type BusyInterval = { start: number; end: number; barberId: string | null };
 
 /**
- * الفترات المتاحة خلال المدى، مع مراعاة المحجوز والمهلة الدنيا وأيام الإغلاق.
+ * جدول الفترات خلال المدى، مع حالة كل فترة: متاحة، محجوزة، قريبة، أو خارج الدوام.
  *
  * `barberId = null` تعني «أي حلاق»: الفترة متاحة إن كان **حلاق واحد على الأقل**
  * فارغًا فيها. لهذا نجلب حلاقي الفرع لا مواعيد حلاق بعينه.
@@ -156,10 +169,19 @@ export async function listAvailableSlots(
       isActive: true,
       ...(input.barberId ? { id: input.barberId } : {}),
     },
-    select: { id: true },
+    select: {
+      id: true,
+      workScheduleEnabled: true,
+      workStartMinute: true,
+      workEndMinute: true,
+      workClosedWeekdays: true,
+    },
   });
   if (barbers.length === 0) return [];
   const barberIds = barbers.map((barber) => barber.id);
+  const schedules = new Map(
+    barbers.map((barber) => [barber.id, effectiveBarberSchedule(config, barber)]),
+  );
 
   const appointments = await prisma.appointment.findMany({
     where: {
@@ -185,31 +207,60 @@ export async function listAvailableSlots(
     const day = new Date(firstDay);
     day.setDate(day.getDate() + offset);
     const weekday = day.getDay();
-    const closed = config.closedWeekdays.includes(weekday);
+    const branchClosed = config.closedWeekdays.includes(weekday);
     const slots: BookingSlot[] = [];
+    const candidateMinutes = new Set<number>();
 
-    if (!closed) {
-      for (
-        let minute = config.openMinute;
-        minute + config.slotMinutes <= config.closeMinute;
-        minute += config.slotMinutes
-      ) {
+    if (!branchClosed) {
+      for (const barber of barbers) {
+        const schedule = schedules.get(barber.id);
+        if (!schedule?.enabled || schedule.closedWeekdays.includes(weekday)) continue;
+        for (
+          let minute = schedule.openMinute;
+          minute + config.slotMinutes <= schedule.closeMinute;
+          minute += config.slotMinutes
+        ) {
+          candidateMinutes.add(minute);
+        }
+      }
+
+      for (const minute of [...candidateMinutes].sort((left, right) => left - right)) {
         const start = new Date(day);
         start.setMinutes(minute, 0, 0);
         const startMs = start.getTime();
-        if (startMs < earliest) continue;
-
         const endMs = startMs + config.slotMinutes * 60_000;
-        const freeBarber = barberIds.some(
-          (barberId) => !busy.some((slot) => slot.barberId === barberId && startMs < slot.end && slot.start < endMs),
-        );
-        if (!freeBarber) continue;
+        const barberStatuses = barbers.map((barber) => {
+          const schedule = schedules.get(barber.id);
+          let status: BookingSlotStatus;
+          if (!schedule || !isBarberOnDuty(schedule, weekday, minute, config.slotMinutes)) {
+            status = "OFF_DUTY";
+          } else if (startMs < earliest) {
+            status = "TOO_SOON";
+          } else if (
+            busy.some((slot) => slot.barberId === barber.id && startMs < slot.end && slot.start < endMs)
+          ) {
+            status = "BOOKED";
+          } else {
+            status = "AVAILABLE";
+          }
+          return { barberId: barber.id, status };
+        });
 
-        slots.push({ startAt: start.toISOString(), minuteOfDay: minute });
+        slots.push({
+          startAt: start.toISOString(),
+          minuteOfDay: minute,
+          status: combinedSlotStatus(barberStatuses.map((item) => item.status)),
+          barbers: barberStatuses,
+        });
       }
     }
 
-    days.push({ date: toLocalDateKey(day), weekday, closed, slots });
+    days.push({
+      date: toLocalDateKey(day),
+      weekday,
+      closed: branchClosed || candidateMinutes.size === 0,
+      slots,
+    });
   }
 
   return days;
@@ -244,13 +295,6 @@ export async function resolveBookableSlot(
   if (startAt.getSeconds() !== 0 || startAt.getMilliseconds() !== 0) {
     throw new BusinessError("الوقت المختار ليس ضمن الفترات المتاحة");
   }
-  // الفترة لازم تكون على شبكة الفتح تمامًا — وإلا لتسلّل حجز يقطع فترتين.
-  if ((minuteOfDay - config.openMinute) % config.slotMinutes !== 0) {
-    throw new BusinessError("الوقت المختار ليس ضمن الفترات المتاحة");
-  }
-  if (minuteOfDay < config.openMinute || minuteOfDay + config.slotMinutes > config.closeMinute) {
-    throw new BusinessError("الوقت المختار خارج ساعات العمل");
-  }
   if (config.closedWeekdays.includes(startAt.getDay())) {
     throw new BusinessError("الفرع مغلق في هذا اليوم");
   }
@@ -271,11 +315,32 @@ export async function resolveBookableSlot(
       isActive: true,
       ...(input.barberId ? { id: input.barberId } : {}),
     },
-    select: { id: true },
+    select: {
+      id: true,
+      workScheduleEnabled: true,
+      workStartMinute: true,
+      workEndMinute: true,
+      workClosedWeekdays: true,
+    },
     orderBy: { createdAt: "asc" },
   });
   if (barbers.length === 0) {
     throw new BusinessError(input.barberId ? "الحلاق غير متاح" : "لا يوجد حلاق متاح في هذا الفرع", 404);
+  }
+
+  const onDutyBarbers = barbers.filter((barber) =>
+    isBarberOnDuty(
+      effectiveBarberSchedule(config, barber),
+      startAt.getDay(),
+      minuteOfDay,
+      config.slotMinutes,
+    ),
+  );
+  if (onDutyBarbers.length === 0) {
+    throw new BusinessError(
+      input.barberId ? "الوقت المختار خارج دوام الحلاق" : "لا يوجد حلاق في دوامه خلال هذا الوقت",
+      409,
+    );
   }
 
   const endAt = new Date(startAt.getTime() + config.slotMinutes * 60_000);
@@ -283,14 +348,14 @@ export async function resolveBookableSlot(
     where: {
       salonId: input.salonId,
       status: { in: ACTIVE_STATUSES },
-      barberId: { in: barbers.map((barber) => barber.id) },
+      barberId: { in: onDutyBarbers.map((barber) => barber.id) },
       // نافذة يوم كامل حول الموعد: المدد أعمدة لا تعبير SQL، فالتداخل يُفحص حسابيًا.
       startAt: { gte: startOfLocalDay(startAt), lt: addDays(startOfLocalDay(startAt), 1) },
     },
     select: { barberId: true, startAt: true, durationMinutes: true },
   });
 
-  const free = barbers.find(
+  const free = onDutyBarbers.find(
     (barber) =>
       !sameWindow.some((other) => {
         if (other.barberId !== barber.id) return false;
@@ -311,4 +376,26 @@ function addDays(value: Date, days: number) {
   const next = new Date(value);
   next.setDate(next.getDate() + days);
   return next;
+}
+
+function isBarberOnDuty(
+  schedule: { enabled: boolean; openMinute: number; closeMinute: number; closedWeekdays: number[] },
+  weekday: number,
+  minuteOfDay: number,
+  slotMinutes: number,
+) {
+  return (
+    schedule.enabled &&
+    !schedule.closedWeekdays.includes(weekday) &&
+    minuteOfDay >= schedule.openMinute &&
+    minuteOfDay + slotMinutes <= schedule.closeMinute &&
+    (minuteOfDay - schedule.openMinute) % slotMinutes === 0
+  );
+}
+
+function combinedSlotStatus(statuses: BookingSlotStatus[]): BookingSlotStatus {
+  if (statuses.includes("AVAILABLE")) return "AVAILABLE";
+  if (statuses.includes("BOOKED")) return "BOOKED";
+  if (statuses.includes("TOO_SOON")) return "TOO_SOON";
+  return "OFF_DUTY";
 }

@@ -6,6 +6,8 @@ import { requireBarberAdminApi, requireBarberOversightApi, getRequestMeta, parse
 import { isSalonAllowed } from "@/lib/auth/salon-scope";
 import { toSafeBarber } from "@/lib/auth/sanitize";
 import { writeAuditLog } from "@/lib/audit/audit-log";
+import { assertValidBarberWorkSchedule } from "@/lib/barbers/work-schedule";
+import { toErrorResponse } from "@/lib/http/error-response";
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const auth = await requireBarberOversightApi();
@@ -24,6 +26,12 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const before = await prisma.barber.findFirst({ where: { id, organizationId: session.organizationId } });
   if (!before) {
     return NextResponse.json({ message: "الحلاق غير موجود" }, { status: 404 });
+  }
+
+  try {
+    assertValidBarberWorkSchedule(before, parsed.data);
+  } catch (error) {
+    return toErrorResponse(error, "تعذر تحديث دوام الحلاق");
   }
 
   // المشرف: نقل بين فروعه المسندة فقط — لا تعديل اسم/جوال/تفعيل.

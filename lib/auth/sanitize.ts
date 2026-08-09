@@ -26,6 +26,10 @@ export type SafeBarber = {
   lastLoginAt?: string | null;
   /** نسبة العمولة %، أو null لاستخدام النسبة الافتراضية للفرع. */
   commissionRate?: number | null;
+  workScheduleEnabled?: boolean;
+  workStartMinute?: number;
+  workEndMinute?: number;
+  workClosedWeekdays?: number[];
 };
 
 export function toSafeAdminUser(
@@ -68,6 +72,10 @@ export function toSafeBarber(barber: Barber, includeManagementFields = false): S
     safeBarber.updatedAt = barber.updatedAt.toISOString();
     safeBarber.lastLoginAt = barber.lastLoginAt?.toISOString() ?? null;
     safeBarber.commissionRate = barber.commissionRate == null ? null : Number(barber.commissionRate);
+    safeBarber.workScheduleEnabled = barber.workScheduleEnabled;
+    safeBarber.workStartMinute = barber.workStartMinute;
+    safeBarber.workEndMinute = barber.workEndMinute;
+    safeBarber.workClosedWeekdays = barber.workClosedWeekdays;
   }
 
   return safeBarber;

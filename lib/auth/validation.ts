@@ -88,6 +88,10 @@ export const updateBarberSchema = z.object({
     .max(100, "نسبة العمولة لا تتجاوز 100")
     .nullable()
     .optional(),
+  workScheduleEnabled: z.boolean().optional(),
+  workStartMinute: z.coerce.number().int().min(0).max(1439).optional(),
+  workEndMinute: z.coerce.number().int().min(1).max(1440).optional(),
+  workClosedWeekdays: z.array(z.coerce.number().int().min(0).max(6)).max(7).optional(),
 });
 
 export const resetBarberPinSchema = z.object({
@@ -403,7 +407,12 @@ export const systemSettingsUpdateSchema = z.object({
     .max(240, "مدة الفترة لا تتجاوز 240 دقيقة")
     .optional(),
   bookingClosedWeekdays: z.array(z.coerce.number().int().min(0).max(6)).max(7).optional(),
-  bookingLeadMinutes: z.coerce.number().int().min(0).max(10080).optional(),
+  bookingLeadMinutes: z.coerce
+    .number()
+    .int()
+    .min(120, "مهلة الحجز لا تقل عن ساعتين")
+    .max(10080)
+    .optional(),
   bookingHorizonDays: z.coerce
     .number()
     .int()
