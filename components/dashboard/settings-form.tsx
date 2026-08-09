@@ -310,14 +310,14 @@ export function SettingsForm({ initialSettings }: { initialSettings: Settings })
                 lang="en"
                 name="bookingLeadMinutes"
                 type="number"
-                min="0"
+                min="120"
                 max="10080"
                 step="15"
                 defaultValue={settings.bookingLeadMinutes}
                 className="dashboard-field mt-2 h-12"
               />
               <span className="mt-1.5 block text-xs font-medium text-salon-charcoal/70">
-                تمنع حجزًا بعد دقائق والحلاق على الكرسي.
+                الحد الأدنى ساعتان، حتى ينهي الحلاق عميله الحالي ويستعد للموعد التالي.
               </span>
             </label>
             <label className="text-sm font-bold text-salon-charcoal">
@@ -377,7 +377,7 @@ export function SettingsForm({ initialSettings }: { initialSettings: Settings })
                 })}
               </div>
               <span className="mt-2 block text-xs font-medium text-salon-charcoal/70">
-                الأيام المحدَّدة لا تُعرض للعميل إطلاقًا.
+                الأيام المحدَّدة تظهر للعميل بحالة «مغلق» ولا يمكن اختيارها.
               </span>
             </fieldset>
           </div>

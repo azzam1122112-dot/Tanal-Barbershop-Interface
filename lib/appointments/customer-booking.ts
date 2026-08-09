@@ -11,6 +11,7 @@ import {
   type BookingDay,
 } from "@/lib/appointments/booking-slots";
 import { sendBarberAppointmentPush } from "@/lib/push/barber-push";
+import { effectiveBarberSchedule } from "@/lib/barbers/work-schedule";
 
 /**
  * الحجز الذاتي من بوابة العميل.
@@ -28,7 +29,14 @@ type BookingPrisma = PrismaClient;
 /** أقصى عدد فروع يفحصها العرض — حارس ضد مؤسسة بعشرات الفروع. */
 const MAX_BOOKABLE_SALONS = 20;
 
-export type BookableBarber = { id: string; name: string };
+export type BookableBarber = {
+  id: string;
+  name: string;
+  openMinute: number;
+  closeMinute: number;
+  closedWeekdays: number[];
+  inheritsSalonSchedule: boolean;
+};
 
 export type BookableSalon = {
   id: string;
@@ -71,7 +79,14 @@ export async function listBookableSalons(
 
     const barbers = await prisma.barber.findMany({
       where: { organizationId, salonId: salon.id, isActive: true },
-      select: { id: true, name: true },
+      select: {
+        id: true,
+        name: true,
+        workScheduleEnabled: true,
+        workStartMinute: true,
+        workEndMinute: true,
+        workClosedWeekdays: true,
+      },
       orderBy: { name: "asc" },
     });
     if (barbers.length === 0) continue;
@@ -82,7 +97,17 @@ export async function listBookableSalons(
       slotMinutes: config.slotMinutes,
       horizonDays: config.horizonDays,
       closedWeekdays: config.closedWeekdays,
-      barbers,
+      barbers: barbers.map((barber) => {
+        const schedule = effectiveBarberSchedule(config, barber);
+        return {
+          id: barber.id,
+          name: barber.name,
+          openMinute: schedule.openMinute,
+          closeMinute: schedule.closeMinute,
+          closedWeekdays: schedule.closedWeekdays,
+          inheritsSalonSchedule: schedule.inherited,
+        };
+      }),
     });
   }
 
@@ -124,7 +149,7 @@ async function assertBarberInSalon(
 export async function getCustomerBookingSlots(
   prisma: BookingPrisma,
   input: { organizationId: string; salonId: string; barberId?: string | null; days?: number },
-): Promise<{ days: BookingDay[]; slotMinutes: number }> {
+): Promise<{ days: BookingDay[]; slotMinutes: number; leadMinutes: number }> {
   await assertSalonInOrganization(prisma, input.organizationId, input.salonId);
   if (input.barberId) {
     await assertBarberInSalon(prisma, input.organizationId, input.salonId, input.barberId);
@@ -141,7 +166,7 @@ export async function getCustomerBookingSlots(
     days: input.days,
   });
 
-  return { days, slotMinutes: config.slotMinutes };
+  return { days, slotMinutes: config.slotMinutes, leadMinutes: config.leadMinutes };
 }
 
 export async function bookCustomerAppointment(

@@ -22,6 +22,10 @@ type BarberDraft = {
   salonId: string;
   /** فارغ = استخدم النسبة الافتراضية للفرع. */
   commissionRate: string;
+  workScheduleEnabled: boolean;
+  workStartTime: string;
+  workEndTime: string;
+  workClosedWeekdays: number[];
 };
 
 type BarberFilter = "all" | "active" | "inactive";
@@ -31,6 +35,7 @@ const dateFormatter = new Intl.DateTimeFormat("ar-SA", {
   month: "short",
   day: "numeric",
 });
+const WEEKDAYS = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
 
 export function BarberManager({
   initialBarbers,
@@ -119,6 +124,10 @@ export function BarberManager({
         isActive: Boolean(barber.isActive),
         salonId: barber.salonId ?? "",
         commissionRate: barber.commissionRate == null ? "" : String(barber.commissionRate),
+        workScheduleEnabled: Boolean(barber.workScheduleEnabled),
+        workStartTime: minutesToTimeValue(barber.workStartMinute ?? 16 * 60),
+        workEndTime: minutesToTimeValue(barber.workEndMinute ?? 23 * 60),
+        workClosedWeekdays: barber.workClosedWeekdays ?? [],
       },
     }));
   }
@@ -191,6 +200,18 @@ export function BarberManager({
     const draftRate = draft.commissionRate.trim();
     const currentRate = barber.commissionRate == null ? "" : String(barber.commissionRate);
     if (draftRate !== currentRate) updateBody.commissionRate = draftRate === "" ? null : Number(draftRate);
+    if (draft.workScheduleEnabled !== Boolean(barber.workScheduleEnabled)) {
+      updateBody.workScheduleEnabled = draft.workScheduleEnabled;
+    }
+    if (draft.workScheduleEnabled) {
+      const startMinute = timeValueToMinutes(draft.workStartTime, barber.workStartMinute ?? 16 * 60);
+      const endMinute = timeValueToMinutes(draft.workEndTime, barber.workEndMinute ?? 23 * 60);
+      if (startMinute !== barber.workStartMinute) updateBody.workStartMinute = startMinute;
+      if (endMinute !== barber.workEndMinute) updateBody.workEndMinute = endMinute;
+      if (!sameNumberSet(draft.workClosedWeekdays, barber.workClosedWeekdays ?? [])) {
+        updateBody.workClosedWeekdays = draft.workClosedWeekdays;
+      }
+    }
 
     const detailsChanged = Object.keys(updateBody).length > 0;
     const pinChanged = draft.pin.trim().length > 0;
@@ -457,6 +478,76 @@ export function BarberManager({
                             </select>
                           </label>
                         ) : null}
+                        <div className="rounded-xl border border-salon-line bg-salon-pearl p-4 md:col-span-2">
+                          <label className="flex items-center justify-between gap-4">
+                            <span>
+                              <span className="block text-sm font-bold text-salon-ink">دوام مخصص للحلاق</span>
+                              <span className="mt-1 block text-xs font-semibold text-salon-charcoal/70">
+                                عند إيقافه يرث ساعات دوام الفرع وأيام إغلاقه.
+                              </span>
+                            </span>
+                            <input
+                              type="checkbox"
+                              checked={draft.workScheduleEnabled}
+                              onChange={(event) => updateDraft(barber.id, { workScheduleEnabled: event.target.checked })}
+                              className="h-5 w-5 shrink-0 accent-salon-forest"
+                            />
+                          </label>
+
+                          {draft.workScheduleEnabled ? (
+                            <div className="mt-4 grid gap-3 border-t border-salon-line pt-4 md:grid-cols-2">
+                              <label className="block">
+                                <span className="mb-2 block text-xs font-bold text-salon-charcoal">بداية الدوام</span>
+                                <input
+                                  type="time"
+                                  lang="en"
+                                  value={draft.workStartTime}
+                                  onChange={(event) => updateDraft(barber.id, { workStartTime: event.target.value })}
+                                  className="dashboard-field py-2.5"
+                                />
+                              </label>
+                              <label className="block">
+                                <span className="mb-2 block text-xs font-bold text-salon-charcoal">نهاية الدوام</span>
+                                <input
+                                  type="time"
+                                  lang="en"
+                                  value={draft.workEndTime}
+                                  onChange={(event) => updateDraft(barber.id, { workEndTime: event.target.value })}
+                                  className="dashboard-field py-2.5"
+                                />
+                              </label>
+                              <fieldset className="md:col-span-2">
+                                <legend className="mb-2 text-xs font-bold text-salon-charcoal">أيام إجازة الحلاق</legend>
+                                <div className="flex flex-wrap gap-2">
+                                  {WEEKDAYS.map((label, index) => {
+                                    const closed = draft.workClosedWeekdays.includes(index);
+                                    return (
+                                      <button
+                                        key={label}
+                                        type="button"
+                                        aria-pressed={closed}
+                                        onClick={() =>
+                                          updateDraft(barber.id, {
+                                            workClosedWeekdays: closed
+                                              ? draft.workClosedWeekdays.filter((day) => day !== index)
+                                              : [...draft.workClosedWeekdays, index],
+                                          })
+                                        }
+                                        className={`rounded-lg border px-3 py-2 text-xs font-bold transition ${
+                                          closed
+                                            ? "border-salon-ruby bg-salon-ruby text-white"
+                                            : "border-salon-line bg-white text-salon-charcoal"
+                                        }`}
+                                      >
+                                        {label}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </fieldset>
+                            </div>
+                          ) : null}
+                        </div>
                       </div>
                     ) : (
                       <div>
@@ -484,6 +575,10 @@ export function BarberManager({
                           <div>
                             <dt className="text-xs font-bold text-salon-charcoal/70">آخر تحديث</dt>
                             <dd className="mt-1 text-salon-ink">{barber.updatedAt ? dateFormatter.format(new Date(barber.updatedAt)) : "غير متاح"}</dd>
+                          </div>
+                          <div className="md:col-span-2">
+                            <dt className="text-xs font-bold text-salon-charcoal/70">دوام الحجز</dt>
+                            <dd className="mt-1 text-salon-ink">{formatBarberSchedule(barber)}</dd>
                           </div>
                         </dl>
                       </div>
@@ -586,4 +681,38 @@ export function BarberManager({
       </section>
     </div>
   );
+}
+
+function minutesToTimeValue(minutes: number) {
+  const safe = Math.max(0, Math.min(24 * 60, Math.trunc(minutes)));
+  const hour = Math.floor(safe / 60);
+  const minute = safe % 60;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function timeValueToMinutes(value: string, fallback: number) {
+  const match = /^(\d{2}):(\d{2})$/.exec(value);
+  if (!match) return fallback;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+function sameNumberSet(left: number[], right: number[]) {
+  const normalize = (values: number[]) => [...new Set(values)].sort((a, b) => a - b).join(",");
+  return normalize(left) === normalize(right);
+}
+
+function formatBarberSchedule(barber: SafeBarber) {
+  if (!barber.workScheduleEnabled) return "يرث ساعات دوام الفرع";
+  const start = formatMinuteLabel(barber.workStartMinute ?? 16 * 60);
+  const end = formatMinuteLabel(barber.workEndMinute ?? 23 * 60);
+  const closed = (barber.workClosedWeekdays ?? []).map((day) => WEEKDAYS[day]).filter(Boolean);
+  return `${start} – ${end}${closed.length > 0 ? ` · الإجازة: ${closed.join("، ")}` : " · بلا إجازة أسبوعية"}`;
+}
+
+function formatMinuteLabel(minutes: number) {
+  const hour24 = Math.floor(minutes / 60);
+  const minute = minutes % 60;
+  const suffix = hour24 < 12 ? "ص" : "م";
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+  return `${hour12}:${String(minute).padStart(2, "0")} ${suffix}`;
 }

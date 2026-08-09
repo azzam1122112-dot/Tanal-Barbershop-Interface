@@ -327,31 +327,36 @@ model User {
 }
 
 model Barber {
-  id                String                   @id @default(cuid())
-  organizationId    String?
-  salonId           String?
-  name              String
-  phone             String
-  accessPinHash     String
-  role              UserRole                 @default(BARBER)
-  isActive          Boolean                  @default(true)
+  id                  String                   @id @default(cuid())
+  organizationId      String?
+  salonId             String?
+  name                String
+  phone               String
+  accessPinHash       String
+  role                UserRole                 @default(BARBER)
+  isActive            Boolean                  @default(true)
   // نسبة عمولة الحلاق %. null = استخدم النسبة الافتراضية للفرع.
-  commissionRate    Decimal?                 @db.Decimal(5, 2)
-  lastLoginAt       DateTime?
-  createdAt         DateTime                 @default(now())
-  updatedAt         DateTime                 @updatedAt
-  organization      Organization?            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  salon             Salon?                   @relation(fields: [salonId], references: [id], onDelete: Cascade)
-  createdCustomers  Customer[]               @relation("CustomerCreatedByBarber")
-  visits            Visit[]
-  auditLogs         AuditLog[]               @relation("BarberAuditLogs")
-  sessions          Session[]
-  dailyCloses       DailyClose[]
-  cashSessions      CashSession[]
-  expenses          CashExpense[]            @relation("CashExpenseBarber")
-  appointments      Appointment[]
-  attendance        AttendanceRecord[]
-  pushSubscriptions BarberPushSubscription[]
+  commissionRate      Decimal?                 @db.Decimal(5, 2)
+  // دوام الحلاق للحجز الذاتي. عند التعطيل يرث دوام الفرع وإجازاته.
+  workScheduleEnabled Boolean                  @default(false)
+  workStartMinute     Int                      @default(960)
+  workEndMinute       Int                      @default(1380)
+  workClosedWeekdays  Int[]                    @default([])
+  lastLoginAt         DateTime?
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+  organization        Organization?            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  salon               Salon?                   @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  createdCustomers    Customer[]               @relation("CustomerCreatedByBarber")
+  visits              Visit[]
+  auditLogs           AuditLog[]               @relation("BarberAuditLogs")
+  sessions            Session[]
+  dailyCloses         DailyClose[]
+  cashSessions        CashSession[]
+  expenses            CashExpense[]            @relation("CashExpenseBarber")
+  appointments        Appointment[]
+  attendance          AttendanceRecord[]
+  pushSubscriptions   BarberPushSubscription[]
 
   @@unique([organizationId, phone])
   @@index([salonId, isActive])
@@ -781,7 +786,7 @@ model SystemSettings {
   // أيام الإغلاق الأسبوعية: 0=الأحد .. 6=السبت.
   bookingClosedWeekdays         Int[]         @default([])
   // أقل مهلة بين الآن وبداية الموعد — تمنع حجزًا بعد دقيقتين والحلاق على الكرسي.
-  bookingLeadMinutes            Int           @default(60)
+  bookingLeadMinutes            Int           @default(120)
   // مدى الحجز المستقبلي بالأيام.
   bookingHorizonDays            Int           @default(14)
   // أقصى عدد مواعيد قائمة للعميل الواحد — يمنع حجز مقاعد وهمية.

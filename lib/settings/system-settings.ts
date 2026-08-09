@@ -1,6 +1,7 @@
 import { BusinessError } from "@/lib/errors";
 import type { Prisma, PrismaClient, SystemSettings, UserRole } from "@prisma/client";
 import { writeAuditLog } from "@/lib/audit/audit-log";
+import { MIN_BOOKING_LEAD_MINUTES } from "@/lib/appointments/booking-slots";
 
 type SettingsPrisma = PrismaClient | Prisma.TransactionClient;
 
@@ -106,11 +107,15 @@ export async function updateSystemSettings(prisma: PrismaClient, data: SystemSet
     const openMinute = data.bookingOpenMinute ?? before.bookingOpenMinute;
     const closeMinute = data.bookingCloseMinute ?? before.bookingCloseMinute;
     const slotMinutes = data.bookingSlotMinutes ?? before.bookingSlotMinutes;
+    const leadMinutes = data.bookingLeadMinutes ?? before.bookingLeadMinutes;
     if (slotMinutes < 5 || slotMinutes > 240) {
       throw new BusinessError("مدة الفترة يجب أن تكون بين 5 و240 دقيقة");
     }
     if (closeMinute - openMinute < slotMinutes) {
       throw new BusinessError("ساعات الاستقبال أقصر من فترة واحدة — وسّع النافذة أو قلّل مدة الفترة");
+    }
+    if (leadMinutes < MIN_BOOKING_LEAD_MINUTES) {
+      throw new BusinessError("أقل مهلة للحجز هي ساعتان من الوقت الحالي");
     }
     if ((data.bookingClosedWeekdays ?? before.bookingClosedWeekdays).length >= 7) {
       throw new BusinessError("لا يمكن إغلاق أيام الأسبوع كلها مع تفعيل الحجز");
