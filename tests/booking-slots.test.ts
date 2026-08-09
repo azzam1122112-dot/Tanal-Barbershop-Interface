@@ -62,7 +62,8 @@ describe("customer booking availability", () => {
   });
 
   it("shows booked and too-soon times while respecting each barber schedule", async () => {
-    const now = new Date(2026, 7, 10, 16, 30, 0, 0);
+    // الثواني لا تظهر للعميل: 4:30:45 يجب أن تسمح بفترة 6:30 بالضبط.
+    const now = new Date(2026, 7, 10, 16, 30, 45, 0);
     const bookedAt = new Date(2026, 7, 10, 19, 0, 0, 0);
     const prisma = mockPrisma({
       barbers: [inheritedBarber, customBarber],

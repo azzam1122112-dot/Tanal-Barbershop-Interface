@@ -200,7 +200,7 @@ export async function listAvailableSlots(
     end: appointment.startAt.getTime() + appointment.durationMinutes * 60_000,
   }));
 
-  const earliest = now.getTime() + config.leadMinutes * 60_000;
+  const earliest = bookingLeadThreshold(now, config.leadMinutes);
   const days: BookingDay[] = [];
 
   for (let offset = 0; offset < dayCount; offset += 1) {
@@ -298,7 +298,7 @@ export async function resolveBookableSlot(
   if (config.closedWeekdays.includes(startAt.getDay())) {
     throw new BusinessError("الفرع مغلق في هذا اليوم");
   }
-  if (startAt.getTime() < now.getTime() + config.leadMinutes * 60_000) {
+  if (startAt.getTime() < bookingLeadThreshold(now, config.leadMinutes)) {
     throw new BusinessError("الوقت المختار قريب جدًا — اختر فترة أبعد");
   }
 
@@ -398,4 +398,11 @@ function combinedSlotStatus(statuses: BookingSlotStatus[]): BookingSlotStatus {
   if (statuses.includes("BOOKED")) return "BOOKED";
   if (statuses.includes("TOO_SOON")) return "TOO_SOON";
   return "OFF_DUTY";
+}
+
+/** المهلة بدقة الدقيقة التي يراها العميل؛ 4:30:45 تعني أن 6:30 متاح بعد ساعتين. */
+function bookingLeadThreshold(now: Date, leadMinutes: number) {
+  const visibleNow = new Date(now);
+  visibleNow.setSeconds(0, 0);
+  return visibleNow.getTime() + leadMinutes * 60_000;
 }
