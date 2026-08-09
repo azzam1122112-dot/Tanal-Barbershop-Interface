@@ -483,7 +483,7 @@ export function BarberManager({
                             <span>
                               <span className="block text-sm font-bold text-salon-ink">دوام مخصص للحلاق</span>
                               <span className="mt-1 block text-xs font-semibold text-salon-charcoal/70">
-                                عند إيقافه يرث ساعات دوام الفرع وأيام إغلاقه.
+                                عند إيقافه يرث دوام الفرع. الدوام المخصص يبقى داخل نافذة حجز الفرع.
                               </span>
                             </span>
                             <input
@@ -710,6 +710,7 @@ function formatBarberSchedule(barber: SafeBarber) {
 }
 
 function formatMinuteLabel(minutes: number) {
+  if (minutes === 24 * 60) return "12:00 ص";
   const hour24 = Math.floor(minutes / 60);
   const minute = minutes % 60;
   const suffix = hour24 < 12 ? "ص" : "م";

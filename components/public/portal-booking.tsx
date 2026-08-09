@@ -61,11 +61,20 @@ function formatDayLabel(dateKey: string) {
 }
 
 function formatSlotTime(minuteOfDay: number) {
+  if (minuteOfDay === 24 * 60) return "12:00 ص";
   const hour24 = Math.floor(minuteOfDay / 60);
   const minute = minuteOfDay % 60;
   const suffix = hour24 < 12 ? "ص" : "م";
   const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
   return `${hour12}:${String(minute).padStart(2, "0")} ${suffix}`;
+}
+
+function formatLeadDuration(minutes: number) {
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  const hourLabel = hours === 1 ? "ساعة" : hours === 2 ? "ساعتين" : `${hours} ساعات`;
+  if (remainder === 0) return hourLabel;
+  return `${hourLabel} و${remainder} دقيقة`;
 }
 
 function formatAppointment(startAt: string) {
@@ -274,12 +283,12 @@ export function PortalBooking({
 
           <div className="mt-4 flex items-start gap-3 rounded-2xl border border-salon-gold/30 bg-salon-gold/10 px-4 py-3">
             <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-salon-ink text-xs font-bold text-white" aria-hidden="true">
-              +2
+              {leadMinutes === 120 ? "+2" : `+${leadMinutes}د`}
             </span>
             <div>
               <p className="text-sm font-bold text-salon-ink">الحجز يبدأ بعد ساعتين من الآن</p>
               <p className="mt-1 text-xs font-semibold leading-5 text-salon-charcoal/70">
-                نعرض تلقائيًا أول وقت يسمح به النظام بعد {Math.round(leadMinutes / 60)} ساعات أو أكثر.
+                نعرض تلقائيًا أول وقت يسمح به النظام بعد {formatLeadDuration(leadMinutes)} أو أكثر.
               </p>
             </div>
           </div>
