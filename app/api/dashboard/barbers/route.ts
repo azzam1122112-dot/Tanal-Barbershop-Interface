@@ -3,20 +3,21 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { hashBarberPin } from "@/lib/auth/barber-pin";
 import { createBarberSchema } from "@/lib/auth/validation";
-import { requireAdminApi, getRequestMeta, parseJsonBody } from "@/lib/auth/http";
+import { requireBarberAdminApi, requireBarberOversightApi, getRequestMeta, parseJsonBody } from "@/lib/auth/http";
+import { salonScopeWhere } from "@/lib/auth/salon-scope";
 import { toSafeBarber } from "@/lib/auth/sanitize";
 import { writeAuditLog } from "@/lib/audit/audit-log";
 import { BusinessError } from "@/lib/errors";
 import { toErrorResponse } from "@/lib/http/error-response";
 
 export async function GET() {
-  const auth = await requireAdminApi();
+  const auth = await requireBarberOversightApi();
   if (auth.response) return auth.response;
   const session = auth.session;
   if (!session || session.type !== "dashboard") return NextResponse.json({ message: "غير مصرح" }, { status: 401 });
 
   const barbers = await prisma.barber.findMany({
-    where: { organizationId: session.organizationId },
+    where: { organizationId: session.organizationId, ...salonScopeWhere(session) },
     orderBy: [{ isActive: "desc" }, { createdAt: "desc" }],
   });
 
@@ -24,7 +25,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const auth = await requireAdminApi();
+  const auth = await requireBarberAdminApi();
   if (auth.response) return auth.response;
   const session = auth.session;
   if (!session || session.type !== "dashboard") return NextResponse.json({ message: "غير مصرح" }, { status: 401 });

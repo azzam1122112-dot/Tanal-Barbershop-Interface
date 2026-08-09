@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireDashboardApi } from "@/lib/auth/http";
+import { effectiveSalonIds } from "@/lib/auth/salon-scope";
 import { prisma } from "@/lib/db/prisma";
 import { getPostCloseAdjustmentReport } from "@/lib/post-close-adjustments/post-close-adjustment-report";
 
@@ -12,7 +13,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const report = await getPostCloseAdjustmentReport(prisma, {
     organizationId: session.organizationId,
-    salonId: session.salonId,
+    salonIds: effectiveSalonIds(session),
     from: url.searchParams.get("from"),
     to: url.searchParams.get("to"),
     barberId: url.searchParams.get("barberId"),

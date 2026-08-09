@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
+import { InlineEmpty } from "@/components/dashboard/ui";
 
 type ManagedService = {
   id: string;
@@ -68,13 +69,13 @@ export function ServiceManager({ initialServices }: { initialServices: ManagedSe
   }
 
   return (
-    <div className="mt-8 grid gap-6 lg:grid-cols-[360px_1fr]">
+    <div className="mt-8 grid items-start gap-6 lg:grid-cols-[360px_1fr]">
       <DashboardToast toast={toast} onClose={() => setToast(null)} />
       <form onSubmit={createService} className="dashboard-panel space-y-4 p-5">
-        <h2 className="text-xl font-black">إضافة خدمة</h2>
+        <h2 className="text-xl font-bold">إضافة خدمة</h2>
         <input name="name" required placeholder="اسم الخدمة" className="dashboard-field" />
-        <input name="defaultPrice" required type="number" min={0} step="0.01" placeholder="السعر الافتراضي" className="dashboard-field" />
-        <input name="sortOrder" required type="number" step={1} defaultValue={0} placeholder="ترتيب الظهور" className="dashboard-field" />
+        <input lang="en" name="defaultPrice" required type="number" min={0} step="0.01" placeholder="السعر الافتراضي" className="dashboard-field" />
+        <input lang="en" name="sortOrder" required type="number" step={1} defaultValue={0} placeholder="ترتيب الظهور" className="dashboard-field" />
         <button disabled={loading} className="dashboard-button w-full">
           {loading ? "جاري الحفظ..." : "حفظ الخدمة"}
         </button>
@@ -100,7 +101,7 @@ export function ServiceManager({ initialServices }: { initialServices: ManagedSe
               </label>
               <label className="grid gap-1 md:block">
                 <span className="text-xs font-bold text-salon-charcoal md:hidden">السعر</span>
-                <input
+                <input lang="en"
                   defaultValue={service.defaultPrice}
                   type="number"
                   min={0}
@@ -111,7 +112,7 @@ export function ServiceManager({ initialServices }: { initialServices: ManagedSe
               </label>
               <label className="grid gap-1 md:block">
                 <span className="text-xs font-bold text-salon-charcoal md:hidden">الترتيب</span>
-                <input
+                <input lang="en"
                   defaultValue={service.sortOrder ?? 0}
                   type="number"
                   step={1}
@@ -131,7 +132,7 @@ export function ServiceManager({ initialServices }: { initialServices: ManagedSe
               </div>
             </div>
           ))}
-          {services.length === 0 ? <p className="px-4 py-8 text-center text-salon-charcoal">لا توجد خدمات بعد</p> : null}
+          {services.length === 0 ? <div className="p-4"><InlineEmpty icon="✂️" title="لا توجد خدمات بعد" hint="أضف خدماتك وأسعارها ليختار منها الحلاق عند تسجيل الزيارة." /></div> : null}
         </div>
       </div>
     </div>

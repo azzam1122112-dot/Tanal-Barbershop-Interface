@@ -24,6 +24,8 @@ export type SafeBarber = {
   createdAt?: string;
   updatedAt?: string;
   lastLoginAt?: string | null;
+  /** نسبة العمولة %، أو null لاستخدام النسبة الافتراضية للفرع. */
+  commissionRate?: number | null;
 };
 
 export function toSafeAdminUser(
@@ -65,6 +67,7 @@ export function toSafeBarber(barber: Barber, includeManagementFields = false): S
     safeBarber.createdAt = barber.createdAt.toISOString();
     safeBarber.updatedAt = barber.updatedAt.toISOString();
     safeBarber.lastLoginAt = barber.lastLoginAt?.toISOString() ?? null;
+    safeBarber.commissionRate = barber.commissionRate == null ? null : Number(barber.commissionRate);
   }
 
   return safeBarber;

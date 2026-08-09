@@ -180,5 +180,80 @@ export async function updateSalon(
 ) {
   const salon = await prisma.salon.findFirst({ where: { id: salonId, organizationId }, select: { id: true } });
   if (!salon) throw new BusinessError("الصالون غير موجود");
+
+  // إبقاء فرع نشط واحد على الأقل حتى لا تتعطّل المؤسسة بالكامل.
+  if (data.isActive === false) {
+    const otherActive = await prisma.salon.count({
+      where: { organizationId, isActive: true, id: { not: salon.id } },
+    });
+    if (otherActive === 0) {
+      throw new BusinessError("يجب بقاء فرع نشط واحد على الأقل في المؤسسة");
+    }
+  }
+
   return prisma.salon.update({ where: { id: salon.id }, data });
+}
+
+/**
+ * حذف فرع نهائيًا. الحذف مسموح فقط للفرع الفارغ من أي تاريخ تشغيلي؛
+ * غير ذلك يُقترح التعطيل حفاظًا على سلامة السجلات المالية والتدقيق.
+ */
+export async function deleteSalon(prisma: PrismaClient, organizationId: string, salonId: string) {
+  const salon = await prisma.salon.findFirst({ where: { id: salonId, organizationId } });
+  if (!salon) throw new BusinessError("الصالون غير موجود", 404);
+
+  const totalSalons = await prisma.salon.count({ where: { organizationId } });
+  if (totalSalons <= 1) {
+    throw new BusinessError("لا يمكن حذف الفرع الوحيد في المؤسسة");
+  }
+
+  const [visits, cashSessions, dailyCloses, barbers, services] = await prisma.$transaction([
+    prisma.visit.count({ where: { salonId } }),
+    prisma.cashSession.count({ where: { salonId } }),
+    prisma.dailyClose.count({ where: { salonId } }),
+    prisma.barber.count({ where: { salonId } }),
+    prisma.service.count({ where: { salonId } }),
+  ]);
+
+  if (visits + cashSessions + dailyCloses > 0) {
+    throw new BusinessError(
+      "لا يمكن حذف فرع له سجل تشغيلي (زيارات أو جلسات صندوق أو إغلاقات). عطّل الفرع بدل حذفه للحفاظ على تقاريره.",
+      409,
+    );
+  }
+
+  if (barbers > 0) {
+    throw new BusinessError("انقل حلاقي هذا الفرع أو احذفهم قبل حذف الفرع", 409);
+  }
+
+  // مشرف بلا فروع مسندة يفقد وصوله كليًا — امنع الحذف حتى يُسند لفرع آخر.
+  const assignedUserIds = (await prisma.staffSalon.findMany({ where: { salonId }, select: { userId: true } })).map(
+    (row) => row.userId,
+  );
+  if (assignedUserIds.length > 0) {
+    const stranded = await prisma.user.findMany({
+      where: {
+        id: { in: assignedUserIds },
+        role: "SUPERVISOR",
+        salonAssignments: { none: { salonId: { not: salonId } } },
+      },
+      select: { name: true },
+    });
+    if (stranded.length > 0) {
+      throw new BusinessError(
+        `هذا الفرع هو الوحيد المسند لـ ${stranded.map((user) => user.name).join("، ")}. أسندهم لفرع آخر أولًا.`,
+        409,
+      );
+    }
+  }
+
+  // الفرع فارغ: نحذف إعداداته وخدماته المرتبطة ثم الفرع نفسه.
+  await prisma.$transaction(async (tx) => {
+    await tx.staffSalon.deleteMany({ where: { salonId } });
+    await tx.systemSettings.deleteMany({ where: { salonId } });
+    if (services > 0) await tx.service.deleteMany({ where: { salonId } });
+    await tx.salon.delete({ where: { id: salonId } });
+  });
+
+  return { id: salon.id, name: salon.name, slug: salon.slug };
 }

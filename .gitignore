@@ -4,6 +4,8 @@ node_modules/
 
 # next.js
 .next/
+# مجلد بناء بديل عبر NEXT_DIST_DIR (بناء بلا إيقاف خادم التطوير)
+.next-*/
 out/
 
 # production
@@ -30,6 +32,15 @@ pnpm-debug.log*
 .dev-server.log
 .dev-server*.log
 .dev-server.pid
+.dev-*.log
+.next-dev.log
+.*-dev-*.log
+
+# local inspection artifacts
+p.html
+slots.json
+app/my/*/h.txt
+app/my/*/m.json
 
 # tests
 coverage/

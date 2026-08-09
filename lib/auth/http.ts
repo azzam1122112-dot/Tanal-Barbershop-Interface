@@ -1,8 +1,19 @@
+import { cache } from "react";
 import { cookies, headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS } from "./config";
-import { canAccessBarberApp, canAccessDashboard, canAccessPlatform, canManageOrganization, canManageStaff } from "./access";
+import {
+  canAccessBarberApp,
+  canAccessDashboard,
+  canAccessPlatform,
+  canManageBarbers,
+  canManageOrganization,
+  canManageStaff,
+  canOperateLoyalty,
+  canSetLoyaltyPolicy,
+  canTransferBarbers,
+} from "./access";
 import { getAuthSession } from "./session";
 
 export function setSessionCookie(response: NextResponse, token: string) {
@@ -29,11 +40,20 @@ export function clearSessionCookie(response: NextResponse) {
   });
 }
 
-export async function getRequestSession() {
+/**
+ * الجلسة الحالية، محفوظة لكل طلب عبر `cache` من React.
+ *
+ * الجلسة تُقرأ عدة مرات في الطلب الواحد (التخطيط + الصفحة + بوابات الصلاحية)،
+ * وكل قراءة استعلام `findUnique` بأربعة `include`. بلا `cache` كان الطلب الواحد
+ * يضرب قاعدة البيانات مرتين أو أكثر بنفس الاستعلام حرفيًا.
+ *
+ * النطاق طلب واحد فقط — لا تسرّب بين الطلبات ولا بين المستخدمين.
+ */
+export const getRequestSession = cache(async () => {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
   return getAuthSession(prisma, token);
-}
+});
 
 export async function requireDashboardApi() {
   const session = await getRequestSession();
@@ -53,6 +73,58 @@ export async function requireAdminApi() {
   }
 
   if (!canManageStaff(session)) {
+    return { session, response: NextResponse.json({ message: "صلاحية المدير مطلوبة" }, { status: 403 }) };
+  }
+
+  return { session, response: null };
+}
+
+/** تشغيل برنامج الولاء (مكافآت، حملات، واتساب، متابعة عملاء) — يشمل المشرف. */
+export async function requireLoyaltyOperatorApi() {
+  const session = await getRequestSession();
+
+  if (!canOperateLoyalty(session)) {
+    return { session: null, response: NextResponse.json({ message: "غير مصرح" }, { status: 401 }) };
+  }
+
+  return { session, response: null };
+}
+
+/** سياسة الولاء (معدّل النقاط وقواعد المكافآت) — مالك/مدير فقط. */
+export async function requireLoyaltyPolicyApi() {
+  const session = await getRequestSession();
+
+  if (!canAccessDashboard(session)) {
+    return { session: null, response: NextResponse.json({ message: "غير مصرح" }, { status: 401 }) };
+  }
+
+  if (!canSetLoyaltyPolicy(session)) {
+    return { session, response: NextResponse.json({ message: "تعديل سياسة الولاء يتطلب صلاحية المدير" }, { status: 403 }) };
+  }
+
+  return { session, response: null };
+}
+
+/** متابعة الحلاقين ونقلهم بين الفروع — يشمل المشرف داخل فروعه. */
+export async function requireBarberOversightApi() {
+  const session = await getRequestSession();
+
+  if (!canTransferBarbers(session)) {
+    return { session: null, response: NextResponse.json({ message: "غير مصرح" }, { status: 401 }) };
+  }
+
+  return { session, response: null };
+}
+
+/** إنشاء/حذف حلاق وتغيير رمز دخوله — مالك/مدير فقط. */
+export async function requireBarberAdminApi() {
+  const session = await getRequestSession();
+
+  if (!canAccessDashboard(session)) {
+    return { session: null, response: NextResponse.json({ message: "غير مصرح" }, { status: 401 }) };
+  }
+
+  if (!canManageBarbers(session)) {
     return { session, response: NextResponse.json({ message: "صلاحية المدير مطلوبة" }, { status: 403 }) };
   }
 

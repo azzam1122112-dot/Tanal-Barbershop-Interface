@@ -19,11 +19,12 @@ export async function resolveRequestOrganization() {
 }
 
 /**
- * معرّف المؤسسة المعروف من السياق فقط (النطاق الفرعي إن وُجد، وإلا المعرّف المُدخل).
- * يرجع null إن لم يُعرف — عندها يُحلّ المستأجر من هوية المستخدم (البريد/الجوال).
+ * معرّف المؤسسة المستنتج من **النطاق الفرعي فقط**.
+ * يرجع null على نطاق موحّد أو محليًا — عندها يُحلّ المستأجر من هوية المستخدم
+ * (البريد/الجوال) وبيانات اعتماده، فلا يُطلب منه كتابة معرّف مؤسسة أبدًا.
  */
-export async function getKnownLoginOrgSlug(explicitSlug?: string | null) {
+export async function getKnownLoginOrgSlug() {
   const headerStore = await headers();
   const host = headerStore.get("x-forwarded-host") ?? headerStore.get("host");
-  return extractOrgSlug(host) ?? (explicitSlug?.trim().toLowerCase() || null);
+  return extractOrgSlug(host);
 }

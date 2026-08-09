@@ -9,16 +9,16 @@ const config: Config = {
     extend: {
       colors: {
         salon: {
-          ink: "#101916",
-          onyx: "#0b1310",
-          charcoal: "#303832",
-          gold: "#a98245",
-          goldlight: "#c9a86a",
-          mist: "#f4f2ed",
-          line: "#d6cec1",
-          pearl: "#fbfaf6",
-          cream: "#faf8f2",
-          forest: "#173b33",
+          ink: "#15111f",
+          onyx: "#09070f",
+          charcoal: "#4b4655",
+          gold: "#7c3aed",
+          goldlight: "#c4b5fd",
+          mist: "#f4f1f9",
+          line: "#ddd6ee",
+          pearl: "#fcfbff",
+          cream: "#f9f7fc",
+          forest: "#4c1d95",
           ruby: "#7f2d35",
           steel: "#33485a",
         },
@@ -27,8 +27,8 @@ const config: Config = {
         sans: ["var(--font-sans)", "Arial", "sans-serif"],
       },
       backgroundImage: {
-        "gold-sheen": "linear-gradient(180deg, #c19a55 0%, #a98245 55%, #8f6c39 100%)",
-        "sidebar-onyx": "linear-gradient(180deg, #14201b 0%, #0d1611 60%, #0b1310 100%)",
+        "gold-sheen": "linear-gradient(180deg, #9f7aea 0%, #7c3aed 55%, #5b21b6 100%)",
+        "sidebar-onyx": "linear-gradient(180deg, #171020 0%, #0d0914 60%, #09070f 100%)",
       },
       boxShadow: {
         lux: "0 10px 24px -12px rgba(16,25,22,0.18), 0 4px 10px -6px rgba(16,25,22,0.10)",

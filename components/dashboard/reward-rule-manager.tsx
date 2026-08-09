@@ -17,7 +17,7 @@ type RewardRuleResponse = {
   message?: string;
 };
 
-export function RewardRuleManager({ initialRules }: { initialRules: RewardRule[] }) {
+export function RewardRuleManager({ initialRules, readOnly = false }: { initialRules: RewardRule[]; readOnly?: boolean }) {
   const [rules, setRules] = useState(initialRules);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -66,17 +66,19 @@ export function RewardRuleManager({ initialRules }: { initialRules: RewardRule[]
   }
 
   return (
-    <div className="mt-8 grid gap-6 lg:grid-cols-[360px_1fr]">
+    <div className={`mt-8 grid gap-6 ${readOnly ? "" : "lg:grid-cols-[360px_1fr]"}`}>
       <DashboardToast toast={toast} onClose={() => setToast(null)} />
-      <form onSubmit={createRule} className="dashboard-panel space-y-4 p-5">
-        <h2 className="text-xl font-black">إضافة مكافأة</h2>
-        <input name="requiredPoints" required type="number" min={1} placeholder="النقاط المطلوبة" className="dashboard-field" />
-        <input name="discountAmount" required type="number" min={0.01} step="0.01" placeholder="قيمة الخصم" className="dashboard-field" />
-        <input name="sortOrder" required type="number" step={1} defaultValue={0} placeholder="الترتيب" className="dashboard-field" />
-        <button disabled={loading} className="dashboard-button w-full">
-          {loading ? "جاري الحفظ..." : "حفظ المكافأة"}
-        </button>
-      </form>
+      {readOnly ? null : (
+        <form onSubmit={createRule} className="dashboard-panel space-y-4 p-5">
+          <h2 className="text-xl font-bold">إضافة مكافأة</h2>
+          <input lang="en" name="requiredPoints" required type="number" min={1} placeholder="النقاط المطلوبة" className="dashboard-field" />
+          <input lang="en" name="discountAmount" required type="number" min={0.01} step="0.01" placeholder="قيمة الخصم" className="dashboard-field" />
+          <input lang="en" name="sortOrder" required type="number" step={1} defaultValue={0} placeholder="الترتيب" className="dashboard-field" />
+          <button disabled={loading} className="dashboard-button w-full">
+            {loading ? "جاري الحفظ..." : "حفظ المكافأة"}
+          </button>
+        </form>
+      )}
 
       <div className="dashboard-panel overflow-x-auto">
         <div className="hidden grid-cols-[1fr_130px_130px_120px] gap-3 border-b border-salon-line px-4 py-3 text-sm font-bold text-salon-charcoal md:grid">
@@ -92,37 +94,41 @@ export function RewardRuleManager({ initialRules }: { initialRules: RewardRule[]
                 <span className="text-xs font-bold text-salon-charcoal md:hidden">المكافأة</span>
                 <input
                   defaultValue={rule.name}
-                  onBlur={(event) => event.currentTarget.value !== rule.name && updateRule(rule.id, { name: event.currentTarget.value })}
-                  className="dashboard-field py-2 font-bold"
+                  readOnly={readOnly}
+                  onBlur={(event) => !readOnly && event.currentTarget.value !== rule.name && updateRule(rule.id, { name: event.currentTarget.value })}
+                  className={`dashboard-field py-2 font-bold ${readOnly ? "cursor-default bg-salon-pearl/60" : ""}`}
                 />
               </label>
               <label className="grid gap-1 md:block">
                 <span className="text-xs font-bold text-salon-charcoal md:hidden">النقاط</span>
-                <input
+                <input lang="en"
                   defaultValue={rule.pointsRequired}
                   type="number"
                   min={1}
-                  onBlur={(event) => Number(event.currentTarget.value) !== rule.pointsRequired && updateRule(rule.id, { requiredPoints: event.currentTarget.value })}
-                  className="dashboard-field py-2"
+                  readOnly={readOnly}
+                  onBlur={(event) => !readOnly && Number(event.currentTarget.value) !== rule.pointsRequired && updateRule(rule.id, { requiredPoints: event.currentTarget.value })}
+                  className={`dashboard-field py-2 ${readOnly ? "cursor-default bg-salon-pearl/60" : ""}`}
                 />
               </label>
               <label className="grid gap-1 md:block">
                 <span className="text-xs font-bold text-salon-charcoal md:hidden">الخصم</span>
-                <input
+                <input lang="en"
                   defaultValue={rule.discountAmount}
                   type="number"
                   min={0.01}
                   step="0.01"
-                  onBlur={(event) => Number(event.currentTarget.value) !== rule.discountAmount && updateRule(rule.id, { discountAmount: event.currentTarget.value })}
-                  className="dashboard-field py-2"
+                  readOnly={readOnly}
+                  onBlur={(event) => !readOnly && Number(event.currentTarget.value) !== rule.discountAmount && updateRule(rule.id, { discountAmount: event.currentTarget.value })}
+                  className={`dashboard-field py-2 ${readOnly ? "cursor-default bg-salon-pearl/60" : ""}`}
                 />
               </label>
               <div className="grid gap-1 md:block">
                 <span className="text-xs font-bold text-salon-charcoal md:hidden">الحالة</span>
                 <button
                   type="button"
+                  disabled={readOnly}
                   onClick={() => updateRule(rule.id, { isActive: !rule.isActive })}
-                  className={`w-full rounded-lg px-3 py-2 font-bold md:w-auto ${rule.isActive ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}
+                  className={`w-full rounded-lg px-3 py-2 font-bold md:w-auto ${rule.isActive ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"} ${readOnly ? "cursor-default" : ""}`}
                 >
                   {rule.isActive ? "فعالة" : "معطلة"}
                 </button>

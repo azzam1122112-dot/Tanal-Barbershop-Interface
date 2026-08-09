@@ -7,6 +7,8 @@ import type {
   Prisma,
   PrismaClient,
   UserRole,
+  WhatsAppConsentSource,
+  WhatsAppMessageCategory,
   WhatsAppMessageLog,
   WhatsAppMessageStatus,
   WhatsAppTemplateType,
@@ -14,6 +16,12 @@ import type {
 import { normalizeSaudiPhone, toSaudiWhatsAppPhone } from "@/lib/phone/saudi-phone";
 import { writeAuditLog } from "@/lib/audit/audit-log";
 import { getActiveManagerRewards } from "@/lib/manager-rewards/manager-reward-service";
+import { getEffectiveSettings } from "@/lib/settings/system-settings";
+import {
+  categoryForTemplate,
+  evaluateWhatsAppPolicy,
+  recordWhatsAppPolicyBlock,
+} from "@/lib/whatsapp/whatsapp-safety";
 
 type WhatsAppPrisma = PrismaClient | Prisma.TransactionClient;
 
@@ -32,6 +40,14 @@ type GenerateInput = {
   visitId?: string;
   campaignId?: string;
   customMessage?: string;
+  messageCategory?: WhatsAppMessageCategory;
+};
+
+export type CustomerWhatsAppPreferenceInput = {
+  transactionalOptIn?: boolean;
+  marketingOptIn?: boolean;
+  consentSource?: WhatsAppConsentSource;
+  optOutReason?: string;
 };
 
 const allowedVariables = new Set([
@@ -137,28 +153,25 @@ export async function generateWhatsAppMessage(prisma: PrismaClient, input: Gener
       visits: { orderBy: { visitedAt: "desc" }, take: 1 },
     },
   });
-  if (!customer) throw new BusinessError("العميل غير موجود");
-  if (!customer.whatsappOptIn) {
-    throw new BusinessError("العميل لا يرغب باستلام رسائل واتساب");
-  }
+  if (!customer || (meta.organizationId && customer.organizationId !== meta.organizationId)) throw new BusinessError("العميل غير موجود");
 
   const phone = normalizeSaudiPhone(customer.phone);
   const template = input.templateId
-    ? await prisma.whatsAppTemplate.findUnique({ where: { id: input.templateId } })
+    ? await prisma.whatsAppTemplate.findFirst({ where: { id: input.templateId, ...(customer.organizationId ? { organizationId: customer.organizationId } : {}) } })
     : null;
   if (input.templateId && (!template || !template.isActive)) {
     throw new BusinessError("قالب واتساب غير متاح");
   }
 
   const [settings, visit, campaign, reward, managerRewards] = await Promise.all([
-    prisma.systemSettings.findFirst({}),
+    getEffectiveSettings(prisma, { organizationId: customer.organizationId }),
     input.visitId
       ? prisma.visit.findUnique({
           where: { id: input.visitId },
           include: { customer: true },
         })
       : null,
-    input.campaignId ? prisma.campaign.findUnique({ where: { id: input.campaignId } }) : null,
+    input.campaignId ? prisma.campaign.findFirst({ where: { id: input.campaignId, ...(customer.organizationId ? { organizationId: customer.organizationId } : {}) } }) : null,
     getBestAvailableReward(prisma, customer.loyaltyAccount?.points ?? 0),
     getActiveManagerRewards(prisma, customer.id),
   ]);
@@ -175,17 +188,44 @@ export async function generateWhatsAppMessage(prisma: PrismaClient, input: Gener
     throw new BusinessError("الحملة غير موجودة");
   }
 
+  const category: WhatsAppMessageCategory = campaign
+    ? "MARKETING"
+    : template
+      ? categoryForTemplate(template.type)
+      : input.messageCategory ?? categoryForTemplate(input.contextType);
+  if (!customer.organizationId) throw new BusinessError("مؤسسة العميل غير محددة");
+
+  let policy;
+  try {
+    policy = await evaluateWhatsAppPolicy(prisma, {
+      organizationId: customer.organizationId,
+      customer,
+      category,
+    });
+  } catch (error) {
+    await recordWhatsAppPolicyBlock(
+      prisma,
+      { customerId: customer.id, category, reason: error instanceof Error ? error.message : "رفضتها سياسة الحماية" },
+      { ...meta, organizationId: customer.organizationId },
+    );
+    throw error;
+  }
+
   const variables = buildVariables({
     customer,
     points: customer.loyaltyAccount?.points ?? 0,
-    salonName: settings?.salonName ?? "صالون تانال",
+    salonName: settings?.salonName ?? "صالون XMANSX",
     visit,
     campaign,
     managerReward,
     rewardDiscount: managerReward ? managerReward.discountAmount : reward ? Number(reward.discountAmount) : "",
   });
   const body = input.customMessage?.trim() || template?.body || "";
-  const message = renderWhatsAppTemplate(body, variables).trim();
+  let message = renderWhatsAppTemplate(body, variables).trim();
+  if (category === "MARKETING" && policy.settings.appendOptOutInstructions) {
+    const optOutText = policy.settings.optOutText.trim();
+    if (optOutText && !message.includes(optOutText)) message = `${message}\n\n${optOutText}`;
+  }
   const waUrl = buildWhatsAppUrl(phone, message);
   const log = await prisma.whatsAppMessageLog.create({
     data: {
@@ -198,6 +238,8 @@ export async function generateWhatsAppMessage(prisma: PrismaClient, input: Gener
       message,
       waUrl,
       status: "DRAFTED",
+      category,
+      policySnapshot: policy.snapshot,
     },
     include: messageLogInclude,
   });
@@ -246,14 +288,25 @@ export async function markWhatsAppMessageOpened(prisma: PrismaClient, id: string
 
 export async function markWhatsAppMessageSent(prisma: PrismaClient, id: string, meta: ActorMeta) {
   await assertMessageInOrg(prisma, id, meta.organizationId);
-  const log = await prisma.whatsAppMessageLog.update({
-    where: { id },
-    data: {
-      status: "MARKED_SENT",
-      markedSentByUserId: meta.actorUserId,
-      markedSentAt: new Date(),
-    },
-    include: messageLogInclude,
+  const now = new Date();
+  const log = await prisma.$transaction(async (tx) => {
+    const updated = await tx.whatsAppMessageLog.update({
+      where: { id },
+      data: {
+        status: "MARKED_SENT",
+        markedSentByUserId: meta.actorUserId,
+        markedSentAt: now,
+      },
+      include: messageLogInclude,
+    });
+    await tx.customer.update({
+      where: { id: updated.customerId },
+      data: {
+        whatsappLastContactedAt: now,
+        ...(updated.category === "MARKETING" ? { whatsappLastMarketingAt: now } : {}),
+      },
+    });
+    return updated;
   });
   await writeAuditLog({
     prisma,
@@ -372,10 +425,34 @@ export async function getCampaignWhatsAppAudience(prisma: WhatsAppPrisma, campai
   return eligible.slice(0, 100);
 }
 
-export async function updateCustomerWhatsappPreference(prisma: PrismaClient, customerId: string, whatsappOptIn: boolean, meta: ActorMeta) {
+export async function updateCustomerWhatsappPreference(
+  prisma: PrismaClient,
+  customerId: string,
+  input: boolean | CustomerWhatsAppPreferenceInput,
+  meta: ActorMeta,
+) {
   const before = await prisma.customer.findFirst({ where: { id: customerId, ...(meta.organizationId ? { organizationId: meta.organizationId } : {}) } });
   if (!before) throw new BusinessError("العميل غير موجود");
-  const customer = await prisma.customer.update({ where: { id: customerId }, data: { whatsappOptIn } });
+  const normalized = typeof input === "boolean"
+    ? { transactionalOptIn: input, marketingOptIn: input }
+    : input;
+  const now = new Date();
+  const transactionalOptIn = normalized.transactionalOptIn ?? before.whatsappTransactionalOptIn;
+  const marketingOptIn = normalized.marketingOptIn ?? before.whatsappMarketingOptIn;
+  const whatsappOptIn = transactionalOptIn || marketingOptIn;
+  const customer = await prisma.customer.update({
+    where: { id: customerId },
+    data: {
+      whatsappOptIn,
+      whatsappTransactionalOptIn: transactionalOptIn,
+      whatsappMarketingOptIn: marketingOptIn,
+      ...(normalized.transactionalOptIn === true ? { whatsappTransactionalConsentAt: now } : {}),
+      ...(normalized.marketingOptIn === true ? { whatsappMarketingConsentAt: now } : {}),
+      ...(normalized.consentSource ? { whatsappConsentSource: normalized.consentSource } : {}),
+      whatsappOptOutAt: whatsappOptIn ? null : now,
+      whatsappOptOutReason: whatsappOptIn ? null : normalized.optOutReason?.trim() || "طلب العميل إيقاف التواصل",
+    },
+  });
   await writeAuditLog({
     prisma,
     organizationId: meta.organizationId,
@@ -384,8 +461,17 @@ export async function updateCustomerWhatsappPreference(prisma: PrismaClient, cus
     action: "whatsapp.customer_preference_updated",
     entityType: "Customer",
     entityId: customer.id,
-    before: { whatsappOptIn: before.whatsappOptIn },
-    after: { whatsappOptIn: customer.whatsappOptIn },
+    before: {
+      whatsappOptIn: before.whatsappOptIn,
+      transactionalOptIn: before.whatsappTransactionalOptIn,
+      marketingOptIn: before.whatsappMarketingOptIn,
+    },
+    after: {
+      whatsappOptIn: customer.whatsappOptIn,
+      transactionalOptIn: customer.whatsappTransactionalOptIn,
+      marketingOptIn: customer.whatsappMarketingOptIn,
+      consentSource: customer.whatsappConsentSource,
+    },
     ipAddress: meta.ipAddress,
     userAgent: meta.userAgent,
   });
@@ -394,6 +480,10 @@ export async function updateCustomerWhatsappPreference(prisma: PrismaClient, cus
     name: customer.name,
     phone: customer.phone,
     whatsappOptIn: customer.whatsappOptIn,
+    whatsappTransactionalOptIn: customer.whatsappTransactionalOptIn,
+    whatsappMarketingOptIn: customer.whatsappMarketingOptIn,
+    whatsappConsentSource: customer.whatsappConsentSource,
+    whatsappOptOutAt: customer.whatsappOptOutAt?.toISOString() ?? null,
   };
 }
 
@@ -423,11 +513,15 @@ function toGeneratedMessage(log: MessageLogWithRelations) {
       name: log.customer.name,
       phone: log.customer.phone,
       whatsappOptIn: log.customer.whatsappOptIn,
+      whatsappTransactionalOptIn: log.customer.whatsappTransactionalOptIn,
+      whatsappMarketingOptIn: log.customer.whatsappMarketingOptIn,
     },
     phone: log.phone,
     message: log.message,
     waUrl: log.waUrl,
     status: log.status,
+    category: log.category,
+    policySnapshot: log.policySnapshot,
   };
 }
 
@@ -439,6 +533,8 @@ function toSafeMessageLog(log: MessageLogWithRelations) {
       name: log.customer.name,
       phone: log.customer.phone,
       whatsappOptIn: log.customer.whatsappOptIn,
+      whatsappTransactionalOptIn: log.customer.whatsappTransactionalOptIn,
+      whatsappMarketingOptIn: log.customer.whatsappMarketingOptIn,
     },
     template: log.template ? { id: log.template.id, name: log.template.name, type: log.template.type } : null,
     campaign: log.campaign ? { id: log.campaign.id, name: log.campaign.name } : null,
@@ -447,6 +543,8 @@ function toSafeMessageLog(log: MessageLogWithRelations) {
     message: log.message,
     waUrl: log.waUrl,
     status: log.status,
+    category: log.category,
+    policySnapshot: log.policySnapshot,
     openedBy: log.openedBy ? { id: log.openedBy.id, name: log.openedBy.name } : null,
     openedAt: log.openedAt?.toISOString() ?? null,
     markedSentBy: log.markedSentBy ? { id: log.markedSentBy.id, name: log.markedSentBy.name } : null,
@@ -528,7 +626,9 @@ function toAudienceCustomer(customer: Customer & { loyaltyAccount?: LoyaltyAccou
     lastVisitAt: customer.lastVisitAt?.toISOString() ?? null,
     daysSinceLastVisit: customer.lastVisitAt ? Math.floor((now.getTime() - customer.lastVisitAt.getTime()) / (24 * 60 * 60 * 1000)) : null,
     points: customer.loyaltyAccount?.points ?? 0,
-    isWhatsappAllowed: customer.whatsappOptIn,
+    isWhatsappAllowed: customer.whatsappMarketingOptIn,
+    transactionalOptIn: customer.whatsappTransactionalOptIn,
+    marketingOptIn: customer.whatsappMarketingOptIn,
     managerRewardTitle: managerReward?.title,
     managerRewardDiscount: managerReward ? Number(managerReward.discountAmount) : undefined,
     managerRewardExpiresAt: managerReward?.expiresAt?.toISOString() ?? null,

@@ -40,6 +40,7 @@ describe("auth sanitization and access rules", () => {
         phone: "966500000002",
         accessPinHash: "pin-hash",
         role: "BARBER",
+        commissionRate: null,
         isActive: true,
         lastLoginAt: null,
         createdAt: date,

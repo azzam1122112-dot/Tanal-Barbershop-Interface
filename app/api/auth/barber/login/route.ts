@@ -8,11 +8,12 @@ import { writeAuditLog } from "@/lib/audit/audit-log";
 import { clearRateLimit, consumeRateLimit } from "@/lib/auth/rate-limit";
 import { canBarberLogin } from "@/lib/auth/login-policy";
 import { getKnownLoginOrgSlug } from "@/lib/tenant/request-org";
+import { resolveLoginIdentity } from "@/lib/auth/login-resolver";
 
 const ERROR_MESSAGE = "رقم الجوال أو رمز الدخول غير صحيح";
 const ORG_NOT_FOUND_MESSAGE = "لم نجد مؤسسة بهذا المعرّف. تأكد من كتابة معرّف صالونك بشكل صحيح.";
 const RATE_LIMITED_MESSAGE = "محاولات كثيرة. يرجى المحاولة بعد قليل.";
-const NEEDS_ORG_MESSAGE = "رقمك مسجّل في أكثر من مؤسسة. أدخل معرّف صالونك للمتابعة.";
+const NEEDS_ORG_MESSAGE = "رقمك مسجّل في أكثر من صالون. اختر صالونك للمتابعة.";
 
 export async function POST(request: Request) {
   const body = await parseJsonBody(request);
@@ -41,32 +42,43 @@ export async function POST(request: Request) {
     );
   }
 
-  // المؤسسة معروفة من النطاق الفرعي أو المعرّف المُدخل؛ وإلا نحلّها من رقم الجوال نفسه.
-  const knownSlug = await getKnownLoginOrgSlug(parsed.data.organizationSlug);
-  let organization = null;
-  if (knownSlug) {
-    organization = await prisma.organization.findUnique({ where: { slug: knownSlug } });
-    if (!organization) {
-      return NextResponse.json({ message: ORG_NOT_FOUND_MESSAGE }, { status: 404 });
-    }
-  } else {
-    const candidates = await prisma.barber.findMany({
-      where: { phone, isActive: true, organizationId: { not: null } },
-      select: { organizationId: true },
-      distinct: ["organizationId"],
-    });
-    if (candidates.length > 1) {
-      return NextResponse.json({ message: NEEDS_ORG_MESSAGE, needsOrganization: true }, { status: 409 });
-    }
-    organization = candidates[0]?.organizationId
-      ? await prisma.organization.findUnique({ where: { id: candidates[0].organizationId } })
-      : null;
+  // لا معرّف مؤسسة يُطلب من الحلاق: النطاق الفرعي إن وُجد، وإلا نحلّها من
+  // الجوال ورمز الدخول معًا، وعند التكرار يختار صالونه بالاسم.
+  const hostSlug = await getKnownLoginOrgSlug();
+  const scopedOrganizationId = hostSlug
+    ? (await prisma.organization.findUnique({ where: { slug: hostSlug }, select: { id: true } }))?.id
+    : parsed.data.organizationId;
+
+  if (hostSlug && !scopedOrganizationId) {
+    return NextResponse.json({ message: ORG_NOT_FOUND_MESSAGE }, { status: 404 });
   }
 
-  const barber = organization
-    ? await prisma.barber.findFirst({ where: { phone, organizationId: organization.id } })
-    : null;
-  const pinOk = barber ? await verifyBarberPin(parsed.data.pin, barber.accessPinHash) : false;
+  const candidates = await prisma.barber.findMany({
+    where: {
+      phone,
+      isActive: true,
+      organizationId: scopedOrganizationId ? scopedOrganizationId : { not: null },
+      organization: { status: "ACTIVE" },
+    },
+    include: { organization: { select: { id: true, name: true } } },
+  });
+
+  const resolution = await resolveLoginIdentity(
+    candidates,
+    (candidate) => verifyBarberPin(parsed.data.pin, candidate.accessPinHash),
+    (candidate) => (candidate.organization ? { id: candidate.organization.id, name: candidate.organization.name } : null),
+  );
+
+  if (resolution.outcome === "NEEDS_CHOICE") {
+    return NextResponse.json(
+      { message: NEEDS_ORG_MESSAGE, needsOrganizationChoice: true, organizations: resolution.organizations },
+      { status: 409 },
+    );
+  }
+
+  const barber = resolution.outcome === "SINGLE" ? resolution.identity : null;
+  const organization = barber?.organization ?? null;
+  const pinOk = Boolean(barber);
 
   if (!barber || !organization || !canBarberLogin(barber, pinOk)) {
     await writeAuditLog({

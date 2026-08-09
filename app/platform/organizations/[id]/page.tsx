@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PlatformShell } from "@/components/platform/platform-shell";
 import { OrgSubscriptionManager } from "@/components/platform/org-subscription-manager";
+import { OrgBilling } from "@/components/platform/org-billing";
+import { listInvoices } from "@/lib/billing/billing-service";
 import { OrgAccessManager } from "@/components/platform/org-access-manager";
 import { OrgDelete } from "@/components/platform/org-delete";
 import { prisma } from "@/lib/db/prisma";
@@ -16,7 +18,11 @@ function usageText(used: number, limit: number | null) {
 
 export default async function PlatformOrganizationDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [org, plans] = await Promise.all([getOrganizationDetail(prisma, id), listPlans(prisma)]);
+  const [org, plans, invoices] = await Promise.all([
+    getOrganizationDetail(prisma, id),
+    listPlans(prisma),
+    listInvoices(prisma, id),
+  ]);
   if (!org) notFound();
 
   return (
@@ -62,6 +68,14 @@ export default async function PlatformOrganizationDetailPage({ params }: { param
           currentPeriodEnd: org.currentPeriodEnd,
         }}
         plans={plans.map((plan) => ({ id: plan.id, name: plan.name, priceMonthly: plan.priceMonthly, maxSalons: plan.maxSalons, maxBarbers: plan.maxBarbers }))}
+      />
+
+      <OrgBilling
+        organizationId={org.id}
+        currentPlanId={org.plan?.id ?? null}
+        currentPeriodEnd={org.currentPeriodEnd}
+        plans={plans.map((plan) => ({ id: plan.id, name: plan.name, priceMonthly: plan.priceMonthly }))}
+        initialInvoices={invoices}
       />
 
       {/* الاستهلاك مقابل الحدود */}

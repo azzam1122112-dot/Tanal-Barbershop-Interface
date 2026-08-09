@@ -1,9 +1,10 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { formatMoney } from "@/lib/format";
+import { formatDateTime, formatMoney, formatNumber } from "@/lib/format";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { InlineEmpty } from "@/components/dashboard/ui";
 
 type SummaryRow = {
   barberId: string;
@@ -85,7 +86,8 @@ export function DailyCloseManager({ initialSummary }: { initialSummary: SummaryR
     <div className="mt-6 space-y-4">
       {confirmDialog}
       <DashboardToast toast={toast} onClose={() => setToast(null)} />
-      <div className="dashboard-panel overflow-x-auto">
+      <div className="dashboard-panel table-scroll-wrap overflow-hidden">
+        <div className="table-scroll">
         <table className="dashboard-table min-w-[1160px]">
           <thead>
             <tr>
@@ -112,7 +114,7 @@ export function DailyCloseManager({ initialSummary }: { initialSummary: SummaryR
                       {session ? "مفتوحة" : "لا توجد جلسة مفتوحة"}
                     </span>
                   </td>
-                  <td className="px-3 py-3">{session ? new Date(session.openedAt).toLocaleString("ar-SA") : "-"}</td>
+                  <td className="px-3 py-3">{session ? formatDateTime(session.openedAt) : "-"}</td>
                   <td className="px-3 py-3">{session ? formatDuration(session.openedAt) : "-"}</td>
                   <td className="px-3 py-3">{session?.visitsCount ?? 0}</td>
                   <td className="px-3 py-3">{formatMoney(session?.cashTotal ?? 0)}</td>
@@ -122,7 +124,7 @@ export function DailyCloseManager({ initialSummary }: { initialSummary: SummaryR
                   <td className="px-3 py-3">
                     {session ? (
                       <form onSubmit={(event) => closeSession(event, row)} className="grid min-w-[280px] gap-2">
-                        <input
+                        <input lang="en"
                           name="cashReceivedAmount"
                           type="number"
                           min={0}
@@ -146,9 +148,10 @@ export function DailyCloseManager({ initialSummary }: { initialSummary: SummaryR
                 </tr>
               );
             })}
-            {summary.length === 0 ? <tr><td colSpan={10} className="px-4 py-8 text-center text-salon-charcoal">لا يوجد حلاقون نشطون</td></tr> : null}
+            {summary.length === 0 ? <tr><td colSpan={10} className="p-4"><InlineEmpty icon="💈" title="لا يوجد حلاقون نشطون" hint="فعّل حلاقًا من صفحة الحلاقين ليظهر هنا صندوقه." /></td></tr> : null}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
@@ -157,5 +160,5 @@ export function DailyCloseManager({ initialSummary }: { initialSummary: SummaryR
 function formatDuration(openedAt: string) {
   const hours = Math.max(0, Math.floor((Date.now() - new Date(openedAt).getTime()) / (60 * 60 * 1000)));
   if (hours < 1) return "أقل من ساعة";
-  return `${hours.toLocaleString("ar-SA")} ساعة`;
+  return `${formatNumber(hours)} ساعة`;
 }

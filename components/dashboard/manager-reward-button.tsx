@@ -46,23 +46,23 @@ export function ManagerRewardButton({ customerId, customerName }: { customerId: 
       {open ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-salon-ink/35 px-4" role="dialog" aria-modal="true">
           <button type="button" aria-label="إغلاق" className="absolute inset-0 cursor-default" onClick={() => setOpen(false)} />
-          <form onSubmit={submitReward} className="relative w-full max-w-md rounded-lg border border-salon-line bg-white p-5 shadow-2xl shadow-salon-ink/20">
+          <form onSubmit={submitReward} className="dashboard-panel relative w-full max-w-md p-5 shadow-[0_28px_70px_-24px_rgba(16,25,22,0.45)]">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-xl font-black">إصدار مكافأة</h2>
+                <h2 className="text-xl font-bold">إصدار مكافأة</h2>
                 <p className="mt-1 text-sm font-semibold text-salon-charcoal">{customerName}</p>
               </div>
-              <button type="button" onClick={() => setOpen(false)} className="rounded-lg border border-salon-line px-3 py-2 text-sm font-bold">
+              <button type="button" onClick={() => setOpen(false)} className="rounded-xl border border-salon-line px-3 py-2 text-sm font-bold">
                 إغلاق
               </button>
             </div>
             <div className="mt-4 space-y-3">
               <input name="title" defaultValue="مكافأة من الإدارة" required className="dashboard-field" />
-              <input name="discountAmount" type="number" min="0.01" step="0.01" required placeholder="قيمة الخصم بالريال" className="dashboard-field" />
-              <input name="expiresAt" type="datetime-local" className="dashboard-field" />
+              <input lang="en" name="discountAmount" type="number" min="0.01" step="0.01" required placeholder="قيمة الخصم بالريال" className="dashboard-field" />
+              <input lang="en" name="expiresAt" type="datetime-local" className="dashboard-field" />
               <textarea name="description" rows={3} placeholder="سبب المكافأة أو ملاحظة للحلاق" className="dashboard-field" />
             </div>
-            {message ? <p className="mt-3 rounded-lg border border-salon-line bg-salon-mist px-3 py-2 text-sm font-bold">{message}</p> : null}
+            {message ? <p className="mt-3 rounded-xl border border-salon-line bg-salon-mist px-3 py-2 text-sm font-bold">{message}</p> : null}
             <button disabled={submitting} className="dashboard-button-gold mt-4 w-full">
               {submitting ? "جاري الإصدار..." : "إصدار المكافأة"}
             </button>

@@ -33,7 +33,7 @@ export async function PlatformShell({
           <div className="flex items-center gap-3">
             <BrandLogo className="h-10 w-10 ring-1 ring-salon-gold/30" priority />
             <div className="leading-tight">
-              <p className="text-[10px] font-bold uppercase tracking-eyebrow text-salon-goldlight">منصّة تنال</p>
+              <p className="text-[10px] font-bold uppercase tracking-eyebrow text-salon-goldlight">منصّة XMANSX</p>
               <p className="text-sm font-bold">لوحة المدير العام</p>
             </div>
           </div>
@@ -56,7 +56,7 @@ export async function PlatformShell({
 
       <section className="mx-auto max-w-6xl px-5 py-8">
         <div className="dashboard-panel flex flex-col gap-2 px-5 py-5">
-          <p className="text-[11px] font-bold uppercase tracking-eyebrow text-salon-gold">منصّة تنال</p>
+          <p className="text-[11px] font-bold uppercase tracking-eyebrow text-salon-gold">منصّة XMANSX</p>
           <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
           {description ? <p className="dashboard-muted max-w-3xl">{description}</p> : null}
         </div>

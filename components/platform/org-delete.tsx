@@ -59,7 +59,7 @@ export function OrgDelete({ orgId, name, slug }: { orgId: string; name: string; 
       </div>
 
       {open ? (
-        <div className="fixed inset-0 z-[100] flex items-end justify-center bg-salon-ink/55 px-4 py-5 backdrop-blur-sm sm:items-center" onClick={() => !busy && setOpen(false)}>
+        <div className="fixed inset-0 z-[100] flex items-end justify-center bg-salon-ink/55 px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] backdrop-blur-sm sm:items-center" onClick={() => !busy && setOpen(false)}>
           <section
             role="dialog"
             aria-modal="true"
@@ -68,9 +68,9 @@ export function OrgDelete({ orgId, name, slug }: { orgId: string; name: string; 
             className="w-full rounded-2xl border border-salon-line bg-white p-5 text-salon-ink shadow-[0_26px_70px_rgba(16,25,22,0.22)] sm:max-w-md"
           >
             <div className="flex items-start gap-3">
-              <span aria-hidden="true" className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-salon-ruby/10 text-xl font-black text-salon-ruby">!</span>
+              <span aria-hidden="true" className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-salon-ruby/10 text-xl font-bold text-salon-ruby">!</span>
               <div className="min-w-0">
-                <h3 className="text-lg font-black leading-tight">حذف «{name}» نهائيًا</h3>
+                <h3 className="text-lg font-bold leading-tight">حذف «{name}» نهائيًا</h3>
                 <p className="mt-2 text-sm font-semibold leading-7 text-salon-charcoal">
                   سيُحذف كل ما يخص هذه المؤسسة بلا رجعة. للتأكيد اكتب معرّف المؤسسة:
                   <span className="mx-1 rounded bg-salon-pearl px-1.5 py-0.5 font-mono font-bold text-salon-ink" dir="ltr">{slug}</span>
@@ -87,10 +87,10 @@ export function OrgDelete({ orgId, name, slug }: { orgId: string; name: string; 
               className="dashboard-field mt-4"
             />
             <div className="mt-5 grid grid-cols-2 gap-2">
-              <button type="button" onClick={() => setOpen(false)} disabled={busy} className="h-12 w-full rounded-xl border border-salon-line bg-white font-black text-salon-charcoal transition active:scale-[0.99] disabled:opacity-50">
+              <button type="button" onClick={() => setOpen(false)} disabled={busy} className="h-12 w-full rounded-xl border border-salon-line bg-white font-bold text-salon-charcoal transition active:scale-[0.99] disabled:opacity-50">
                 إلغاء
               </button>
-              <button type="button" onClick={remove} disabled={!matches || busy} className="h-12 w-full rounded-xl bg-salon-ruby font-black text-white shadow-sm transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50">
+              <button type="button" onClick={remove} disabled={!matches || busy} className="h-12 w-full rounded-xl bg-salon-ruby font-bold text-white shadow-sm transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50">
                 {busy ? "جاري الحذف..." : "حذف نهائي"}
               </button>
             </div>

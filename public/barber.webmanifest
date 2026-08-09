@@ -1,0 +1,44 @@
+{
+  "id": "/barber",
+  "name": "XMANSX — واجهة الحلاق",
+  "short_name": "XMANSX حلاق",
+  "description": "تسجيل الزيارات، البحث عن العملاء، وجلسة الصندوق — من جوالك مباشرة.",
+  "start_url": "/barber",
+  "scope": "/barber",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "dir": "rtl",
+  "lang": "ar",
+  "theme_color": "#09070f",
+  "background_color": "#09070f",
+  "categories": ["business", "productivity"],
+  "shortcuts": [
+    {
+      "name": "بحث عن عميل",
+      "short_name": "بحث عميل",
+      "description": "يفتح شاشة العمل مع حقل رقم الجوال جاهزًا للكتابة.",
+      "url": "/barber?action=search",
+      "icons": [{ "src": "/icons/xmansx-icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ],
+  "icons": [
+    {
+      "src": "/icons/xmansx-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/xmansx-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/xmansx-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -153,7 +153,7 @@ export function OrgSubscriptionManager({
           <div>
             <label className="block text-sm font-semibold">
               نهاية التجربة
-              <input
+              <input lang="en"
                 type="date"
                 value={toDateInput(state.trialEndsAt)}
                 disabled={busy}
@@ -175,7 +175,7 @@ export function OrgSubscriptionManager({
           <div className="border-t border-salon-line/70 pt-3">
             <label className="block text-sm font-semibold">
               نهاية الاشتراك (الباقة الشهرية)
-              <input
+              <input lang="en"
                 type="date"
                 value={toDateInput(state.currentPeriodEnd)}
                 disabled={busy}

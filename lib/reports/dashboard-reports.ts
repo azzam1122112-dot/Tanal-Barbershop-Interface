@@ -4,7 +4,8 @@ type ReportPrisma = PrismaClient | Prisma.TransactionClient;
 
 export type ReportFilters = {
   organizationId?: string | null;
-  salonId?: string | null;
+  /** الفروع المسموح بها. `null`/غير محدد = كل فروع المؤسسة. مصفوفة = قصر على هذه الفروع. */
+  salonIds?: string[] | null;
   from?: Date | string | null;
   to?: Date | string | null;
   barberId?: string | null;
@@ -56,7 +57,7 @@ export function normalizeReportFilters(filters: ReportFilters = {}) {
 
   return {
     organizationId: filters.organizationId || undefined,
-    salonId: filters.salonId || undefined,
+    salonIds: filters.salonIds && filters.salonIds.length > 0 ? filters.salonIds : undefined,
     from,
     to,
     barberId: filters.barberId || undefined,
@@ -64,9 +65,9 @@ export function normalizeReportFilters(filters: ReportFilters = {}) {
   };
 }
 
-export async function getDashboardSummary(prisma: ReportPrisma, organizationId?: string, salonId?: string | null, now = new Date()) {
+export async function getDashboardSummary(prisma: ReportPrisma, organizationId?: string, salonIds?: string[] | null, now = new Date()) {
   const range = getTodayRange(now);
-  const normalized = normalizeReportFilters({ ...range, organizationId, salonId });
+  const normalized = normalizeReportFilters({ ...range, organizationId, salonIds });
   const visits = await getVisitsForReport(prisma, normalized);
   const revenue = buildRevenueSummary(visits, range);
   const barberRows = buildBarberPerformance(visits, range);
@@ -117,7 +118,7 @@ async function getVisitsForReport(prisma: ReportPrisma, filters: ReturnType<type
       status: "COMPLETED",
       visitedAt: { gte: filters.from, lt: filters.to },
       ...(filters.organizationId ? { organizationId: filters.organizationId } : {}),
-      ...(filters.salonId ? { salonId: filters.salonId } : {}),
+      ...(filters.salonIds ? { salonId: { in: filters.salonIds } } : {}),
       ...(filters.barberId ? { barberId: filters.barberId } : {}),
       ...(filters.paymentMethod ? { paymentMethod: filters.paymentMethod } : {}),
     },

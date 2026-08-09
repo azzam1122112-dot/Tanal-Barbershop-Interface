@@ -3,6 +3,8 @@ import { Prisma } from "@prisma/client";
 import type { PaymentMethod, PrismaClient } from "@prisma/client";
 import { computeCampaignDiscount } from "@/lib/campaigns/campaign-eligibility";
 import { calculateVisitTotals } from "@/lib/loyalty/calculations";
+import { getEffectiveSettings } from "@/lib/settings/system-settings";
+import { recordStockMovement } from "@/lib/products/product-service";
 
 type AdminVisitPrisma = PrismaClient | Prisma.TransactionClient;
 
@@ -22,6 +24,7 @@ type VisitForAdmin = Prisma.VisitGetPayload<{
     customer: { include: { loyaltyAccount: true } };
     barber: true;
     services: true;
+    productLines: true;
     loyaltyTransactions: true;
     campaignRedemption: { include: { campaign: true } };
     managerReward: true;
@@ -89,6 +92,21 @@ export async function cancelVisit(prisma: PrismaClient, visitId: string, meta: A
       where: { customerId: visit.customerId },
       data: { points: balanceAfterRestore },
     });
+
+    // إلغاء الزيارة يعيد المنتجات المباعة للمخزون بحركة مسجّلة لا بتعديل صامت.
+    if (visit.organizationId) {
+      for (const line of visit.productLines) {
+        await recordStockMovement(tx, {
+          productId: line.productId,
+          organizationId: visit.organizationId,
+          type: "RETURN",
+          quantity: line.quantity,
+          reason: `إلغاء زيارة: ${meta.reason}`,
+          visitId: visit.id,
+          recordedByUserId: meta.actorUserId,
+        });
+      }
+    }
 
     const updated = await tx.visit.update({
       where: { id: visit.id },
@@ -175,13 +193,20 @@ export async function updateVisitAmount(prisma: PrismaClient, visitId: string, g
   return runSerializableTransaction(prisma, async (tx) => {
     const visit = await getCompletedVisitForAdmin(tx, visitId, meta.organizationId, meta.salonIds);
     const postCloseAdjustment = await isPostCloseAdjustment(tx, visit);
-    const settings = visit.salonId ? await tx.systemSettings.findFirst({ where: { salonId: visit.salonId } }) : await tx.systemSettings.findFirst({});
+    const settings = await getEffectiveSettings(tx, {
+      organizationId: visit.organizationId,
+      salonId: visit.salonId,
+    });
     const discountAmount = await calculateUpdatedDiscount(tx, visit, grossAmount);
     const totals = calculateVisitTotals({
       grossAmount,
       discountAmount,
       pointsPerCurrencyUnit: settings ? Number(settings.pointsPerCurrencyUnit) : 1,
       pointsCalculatedAfterDiscount: settings?.pointsCalculatedAfterDiscount ?? true,
+      // نعتمد معدّل الزيارة الأصلي لا معدّل اليوم — تصحيح فاتورة قديمة يبقى بضريبتها.
+      vatEnabled: Number(visit.vatRate) > 0,
+      vatRate: Number(visit.vatRate),
+      vatInclusive: settings?.vatInclusive ?? true,
     });
     const currentEarned = sumPoints(visit.loyaltyTransactions.filter((transaction) => transaction.type === "EARN").map((transaction) => transaction.points));
     const pointsAdjustment = totals.pointsEarned - currentEarned;
@@ -214,6 +239,8 @@ export async function updateVisitAmount(prisma: PrismaClient, visitId: string, g
       data: {
         grossAmount: totals.grossAmount,
         discountAmount: totals.discountAmount,
+        subtotalAmount: totals.subtotalAmount,
+        vatAmount: totals.vatAmount,
         netAmount: totals.netAmount,
         pointsEarned: totals.pointsEarned,
       },
@@ -404,6 +431,7 @@ const adminVisitInclude = {
   customer: { include: { loyaltyAccount: true } },
   barber: true,
   services: true,
+  productLines: true,
   loyaltyTransactions: true,
   campaignRedemption: { include: { campaign: true } },
   managerReward: true,

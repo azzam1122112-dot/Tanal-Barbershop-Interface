@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireDashboardApi } from "@/lib/auth/http";
+import { effectiveSalonIds } from "@/lib/auth/salon-scope";
 import { getCashSessionSummary } from "@/lib/cash-sessions/cash-session-service";
 import { prisma } from "@/lib/db/prisma";
 
@@ -9,6 +10,6 @@ export async function GET() {
   const session = auth.session;
   if (!session || session.type !== "dashboard") return NextResponse.json({ message: "غير مصرح" }, { status: 401 });
 
-  const summary = await getCashSessionSummary(prisma, session.organizationId);
+  const summary = await getCashSessionSummary(prisma, session.organizationId, effectiveSalonIds(session));
   return NextResponse.json({ summary });
 }

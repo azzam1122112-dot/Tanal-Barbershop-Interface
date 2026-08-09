@@ -22,7 +22,7 @@ function serializeError(error: unknown) {
 
 /**
  * مُسجّل JSON منظّم بسيط بدون اعتماديات خارجية.
- * يكتب سطرًا واحدًا لكل حدث ليسهل تجميعه في الإنتاج (Render logs).
+ * يكتب سطرًا واحدًا لكل حدث ليسهل تجميعه في الإنتاج بأي مجمّع سجلات.
  */
 function emit(level: LogLevel, message: string, context?: unknown) {
   if (LEVEL_ORDER[level] < LEVEL_ORDER[minLevel()]) return;

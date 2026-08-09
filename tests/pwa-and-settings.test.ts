@@ -26,6 +26,8 @@ describe("pwa and settings polish", () => {
     originalSettings = toSafeSystemSettings(settings);
     const barber = await prisma.barber.create({
       data: {
+        organizationId: "org_default",
+        salonId: "salon_default",
         name: `pwa-barber-${Date.now()}`,
         phone: randomSaudiPhone(),
         accessPinHash: await hashBarberPin("Tanal@123"),
@@ -35,7 +37,9 @@ describe("pwa and settings polish", () => {
     barberId = barber.id;
     createdBarberIds.push(barberId);
     const service = await prisma.service.create({
-      data: { name: `خدمة pwa ${Date.now()}`, defaultPrice: 50, isActive: true, sortOrder: 900 },
+      data: {
+        organizationId: "org_default",
+        salonId: "salon_default", name: `خدمة pwa ${Date.now()}`, defaultPrice: 50, isActive: true, sortOrder: 900 },
     });
     serviceId = service.id;
     createdServiceIds.push(serviceId);
@@ -80,20 +84,28 @@ describe("pwa and settings polish", () => {
     await prisma.$disconnect();
   });
 
-  it("has an installable manifest with barber start url and no service worker cache", () => {
-    const manifest = JSON.parse(readFileSync(join(process.cwd(), "public", "manifest.webmanifest"), "utf8")) as {
-      start_url: string;
-      display: string;
-      dir: string;
-      lang: string;
-      icons: unknown[];
-    };
+  it("ships two scoped manifests: platform at root and barber app at /barber", () => {
+    type Manifest = { start_url: string; scope: string; display: string; dir: string; lang: string; icons: unknown[] };
+    const read = (file: string) =>
+      JSON.parse(readFileSync(join(process.cwd(), "public", file), "utf8")) as Manifest;
 
-    expect(manifest.start_url).toBe("/barber");
-    expect(manifest.display).toBe("standalone");
-    expect(manifest.dir).toBe("rtl");
-    expect(manifest.lang).toBe("ar");
-    expect(manifest.icons.length).toBeGreaterThan(0);
+    const platform = read("manifest.webmanifest");
+    const barber = read("barber.webmanifest");
+
+    // بيانان منفصلان عمدًا: تثبيت تطبيق الحلاق يجب أن يفتح شاشة عمله مباشرة،
+    // لا صفحة الهبوط التسويقية. لذلك نطاقه `/barber` وبيان الجذر للمنصّة.
+    expect(barber.start_url).toBe("/barber");
+    expect(barber.scope).toBe("/barber");
+    expect(platform.start_url).toBe("/");
+
+    for (const manifest of [platform, barber]) {
+      expect(manifest.display).toBe("standalone");
+      expect(manifest.dir).toBe("rtl");
+      expect(manifest.lang).toBe("ar");
+      expect(manifest.icons.length).toBeGreaterThan(0);
+    }
+
+    // لا service worker: لا نخزّن صفحات محمية أو بيانات عملاء على الجهاز.
     expect(existsSync(join(process.cwd(), "public", "sw.js"))).toBe(false);
     expect(existsSync(join(process.cwd(), "public", "service-worker.js"))).toBe(false);
   });
@@ -150,6 +162,9 @@ function adminMeta() {
   return {
     actorUserId: adminUserId,
     actorType: "ADMIN" as const,
+    // نطاق المستأجر إلزامي: قراءة الإعدادات بلا نطاق قد تلتقط إعدادات مؤسسة أخرى.
+    organizationId: "org_default",
+    salonId: "salon_default",
   };
 }
 

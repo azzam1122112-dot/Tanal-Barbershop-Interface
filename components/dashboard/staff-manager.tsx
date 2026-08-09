@@ -2,7 +2,9 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import type { SafeAdminUser } from "@/lib/auth/sanitize";
+import { InlineEmpty } from "@/components/dashboard/ui";
 
 type StaffResponse = {
   user?: SafeAdminUser;
@@ -47,6 +49,7 @@ export function StaffManager({ initialUsers, salons, currentUserId }: { initialU
   const [filter, setFilter] = useState<StaffFilter>("all");
   const [createRole, setCreateRole] = useState<"ADMIN" | "SUPERVISOR">("SUPERVISOR");
   const [createSalonIds, setCreateSalonIds] = useState<string[]>([]);
+  const { confirm, confirmDialog } = useConfirm();
   const salonName = (id: string) => salons.find((salon) => salon.id === id)?.name ?? "فرع محذوف";
 
   const adminCount = users.filter((user) => user.role === "ADMIN" && user.isActive).length;
@@ -213,8 +216,33 @@ export function StaffManager({ initialUsers, salons, currentUserId }: { initialU
     setPendingId(null);
   }
 
+  async function deleteStaff(user: SafeAdminUser) {
+    const confirmed = await confirm({
+      title: `حذف ${user.name} نهائيًا؟`,
+      description:
+        "الحذف متاح فقط لموظف بلا سجل تشغيلي مرتبط. إن كان قد أغلق صندوقًا أو صرف مكافأة، عطّل حسابه بدل حذفه للحفاظ على سجل التدقيق.",
+      confirmLabel: "حذف الموظف",
+      tone: "danger",
+    });
+    if (!confirmed) return;
+
+    setPendingId(user.id);
+    setToast(null);
+    const response = await fetch(`/api/dashboard/staff/${user.id}`, { method: "DELETE" });
+    const data = (await response.json().catch(() => ({}))) as { message?: string };
+
+    if (response.ok) {
+      setUsers((current) => current.filter((item) => item.id !== user.id));
+      setToast({ message: "تم حذف الموظف", tone: "success" });
+    } else {
+      setToast({ message: data.message ?? "تعذر حذف الموظف", tone: "error" });
+    }
+    setPendingId(null);
+  }
+
   return (
     <div className="mt-8 space-y-6">
+      {confirmDialog}
       <DashboardToast toast={toast} onClose={() => setToast(null)} />
 
       <section className="grid gap-4 md:grid-cols-3">
@@ -223,11 +251,11 @@ export function StaffManager({ initialUsers, salons, currentUserId }: { initialU
         <SummaryTile label="حسابات معطلة" value={inactiveCount} tone="ruby" />
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[390px_1fr]">
+      <section className="grid items-start gap-6 xl:grid-cols-[390px_1fr]">
         <form onSubmit={createStaff} className="dashboard-panel h-fit overflow-hidden">
           <div className="border-b border-salon-line bg-salon-ink px-5 py-4 text-white">
-            <p className="text-xs font-black text-salon-gold">حساب إدارة جديد</p>
-            <h2 className="mt-2 text-2xl font-black">إضافة موظف</h2>
+            <p className="text-xs font-bold text-salon-gold">حساب إدارة جديد</p>
+            <h2 className="mt-2 text-2xl font-bold">إضافة موظف</h2>
           </div>
           <div className="space-y-4 p-5">
             <Field label="اسم الموظف">
@@ -281,8 +309,8 @@ export function StaffManager({ initialUsers, salons, currentUserId }: { initialU
           <div className="border-b border-salon-line px-5 py-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <p className="text-xs font-black text-salon-gold">الصلاحيات</p>
-                <h2 className="mt-2 text-2xl font-black">مدراء النظام والمشرفون</h2>
+                <p className="text-xs font-bold text-salon-gold">الصلاحيات</p>
+                <h2 className="mt-2 text-2xl font-bold">مدراء النظام والمشرفون</h2>
               </div>
               <div className="grid gap-2 sm:grid-cols-[220px_1fr]">
                 <input
@@ -291,7 +319,7 @@ export function StaffManager({ initialUsers, salons, currentUserId }: { initialU
                   placeholder="بحث بالاسم أو البريد"
                   className="dashboard-field py-2.5"
                 />
-                <div className="grid grid-cols-4 rounded-lg border border-salon-line bg-white p-1 text-xs font-black">
+                <div className="grid grid-cols-4 rounded-xl border border-salon-line bg-white p-1 text-xs font-bold">
                   {[
                     ["all", "الكل"],
                     ["ADMIN", "مدير"],
@@ -365,8 +393,8 @@ export function StaffManager({ initialUsers, salons, currentUserId }: { initialU
                             className="dashboard-field py-2.5"
                           />
                         </Field>
-                        <label className="flex items-center justify-between gap-3 rounded-lg border border-salon-line bg-salon-pearl px-3 py-2.5">
-                          <span className="text-sm font-black text-salon-charcoal">الحساب نشط</span>
+                        <label className="flex items-center justify-between gap-3 rounded-xl border border-salon-line bg-salon-pearl px-3 py-2.5">
+                          <span className="text-sm font-bold text-salon-charcoal">الحساب نشط</span>
                           <input
                             type="checkbox"
                             checked={draft.isActive}
@@ -377,7 +405,7 @@ export function StaffManager({ initialUsers, salons, currentUserId }: { initialU
                         </label>
                         {draft.role === "SUPERVISOR" ? (
                           <div className="md:col-span-2">
-                            <span className="mb-2 block text-xs font-black text-salon-charcoal">فروع الإشراف</span>
+                            <span className="mb-2 block text-xs font-bold text-salon-charcoal">فروع الإشراف</span>
                             <BranchPicker salons={salons} selected={draft.salonIds} onChange={(ids) => updateDraft(user.id, { salonIds: ids })} />
                           </div>
                         ) : null}
@@ -385,10 +413,10 @@ export function StaffManager({ initialUsers, salons, currentUserId }: { initialU
                     ) : (
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-xl font-black">{user.name}</h3>
-                          {isCurrentUser ? <span className="rounded-full bg-salon-gold/15 px-3 py-1 text-xs font-black text-salon-gold">حسابك</span> : null}
+                          <h3 className="text-xl font-bold">{user.name}</h3>
+                          {isCurrentUser ? <span className="rounded-full bg-salon-gold/15 px-3 py-1 text-xs font-bold text-salon-gold">حسابك</span> : null}
                           <RoleBadge role={user.role} />
-                          <span className={`rounded-full px-3 py-1 text-xs font-black ${user.isActive ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+                          <span className={`rounded-full px-3 py-1 text-xs font-bold ${user.isActive ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
                             {user.isActive ? "نشط" : "معطل"}
                           </span>
                         </div>
@@ -399,7 +427,7 @@ export function StaffManager({ initialUsers, salons, currentUserId }: { initialU
                           <Info label="آخر تحديث" value={user.updatedAt ? dateFormatter.format(new Date(user.updatedAt)) : "-"} />
                           {user.role === "SUPERVISOR" ? (
                             <div className="md:col-span-2">
-                              <dt className="text-xs font-black text-salon-charcoal/70">فروع الإشراف</dt>
+                              <dt className="text-xs font-bold text-salon-charcoal/70">فروع الإشراف</dt>
                               <dd className="mt-1.5 flex flex-wrap gap-1.5">
                                 {(user.assignedSalons ?? []).length === 0 ? (
                                   <span className="text-salon-ruby">لا توجد فروع مسندة</span>
@@ -416,8 +444,8 @@ export function StaffManager({ initialUsers, salons, currentUserId }: { initialU
                     )}
                   </div>
 
-                  <div className="rounded-lg border border-salon-line bg-salon-pearl px-4 py-3">
-                    <p className="text-xs font-black text-salon-charcoal">صلاحية الوصول</p>
+                  <div className="rounded-xl border border-salon-line bg-salon-pearl px-4 py-3">
+                    <p className="text-xs font-bold text-salon-charcoal">صلاحية الوصول</p>
                     <p className="mt-2 text-sm font-bold text-salon-charcoal/75">
                       {user.role === "ADMIN"
                         ? "مدير كامل الصلاحيات على كل الفروع"
@@ -427,7 +455,7 @@ export function StaffManager({ initialUsers, salons, currentUserId }: { initialU
                       type="button"
                       disabled={isPending || isEditing || isCurrentUser}
                       onClick={() => void toggleStatus(user)}
-                      className={`mt-3 w-full rounded-lg px-3 py-2 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-55 ${
+                      className={`mt-3 w-full rounded-lg px-3 py-2 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-55 ${
                         user.isActive ? "bg-green-50 text-green-700 hover:bg-green-100" : "bg-red-50 text-red-700 hover:bg-red-100"
                       }`}
                     >
@@ -446,9 +474,21 @@ export function StaffManager({ initialUsers, salons, currentUserId }: { initialU
                         </button>
                       </>
                     ) : (
-                      <button type="button" disabled={Boolean(editingId) || isPending} onClick={() => startEdit(user)} className="dashboard-button py-2.5">
-                        تعديل
-                      </button>
+                      <>
+                        <button type="button" disabled={Boolean(editingId) || isPending} onClick={() => startEdit(user)} className="dashboard-button py-2.5">
+                          تعديل
+                        </button>
+                        {user.id === currentUserId || user.role === "OWNER" ? null : (
+                          <button
+                            type="button"
+                            disabled={Boolean(editingId) || isPending}
+                            onClick={() => void deleteStaff(user)}
+                            className="dashboard-danger-button py-2.5"
+                          >
+                            حذف
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
                 </article>
@@ -456,10 +496,7 @@ export function StaffManager({ initialUsers, salons, currentUserId }: { initialU
             })}
 
             {filteredUsers.length === 0 ? (
-              <div className="px-5 py-12 text-center">
-                <p className="text-lg font-black">لا توجد نتائج مطابقة</p>
-                <p className="dashboard-muted mt-2">غيّر البحث أو الفلتر لعرض الموظفين.</p>
-              </div>
+              <div className="p-5"><InlineEmpty icon="🔎" title="لا توجد نتائج مطابقة" hint="غيّر كلمة البحث أو الفلتر لعرض موظفين آخرين." /></div>
             ) : null}
           </div>
         </div>
@@ -474,7 +511,7 @@ function BranchPicker({ salons, selected, onChange }: { salons: SalonOption[]; s
   }
 
   if (salons.length === 0) {
-    return <p className="rounded-lg border border-salon-line bg-salon-pearl px-3 py-2.5 text-xs font-bold text-salon-ruby">لا توجد فروع نشطة. أضِف فرعًا أولًا من «الفروع».</p>;
+    return <p className="rounded-xl border border-salon-line bg-salon-pearl px-3 py-2.5 text-xs font-bold text-salon-ruby">لا توجد فروع نشطة. أضِف فرعًا أولًا من «الفروع».</p>;
   }
 
   return (
@@ -500,7 +537,7 @@ function BranchPicker({ salons, selected, onChange }: { salons: SalonOption[]; s
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-xs font-black text-salon-charcoal">{label}</span>
+      <span className="mb-2 block text-xs font-bold text-salon-charcoal">{label}</span>
       {children}
     </label>
   );
@@ -515,8 +552,8 @@ function SummaryTile({ label, value, tone }: { label: string; value: number; ton
 
   return (
     <div className="dashboard-soft-panel p-4">
-      <p className="text-xs font-black text-salon-charcoal">{label}</p>
-      <p className={`mt-2 text-3xl font-black ${toneClass}`}>{value}</p>
+      <p className="text-xs font-bold text-salon-charcoal">{label}</p>
+      <p className={`mt-2 text-3xl font-bold ${toneClass}`}>{value}</p>
     </div>
   );
 }
@@ -524,13 +561,13 @@ function SummaryTile({ label, value, tone }: { label: string; value: number; ton
 function RoleBadge({ role }: { role: "OWNER" | "ADMIN" | "SUPERVISOR" }) {
   const label = role === "OWNER" ? "مالك" : role === "ADMIN" ? "مدير النظام" : "مشرف";
   const tone = role === "SUPERVISOR" ? "bg-salon-steel/10 text-salon-steel" : "bg-salon-ink text-white";
-  return <span className={`rounded-full px-3 py-1 text-xs font-black ${tone}`}>{label}</span>;
+  return <span className={`rounded-full px-3 py-1 text-xs font-bold ${tone}`}>{label}</span>;
 }
 
 function Info({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs font-black text-salon-charcoal/70">{label}</dt>
+      <dt className="text-xs font-bold text-salon-charcoal/70">{label}</dt>
       <dd className="mt-1 break-words text-salon-ink">{value}</dd>
     </div>
   );

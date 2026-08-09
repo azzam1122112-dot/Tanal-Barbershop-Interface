@@ -39,6 +39,8 @@ describe("daily close and operation alerts", () => {
     adminUserId = admin.id;
     const barber = await prisma.barber.create({
       data: {
+        organizationId: "org_default",
+        salonId: "salon_default",
         name: `حلاق إغلاق ${Date.now()}`,
         phone: randomSaudiPhone(),
         accessPinHash: await hashBarberPin("Tanal@123"),
@@ -50,6 +52,8 @@ describe("daily close and operation alerts", () => {
     createdCashSessionIds.push((await openCashSession(prisma, { barberId })).cashSession.id);
     const openBarber = await prisma.barber.create({
       data: {
+        organizationId: "org_default",
+        salonId: "salon_default",
         name: `حلاق مفتوح ${Date.now()}`,
         phone: randomSaudiPhone(),
         accessPinHash: await hashBarberPin("Tanal@123"),
@@ -61,6 +65,8 @@ describe("daily close and operation alerts", () => {
     createdCashSessionIds.push((await openCashSession(prisma, { barberId: openBarberId })).cashSession.id);
     const highDiscountBarber = await prisma.barber.create({
       data: {
+        organizationId: "org_default",
+        salonId: "salon_default",
         name: `حلاق خصم مرتفع ${Date.now()}`,
         phone: randomSaudiPhone(),
         accessPinHash: await hashBarberPin("Tanal@123"),
@@ -73,7 +79,9 @@ describe("daily close and operation alerts", () => {
     closeDate = normalizeCloseDate(new Date());
 
     const service = await prisma.service.create({
-      data: { name: `خدمة إغلاق ${Date.now()}`, defaultPrice: 60, isActive: true, sortOrder: 90 },
+      data: {
+        organizationId: "org_default",
+        salonId: "salon_default", name: `خدمة إغلاق ${Date.now()}`, defaultPrice: 60, isActive: true, sortOrder: 90 },
     });
     serviceId = service.id;
     createdServiceIds.push(serviceId);

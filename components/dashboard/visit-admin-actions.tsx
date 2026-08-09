@@ -1,5 +1,7 @@
 "use client";
 
+import { formatDateTime } from "@/lib/format";
+
 import { FormEvent, useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -79,7 +81,7 @@ export function VisitAdminActions({ visit }: { visit: VisitRow }) {
         <p className="font-bold text-red-700">ملغاة</p>
         <p>{visit.cancelReason ?? "-"}</p>
         <p>{visit.cancelledBy?.name ?? "-"}</p>
-        <p>{visit.cancelledAt ? new Date(visit.cancelledAt).toLocaleString("ar-SA") : "-"}</p>
+        <p>{visit.cancelledAt ? formatDateTime(visit.cancelledAt) : "-"}</p>
       </div>
     );
   }
@@ -99,7 +101,7 @@ export function VisitAdminActions({ visit }: { visit: VisitRow }) {
         </button>
       </form>
       <form onSubmit={(event) => submit(event, "amount")} className="grid grid-cols-[110px_1fr] gap-2">
-        <input name="grossAmount" required type="number" min={0.01} step="0.01" defaultValue={visit.grossAmount} className="dashboard-field py-2" />
+        <input lang="en" name="grossAmount" required type="number" min={0.01} step="0.01" defaultValue={visit.grossAmount} className="dashboard-field py-2" />
         <input name="reason" required minLength={5} placeholder="سبب تعديل المبلغ" className="dashboard-field py-2" />
         <button disabled={loading === "amount"} className="dashboard-button-gold col-span-2 px-3 py-2">
           تعديل المبلغ

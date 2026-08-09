@@ -83,7 +83,8 @@ export function PlatformOrganizations({
     <div className="mt-4">
       {confirmDialog}
       <DashboardToast toast={toast} onClose={() => setToast(null)} />
-      <div className="dashboard-panel overflow-x-auto">
+      <div className="dashboard-panel table-scroll-wrap overflow-hidden">
+        <div className="table-scroll">
         <table className="dashboard-table min-w-[1080px]">
           <thead>
             <tr>
@@ -166,6 +167,7 @@ export function PlatformOrganizations({
             {orgs.length === 0 ? <tr><td colSpan={6} className="px-4 py-8 text-center text-salon-charcoal">لا توجد مؤسسات مطابقة</td></tr> : null}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

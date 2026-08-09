@@ -2,6 +2,8 @@ import { BusinessError } from "@/lib/errors";
 import { Prisma } from "@prisma/client";
 import type { AuditActorType, PrismaClient } from "@prisma/client";
 import { aggregateVisitTotals, roundMoney } from "@/lib/visits/visit-totals";
+import { assertSubscriptionActive } from "@/lib/plans/subscription-guard";
+import { sumSessionExpenses } from "@/lib/expenses/expense-service";
 
 type CashSessionPrisma = PrismaClient | Prisma.TransactionClient;
 
@@ -49,6 +51,11 @@ export async function openCashSession(
     const barber = await tx.barber.findUnique({ where: { id: input.barberId } });
     if (!barber || !barber.isActive) {
       throw new BusinessError("الحلاق غير موجود أو غير فعال");
+    }
+
+    // لا تُفتح جلسة صندوق على اشتراك منتهٍ — نمنع من البداية لا بعد تسجيل الزيارات.
+    if (barber.organizationId) {
+      await assertSubscriptionActive(tx, barber.organizationId);
     }
 
     const existing = await getOpenCashSession(tx, input.barberId);
@@ -104,12 +111,16 @@ export async function closeCashSession(prisma: PrismaClient, input: CashSessionC
     }
 
     const totals = await calculateCashSessionSnapshot(tx, session.id);
-    const cashReceivedAmount = input.cashReceivedAmount ?? totals.cashTotal;
+    // الكاش المتوقع في الدرج = مقبوضات الكاش ناقص ما صُرف منه نثريًا.
+    const expensesTotal = await sumSessionExpenses(tx, session.id);
+    const expectedCash = roundMoney(totals.cashTotal - expensesTotal);
+    const cashReceivedAmount = input.cashReceivedAmount ?? expectedCash;
     const close = await tx.cashSession.update({
       where: { id: session.id },
       data: {
         status: "CLOSED",
         closedAt: new Date(),
+        expensesTotal,
         ...(input.closedByUserId ? { closedByUserId: input.closedByUserId } : {}),
         visitsCount: totals.visitsCount,
         grossTotal: totals.grossTotal,
@@ -137,7 +148,9 @@ export async function closeCashSession(prisma: PrismaClient, input: CashSessionC
         entityId: close.id,
         after: {
           ...toStoredCashSessionRow(close),
-          cashDifference: roundMoney(cashReceivedAmount - totals.cashTotal),
+          expensesTotal,
+          expectedCash,
+          cashDifference: roundMoney(cashReceivedAmount - expectedCash),
         },
         ipAddress: input.auditMeta?.ipAddress,
         userAgent: input.auditMeta?.userAgent,
@@ -148,8 +161,11 @@ export async function closeCashSession(prisma: PrismaClient, input: CashSessionC
   });
 }
 
-export async function getCashSessionSummary(prisma: CashSessionPrisma, organizationId?: string, salonId?: string | null) {
-  const scopeFilter = { ...(organizationId ? { organizationId } : {}), ...(salonId ? { salonId } : {}) };
+export async function getCashSessionSummary(prisma: CashSessionPrisma, organizationId?: string, salonIds?: string[] | null) {
+  const scopeFilter = {
+    ...(organizationId ? { organizationId } : {}),
+    ...(salonIds && salonIds.length > 0 ? { salonId: { in: salonIds } } : {}),
+  };
   const [barbers, openSessions] = await Promise.all([
     prisma.barber.findMany({ where: { isActive: true, ...scopeFilter }, orderBy: { name: "asc" } }),
     prisma.cashSession.findMany({
@@ -160,28 +176,33 @@ export async function getCashSessionSummary(prisma: CashSessionPrisma, organizat
   ]);
   const openByBarber = new Map(openSessions.map((session) => [session.barberId, session]));
 
-  const rows = [];
-  for (const barber of barbers) {
-    const session = openByBarber.get(barber.id);
-    rows.push({
+  // كل جلسة مفتوحة تحتاج استعلاميها (لقطة الإجماليات + مجموع المصروفات).
+  // احسبها مرة واحدة للجلسات المفتوحة فقط وبالتوازي — لا داخل حلقة على كل الحلاقين،
+  // وإلا صار العدد استعلامًا متسلسلًا لكل حلاق ونما مع حجم الفريق.
+  const openRowEntries = await Promise.all(
+    openSessions.map(async (session) => [session.barberId, await toCashSessionRow(prisma, session)] as const),
+  );
+  const openRowByBarber = new Map(openRowEntries);
+
+  return barbers.map((barber) => {
+    const hasOpenSession = openByBarber.has(barber.id);
+    return {
       barberId: barber.id,
       barberName: barber.name,
-      status: session ? ("OPEN" as const) : ("CLOSED" as const),
-      openSession: session ? await toCashSessionRow(prisma, session) : null,
-    });
-  }
-
-  return rows;
+      status: hasOpenSession ? ("OPEN" as const) : ("CLOSED" as const),
+      openSession: openRowByBarber.get(barber.id) ?? null,
+    };
+  });
 }
 
-export async function getCashSessionHistory(prisma: CashSessionPrisma, filters: { organizationId?: string | null; salonId?: string | null; from?: Date | string | null; to?: Date | string | null; barberId?: string | null } = {}) {
+export async function getCashSessionHistory(prisma: CashSessionPrisma, filters: { organizationId?: string | null; salonIds?: string[] | null; from?: Date | string | null; to?: Date | string | null; barberId?: string | null } = {}) {
   const from = filters.from ? new Date(filters.from) : undefined;
   const to = filters.to ? endOfDay(filters.to) : undefined;
   const sessions = await prisma.cashSession.findMany({
     where: {
       status: "CLOSED",
       ...(filters.organizationId ? { organizationId: filters.organizationId } : {}),
-      ...(filters.salonId ? { salonId: filters.salonId } : {}),
+      ...(filters.salonIds && filters.salonIds.length > 0 ? { salonId: { in: filters.salonIds } } : {}),
       ...(filters.barberId ? { barberId: filters.barberId } : {}),
       ...(from || to ? { closedAt: { ...(from ? { gte: from } : {}), ...(to ? { lt: to } : {}) } } : {}),
     },
@@ -210,6 +231,10 @@ async function toCashSessionRow(
   session: Prisma.CashSessionGetPayload<{ include: { barber: true; closedBy: true } }>,
 ) {
   const totals = session.status === "OPEN" ? await calculateCashSessionSnapshot(prisma, session.id) : storedTotals(session);
+  // الجلسة المفتوحة تُحسب مصروفاتها لحظيًا؛ المغلقة تعتمد اللقطة المحفوظة.
+  const expensesTotal =
+    session.status === "OPEN" ? await sumSessionExpenses(prisma, session.id) : Number(session.expensesTotal);
+  const expectedCash = roundMoney(totals.cashTotal - expensesTotal);
   return {
     id: session.id,
     barber: { id: session.barber.id, name: session.barber.name },
@@ -218,15 +243,19 @@ async function toCashSessionRow(
     closedAt: session.closedAt?.toISOString() ?? null,
     closedBy: session.closedBy ? { id: session.closedBy.id, name: session.closedBy.name } : null,
     ...totals,
+    expensesTotal,
+    expectedCash,
     cashReceivedAmount: session.cashReceivedAmount ? Number(session.cashReceivedAmount) : null,
-    cashDifference: session.cashReceivedAmount ? roundMoney(Number(session.cashReceivedAmount) - totals.cashTotal) : null,
+    cashDifference: session.cashReceivedAmount ? roundMoney(Number(session.cashReceivedAmount) - expectedCash) : null,
     notes: session.notes,
   };
 }
 
 function toStoredCashSessionRow(session: Prisma.CashSessionGetPayload<{ include: { barber: true; closedBy: true } }>) {
   const totals = storedTotals(session);
-  const cashReceivedAmount = session.cashReceivedAmount ? Number(session.cashReceivedAmount) : totals.cashTotal;
+  const expensesTotal = Number(session.expensesTotal);
+  const expectedCash = roundMoney(totals.cashTotal - expensesTotal);
+  const cashReceivedAmount = session.cashReceivedAmount ? Number(session.cashReceivedAmount) : expectedCash;
   return {
     id: session.id,
     barber: { id: session.barber.id, name: session.barber.name },
@@ -235,8 +264,10 @@ function toStoredCashSessionRow(session: Prisma.CashSessionGetPayload<{ include:
     closedAt: session.closedAt?.toISOString() ?? null,
     closedBy: session.closedBy ? { id: session.closedBy.id, name: session.closedBy.name } : null,
     ...totals,
+    expensesTotal,
+    expectedCash,
     cashReceivedAmount,
-    cashDifference: roundMoney(cashReceivedAmount - totals.cashTotal),
+    cashDifference: roundMoney(cashReceivedAmount - expectedCash),
     notes: session.notes,
   };
 }

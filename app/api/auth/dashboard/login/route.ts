@@ -8,11 +8,12 @@ import { writeAuditLog } from "@/lib/audit/audit-log";
 import { clearRateLimit, consumeRateLimit } from "@/lib/auth/rate-limit";
 import { canAdminLogin } from "@/lib/auth/login-policy";
 import { getKnownLoginOrgSlug } from "@/lib/tenant/request-org";
+import { resolveLoginIdentity } from "@/lib/auth/login-resolver";
 
 const ERROR_MESSAGE = "بيانات الدخول غير صحيحة";
 const ORG_NOT_FOUND_MESSAGE = "لم نجد مؤسسة بهذا المعرّف. تأكد من كتابة معرّف مؤسستك كما اخترته عند التسجيل.";
 const RATE_LIMITED_MESSAGE = "محاولات كثيرة. يرجى المحاولة بعد قليل.";
-const NEEDS_ORG_MESSAGE = "بريدك مسجّل في أكثر من مؤسسة. أدخل معرّف المؤسسة للمتابعة.";
+const NEEDS_ORG_MESSAGE = "بريدك مسجّل في أكثر من صالون. اختر الصالون للمتابعة.";
 const ADMIN_LOGIN_ROLES = ["OWNER", "ADMIN", "SUPERVISOR"] as const;
 
 export async function POST(request: Request) {
@@ -42,32 +43,45 @@ export async function POST(request: Request) {
     );
   }
 
-  // المؤسسة معروفة من النطاق الفرعي أو المعرّف المُدخل؛ وإلا نحلّها من البريد نفسه.
-  const knownSlug = await getKnownLoginOrgSlug(parsed.data.organizationSlug);
-  let organization = null;
-  if (knownSlug) {
-    organization = await prisma.organization.findUnique({ where: { slug: knownSlug } });
-    if (!organization) {
-      return NextResponse.json({ message: ORG_NOT_FOUND_MESSAGE }, { status: 404 });
-    }
-  } else {
-    const candidates = await prisma.user.findMany({
-      where: { email, isActive: true, role: { in: [...ADMIN_LOGIN_ROLES] }, organizationId: { not: null } },
-      select: { organizationId: true },
-      distinct: ["organizationId"],
-    });
-    if (candidates.length > 1) {
-      return NextResponse.json({ message: NEEDS_ORG_MESSAGE, needsOrganization: true }, { status: 409 });
-    }
-    organization = candidates[0]?.organizationId
-      ? await prisma.organization.findUnique({ where: { id: candidates[0].organizationId } })
-      : null;
+  // لا نطلب معرّف مؤسسة من المستخدم إطلاقًا: النطاق الفرعي إن وُجد، وإلا نحلّها
+  // من البريد وكلمة المرور معًا، وعند التكرار نعرض أسماء الصالونات للاختيار.
+  const hostSlug = await getKnownLoginOrgSlug();
+  const scopedOrganizationId = hostSlug
+    ? (await prisma.organization.findUnique({ where: { slug: hostSlug }, select: { id: true } }))?.id
+    : parsed.data.organizationId;
+
+  if (hostSlug && !scopedOrganizationId) {
+    return NextResponse.json({ message: ORG_NOT_FOUND_MESSAGE }, { status: 404 });
   }
 
-  const user = organization
-    ? await prisma.user.findFirst({ where: { email, organizationId: organization.id } })
-    : null;
-  const passwordOk = user ? await verifyAdminPassword(parsed.data.password, user.passwordHash) : false;
+  const candidates = await prisma.user.findMany({
+    where: {
+      email,
+      isActive: true,
+      role: { in: [...ADMIN_LOGIN_ROLES] },
+      organizationId: scopedOrganizationId ? scopedOrganizationId : { not: null },
+      organization: { status: "ACTIVE" },
+    },
+    include: { organization: { select: { id: true, name: true } } },
+  });
+
+  const resolution = await resolveLoginIdentity(
+    candidates,
+    (candidate) => verifyAdminPassword(parsed.data.password, candidate.passwordHash),
+    (candidate) => (candidate.organization ? { id: candidate.organization.id, name: candidate.organization.name } : null),
+  );
+
+  if (resolution.outcome === "NEEDS_CHOICE") {
+    // كلمة المرور صحيحة في أكثر من صالون — يختار صاحبها أيّها يريد بالاسم.
+    return NextResponse.json(
+      { message: NEEDS_ORG_MESSAGE, needsOrganizationChoice: true, organizations: resolution.organizations },
+      { status: 409 },
+    );
+  }
+
+  const user = resolution.outcome === "SINGLE" ? resolution.identity : null;
+  const organization = user?.organization ?? null;
+  const passwordOk = Boolean(user);
 
   if (!user || !organization || !canAdminLogin(user, passwordOk)) {
     await writeAuditLog({

@@ -1,22 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 import { BrandLogo } from "@/components/brand-logo";
 
 export default function DashboardLoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [orgSlug, setOrgSlug] = useState("");
-  const [showOrg, setShowOrg] = useState(false);
-
-  useEffect(() => {
-    const fromUrl = new URLSearchParams(window.location.search).get("org");
-    if (fromUrl) {
-      setOrgSlug(fromUrl.toLowerCase());
-      setShowOrg(true);
-    }
-  }, []);
+  // لا يُطلب معرّف مؤسسة. هذه القائمة تظهر فقط في الحالة النادرة: بريد وكلمة
+  // مرور صحيحان في أكثر من صالون — فيختار صاحبها بالاسم لا بمعرّف يحفظه.
+  const [organizations, setOrganizations] = useState<{ id: string; name: string }[]>([]);
+  const [organizationId, setOrganizationId] = useState("");
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -30,17 +24,21 @@ export default function DashboardLoginPage() {
       body: JSON.stringify({
         email: form.get("email"),
         password: form.get("password"),
-        organizationSlug: form.get("organizationSlug") || undefined,
+        organizationId: organizationId || undefined,
       }),
     });
     const data = (await response.json().catch(() => ({}))) as {
       message?: string;
       redirectTo?: string;
-      needsOrganization?: boolean;
+      needsOrganizationChoice?: boolean;
+      organizations?: { id: string; name: string }[];
     };
 
     if (!response.ok) {
-      if (data.needsOrganization) setShowOrg(true);
+      if (data.needsOrganizationChoice && data.organizations?.length) {
+        setOrganizations(data.organizations);
+        setOrganizationId(data.organizations[0].id);
+      }
       setError(data.message ?? "بيانات الدخول غير صحيحة");
       setLoading(false);
       return;
@@ -64,7 +62,7 @@ export default function DashboardLoginPage() {
       <section className="relative mx-auto flex min-h-[calc(100vh-6rem)] max-w-md flex-col justify-center">
         <div className="mb-8">
           <BrandLogo className="animate-float mb-6 h-24 w-24 ring-1 ring-salon-gold/30" priority />
-          <p className="text-[11px] font-bold uppercase tracking-eyebrow text-salon-goldlight">واجهة تنال · لوحة الإدارة</p>
+          <p className="text-[11px] font-bold uppercase tracking-eyebrow text-salon-goldlight">XMANSX · لوحة الإدارة</p>
           <h1 className="mt-3 text-4xl font-bold leading-tight tracking-tight">
             دخول <span className="text-gold-sheen">الإدارة</span>
           </h1>
@@ -72,21 +70,24 @@ export default function DashboardLoginPage() {
         </div>
         <form onSubmit={submit} className="sheen-overlay relative space-y-4 rounded-2xl border border-white/10 bg-white/95 p-6 text-salon-ink shadow-[0_40px_90px_-40px_rgba(0,0,0,0.75)] backdrop-blur">
           <span className="absolute inset-x-0 top-0 h-1 bg-royal-gold" aria-hidden="true" />
-          {showOrg ? (
+          {organizations.length > 0 ? (
             <label className="block text-sm font-semibold">
-              معرّف المؤسسة
-              <input
-                name="organizationSlug"
-                value={orgSlug}
-                onChange={(event) => setOrgSlug(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
-                dir="ltr"
-                required
+              اختر صالونك
+              <select
+                value={organizationId}
+                onChange={(event) => setOrganizationId(event.target.value)}
                 autoFocus
-                autoComplete="organization"
-                placeholder="my-salon"
                 className="dashboard-field mt-2"
-              />
-              <span className="mt-1 block text-xs font-medium text-salon-charcoal/60">المعرّف الذي اخترته عند إنشاء مؤسستك.</span>
+              >
+                {organizations.map((organization) => (
+                  <option key={organization.id} value={organization.id}>
+                    {organization.name}
+                  </option>
+                ))}
+              </select>
+              <span className="mt-1 block text-xs font-medium text-salon-charcoal/60">
+                بريدك مسجّل في أكثر من صالون — اختر الذي تريد الدخول إليه.
+              </span>
             </label>
           ) : null}
           <label className="block text-sm font-semibold">

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, type WhatsAppSafetySettings } from "@prisma/client";
 import { hashBarberPin } from "../lib/auth/barber-pin";
 import { canAccessDashboard } from "../lib/auth/access";
 import { openCashSession } from "../lib/cash-sessions/cash-session-service";
@@ -40,12 +40,36 @@ let managerRewardCustomerId = "";
 let visitId = "";
 let templateId = "";
 let campaignId = "";
+let originalSafetySettings: WhatsAppSafetySettings | null = null;
 
 describe("whatsapp templates and message logs", () => {
   beforeAll(async () => {
     adminUserId = (await prisma.user.findFirstOrThrow({ where: { role: "ADMIN", isActive: true } })).id;
+    originalSafetySettings = await prisma.whatsAppSafetySettings.findUnique({ where: { organizationId: "org_default" } });
+    await prisma.whatsAppSafetySettings.upsert({
+      where: { organizationId: "org_default" },
+      create: {
+        organizationId: "org_default",
+        mode: "CUSTOM",
+        marketingCooldownHours: 24,
+        maxMarketingPerCustomer30Days: 30,
+        maxMessagesPerCustomer24Hours: 10,
+        dailyOrganizationDraftLimit: 5000,
+      },
+      update: {
+        mode: "CUSTOM",
+        marketingCooldownHours: 24,
+        maxMarketingPerCustomer30Days: 30,
+        maxMessagesPerCustomer24Hours: 10,
+        dailyOrganizationDraftLimit: 5000,
+        marketingPaused: false,
+        appendOptOutInstructions: true,
+      },
+    });
     const barber = await prisma.barber.create({
       data: {
+        organizationId: "org_default",
+        salonId: "salon_default",
         name: `whatsapp-barber-${Date.now()}`,
         phone: randomSaudiPhone(),
         accessPinHash: await hashBarberPin("Tanal@123"),
@@ -57,7 +81,9 @@ describe("whatsapp templates and message logs", () => {
     createdCashSessionIds.push((await openCashSession(prisma, { barberId })).cashSession.id);
 
     const service = await prisma.service.create({
-      data: { name: `خدمة واتساب ${Date.now()}`, defaultPrice: 50, isActive: true, sortOrder: 400 },
+      data: {
+        organizationId: "org_default",
+        salonId: "salon_default", name: `خدمة واتساب ${Date.now()}`, defaultPrice: 50, isActive: true, sortOrder: 400 },
     });
     serviceId = service.id;
     createdServiceIds.push(serviceId);
@@ -70,7 +96,11 @@ describe("whatsapp templates and message logs", () => {
 
     await prisma.customer.update({
       where: { id: optOutCustomerId },
-      data: { whatsappOptIn: false },
+      data: {
+        whatsappOptIn: false,
+        whatsappTransactionalOptIn: false,
+        whatsappMarketingOptIn: false,
+      },
     });
     await prisma.customer.update({
       where: { id: inactiveCustomerId },
@@ -150,6 +180,23 @@ describe("whatsapp templates and message logs", () => {
     await prisma.customer.deleteMany({ where: { id: { in: createdCustomerIds } } });
     await prisma.service.deleteMany({ where: { id: { in: createdServiceIds } } });
     await prisma.barber.deleteMany({ where: { id: { in: createdBarberIds } } });
+    if (originalSafetySettings) {
+      await prisma.whatsAppSafetySettings.update({
+        where: { organizationId: "org_default" },
+        data: {
+          mode: originalSafetySettings.mode,
+          marketingCooldownHours: originalSafetySettings.marketingCooldownHours,
+          maxMarketingPerCustomer30Days: originalSafetySettings.maxMarketingPerCustomer30Days,
+          maxMessagesPerCustomer24Hours: originalSafetySettings.maxMessagesPerCustomer24Hours,
+          dailyOrganizationDraftLimit: originalSafetySettings.dailyOrganizationDraftLimit,
+          appendOptOutInstructions: originalSafetySettings.appendOptOutInstructions,
+          optOutText: originalSafetySettings.optOutText,
+          marketingPaused: originalSafetySettings.marketingPaused,
+        },
+      });
+    } else {
+      await prisma.whatsAppSafetySettings.deleteMany({ where: { organizationId: "org_default" } });
+    }
     await prisma.$disconnect();
   });
 
@@ -184,7 +231,7 @@ describe("whatsapp templates and message logs", () => {
   });
 
   it("rejects message generation when customer disabled whatsapp", async () => {
-    await expect(generateWhatsAppMessage(prisma, { customerId: optOutCustomerId, templateId }, adminMeta())).rejects.toThrow("العميل لا يرغب");
+    await expect(generateWhatsAppMessage(prisma, { customerId: optOutCustomerId, templateId }, adminMeta())).rejects.toThrow("لا توجد موافقة على رسائل الخدمة");
   });
 
   it("rejects message generation when whatsapp is disabled in system settings", async () => {
@@ -252,6 +299,37 @@ describe("whatsapp templates and message logs", () => {
     expect(canAccessDashboard({ type: "barber", id: "wa-b", role: "BARBER", organizationId: "org_default", salonId: "salon_default", barber: { id: barberId, name: "حلاق", phone: "0500000001", role: "BARBER" } })).toBe(false);
     expect(canAccessDashboard({ type: "dashboard", id: "wa-a", role: "ADMIN", organizationId: "org_default", salonId: null, scopedSalonIds: null, user: { id: adminUserId, name: "مدير", email: "admin@tanal.local", role: "ADMIN" } })).toBe(true);
   });
+
+  it("requires separate marketing consent, appends opt-out text, and enforces cooldown", async () => {
+    await updateCustomerWhatsappPreference(
+      prisma,
+      rewardCustomerId,
+      { transactionalOptIn: true, marketingOptIn: false, consentSource: "IN_PERSON" },
+      adminMeta(),
+    );
+    await expect(
+      generateWhatsAppMessage(prisma, { customerId: rewardCustomerId, customMessage: "عرض خاص", messageCategory: "MARKETING" }, adminMeta()),
+    ).rejects.toThrow("موافقة تسويقية");
+
+    await updateCustomerWhatsappPreference(
+      prisma,
+      rewardCustomerId,
+      { marketingOptIn: true, consentSource: "IN_PERSON" },
+      adminMeta(),
+    );
+    const first = await generateWhatsAppMessage(
+      prisma,
+      { customerId: rewardCustomerId, customMessage: "عرض خاص", messageCategory: "MARKETING" },
+      adminMeta(),
+    );
+    createdMessageIds.push(first.messageLogId);
+    expect(first.message).toContain("لإيقاف العروض اكتب إيقاف");
+    expect(first.category).toBe("MARKETING");
+
+    await expect(
+      generateWhatsAppMessage(prisma, { customerId: rewardCustomerId, customMessage: "عرض ثانٍ", messageCategory: "MARKETING" }, adminMeta()),
+    ).rejects.toThrow("فترة تهدئة");
+  });
 });
 
 async function createCustomer(name: string) {
@@ -261,6 +339,9 @@ async function createCustomer(name: string) {
     name,
     phone: randomSaudiPhone(),
     createdByBarberId: barberId,
+    whatsappTransactionalOptIn: true,
+    whatsappMarketingOptIn: true,
+    whatsappConsentSource: "IN_PERSON",
   });
   createdCustomerIds.push(result.customer.id);
   return result;
@@ -270,6 +351,7 @@ function adminMeta() {
   return {
     actorUserId: adminUserId,
     actorType: "ADMIN" as const,
+    organizationId: "org_default",
   };
 }
 

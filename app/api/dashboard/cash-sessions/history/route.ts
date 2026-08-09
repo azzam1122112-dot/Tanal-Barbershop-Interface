@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireDashboardApi } from "@/lib/auth/http";
+import { effectiveSalonIds } from "@/lib/auth/salon-scope";
 import { getCashSessionHistory } from "@/lib/cash-sessions/cash-session-service";
 import { prisma } from "@/lib/db/prisma";
 
@@ -12,6 +13,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const history = await getCashSessionHistory(prisma, {
     organizationId: session.organizationId,
+    salonIds: effectiveSalonIds(session),
     from: url.searchParams.get("from"),
     to: url.searchParams.get("to"),
     barberId: url.searchParams.get("barberId"),

@@ -2,18 +2,26 @@ import type { PrismaClient } from "@prisma/client";
 import { getCashSessionSummary } from "@/lib/cash-sessions/cash-session-service";
 import { getTodayRange } from "@/lib/reports/dashboard-reports";
 
-export async function getOperationAlerts(prisma: PrismaClient, date: Date | string = new Date(), organizationId?: string, salonId?: string | null) {
-  const summary = await getCashSessionSummary(prisma, organizationId, salonId);
-  const orgFilter = { ...(organizationId ? { organizationId } : {}), ...(salonId ? { salonId } : {}) };
+export async function getOperationAlerts(prisma: PrismaClient, date: Date | string = new Date(), organizationId?: string, salonIds?: string[] | null) {
+  const orgFilter = {
+    ...(organizationId ? { organizationId } : {}),
+    ...(salonIds && salonIds.length > 0 ? { salonId: { in: salonIds } } : {}),
+  };
   const { from, to } = getTodayRange(new Date(date));
-  const zeroNetVisits = await prisma.visit.count({
-    where: {
-      ...orgFilter,
-      status: "COMPLETED",
-      visitedAt: { gte: from, lt: to },
-      netAmount: 0,
-    },
-  });
+
+  // الثلاثة مستقلة عن بعضها — لا تجعلها رحلات متتابعة إلى قاعدة البيانات.
+  const [summary, zeroNetVisits, closesTodayCount] = await Promise.all([
+    getCashSessionSummary(prisma, organizationId, salonIds),
+    prisma.visit.count({
+      where: {
+        ...orgFilter,
+        status: "COMPLETED",
+        visitedAt: { gte: from, lt: to },
+        netAmount: 0,
+      },
+    }),
+    prisma.cashSession.count({ where: { ...orgFilter, status: "CLOSED", closedAt: { gte: from, lt: to } } }),
+  ]);
   const alerts = [];
 
   const openCashRows = summary.filter((row) => row.openSession && row.openSession.cashTotal > 0);
@@ -79,7 +87,7 @@ export async function getOperationAlerts(prisma: PrismaClient, date: Date | stri
     date: new Date(date).toISOString(),
     openCashBarbersCount: openCashRows.length,
     unclosedCashTotal: openCashRows.reduce((total, row) => total + (row.openSession?.cashTotal ?? 0), 0),
-    closesTodayCount: await prisma.cashSession.count({ where: { ...orgFilter, status: "CLOSED", closedAt: { gte: from, lt: to } } }),
+    closesTodayCount,
     alerts,
   };
 }
