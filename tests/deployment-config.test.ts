@@ -64,15 +64,15 @@ describe("إعداد النشر", () => {
   });
 
   it("يشغّل حذف الحسابات غير النشطة وصيانة الخصوصية يوميًا", () => {
-    const service = readFileSync(join(process.cwd(), "deploy", "systemd", "xmansx-maintenance.service"), "utf8");
-    const timer = readFileSync(join(process.cwd(), "deploy", "systemd", "xmansx-maintenance.timer"), "utf8");
+    const service = readFileSync(join(process.cwd(), "deploy", "systemd", "tanal-maintenance.service"), "utf8");
+    const timer = readFileSync(join(process.cwd(), "deploy", "systemd", "tanal-maintenance.timer"), "utf8");
     expect(service).toContain("npm run maintenance:cleanup");
     expect(timer).toContain("OnCalendar=");
     expect(timer).toContain("Persistent=true");
   });
 
   it("يحدد دورة حذف آمنة للنسخ الاحتياطية المشفرة", () => {
-    const backup = readFileSync(join(process.cwd(), "deploy", "backup", "xmansx-backup.sh"), "utf8");
+    const backup = readFileSync(join(process.cwd(), "deploy", "backup", "tanal-backup.sh"), "utf8");
     const envExample = readFileSync(join(process.cwd(), ".env.example"), "utf8");
     expect(backup).toContain('BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-30}"');
     expect(backup).toContain("BACKUP_DIR must be an absolute non-root directory");

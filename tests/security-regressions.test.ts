@@ -82,7 +82,7 @@ describe("security regression controls", () => {
       join(process.cwd(), "prisma", "migrations", "20260811000000_performance_indexes", "migration.sql"),
       "utf8",
     );
-    const nginx = readFileSync(join(process.cwd(), "deploy", "nginx", "xmansx.conf"), "utf8");
+    const nginx = readFileSync(join(process.cwd(), "deploy", "nginx", "tanal.conf"), "utf8");
     expect(migration).not.toContain("CONCURRENTLY");
     expect(nginx).toContain("proxy_set_header X-Forwarded-For $remote_addr");
     expect(nginx).not.toContain("$proxy_add_x_forwarded_for");
@@ -92,7 +92,7 @@ describe("security regression controls", () => {
     const migration = readFileSync(join(process.cwd(), "prisma", "migrations", "20260811010000_security_hardening", "migration.sql"), "utf8");
     const auditMigration = readFileSync(join(process.cwd(), "prisma", "migrations", "20260811011000_audit_pii_guard", "migration.sql"), "utf8");
     const expandedTenantMigration = readFileSync(join(process.cwd(), "prisma", "migrations", "20260811012000_tenant_constraint_expansion", "migration.sql"), "utf8");
-    const restore = readFileSync(join(process.cwd(), "deploy", "backup", "xmansx-restore-drill.sh"), "utf8");
+    const restore = readFileSync(join(process.cwd(), "deploy", "backup", "tanal-restore-drill.sh"), "utf8");
     const securityWorkflow = readFileSync(join(process.cwd(), ".github", "workflows", "security.yml"), "utf8");
     const semgrepPolicy = readFileSync(join(process.cwd(), ".semgrep.yml"), "utf8");
     expect(migration).toContain("VisitService_tenant_guard");
