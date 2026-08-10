@@ -63,8 +63,8 @@ describe("customer booking availability", () => {
 
   it("shows booked and too-soon times while respecting each barber schedule", async () => {
     // الثواني لا تظهر للعميل: 4:30:45 يجب أن تسمح بفترة 6:30 بالضبط.
-    const now = new Date(2026, 7, 10, 16, 30, 45, 0);
-    const bookedAt = new Date(2026, 7, 10, 19, 0, 0, 0);
+    const now = new Date("2026-08-10T13:30:45.000Z"); // 4:30:45 م في الرياض
+    const bookedAt = new Date("2026-08-10T16:00:00.000Z"); // 7:00 م في الرياض
     const prisma = mockPrisma({
       barbers: [inheritedBarber, customBarber],
       appointments: [
@@ -96,7 +96,7 @@ describe("customer booking availability", () => {
   });
 
   it("rejects a chosen time outside the selected barber's duty", async () => {
-    const now = new Date(2026, 7, 10, 12, 0, 0, 0);
+    const now = new Date("2026-08-10T09:00:00.000Z"); // 12:00 م في الرياض
     const prisma = mockPrisma({ barbers: [customBarber], appointments: [] });
 
     await expect(
@@ -104,7 +104,7 @@ describe("customer booking availability", () => {
         organizationId: "org",
         salonId: "salon",
         barberId: customBarber.id,
-        startAt: new Date(2026, 7, 10, 16, 30, 0, 0),
+        startAt: new Date("2026-08-10T13:30:00.000Z"), // 4:30 م في الرياض
         config,
         now,
       }),
@@ -112,8 +112,8 @@ describe("customer booking availability", () => {
   });
 
   it("rejects an occupied slot for the selected barber", async () => {
-    const now = new Date(2026, 7, 10, 12, 0, 0, 0);
-    const startAt = new Date(2026, 7, 10, 18, 30, 0, 0);
+    const now = new Date("2026-08-10T09:00:00.000Z");
+    const startAt = new Date("2026-08-10T15:30:00.000Z"); // 6:30 م في الرياض
     const prisma = mockPrisma({
       barbers: [customBarber],
       appointments: [{ barberId: customBarber.id, startAt, durationMinutes: 30 }],

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Icon } from "@/components/icons";
 import type { BarberAppointment } from "@/components/barber/appointments-panel";
+import { parseDateKeyParts, RIYADH_TIME_ZONE } from "@/lib/datetime/riyadh";
 
 type SlotStatus = "AVAILABLE" | "BOOKED" | "TOO_SOON" | "OFF_DUTY";
 type RescheduleSlot = {
@@ -18,11 +19,13 @@ type RescheduleDay = {
 };
 
 const dayFormatter = new Intl.DateTimeFormat("ar-SA", {
+  timeZone: "UTC",
   weekday: "short",
   day: "numeric",
   month: "short",
 });
 const currentFormatter = new Intl.DateTimeFormat("ar-SA", {
+  timeZone: RIYADH_TIME_ZONE,
   weekday: "long",
   day: "numeric",
   month: "long",
@@ -279,12 +282,16 @@ export function BarberRescheduleDialog({
 }
 
 function formatDay(dateKey: string) {
-  return dayFormatter.format(new Date(`${dateKey}T12:00:00`));
+  const { year, month, day } = parseDateKeyParts(dateKey);
+  const date = new Date(0);
+  date.setUTCFullYear(year, month - 1, day);
+  date.setUTCHours(12, 0, 0, 0);
+  return dayFormatter.format(date);
 }
 
 function formatMinute(minute: number) {
-  const date = new Date(2000, 0, 1, Math.floor(minute / 60), minute % 60);
-  return new Intl.DateTimeFormat("ar-SA", { hour: "2-digit", minute: "2-digit" }).format(date);
+  const date = new Date(Date.UTC(2000, 0, 1, Math.floor(minute / 60) - 3, minute % 60));
+  return new Intl.DateTimeFormat("ar-SA", { timeZone: RIYADH_TIME_ZONE, hour: "2-digit", minute: "2-digit" }).format(date);
 }
 
 function formatLead(minutes: number) {

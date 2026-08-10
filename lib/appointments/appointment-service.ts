@@ -3,6 +3,7 @@ import { BusinessError } from "@/lib/errors";
 import { normalizeSaudiPhone } from "@/lib/phone/saudi-phone";
 import { sendBarberAppointmentPush } from "@/lib/push/barber-push";
 import { nextBookingDisciplineState } from "@/lib/appointments/booking-discipline";
+import { addRiyadhDays, startOfRiyadhDay } from "@/lib/datetime/riyadh";
 
 type AppointmentPrisma = PrismaClient | Prisma.TransactionClient;
 
@@ -140,11 +141,9 @@ async function assertNoOverlap(
   input: { barberId: string; startAt: Date; durationMinutes: number; excludeId?: string },
 ) {
   const end = new Date(input.startAt.getTime() + input.durationMinutes * 60 * 1000);
-  // نجلب مواعيد اليوم للحلاق ثم نفحص التداخل بالحساب (المدة عمود لا تعبير SQL).
-  const dayStart = new Date(input.startAt);
-  dayStart.setHours(0, 0, 0, 0);
-  const dayEnd = new Date(dayStart);
-  dayEnd.setDate(dayEnd.getDate() + 1);
+  // نجلب مواعيد يوم الرياض للحلاق ثم نفحص التداخل بالحساب (المدة عمود لا تعبير SQL).
+  const dayStart = startOfRiyadhDay(input.startAt);
+  const dayEnd = addRiyadhDays(dayStart, 1);
 
   const sameDay = await prisma.appointment.findMany({
     where: {
@@ -178,10 +177,8 @@ export async function listAppointments(
   },
 ) {
   const day = filters.date ? new Date(filters.date) : new Date();
-  const from = new Date(day);
-  from.setHours(0, 0, 0, 0);
-  const to = new Date(from);
-  to.setDate(to.getDate() + 1);
+  const from = startOfRiyadhDay(day);
+  const to = addRiyadhDays(from, 1);
 
   const appointments = await prisma.appointment.findMany({
     where: {

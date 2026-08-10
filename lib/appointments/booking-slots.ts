@@ -1,6 +1,16 @@
 import type { AppointmentStatus, Prisma, PrismaClient, SystemSettings } from "@prisma/client";
 import { BusinessError } from "@/lib/errors";
 import { effectiveBarberSchedule } from "@/lib/barbers/work-schedule";
+import {
+  addRiyadhDays,
+  getRiyadhDateParts,
+  getRiyadhMinuteOfDay,
+  getRiyadhWeekday,
+  parseRiyadhDateKey,
+  riyadhDateTimeForDay,
+  startOfRiyadhDay,
+  toRiyadhDateKey,
+} from "@/lib/datetime/riyadh";
 
 /**
  * حساب الفترات المتاحة للحجز الذاتي من بوابة العميل.
@@ -8,8 +18,8 @@ import { effectiveBarberSchedule } from "@/lib/barbers/work-schedule";
  * **مصدر حقيقة واحد للتوافر**: تُستخدم لعرض الشبكة للعميل _و_ للتحقق قبل الإنشاء.
  * لو تفرّق المنطقان لأمكن للعميل حجز فترة لا تعرضها الشاشة (سباق أو طلب مصنوع يدويًا).
  *
- * **التوقيت**: النظام كله يعمل بالتوقيت المحلي للخادم (انظر `assertNoOverlap`)،
- * وهذه الوحدة تلتزم بنفس الاتفاق — `bookingOpenMinute` دقائق من منتصف الليل المحلي.
+ * **التوقيت**: كل الأيام والساعات التشغيلية محسوبة صراحةً بتوقيت الرياض،
+ * ولا تعتمد على المنطقة الزمنية لخادم Node أو جهاز العميل.
  */
 
 type SlotPrisma = PrismaClient | Prisma.TransactionClient;
@@ -90,26 +100,21 @@ function clamp(value: number, min: number, max: number, fallback: number) {
 }
 
 export function startOfLocalDay(value: Date) {
-  const day = new Date(value);
-  day.setHours(0, 0, 0, 0);
-  return day;
+  return startOfRiyadhDay(value);
 }
 
-/** `YYYY-MM-DD` بالتوقيت المحلي — `toISOString` يزيح اليوم عند فروق المنطقة. */
+/** @deprecated استخدم الاسم الأدق `toRiyadhDateKey`. */
 export function toLocalDateKey(value: Date) {
-  const year = value.getFullYear();
-  const month = String(value.getMonth() + 1).padStart(2, "0");
-  const day = String(value.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return toRiyadhDateKey(value);
 }
 
-/** يحوّل `YYYY-MM-DD` إلى منتصف ليل محلي، ويرفض ما عداه. */
+/** @deprecated استخدم الاسم الأدق `parseRiyadhDateKey`. */
 export function parseLocalDateKey(value: string): Date {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
-  if (!match) throw new BusinessError("التاريخ غير صحيح");
-  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 0, 0, 0, 0);
-  if (Number.isNaN(date.getTime())) throw new BusinessError("التاريخ غير صحيح");
-  return date;
+  try {
+    return parseRiyadhDateKey(value);
+  } catch {
+    throw new BusinessError("التاريخ غير صحيح");
+  }
 }
 
 export type BookingSlot = {
@@ -160,10 +165,9 @@ export async function listAvailableSlots(
   const durationMinutes = validDurationMinutes(input.durationMinutes ?? config.slotMinutes);
 
   const now = input.from ?? new Date();
-  const firstDay = startOfLocalDay(now);
+  const firstDay = startOfRiyadhDay(now);
   const dayCount = Math.min(input.days ?? config.horizonDays, config.horizonDays);
-  const rangeEnd = new Date(firstDay);
-  rangeEnd.setDate(rangeEnd.getDate() + dayCount);
+  const rangeEnd = addRiyadhDays(firstDay, dayCount);
 
   const barbers = await prisma.barber.findMany({
     where: {
@@ -208,9 +212,8 @@ export async function listAvailableSlots(
   const days: BookingDay[] = [];
 
   for (let offset = 0; offset < dayCount; offset += 1) {
-    const day = new Date(firstDay);
-    day.setDate(day.getDate() + offset);
-    const weekday = day.getDay();
+    const day = addRiyadhDays(firstDay, offset);
+    const weekday = getRiyadhWeekday(day);
     const branchClosed = config.closedWeekdays.includes(weekday);
     const slots: BookingSlot[] = [];
     const candidateMinutes = new Set<number>();
@@ -229,8 +232,7 @@ export async function listAvailableSlots(
       }
 
       for (const minute of [...candidateMinutes].sort((left, right) => left - right)) {
-        const start = new Date(day);
-        start.setMinutes(minute, 0, 0);
+        const start = riyadhDateTimeForDay(day, minute);
         const startMs = start.getTime();
         const endMs = startMs + durationMinutes * 60_000;
         const barberStatuses = barbers.map((barber) => {
@@ -260,7 +262,7 @@ export async function listAvailableSlots(
     }
 
     days.push({
-      date: toLocalDateKey(day),
+      date: toRiyadhDateKey(day),
       weekday,
       closed: branchClosed || candidateMinutes.size === 0,
       slots,
@@ -296,21 +298,21 @@ export async function resolveBookableSlot(
   if (Number.isNaN(startAt.getTime())) throw new BusinessError("وقت الموعد غير صحيح");
 
   const now = input.now ?? new Date();
-  const minuteOfDay = startAt.getHours() * 60 + startAt.getMinutes();
+  const minuteOfDay = getRiyadhMinuteOfDay(startAt);
   const durationMinutes = validDurationMinutes(input.durationMinutes ?? config.slotMinutes);
 
-  if (startAt.getSeconds() !== 0 || startAt.getMilliseconds() !== 0) {
+  const riyadhParts = getRiyadhDateParts(startAt);
+  if (riyadhParts.second !== 0 || riyadhParts.millisecond !== 0) {
     throw new BusinessError("الوقت المختار ليس ضمن الفترات المتاحة");
   }
-  if (config.closedWeekdays.includes(startAt.getDay())) {
+  if (config.closedWeekdays.includes(getRiyadhWeekday(startAt))) {
     throw new BusinessError("الفرع مغلق في هذا اليوم");
   }
   if (startAt.getTime() < bookingLeadThreshold(now, config.leadMinutes)) {
     throw new BusinessError("الوقت المختار قريب جدًا — اختر فترة أبعد");
   }
 
-  const horizonEnd = startOfLocalDay(now);
-  horizonEnd.setDate(horizonEnd.getDate() + config.horizonDays);
+  const horizonEnd = addRiyadhDays(startOfRiyadhDay(now), config.horizonDays);
   if (startAt.getTime() >= horizonEnd.getTime()) {
     throw new BusinessError("لا يمكن الحجز لهذا التاريخ البعيد");
   }
@@ -338,7 +340,7 @@ export async function resolveBookableSlot(
   const onDutyBarbers = barbers.filter((barber) =>
     isBarberOnDuty(
       effectiveBarberSchedule(config, barber),
-      startAt.getDay(),
+      getRiyadhWeekday(startAt),
       minuteOfDay,
       durationMinutes,
       config.slotMinutes,
@@ -359,7 +361,7 @@ export async function resolveBookableSlot(
       barberId: { in: onDutyBarbers.map((barber) => barber.id) },
       ...(input.excludeAppointmentId ? { id: { not: input.excludeAppointmentId } } : {}),
       // نافذة يوم كامل حول الموعد: المدد أعمدة لا تعبير SQL، فالتداخل يُفحص حسابيًا.
-      startAt: { gte: startOfLocalDay(startAt), lt: addDays(startOfLocalDay(startAt), 1) },
+      startAt: { gte: startOfRiyadhDay(startAt), lt: addRiyadhDays(startAt, 1) },
     },
     select: { barberId: true, startAt: true, durationMinutes: true },
   });
@@ -379,12 +381,6 @@ export async function resolveBookableSlot(
   }
 
   return { barberId: free.id, startAt, durationMinutes };
-}
-
-function addDays(value: Date, days: number) {
-  const next = new Date(value);
-  next.setDate(next.getDate() + days);
-  return next;
 }
 
 function isBarberOnDuty(

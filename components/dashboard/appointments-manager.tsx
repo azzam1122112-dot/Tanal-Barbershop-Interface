@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { InlineEmpty } from "@/components/dashboard/ui";
+import { parseRiyadhDateKey, RIYADH_TIME_ZONE } from "@/lib/datetime/riyadh";
 
 type Appointment = {
   id: string;
@@ -24,7 +25,11 @@ type Appointment = {
 type BarberOption = { id: string; name: string; salonId: string | null };
 type SalonOption = { id: string; name: string };
 
-const timeFormatter = new Intl.DateTimeFormat("ar-SA", { hour: "2-digit", minute: "2-digit" });
+const timeFormatter = new Intl.DateTimeFormat("ar-SA", {
+  timeZone: RIYADH_TIME_ZONE,
+  hour: "2-digit",
+  minute: "2-digit",
+});
 
 export function AppointmentsManager({
   initialAppointments,
@@ -57,6 +62,9 @@ export function AppointmentsManager({
     const formEl = event.currentTarget;
     const form = new FormData(formEl);
     const time = String(form.get("time") ?? "");
+    const [hour, minute] = time.split(":").map(Number);
+    const riyadhMidnight = parseRiyadhDateKey(date);
+    const startAt = new Date(riyadhMidnight.getTime() + (hour * 60 + minute) * 60_000);
 
     const response = await fetch("/api/dashboard/appointments", {
       method: "POST",
@@ -66,8 +74,8 @@ export function AppointmentsManager({
         barberId: form.get("barberId") || null,
         customerName: form.get("customerName"),
         customerPhone: form.get("customerPhone"),
-        // نبني وقتًا محليًا من تاريخ اليوم المعروض + الوقت المدخل.
-        startAt: new Date(`${date}T${time}`).toISOString(),
+        // وقت الإدخال هو وقت الفرع في الرياض مهما كانت منطقة جهاز المدير.
+        startAt: startAt.toISOString(),
         durationMinutes: Number(form.get("durationMinutes")) || 30,
         notes: form.get("notes") || null,
       }),

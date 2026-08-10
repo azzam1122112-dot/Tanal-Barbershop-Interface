@@ -17,6 +17,7 @@ import { BarberAppointmentsPanel } from "@/components/barber/appointments-panel"
 import { prisma } from "@/lib/db/prisma";
 import { getBarberMonthlyCommission } from "@/lib/commissions/barber-monthly-commission";
 import Link from "next/link";
+import { RIYADH_TIME_ZONE } from "@/lib/datetime/riyadh";
 
 export default async function BarberHomePage() {
   const session = await getRequestSession();
@@ -187,7 +188,7 @@ export default async function BarberHomePage() {
                       <span className="font-black tabular-nums text-salon-forest">{formatMoney(visit.netAmount)}</span>
                     </div>
                     <p className="mt-1 text-xs font-semibold text-salon-charcoal/75">
-                      {visit.paymentMethod === "CASH" ? "كاش" : "شبكة"} - {new Date(visit.visitedAt).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}
+                      {visit.paymentMethod === "CASH" ? "كاش" : "شبكة"} - {new Date(visit.visitedAt).toLocaleTimeString("ar-SA", { timeZone: RIYADH_TIME_ZONE, hour: "2-digit", minute: "2-digit" })}
                     </p>
                   </div>
                 ))}

@@ -125,7 +125,11 @@ export function BarberNotificationCenter() {
     setBusy(true);
     setFeedback(null);
     try {
-      const permission = await Notification.requestPermission();
+      const permission = await withTimeout(
+        Notification.requestPermission(),
+        30_000,
+        "انتهت مهلة إذن التنبيهات — حاول مجددًا",
+      );
       if (permission !== "granted") {
         setState("denied");
         return;
@@ -134,7 +138,7 @@ export function BarberNotificationCenter() {
       const registration =
         (await navigator.serviceWorker.getRegistration("/barber")) ??
         (await navigator.serviceWorker.register("/barber-sw.js", { scope: "/barber" }));
-      await navigator.serviceWorker.ready;
+      await waitForActiveWorker(registration);
 
       const existing = await registration.pushManager.getSubscription();
       const subscription =
@@ -279,4 +283,49 @@ function urlBase64ToUint8Array(value: string) {
   const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
   const raw = window.atob(base64);
   return Uint8Array.from([...raw].map((character) => character.charCodeAt(0)));
+}
+
+async function waitForActiveWorker(registration: ServiceWorkerRegistration) {
+  if (registration.active) return;
+  const worker = registration.installing ?? registration.waiting;
+  if (!worker) throw new Error("تعذر تشغيل خدمة التنبيهات — أعد تحميل الصفحة وحاول مجددًا");
+
+  await new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(
+      () => finish(new Error("استغرق تشغيل خدمة التنبيهات وقتًا طويلًا — أعد المحاولة")),
+      15_000,
+    );
+
+    function finish(error?: Error) {
+      clearTimeout(timeout);
+      worker?.removeEventListener("statechange", onStateChange);
+      if (error) reject(error);
+      else resolve();
+    }
+
+    function onStateChange() {
+      if (worker?.state === "activated" || registration.active) {
+        finish();
+      } else if (worker?.state === "redundant") {
+        finish(new Error("تعذر تشغيل خدمة التنبيهات — أعد تحميل الصفحة وحاول مجددًا"));
+      }
+    }
+
+    worker.addEventListener("statechange", onStateChange);
+    onStateChange();
+  });
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string) {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => reject(new Error(message)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
 }

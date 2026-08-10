@@ -4,6 +4,7 @@ import {
   getBarberRescheduleOptions,
   rescheduleBarberAppointment,
 } from "../lib/appointments/barber-reschedule";
+import { addRiyadhDays, riyadhDateTimeForDay, toRiyadhDateKey } from "../lib/datetime/riyadh";
 
 const prisma = new PrismaClient();
 const suffix = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
@@ -57,14 +58,10 @@ describe("barber appointment rescheduling", () => {
       },
     });
 
-    const day = new Date();
-    day.setDate(day.getDate() + 1);
-    day.setHours(18, 0, 0, 0);
-    oldStart = new Date(day);
-    blockedStart = new Date(day);
-    blockedStart.setHours(19, 30, 0, 0);
-    newStart = new Date(day);
-    newStart.setHours(20, 0, 0, 0);
+    const day = addRiyadhDays(new Date(), 1);
+    oldStart = riyadhDateTimeForDay(day, 18 * 60);
+    blockedStart = riyadhDateTimeForDay(day, 19 * 60 + 30);
+    newStart = riyadhDateTimeForDay(day, 20 * 60);
 
     const appointment = await prisma.appointment.create({
       data: {
@@ -99,7 +96,7 @@ describe("barber appointment rescheduling", () => {
 
   it("shows only valid slots while excluding the appointment being moved", async () => {
     const options = await getBarberRescheduleOptions(prisma, scope());
-    const day = options.days.find((item) => item.date === localDateKey(oldStart));
+    const day = options.days.find((item) => item.date === toRiyadhDateKey(oldStart));
 
     expect(day?.slots.find((slot) => slot.minuteOfDay === 18 * 60)?.status).toBe("AVAILABLE");
     // مدة الموعد ساعة؛ لذلك 19:00 يتداخل مع حجز 19:30.
@@ -135,10 +132,3 @@ function scope() {
   return { organizationId, salonId, barberId, appointmentId };
 }
 
-function localDateKey(value: Date) {
-  return [
-    value.getFullYear(),
-    String(value.getMonth() + 1).padStart(2, "0"),
-    String(value.getDate()).padStart(2, "0"),
-  ].join("-");
-}

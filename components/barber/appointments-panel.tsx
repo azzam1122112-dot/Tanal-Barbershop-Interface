@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/icons";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { buildAppointmentWhatsAppMessage } from "@/lib/appointments/barber-contact";
 import { toSaudiWhatsAppPhone } from "@/lib/phone/saudi-phone";
 import { BarberRescheduleDialog } from "@/components/barber/reschedule-dialog";
+import { isSameRiyadhDay, RIYADH_TIME_ZONE } from "@/lib/datetime/riyadh";
 
 type AppointmentStatus = "BOOKED" | "ARRIVED" | "CANCELLED" | "NO_SHOW";
 
@@ -22,10 +23,12 @@ export type BarberAppointment = {
 };
 
 const timeFormatter = new Intl.DateTimeFormat("ar-SA", {
+  timeZone: RIYADH_TIME_ZONE,
   hour: "2-digit",
   minute: "2-digit",
 });
 const messageDateFormatter = new Intl.DateTimeFormat("ar-SA", {
+  timeZone: RIYADH_TIME_ZONE,
   weekday: "long",
   day: "numeric",
   month: "long",
@@ -47,7 +50,35 @@ export function BarberAppointmentsPanel({
   const [toast, setToast] = useState<ToastState | null>(null);
   const [rescheduling, setRescheduling] = useState<BarberAppointment | null>(null);
   const [rescheduleShare, setRescheduleShare] = useState<BarberAppointment | null>(null);
+  const pendingIdRef = useRef<string | null>(null);
   const { confirm, confirmDialog } = useConfirm();
+
+  const refreshAppointments = useCallback(async () => {
+    if (document.visibilityState === "hidden" || pendingIdRef.current) return;
+    try {
+      const response = await fetch("/api/barber/appointments", { cache: "no-store" });
+      const data = (await response.json().catch(() => ({}))) as {
+        appointments?: BarberAppointment[];
+      };
+      if (response.ok && data.appointments) setAppointments(data.appointments);
+    } catch {
+      // التحديث التالي يعيد المحاولة؛ لا نزعج الحلاق بتنبيه خطأ كل عدة ثوانٍ.
+    }
+  }, []);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => void refreshAppointments(), 10_000);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") void refreshAppointments();
+    };
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [refreshAppointments]);
 
   function onRescheduled(changed: BarberAppointment) {
     setAppointments((current) => {
@@ -81,6 +112,7 @@ export function BarberAppointmentsPanel({
     }
 
     setPendingId(appointment.id);
+    pendingIdRef.current = appointment.id;
     setToast(null);
     try {
       const response = await fetch(`/api/barber/appointments/${appointment.id}`, {
@@ -117,6 +149,7 @@ export function BarberAppointmentsPanel({
       setToast({ message: "تعذر الاتصال بالخادم، حاول مرة أخرى", tone: "error" });
     } finally {
       setPendingId(null);
+      pendingIdRef.current = null;
     }
   }
 
@@ -135,7 +168,7 @@ export function BarberAppointmentsPanel({
       <div className="barber-card-head flex items-center justify-between gap-3">
         <div>
           <h2 className="font-bold text-salon-ink">مواعيدك اليوم</h2>
-          <p className="mt-1 text-xs font-semibold text-salon-charcoal/60">حدّث حالة كل حجز مباشرة</p>
+          <p className="mt-1 text-xs font-semibold text-salon-charcoal/60">تتحدّث تلقائيًا كل 10 ثوانٍ</p>
         </div>
         <span className="rounded-full bg-salon-forest px-3 py-1 text-xs font-black text-white">
           {appointments.length}
@@ -177,7 +210,7 @@ export function BarberAppointmentsPanel({
             <Icon name="check" className="h-6 w-6" />
           </span>
           <p className="mt-3 text-sm font-bold text-salon-ink">لا توجد حجوزات نشطة الآن</p>
-          <p className="mt-1 text-xs font-semibold text-salon-charcoal/60">ستظهر الحجوزات الجديدة هنا تلقائيًا عند تحديث الصفحة.</p>
+          <p className="mt-1 text-xs font-semibold text-salon-charcoal/60">ستظهر الحجوزات الجديدة هنا تلقائيًا خلال ثوانٍ.</p>
         </div>
       ) : (
         <div className="divide-y divide-salon-line/70">
@@ -306,11 +339,5 @@ function buildWhatsAppUrl(appointment: BarberAppointment, barberName: string, sa
 }
 
 function isToday(startAt: string) {
-  const value = new Date(startAt);
-  const today = new Date();
-  return (
-    value.getFullYear() === today.getFullYear() &&
-    value.getMonth() === today.getMonth() &&
-    value.getDate() === today.getDate()
-  );
+  return isSameRiyadhDay(new Date(startAt), new Date());
 }

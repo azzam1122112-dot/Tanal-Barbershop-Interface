@@ -6,6 +6,7 @@ import { dashboardScope } from "@/lib/auth/salon-scope";
 import { getRequestSession } from "@/lib/auth/http";
 import { prisma } from "@/lib/db/prisma";
 import { listAppointments } from "@/lib/appointments/appointment-service";
+import { toRiyadhDateKey } from "@/lib/datetime/riyadh";
 
 export default async function AppointmentsPage({
   searchParams,
@@ -71,6 +72,5 @@ export default async function AppointmentsPage({
 }
 
 function toDateInput(date: Date) {
-  const offset = date.getTimezoneOffset();
-  return new Date(date.getTime() - offset * 60 * 1000).toISOString().slice(0, 10);
+  return toRiyadhDateKey(date);
 }
