@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getCustomerPortalView } from "@/lib/customers/customer-portal";
 import { PortalBooking } from "@/components/public/portal-booking";
 import { PortalInstall } from "@/components/public/portal-install";
+import { CustomerPrivacyRequest } from "@/components/public/customer-privacy-request";
 
 /**
  * البيان يُحقن عبر `metadata` لا كوسم `<link>` في الجسم: الوسم اليدوي **يُضاف**
@@ -114,6 +115,7 @@ export default async function CustomerPortalPage({ params }: { params: Promise<{
             token={token}
             salons={view.bookableSalons}
             initialAppointments={view.appointments}
+            bookingPolicy={view.bookingPolicy}
           />
         ) : null}
 
@@ -140,6 +142,8 @@ export default async function CustomerPortalPage({ params }: { params: Promise<{
         </section>
 
         <PortalInstall />
+
+        <CustomerPrivacyRequest token={token} initialRequests={view.dataSubjectRequests} />
 
         <p className="pb-4 text-center text-xs font-semibold text-salon-charcoal/70">
           هذا الرابط خاص بك — لا تشاركه مع أحد.

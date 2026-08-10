@@ -36,7 +36,7 @@ describe("cash sessions", () => {
     const service = await prisma.service.create({
       data: {
         organizationId: "org_default",
-        salonId: "salon_default", name: `خدمة جلسة صندوق ${Date.now()}`, defaultPrice: 50, isActive: true, sortOrder: 700 },
+        salonId: "salon_default", name: `خدمة جلسة صندوق ${Date.now()}`, defaultPrice: 60, isActive: true, sortOrder: 700 },
     });
     serviceId = service.id;
     createdServiceIds.push(serviceId);

@@ -176,12 +176,42 @@ export async function getCashSessionSummary(prisma: CashSessionPrisma, organizat
   ]);
   const openByBarber = new Map(openSessions.map((session) => [session.barberId, session]));
 
-  // كل جلسة مفتوحة تحتاج استعلاميها (لقطة الإجماليات + مجموع المصروفات).
-  // احسبها مرة واحدة للجلسات المفتوحة فقط وبالتوازي — لا داخل حلقة على كل الحلاقين،
-  // وإلا صار العدد استعلامًا متسلسلًا لكل حلاق ونما مع حجم الفريق.
-  const openRowEntries = await Promise.all(
-    openSessions.map(async (session) => [session.barberId, await toCashSessionRow(prisma, session)] as const),
+  // لقطة واحدة لكل الزيارات وتجميع واحد لكل المصروفات بدل استعلامين إضافيين
+  // لكل جلسة مفتوحة. عدد الاستعلامات الآن ثابت مهما كبر الفريق.
+  const openSessionIds = openSessions.map((session) => session.id);
+  const [openVisits, expenseGroups] = openSessionIds.length > 0
+    ? await Promise.all([
+        prisma.visit.findMany({
+          where: { cashSessionId: { in: openSessionIds }, status: "COMPLETED" },
+          include: { loyaltyTransactions: true },
+        }),
+        prisma.cashExpense.groupBy({
+          by: ["cashSessionId"],
+          where: { cashSessionId: { in: openSessionIds } },
+          _sum: { amount: true },
+        }),
+      ])
+    : [[], []];
+  const visitsBySession = new Map<string, typeof openVisits>();
+  for (const visit of openVisits) {
+    if (!visit.cashSessionId) continue;
+    const rows = visitsBySession.get(visit.cashSessionId) ?? [];
+    rows.push(visit);
+    visitsBySession.set(visit.cashSessionId, rows);
+  }
+  const expensesBySession = new Map(
+    expenseGroups
+      .filter((row) => row.cashSessionId)
+      .map((row) => [row.cashSessionId!, Number(row._sum.amount ?? 0)]),
   );
+  const openRowEntries = openSessions.map((session) => [
+    session.barberId,
+    toCashSessionRowFromTotals(
+      session,
+      aggregateVisitTotals(visitsBySession.get(session.id) ?? []),
+      expensesBySession.get(session.id) ?? 0,
+    ),
+  ] as const);
   const openRowByBarber = new Map(openRowEntries);
 
   return barbers.map((barber) => {
@@ -234,6 +264,14 @@ async function toCashSessionRow(
   // الجلسة المفتوحة تُحسب مصروفاتها لحظيًا؛ المغلقة تعتمد اللقطة المحفوظة.
   const expensesTotal =
     session.status === "OPEN" ? await sumSessionExpenses(prisma, session.id) : Number(session.expensesTotal);
+  return toCashSessionRowFromTotals(session, totals, expensesTotal);
+}
+
+function toCashSessionRowFromTotals(
+  session: Prisma.CashSessionGetPayload<{ include: { barber: true; closedBy: true } }>,
+  totals: ReturnType<typeof aggregateVisitTotals>,
+  expensesTotal: number,
+) {
   const expectedCash = roundMoney(totals.cashTotal - expensesTotal);
   return {
     id: session.id,
@@ -298,7 +336,9 @@ async function runSerializableTransaction<T>(prisma: PrismaClient, callback: (tx
   const maxAttempts = 3;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
-      return await prisma.$transaction(callback);
+      return await prisma.$transaction(callback, {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      });
     } catch (error) {
       if (!isSerializableWriteConflict(error) || attempt === maxAttempts) {
         throw error;

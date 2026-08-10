@@ -1,0 +1,11 @@
+[Unit]
+Description=Run XMANSX privacy retention cleanup daily
+
+[Timer]
+OnCalendar=*-*-* 02:10:00 Asia/Riyadh
+RandomizedDelaySec=600
+Persistent=true
+Unit=xmansx-maintenance.service
+
+[Install]
+WantedBy=timers.target

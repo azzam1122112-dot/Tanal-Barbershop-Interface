@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { requireDashboardApi } from "@/lib/auth/http";
+import { requireLoyaltyOperatorApi } from "@/lib/auth/http";
 import { toCustomerDashboardRow } from "@/lib/customers/customer-summary";
 
 export async function GET(request: Request) {
-  const auth = await requireDashboardApi();
+  const auth = await requireLoyaltyOperatorApi();
   if (auth.response) return auth.response;
   const session = auth.session;
   if (!session || session.type !== "dashboard") {

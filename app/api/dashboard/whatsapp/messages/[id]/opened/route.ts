@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { toErrorResponse } from "@/lib/http/error-response";
 import { getRequestMeta, requireLoyaltyOperatorApi } from "@/lib/auth/http";
 import { prisma } from "@/lib/db/prisma";
 import { markWhatsAppMessageOpened } from "@/lib/whatsapp/whatsapp-service";
@@ -18,7 +19,7 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
       ...(await getRequestMeta()),
     });
     return NextResponse.json({ message, waUrl: message.waUrl });
-  } catch {
-    return NextResponse.json({ message: "تعذر تحديث حالة فتح واتساب" }, { status: 400 });
+  } catch (error) {
+    return toErrorResponse(error, "تعذر فتح واتساب");
   }
 }

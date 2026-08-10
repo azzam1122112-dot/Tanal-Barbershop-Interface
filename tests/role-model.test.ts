@@ -36,10 +36,10 @@ const supervisor = session({
 });
 
 describe("نموذج الأدوار: من يضبط سياسة الولاء ومن يشغّلها", () => {
-  it("يسمح للمالك والمدير والمشرف بتشغيل برنامج الولاء", () => {
+  it("يقصر تشغيل العملاء والحملات والرسائل على المالك والمدير", () => {
     expect(canOperateLoyalty(owner)).toBe(true);
     expect(canOperateLoyalty(admin)).toBe(true);
-    expect(canOperateLoyalty(supervisor)).toBe(true);
+    expect(canOperateLoyalty(supervisor)).toBe(false);
     expect(canOperateLoyalty(null)).toBe(false);
   });
 

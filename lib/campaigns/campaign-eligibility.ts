@@ -27,17 +27,20 @@ export function computeCampaignDiscount(campaign: Pick<Campaign, "discountType" 
 
 export async function getAvailableCampaigns({
   prisma,
+  organizationId,
   customer,
   grossAmount,
   now = new Date(),
 }: {
   prisma: CampaignPrisma;
+  organizationId: string;
   customer: CampaignCustomer;
   grossAmount: number;
   now?: Date;
 }) {
   const campaigns = await prisma.campaign.findMany({
     where: {
+      organizationId,
       isActive: true,
       startAt: { lte: now },
       endAt: { gte: now },
@@ -58,18 +61,20 @@ export async function getAvailableCampaigns({
 
 export async function getEligibleCampaignOrThrow({
   prisma,
+  organizationId,
   campaignId,
   customer,
   grossAmount,
   now = new Date(),
 }: {
   prisma: CampaignPrisma;
+  organizationId: string;
   campaignId: string;
   customer: CampaignCustomer;
   grossAmount: number;
   now?: Date;
 }) {
-  const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
+  const campaign = await prisma.campaign.findFirst({ where: { id: campaignId, organizationId } });
   if (!campaign) {
     throw new BusinessError("الحملة غير متاحة");
   }

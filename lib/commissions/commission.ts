@@ -25,19 +25,23 @@ export type CommissionLineResult<TLine extends CommissionLineInput = CommissionL
  *   ولا على خصم لم يدفعه العميل.
  * - أسبقية النسبة: نسبة الخدمة ← نسبة الحلاق ← النسبة الافتراضية للفرع.
  * - الوعاء يُوزَّع على الخدمات بنسبة قيمة كل سطر، فتُطبَّق نسبة كل خدمة على حصتها فقط.
+ * - عند تعطيل عمولة الحلاق تصبح كل النسب صفرًا، بما فيها نسبة الخدمة.
  */
 export function calculateVisitCommission<TLine extends CommissionLineInput>(input: {
   lines: TLine[];
   /** المبلغ بعد الخصم وقبل الضريبة. */
   commissionBase: number;
+  /** بوابة العمولة للحلاق. القيمة الافتراضية true للتوافق مع الاستدعاءات القديمة. */
+  enabled?: boolean;
   barberRate?: number | null;
   defaultRate?: number | null;
 }): { totalCommission: number; lines: CommissionLineResult<TLine>[] } {
-  const fallbackRate = clampRate(input.barberRate ?? input.defaultRate ?? 0);
+  const enabled = input.enabled !== false;
+  const fallbackRate = enabled ? clampRate(input.barberRate ?? input.defaultRate ?? 0) : 0;
   const linesTotal = round(input.lines.reduce((total, line) => total + line.lineTotal, 0));
 
   const lines = input.lines.map((line) => {
-    const commissionRate = clampRate(line.serviceRate ?? input.barberRate ?? input.defaultRate ?? 0);
+    const commissionRate = enabled ? clampRate(line.serviceRate ?? input.barberRate ?? input.defaultRate ?? 0) : 0;
     // بلا قيمة للسطور (خدمات مجانية) نوزّع بالتساوي بدل القسمة على صفر.
     const share =
       linesTotal > 0

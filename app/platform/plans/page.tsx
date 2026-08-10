@@ -7,7 +7,7 @@ export default async function PlatformPlansPage() {
   const plans = await listPlans(prisma);
 
   return (
-    <PlatformShell active="plans" title="الباقات والحدود" description="عرّف باقات الاشتراك وحدودها (عدد الفروع والحلاقين)، ثم أسندها للمؤسسات.">
+    <PlatformShell active="plans" title="إدارة الباقات والتسعير" description="أنشئ الباقات وأسعارها ومزاياها وحدودها، وتحكم بما يُنشر تلقائيًا في صفحة الهبوط وصفحة اشتراك العملاء.">
       <PlatformPlans initialPlans={plans} />
     </PlatformShell>
   );

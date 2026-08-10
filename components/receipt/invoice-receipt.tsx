@@ -32,11 +32,7 @@ export function InvoiceReceipt({ receipt, backHref }: { receipt: ReceiptData; ba
           <p className="mt-3 inline-block rounded-md border border-salon-line px-3 py-1 text-xs font-bold">
             {receipt.documentTitle}
           </p>
-          {receipt.isTaxInvoice && seller.vatNumber ? (
-            <p className="mt-2 text-xs font-semibold tabular-nums text-salon-charcoal">
-              الرقم الضريبي: <span dir="ltr">{seller.vatNumber}</span>
-            </p>
-          ) : null}
+          <p className="mt-2 text-[10px] font-semibold text-salon-charcoal">إيصال تشغيلي - ليس فاتورة ضريبية ولا مستند ZATCA</p>
         </header>
 
         {receipt.status === "CANCELLED" ? (
@@ -97,17 +93,6 @@ export function InvoiceReceipt({ receipt, backHref }: { receipt: ReceiptData; ba
             ) : null}
             <Row label="رصيد النقاط الحالي" value={formatNumber(receipt.loyalty.balance)} />
           </dl>
-        ) : null}
-
-        {receipt.qrSvg ? (
-          <div className="mt-5 flex flex-col items-center gap-2">
-            <div
-              className="receipt-qr h-[120px] w-[120px]"
-              // الرمز SVG مبني على الخادم من بيانات الفاتورة فقط — لا مدخلات مستخدم حرة.
-              dangerouslySetInnerHTML={{ __html: receipt.qrSvg }}
-            />
-            <p className="text-[10px] font-semibold text-salon-charcoal">امسح الرمز للتحقق من الفاتورة</p>
-          </div>
         ) : null}
 
         <footer className="mt-6 border-t border-dashed border-salon-line pt-4 text-center text-[11px] font-semibold text-salon-charcoal">

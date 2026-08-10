@@ -55,9 +55,37 @@ const MODE_PRESETS = {
 } as const;
 
 export function categoryForTemplate(type?: WhatsAppTemplateType | null): WhatsAppMessageCategory {
-  if (type === "CAMPAIGN" || type === "INACTIVE_CUSTOMER" || type === "REWARD_READY") return "MARKETING";
+  if (type === "CAMPAIGN" || type === "INACTIVE_CUSTOMER" || type === "REWARD_READY" || type === "CUSTOM") return "MARKETING";
   if (type === "POST_VISIT") return "TRANSACTIONAL";
   return "SERVICE";
+}
+
+export async function assertWhatsAppConsentForCategory(
+  prisma: PrismaClient,
+  input: {
+    organizationId: string;
+    customer: Pick<Customer, "id" | "whatsappOptIn" | "whatsappTransactionalOptIn" | "whatsappMarketingOptIn">;
+    category: WhatsAppMessageCategory;
+  },
+) {
+  const settings = await getWhatsAppSafetySettings(prisma, input.organizationId);
+  const consentAllowed = input.category === "MARKETING"
+    ? input.customer.whatsappMarketingOptIn
+    : input.customer.whatsappTransactionalOptIn;
+
+  if (!input.customer.whatsappOptIn || !consentAllowed) {
+    throw new BusinessError(
+      input.category === "MARKETING"
+        ? "لا يمكن الإرسال: العميل لم يوافق على الرسائل التسويقية"
+        : "لا يمكن الإرسال: العميل لم يوافق على رسائل الخدمة والمعاملات",
+      409,
+    );
+  }
+  if (input.category === "MARKETING" && settings.marketingPaused) {
+    throw new BusinessError("لا يمكن الإرسال: الحملات التسويقية متوقفة من مركز حماية واتساب", 409);
+  }
+
+  return settings;
 }
 
 export async function getWhatsAppSafetySettings(prisma: PrismaClient, organizationId: string) {
@@ -110,22 +138,7 @@ export async function evaluateWhatsAppPolicy(
   },
 ) {
   const now = input.now ?? new Date();
-  const settings = await getWhatsAppSafetySettings(prisma, input.organizationId);
-  const consentAllowed = input.category === "MARKETING"
-    ? input.customer.whatsappMarketingOptIn
-    : input.customer.whatsappTransactionalOptIn;
-
-  if (!input.customer.whatsappOptIn || !consentAllowed) {
-    throw new BusinessError(
-      input.category === "MARKETING"
-        ? "لا توجد موافقة تسويقية صريحة لهذا العميل"
-        : "لا توجد موافقة على رسائل الخدمة لهذا العميل",
-      409,
-    );
-  }
-  if (input.category === "MARKETING" && settings.marketingPaused) {
-    throw new BusinessError("الحملات التسويقية متوقفة من مركز حماية واتساب", 409);
-  }
+  const settings = await assertWhatsAppConsentForCategory(prisma, input);
 
   const since24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const since30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);

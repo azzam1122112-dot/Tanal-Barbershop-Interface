@@ -1,0 +1,18 @@
+[Unit]
+Description=XMANSX privacy retention and maintenance cleanup
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=xmansx
+Group=xmansx
+WorkingDirectory=/srv/xmansx/current
+EnvironmentFile=/etc/xmansx/xmansx.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/npm run maintenance:cleanup
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/xmansx/current/.next /var/tmp

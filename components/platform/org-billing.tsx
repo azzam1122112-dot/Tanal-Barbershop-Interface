@@ -18,7 +18,7 @@ type Invoice = {
   periodEnd: string | null;
 };
 
-type PlanOption = { id: string; name: string; priceMonthly: number };
+type PlanOption = { id: string; name: string; priceMonthly: number; priceYearly: number | null };
 
 /**
  * تسجيل دفعات الاشتراك المحصّلة يدويًا (تحويل بنكي/نقدًا).
@@ -46,7 +46,11 @@ export function OrgBilling({
   const { confirm, confirmDialog } = useConfirm();
 
   const selectedPlan = plans.find((plan) => plan.id === planId);
-  const suggestedAmount = selectedPlan ? selectedPlan.priceMonthly * months : 0;
+  const suggestedAmount = selectedPlan
+    ? months % 12 === 0 && selectedPlan.priceYearly !== null
+      ? selectedPlan.priceYearly * (months / 12)
+      : selectedPlan.priceMonthly * months
+    : 0;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -108,8 +112,42 @@ export function OrgBilling({
     setPendingId(null);
   }
 
+  async function reviewRequest(invoice: Invoice, action: "APPROVE" | "REJECT") {
+    const confirmed = await confirm({
+      title: action === "APPROVE" ? "اعتماد التحويل وتفعيل الاشتراك؟" : "رفض طلب الدفع؟",
+      description:
+        action === "APPROVE"
+          ? `سيتم تفعيل باقة ${invoice.planName ?? "المحددة"} وتمديد الاشتراك ${invoice.periodMonths} شهر.`
+          : "سيظهر الطلب للعميل كمرفوض ولن تتغير باقته الحالية.",
+      confirmLabel: action === "APPROVE" ? "اعتماد وتفعيل" : "رفض الطلب",
+      tone: action === "APPROVE" ? "default" : "danger",
+    });
+    if (!confirmed) return;
+
+    setPendingId(invoice.id);
+    const response = await fetch(`/api/platform/organizations/${organizationId}/payments/${invoice.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, reason: action === "REJECT" ? "تعذر التحقق من التحويل" : null }),
+    });
+    const data = (await response.json().catch(() => ({}))) as { invoice?: Invoice; message?: string };
+    if (response.ok) {
+      setInvoices((current) =>
+        current.map((item) =>
+          item.id === invoice.id
+            ? data.invoice ?? { ...item, status: "CANCELLED" as const, note: "تعذر التحقق من التحويل" }
+            : item,
+        ),
+      );
+      setMessage({ text: data.message ?? "تمت مراجعة الطلب", tone: "success" });
+    } else {
+      setMessage({ text: data.message ?? "تعذر مراجعة الطلب", tone: "error" });
+    }
+    setPendingId(null);
+  }
+
   return (
-    <section className="dashboard-panel mt-6 overflow-hidden">
+    <section id="billing" className="dashboard-panel mt-6 scroll-mt-24 overflow-hidden">
       {confirmDialog}
       <div className="flex items-center gap-2.5 border-b border-salon-line/70 px-5 py-4">
         <span className="h-4 w-1 rounded-full bg-gradient-to-b from-salon-gold to-[#8f6c39]" aria-hidden="true" />
@@ -209,6 +247,7 @@ export function OrgBilling({
               <th>تغطي حتى</th>
               <th>الطريقة</th>
               <th>المرجع</th>
+              <th>الحالة</th>
               <th></th>
             </tr>
           </thead>
@@ -225,9 +264,15 @@ export function OrgBilling({
                   {invoice.reference ?? "-"}
                 </td>
                 <td className="px-4 py-3">
-                  {invoice.status === "CANCELLED" ? (
-                    <span className="text-xs font-bold text-salon-ruby">ملغاة</span>
-                  ) : (
+                  <InvoiceStatus status={invoice.status} />
+                </td>
+                <td className="px-4 py-3">
+                  {invoice.status === "PENDING" ? (
+                    <div className="flex gap-2">
+                      <button type="button" disabled={pendingId === invoice.id} onClick={() => void reviewRequest(invoice, "APPROVE")} className="rounded-lg bg-green-700 px-3 py-1.5 text-xs font-bold text-white">اعتماد</button>
+                      <button type="button" disabled={pendingId === invoice.id} onClick={() => void reviewRequest(invoice, "REJECT")} className="dashboard-danger-button px-3 py-1.5 text-xs">رفض</button>
+                    </div>
+                  ) : invoice.status === "PAID" ? (
                     <button
                       type="button"
                       disabled={pendingId === invoice.id}
@@ -236,7 +281,7 @@ export function OrgBilling({
                     >
                       إلغاء
                     </button>
-                  )}
+                  ) : null}
                 </td>
               </tr>
             ))}
@@ -248,4 +293,16 @@ export function OrgBilling({
       </div>
     </section>
   );
+}
+
+function InvoiceStatus({ status }: { status: Invoice["status"] }) {
+  const labels: Record<Invoice["status"], string> = {
+    PENDING: "قيد المراجعة",
+    PAID: "مدفوعة",
+    FAILED: "فشلت",
+    REFUNDED: "مستردة",
+    CANCELLED: "ملغاة/مرفوضة",
+  };
+  const style = status === "PAID" ? "bg-green-50 text-green-700" : status === "PENDING" ? "bg-amber-50 text-amber-800" : "bg-red-50 text-red-700";
+  return <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${style}`}>{labels[status]}</span>;
 }

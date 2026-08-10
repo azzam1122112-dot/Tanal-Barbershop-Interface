@@ -78,11 +78,22 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   }
 
   const isTransfer = Boolean(parsed.data.salonId && parsed.data.salonId !== before.salonId);
+  const mustRevokeSessions = Boolean(
+    isTransfer ||
+      (parsed.data.isActive !== undefined && parsed.data.isActive !== before.isActive) ||
+      (parsed.data.phone && parsed.data.phone !== before.phone),
+  );
 
   try {
-    const barber = await prisma.barber.update({
-      where: { id },
-      data: parsed.data,
+    const barber = await prisma.$transaction(async (tx) => {
+      const updated = await tx.barber.update({ where: { id }, data: parsed.data });
+      if (mustRevokeSessions) {
+        await tx.session.updateMany({
+          where: { barberId: id, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+      }
+      return updated;
     });
 
     const meta = await getRequestMeta();

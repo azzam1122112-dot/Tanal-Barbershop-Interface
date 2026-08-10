@@ -1,0 +1,69 @@
+rules:
+  - id: xmansx-no-eval
+    message: Dynamic code execution is forbidden.
+    severity: ERROR
+    languages: [typescript, javascript]
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: new Function(...)
+
+  - id: xmansx-no-unsafe-prisma-raw
+    message: Unsafe Prisma raw SQL can create SQL injection; use tagged templates.
+    severity: ERROR
+    languages: [typescript, javascript]
+    pattern-either:
+      - pattern: $DB.$queryRawUnsafe(...)
+      - pattern: $DB.$executeRawUnsafe(...)
+
+  - id: xmansx-no-dom-innerhtml-assignment
+    message: Direct innerHTML assignment can create DOM XSS.
+    severity: ERROR
+    languages: [typescript, javascript]
+    pattern: $ELEMENT.innerHTML = $VALUE
+
+  - id: xmansx-no-weak-password-hash
+    message: MD5/SHA-1 must not be used for passwords or general integrity.
+    severity: ERROR
+    languages: [typescript, javascript]
+    patterns:
+      - pattern: crypto.createHash($ALGORITHM)
+      - metavariable-regex:
+          metavariable: $ALGORITHM
+          regex: "['\"](?:md5|sha1)['\"]"
+
+  - id: xmansx-no-public-secrets
+    message: Secrets must never be exposed through NEXT_PUBLIC environment variables.
+    severity: ERROR
+    languages: [typescript, javascript]
+    patterns:
+      - pattern: process.env.$VARIABLE
+      - metavariable-regex:
+          metavariable: $VARIABLE
+          regex: "NEXT_PUBLIC_.*(?:SECRET|TOKEN|PASSWORD|PRIVATE|API_KEY).*"
+
+  - id: xmansx-no-wildcard-credentialed-cors
+    message: Credentialed CORS must not use a wildcard origin.
+    severity: ERROR
+    languages: [typescript, javascript]
+    patterns:
+      - pattern-inside: |
+          $HEADERS = { ... }
+      - pattern: "'Access-Control-Allow-Origin': '*'"
+
+  - id: xmansx-no-shell-request-data
+    message: Never pass request-controlled data to shell execution.
+    severity: ERROR
+    languages: [typescript, javascript]
+    patterns:
+      - pattern-either:
+          - pattern: exec($DATA, ...)
+          - pattern: execSync($DATA, ...)
+      - pattern-inside: |
+          $DATA = await $REQUEST.$METHOD(...)
+          ...
+
+  - id: xmansx-no-plaintext-portal-token-field
+    message: Customer portal tokens must be stored only as hashes.
+    severity: ERROR
+    languages: [typescript, javascript]
+    pattern: "portalToken: $VALUE"

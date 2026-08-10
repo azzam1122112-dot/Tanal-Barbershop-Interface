@@ -98,6 +98,15 @@ export function AppointmentsManager({
 
     if (response.ok && data.appointment) {
       setAppointments((current) => current.map((item) => (item.id === appointment.id ? data.appointment! : item)));
+      setToast({
+        message:
+          status === "NO_SHOW"
+            ? "تم تسجيل عدم الحضور. المخالفة الثانية تعلّق الحجز الإلكتروني للعميل."
+            : reason === "تصحيح حالة عدم الحضور"
+              ? "تم تصحيح الحالة وإعادة احتساب أهلية العميل للحجز."
+              : "تم تحديث حالة الموعد",
+        tone: "success",
+      });
     } else {
       setToast({ message: data.message ?? "تعذر تحديث الموعد", tone: "error" });
     }
@@ -113,6 +122,27 @@ export function AppointmentsManager({
     });
     if (!confirmed) return;
     await setStatus(appointment, "CANCELLED");
+  }
+
+  async function markNoShow(appointment: Appointment) {
+    const confirmed = await confirm({
+      title: `تسجيل عدم حضور ${appointment.customerName}؟`,
+      description: "ستُحتسب مخالفة على العميل. عند عدم الحضور لموعدين يُعلَّق حجزه الإلكتروني تلقائيًا.",
+      confirmLabel: "تسجيل عدم الحضور",
+      tone: "danger",
+    });
+    if (!confirmed) return;
+    await setStatus(appointment, "NO_SHOW");
+  }
+
+  async function correctNoShow(appointment: Appointment) {
+    const confirmed = await confirm({
+      title: `تصحيح حالة ${appointment.customerName}؟`,
+      description: "ستُحذف هذه المخالفة من عدّاد عدم الحضور، وقد يُعاد تفعيل حجز العميل تلقائيًا.",
+      confirmLabel: "تصحيح الحالة",
+    });
+    if (!confirmed) return;
+    await setStatus(appointment, "CANCELLED", "تصحيح حالة عدم الحضور");
   }
 
   return (
@@ -221,7 +251,16 @@ export function AppointmentsManager({
                   </p>
                 </div>
 
-                {closed ? null : (
+                {appointment.status === "NO_SHOW" ? (
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={() => void correctNoShow(appointment)}
+                    className="dashboard-button-soft px-3 py-2 text-xs"
+                  >
+                    تصحيح الحالة
+                  </button>
+                ) : closed ? null : (
                   <div className="flex flex-wrap gap-2">
                     {appointment.status === "BOOKED" ? (
                       <button
@@ -236,7 +275,7 @@ export function AppointmentsManager({
                     <button
                       type="button"
                       disabled={isPending}
-                      onClick={() => void setStatus(appointment, "NO_SHOW")}
+                      onClick={() => void markNoShow(appointment)}
                       className="dashboard-button-soft px-3 py-2 text-xs"
                     >
                       لم يحضر

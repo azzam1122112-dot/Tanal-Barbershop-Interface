@@ -25,7 +25,7 @@ export async function POST(request: Request) {
   }
 
   const phone = parsed.data.phone;
-  const rateKey = `barber:${phone}`;
+  const rateKey = `barber:${phone}:${meta.ipAddress ?? "unknown"}`;
   const rate = await consumeRateLimit(prisma, rateKey);
   if (rate.limited) {
     await writeAuditLog({
@@ -57,7 +57,7 @@ export async function POST(request: Request) {
     where: {
       phone,
       isActive: true,
-      organizationId: scopedOrganizationId ? scopedOrganizationId : { not: null },
+      organizationId: scopedOrganizationId,
       organization: { status: "ACTIVE" },
     },
     include: { organization: { select: { id: true, name: true } } },
@@ -66,7 +66,7 @@ export async function POST(request: Request) {
   const resolution = await resolveLoginIdentity(
     candidates,
     (candidate) => verifyBarberPin(parsed.data.pin, candidate.accessPinHash),
-    (candidate) => (candidate.organization ? { id: candidate.organization.id, name: candidate.organization.name } : null),
+    (candidate) => ({ id: candidate.organization.id, name: candidate.organization.name }),
   );
 
   if (resolution.outcome === "NEEDS_CHOICE") {

@@ -6,7 +6,8 @@ import { DEFAULT_WHATSAPP_TEMPLATES } from "../lib/whatsapp/default-templates";
 
 const prisma = new PrismaClient();
 
-const requireExplicitSeedCredentials = process.env.REQUIRE_EXPLICIT_SEED_CREDENTIALS === "true";
+const requireExplicitSeedCredentials =
+  process.env.NODE_ENV === "production" || process.env.REQUIRE_EXPLICIT_SEED_CREDENTIALS === "true";
 
 // معرّفات ثابتة تطابق هجرة الترحيل backfill_default_tenant.
 const DEFAULT_PLAN_ID = "plan_starter";
@@ -17,7 +18,10 @@ function readSeedEnv(key: string, fallback: string) {
   const value = process.env[key];
 
   if (requireExplicitSeedCredentials && !value) {
-    throw new Error(`${key} is required when REQUIRE_EXPLICIT_SEED_CREDENTIALS=true`);
+    throw new Error(`${key} is required for a protected seed run`);
+  }
+  if (process.env.NODE_ENV === "production" && value === fallback) {
+    throw new Error(`${key} must not use the demo value in production`);
   }
 
   return value ?? fallback;
@@ -42,14 +46,23 @@ async function main() {
   // الباقة الافتراضية
   await prisma.plan.upsert({
     where: { id: DEFAULT_PLAN_ID },
-    update: {},
+    update: {
+      description: "باقة داخلية للتجربة المجانية وبدء المؤسسات الجديدة.",
+      isPublic: false,
+      isSignupDefault: true,
+      trialDays: 14,
+    },
     create: {
       id: DEFAULT_PLAN_ID,
       name: "البداية",
       slug: "starter",
+      description: "باقة داخلية للتجربة المجانية وبدء المؤسسات الجديدة.",
       priceMonthly: 0,
       maxSalons: 1,
       isActive: true,
+      isPublic: false,
+      isSignupDefault: true,
+      trialDays: 14,
       sortOrder: 0,
     },
   });

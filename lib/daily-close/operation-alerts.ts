@@ -1,13 +1,23 @@
 import type { PrismaClient } from "@prisma/client";
 import { getCashSessionSummary } from "@/lib/cash-sessions/cash-session-service";
 import { getTodayRange } from "@/lib/reports/dashboard-reports";
+import { getCachedJson, redisKey, setCachedJson } from "@/lib/cache/redis";
 
 export async function getOperationAlerts(prisma: PrismaClient, date: Date | string = new Date(), organizationId?: string, salonIds?: string[] | null) {
+  const normalizedDate = new Date(date);
+  const scopeKey = salonIds && salonIds.length > 0 ? [...salonIds].sort().join(",") : "all";
+  const cacheKey = organizationId
+    ? redisKey("dashboard", "operation-alerts", organizationId, scopeKey, normalizedDate.toISOString().slice(0, 10))
+    : null;
+  if (cacheKey) {
+    const cached = await getCachedJson<Awaited<ReturnType<typeof buildOperationAlerts>>>(cacheKey);
+    if (cached) return cached;
+  }
   const orgFilter = {
     ...(organizationId ? { organizationId } : {}),
     ...(salonIds && salonIds.length > 0 ? { salonId: { in: salonIds } } : {}),
   };
-  const { from, to } = getTodayRange(new Date(date));
+  const { from, to } = getTodayRange(normalizedDate);
 
   // الثلاثة مستقلة عن بعضها — لا تجعلها رحلات متتابعة إلى قاعدة البيانات.
   const [summary, zeroNetVisits, closesTodayCount] = await Promise.all([
@@ -22,6 +32,17 @@ export async function getOperationAlerts(prisma: PrismaClient, date: Date | stri
     }),
     prisma.cashSession.count({ where: { ...orgFilter, status: "CLOSED", closedAt: { gte: from, lt: to } } }),
   ]);
+  const result = buildOperationAlerts(summary, zeroNetVisits, closesTodayCount, normalizedDate);
+  if (cacheKey) await setCachedJson(cacheKey, result, dashboardCacheTtl());
+  return result;
+}
+
+function buildOperationAlerts(
+  summary: Awaited<ReturnType<typeof getCashSessionSummary>>,
+  zeroNetVisits: number,
+  closesTodayCount: number,
+  date: Date,
+) {
   const alerts = [];
 
   const openCashRows = summary.filter((row) => row.openSession && row.openSession.cashTotal > 0);
@@ -84,7 +105,7 @@ export async function getOperationAlerts(prisma: PrismaClient, date: Date | stri
   }
 
   return {
-    date: new Date(date).toISOString(),
+    date: date.toISOString(),
     openCashBarbersCount: openCashRows.length,
     unclosedCashTotal: openCashRows.reduce((total, row) => total + (row.openSession?.cashTotal ?? 0), 0),
     closesTodayCount,
@@ -94,4 +115,9 @@ export async function getOperationAlerts(prisma: PrismaClient, date: Date | stri
 
 function hoursSince(value: string) {
   return Math.floor((Date.now() - new Date(value).getTime()) / (60 * 60 * 1000));
+}
+
+function dashboardCacheTtl() {
+  const configured = Number(process.env.DASHBOARD_CACHE_TTL_SECONDS);
+  return Number.isFinite(configured) ? Math.min(30, Math.max(2, Math.trunc(configured))) : 5;
 }

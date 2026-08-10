@@ -45,10 +45,19 @@ export async function setPlatformAdminActive(
   const target = await prisma.platformAdmin.findUnique({ where: { id: targetId }, select: { id: true } });
   if (!target) throw new BusinessError("المدير غير موجود");
 
-  return prisma.platformAdmin.update({
-    where: { id: targetId },
-    data: { isActive },
-    select: { id: true, isActive: true },
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.platformAdmin.update({
+      where: { id: targetId },
+      data: { isActive },
+      select: { id: true, isActive: true },
+    });
+    if (!isActive) {
+      await tx.session.updateMany({
+        where: { platformAdminId: targetId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+    }
+    return updated;
   });
 }
 
@@ -57,6 +66,7 @@ export async function changePlatformAdminPassword(
   adminId: string,
   currentPassword: string,
   newPassword: string,
+  currentSessionId: string,
 ) {
   const admin = await prisma.platformAdmin.findUnique({ where: { id: adminId }, select: { id: true, passwordHash: true } });
   if (!admin) throw new BusinessError("المدير غير موجود");
@@ -64,6 +74,13 @@ export async function changePlatformAdminPassword(
   const ok = await verifyAdminPassword(currentPassword, admin.passwordHash);
   if (!ok) throw new BusinessError("كلمة المرور الحالية غير صحيحة");
 
-  await prisma.platformAdmin.update({ where: { id: adminId }, data: { passwordHash: await hashAdminPassword(newPassword) } });
+  const passwordHash = await hashAdminPassword(newPassword);
+  await prisma.$transaction(async (tx) => {
+    await tx.platformAdmin.update({ where: { id: adminId }, data: { passwordHash } });
+    await tx.session.updateMany({
+      where: { platformAdminId: adminId, id: { not: currentSessionId }, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+  });
   return { ok: true };
 }

@@ -9,6 +9,7 @@ import { canAccessDashboard } from "@/lib/auth/access";
 import { getRequestSession } from "@/lib/auth/http";
 import { prisma } from "@/lib/db/prisma";
 import { getSubscriptionState } from "@/lib/plans/subscription-guard";
+import { getDashboardRoleCopy } from "@/lib/auth/role-copy";
 
 /**
  * هيكل اللوحة: شريط جانبي + شريط جوال + حالة الاشتراك.
@@ -29,18 +30,22 @@ export default async function DashboardShellLayout({ children }: { children: Rea
   const activeSalonId = session.type === "dashboard" ? session.salonId : null;
   // المشرف يرى فروعه المسندة فقط في مبدّل الفروع؛ المالك/المدير يرون كل الفروع.
   const scopedSalonIds = session.type === "dashboard" ? session.scopedSalonIds : null;
-  const salons = organizationId
-    ? await prisma.salon.findMany({
-        where: { organizationId, isActive: true, ...(scopedSalonIds ? { id: { in: scopedSalonIds } } : {}) },
-        orderBy: { name: "asc" },
-        select: { id: true, name: true },
-      })
-    : [];
+  const [salons, organization] = organizationId
+    ? await Promise.all([
+        prisma.salon.findMany({
+          where: { organizationId, isActive: true, ...(scopedSalonIds ? { id: { in: scopedSalonIds } } : {}) },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true },
+        }),
+        prisma.organization.findUnique({ where: { id: organizationId }, select: { name: true } }),
+      ])
+    : [[], null];
+  const roleCopy = getDashboardRoleCopy(role);
 
   return (
     <main className="dashboard-page">
-      <DashboardMobileBar role={role} salons={salons} activeSalonId={activeSalonId} />
-      <div className="mx-auto grid max-w-[1680px] gap-0 lg:grid-cols-[320px_1fr]">
+      <DashboardMobileBar role={role} salons={salons} activeSalonId={activeSalonId} organizationName={organization?.name ?? "المؤسسة"} />
+      <div className="mx-auto grid max-w-[1800px] gap-0 lg:grid-cols-[296px_minmax(0,1fr)]">
         <aside className="relative hidden bg-sidebar-onyx text-white shadow-[var(--shadow-sidebar)] lg:sticky lg:top-0 lg:flex lg:min-h-screen lg:flex-col lg:px-5 lg:py-5">
           <span className="pointer-events-none absolute inset-y-0 left-0 hidden w-px bg-gradient-to-b from-transparent via-salon-gold/40 to-transparent lg:block" aria-hidden="true" />
           <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.05] p-4">
@@ -48,18 +53,25 @@ export default async function DashboardShellLayout({ children }: { children: Rea
             <div className="flex items-center gap-3">
               <BrandLogo className="h-12 w-12 ring-1 ring-salon-gold/30" priority />
               <div className="min-w-0">
-                <p className="text-[11px] font-bold uppercase tracking-eyebrow text-salon-goldlight">منصة XMANSX</p>
-                <p className="mt-1 truncate text-lg font-bold">لوحة الإدارة</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-salon-goldlight">XMANSX · {roleCopy.panelEyebrow}</p>
+                <p className="mt-1 truncate text-lg font-bold">{roleCopy.panelTitle}</p>
               </div>
             </div>
-            <p className="mt-3 text-xs leading-6 text-white/55">إدارة التشغيل، العملاء، الصندوق، الحملات، ورسائل واتساب من مكان واحد.</p>
+            <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-white/[0.08] bg-black/20 px-3 py-2.5">
+              <div className="min-w-0">
+                <p className="truncate text-xs font-bold text-white">{organization?.name ?? "المؤسسة"}</p>
+                <p className="mt-0.5 text-[10px] font-semibold text-white/45">{roleCopy.label}</p>
+              </div>
+              <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_0_4px_rgba(52,211,153,0.12)]" aria-label="جلسة نشطة" />
+            </div>
+            <p className="mt-3 text-xs leading-6 text-white/55">{roleCopy.description}</p>
           </div>
 
           <div className="mt-4">
             <SalonSwitcher
               salons={salons}
               activeSalonId={activeSalonId}
-              allLabel={scopedSalonIds === null ? "كل الفروع" : "كل فروعي"}
+              allLabel={scopedSalonIds === null ? "كل الفروع" : "الفروع المسندة"}
             />
           </div>
 
@@ -68,7 +80,7 @@ export default async function DashboardShellLayout({ children }: { children: Rea
           </div>
 
           <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-3">
-            <p className="text-[11px] font-bold uppercase tracking-eyebrow text-white/40">{role === "SUPERVISOR" ? "جلسة مشرف" : "جلسة المدير"}</p>
+            <p className="text-[11px] font-bold uppercase tracking-eyebrow text-white/40">{roleCopy.sessionLabel}</p>
             <LogoutButton className="mt-3 w-full border-white/15 bg-white/10 text-white hover:bg-white/15" />
           </div>
         </aside>

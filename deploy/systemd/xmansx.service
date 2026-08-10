@@ -1,0 +1,31 @@
+[Unit]
+Description=XMANSX Next.js production service
+After=network-online.target postgresql.service redis-server.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=xmansx
+Group=xmansx
+WorkingDirectory=/srv/xmansx/current
+EnvironmentFile=/etc/xmansx/xmansx.env
+Environment=NODE_ENV=production
+ExecStartPre=/usr/bin/npm run prisma:deploy
+ExecStart=/usr/bin/npm start
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGTERM
+
+# Conservative hardening; the app only needs its release and temporary directory.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/xmansx/current/.next /var/tmp
+RestrictSUIDSGID=true
+LockPersonality=true
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

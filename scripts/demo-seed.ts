@@ -13,6 +13,8 @@ async function main() {
   await cleanupDemoData();
   const barber = await prisma.barber.create({
     data: {
+      organizationId: "org_default",
+      salonId: "salon_default",
       name: `${demoPrefix} حلاق تجربة`,
       phone: "0599990000",
       accessPinHash: await hashBarberPin("Tanal@123"),
@@ -26,6 +28,7 @@ async function main() {
 
   const campaign = await prisma.campaign.create({
     data: {
+      organizationId: "org_default",
       name: `${demoPrefix} حملة تجربة`,
       description: "حملة تجريبية للعرض الداخلي",
       discountType: "FIXED_AMOUNT",
@@ -109,7 +112,7 @@ async function main() {
     await generateWhatsAppMessage(
       prisma,
       { customerId: cashCustomer.id, templateId: template.id, visitId: cashVisit.visit.id },
-      { actorUserId: admin.id, actorType: "ADMIN" },
+      { actorUserId: admin.id, actorType: "ADMIN", organizationId: admin.organizationId! },
     );
   }
 
@@ -155,10 +158,11 @@ async function cleanupDemoData() {
 async function createDemoCustomer(name: string, phone: string, points: number) {
   return prisma.customer.create({
     data: {
+      organizationId: "org_default",
       name: `${demoPrefix} ${name}`,
       phone,
       whatsappOptIn: true,
-      loyaltyAccount: { create: { points, lifetimeEarned: points } },
+      loyaltyAccount: { create: { organizationId: "org_default", points, lifetimeEarned: points } },
     },
   });
 }

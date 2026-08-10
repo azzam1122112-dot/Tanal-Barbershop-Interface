@@ -28,7 +28,7 @@ export default async function DashboardStaffPage() {
   ]);
 
   return (
-    <DashboardShell title="الموظفون والصلاحيات" description="إدارة حسابات مدراء النظام والمشرفين، وإسناد المشرفين إلى الفروع. يظهر هذا القسم للمدير فقط.">
+    <DashboardShell title="فريق الإدارة والصلاحيات" description="إدارة حسابات مديري المؤسسة ومديري الفروع، وإسناد كل مدير فرع إلى نطاقه التشغيلي. مدير المنصة غير موجود داخل هذه اللوحة.">
       <StaffManager initialUsers={users.map((user) => toSafeAdminUser(user, true))} salons={salons} currentUserId={session.user.id} />
     </DashboardShell>
   );

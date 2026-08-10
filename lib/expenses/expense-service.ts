@@ -42,9 +42,27 @@ export async function recordCashExpense(prisma: PrismaClient, input: RecordExpen
   return prisma.$transaction(async (tx) => {
     let cashSessionId = input.cashSessionId ?? null;
 
+    if (input.barberId) {
+      const barber = await tx.barber.findFirst({
+        where: {
+          id: input.barberId,
+          organizationId: input.organizationId,
+          salonId: input.salonId,
+          isActive: true,
+        },
+        select: { id: true },
+      });
+      if (!barber) throw new BusinessError("الحلاق غير موجود في هذا الفرع", 404);
+    }
+
     if (cashSessionId) {
       const session = await tx.cashSession.findFirst({
-        where: { id: cashSessionId, organizationId: input.organizationId, salonId: input.salonId },
+        where: {
+          id: cashSessionId,
+          organizationId: input.organizationId,
+          salonId: input.salonId,
+          ...(input.barberId ? { barberId: input.barberId } : {}),
+        },
         select: { id: true, status: true },
       });
       if (!session) throw new BusinessError("جلسة الصندوق غير موجودة", 404);
@@ -53,7 +71,12 @@ export async function recordCashExpense(prisma: PrismaClient, input: RecordExpen
       }
     } else if (input.barberId) {
       const open = await tx.cashSession.findFirst({
-        where: { barberId: input.barberId, status: "OPEN" },
+        where: {
+          barberId: input.barberId,
+          organizationId: input.organizationId,
+          salonId: input.salonId,
+          status: "OPEN",
+        },
         select: { id: true },
       });
       cashSessionId = open?.id ?? null;

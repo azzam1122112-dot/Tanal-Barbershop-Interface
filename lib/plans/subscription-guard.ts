@@ -51,11 +51,22 @@ export function evaluateSubscription(
   const deadline = isTrial ? organization.trialEndsAt : organization.currentPeriodEnd;
   const daysLeft = deadline ? Math.ceil((deadline.getTime() - now.getTime()) / DAY_MS) : null;
 
-  if (organization.subscriptionStatus === "CANCELED") {
+  if (organization.subscriptionStatus === "CANCELED" && (!deadline || deadline.getTime() <= now.getTime())) {
     return {
       canOperate: false,
       blockReason: "انتهى اشتراك مؤسستك. جدّد الباقة لاستئناف تسجيل الزيارات.",
       warning: null,
+      daysLeft,
+      isTrial,
+    };
+  }
+
+  // الإلغاء من المؤسسة يوقف التجديد لا الفترة المدفوعة؛ تستمر الخدمة حتى نهايتها.
+  if (organization.subscriptionStatus === "CANCELED" && deadline && deadline.getTime() > now.getTime()) {
+    return {
+      canOperate: true,
+      blockReason: null,
+      warning: `تم إلغاء التجديد، وتبقى الخدمة فعّالة حتى ${deadline.toLocaleDateString("ar-SA-u-nu-latn")}.`,
       daysLeft,
       isTrial,
     };
@@ -73,12 +84,12 @@ export function evaluateSubscription(
     };
   }
 
-  // متأخر السداد: نُبقي التشغيل ونحذّر — الإيقاف الفوري يضرّ العميل قبل أن يُذكّره.
+  // متأخر السداد/غير مفعّل: تبقى اللوحة والتصدير متاحين لكن تتوقف العمليات.
   if (organization.subscriptionStatus === "PAST_DUE") {
     return {
-      canOperate: true,
-      blockReason: null,
-      warning: "يوجد مستحق غير مسدّد على اشتراكك. سدّد لتفادي إيقاف التشغيل.",
+      canOperate: false,
+      blockReason: "اشتراكك غير فعّال. فعّل باقة لاستئناف التشغيل قبل حذف الحساب بعد 60 يومًا من عدم النشاط.",
+      warning: null,
       daysLeft,
       isTrial,
     };

@@ -25,9 +25,17 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     return NextResponse.json({ message: "الحلاق غير موجود" }, { status: 404 });
   }
 
-  const barber = await prisma.barber.update({
-    where: { id },
-    data: { accessPinHash: await hashBarberPin(parsed.data.pin) },
+  const passwordHash = await hashBarberPin(parsed.data.pin);
+  const barber = await prisma.$transaction(async (tx) => {
+    const updated = await tx.barber.update({
+      where: { id },
+      data: { accessPinHash: passwordHash },
+    });
+    await tx.session.updateMany({
+      where: { barberId: id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    return updated;
   });
 
   const meta = await getRequestMeta();

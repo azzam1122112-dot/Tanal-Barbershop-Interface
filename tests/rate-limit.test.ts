@@ -8,7 +8,7 @@ function key() {
   return `test:rate:${Math.random().toString(36).slice(2)}`;
 }
 
-describe("DB-backed rate limiting", () => {
+describe("distributed rate limiting", () => {
   const used: string[] = [];
 
   afterEach(async () => {
@@ -29,6 +29,18 @@ describe("DB-backed rate limiting", () => {
     const locked = await consumeRateLimit(prisma, k, now);
     expect(locked.limited).toBe(true);
     expect(locked.retryAfterSeconds).toBeGreaterThan(0);
+  });
+
+  it("keeps the limit atomic under concurrent attempts", async () => {
+    const k = key();
+    used.push(k);
+    const now = new Date();
+
+    const results = await Promise.all(
+      Array.from({ length: 12 }, () => consumeRateLimit(prisma, k, now)),
+    );
+
+    expect(results.filter((result) => result.limited)).toHaveLength(4);
   });
 
   it("clears the counter after a successful login", async () => {

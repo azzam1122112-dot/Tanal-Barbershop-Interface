@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient, StockMovementType } from "@prisma/client";
+import { Prisma, type PrismaClient, type StockMovement, type StockMovementType } from "@prisma/client";
 import { BusinessError } from "@/lib/errors";
 import { roundMoney } from "@/lib/visits/visit-totals";
 
@@ -177,7 +177,11 @@ export async function recordStockMovement(
     recordedByBarberId?: string | null;
     salonIds?: string[] | null;
   },
-) {
+): Promise<StockMovement> {
+  if ("$transaction" in prisma) {
+    return runSerializableProductTransaction(prisma, (tx) => recordStockMovement(tx, input));
+  }
+
   const quantity = Math.trunc(input.quantity);
   if (quantity === 0) throw new BusinessError("الكمية يجب ألا تكون صفرًا");
 
@@ -215,6 +219,25 @@ export async function recordStockMovement(
       recordedByBarberId: input.recordedByBarberId ?? null,
     },
   });
+}
+
+async function runSerializableProductTransaction<T>(
+  prisma: PrismaClient,
+  callback: (tx: Prisma.TransactionClient) => Promise<T>,
+) {
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await prisma.$transaction(callback, {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      });
+    } catch (error) {
+      const retryable = error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034";
+      if (!retryable || attempt === maxAttempts) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 25 * attempt));
+    }
+  }
+  throw new BusinessError("تعذر تسجيل حركة المخزون بعد عدة محاولات");
 }
 
 export async function getStockMovements(

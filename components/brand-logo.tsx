@@ -13,7 +13,7 @@ export function BrandLogo({
     <span className={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#09070f] ${className}`}>
       <Image
         src="/brand/xmansx-mark.png"
-        alt="شعار مؤسسة إكس مانس إكس XMANSX"
+        alt="شعار إكس مانس إكس XMANSX"
         width={1254}
         height={1254}
         className={`h-full w-full object-contain p-[6%] ${imageClassName}`}

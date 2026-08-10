@@ -4,8 +4,8 @@ import { hashAdminPassword } from "@/lib/auth/password";
 import { findUserIdentityConflicts, identityConflictMessage } from "@/lib/auth/user-identity";
 import { getDefaultSignupPlan } from "@/lib/plans/subscription-service";
 import { seedDefaultWhatsAppTemplates } from "@/lib/whatsapp/default-templates";
-
-const TRIAL_DAYS = 14;
+import { lockTenantQuota } from "@/lib/db/tenant-lock";
+import { LEGAL_VERSION } from "@/lib/legal";
 
 /** أساس معرّف من اسم لاتيني إن وُجد، وإلا "salon". */
 function slugifyBase(value: string) {
@@ -50,9 +50,15 @@ export async function createOrganizationWithOwner(
     slug?: string;
     salonName?: string;
     ownerName: string;
+    city?: string;
     email: string;
     phone: string;
     password: string;
+    acceptPolicies?: boolean;
+    acceptDataProcessingAgreement?: boolean;
+    legalAcceptedIp?: string | null;
+    legalAcceptedUserAgent?: string | null;
+    createdByPlatformAdminId?: string;
   },
 ) {
   let slug = input.slug?.trim().toLowerCase();
@@ -67,11 +73,13 @@ export async function createOrganizationWithOwner(
 
   const plan = await getDefaultSignupPlan(prisma);
   if (!plan) {
-    throw new BusinessError("لا توجد باقة مجانية فعّالة حاليًا. فعّل باقة مجانية من لوحة المنصة أولًا.");
+    throw new BusinessError("لا توجد باقة تجربة فعّالة حاليًا. حدّد باقة التجربة من لوحة المنصة أولًا.");
   }
 
   const passwordHash = await hashAdminPassword(input.password);
   const salonName = input.salonName?.trim() || "الصالون الرئيسي";
+  const trialDays = Math.min(365, Math.max(1, plan.trialDays));
+  const trialEndsAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
 
   return prisma.$transaction(async (tx) => {
     // حارس عالمي: لا يتكرر بريد المالك أو جواله عبر كل المؤسسات (التفرّد في القاعدة مقيّد بالمؤسسة فقط).
@@ -82,11 +90,25 @@ export async function createOrganizationWithOwner(
     const organization = await tx.organization.create({
       data: {
         name: input.organizationName,
+        city: input.city?.trim() || null,
         slug,
         status: "ACTIVE",
         planId: plan.id,
         subscriptionStatus: "TRIALING",
-        trialEndsAt: new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000),
+        trialEndsAt,
+        ...(input.acceptPolicies
+          ? {
+              termsAcceptedAt: new Date(),
+              termsVersion: LEGAL_VERSION,
+              privacyAcceptedAt: new Date(),
+              privacyVersion: LEGAL_VERSION,
+              legalAcceptedIp: input.legalAcceptedIp ?? null,
+              legalAcceptedUserAgent: input.legalAcceptedUserAgent ?? null,
+            }
+          : {}),
+        ...(input.acceptDataProcessingAgreement
+          ? { dpaAcceptedAt: new Date(), dpaVersion: LEGAL_VERSION }
+          : {}),
       },
     });
 
@@ -112,16 +134,24 @@ export async function createOrganizationWithOwner(
     await tx.auditLog.create({
       data: {
         organizationId: organization.id,
-        actorType: "OWNER",
-        actorUserId: owner.id,
+        actorType: input.createdByPlatformAdminId ? "PLATFORM_ADMIN" : "OWNER",
+        actorUserId: input.createdByPlatformAdminId ? null : owner.id,
         action: "organization.created",
         entityType: "Organization",
         entityId: organization.id,
-        after: { slug: organization.slug, name: organization.name, salonId: salon.id },
+        after: {
+          slug: organization.slug,
+          name: organization.name,
+          city: organization.city,
+          salonId: salon.id,
+          planId: plan.id,
+          trialDays,
+          platformAdminId: input.createdByPlatformAdminId ?? null,
+        },
       },
     });
 
-    return { organization, salon, owner };
+    return { organization, salon, owner, plan, trialDays };
   });
 }
 
@@ -146,30 +176,25 @@ export async function createSalon(
   organizationId: string,
   input: { name: string; slug: string },
 ) {
-  const organization = await prisma.organization.findUnique({
-    where: { id: organizationId },
-    include: { plan: true, _count: { select: { salons: true } } },
-  });
-  if (!organization) throw new BusinessError("المؤسسة غير موجودة");
-
-  const maxSalons = organization.plan?.maxSalons ?? 1;
-  if (organization._count.salons >= maxSalons) {
-    throw new BusinessError(`باقتك تسمح بـ ${maxSalons} صالون. رقّ باقتك لإضافة فروع أكثر.`);
-  }
-
-  const duplicate = await prisma.salon.findFirst({
-    where: { organizationId, slug: input.slug },
-    select: { id: true },
-  });
-  if (duplicate) throw new BusinessError("معرّف الصالون مستخدم مسبقًا داخل مؤسستك");
-
   return prisma.$transaction(async (tx) => {
+    await lockTenantQuota(tx, organizationId, "salons");
+    const organization = await tx.organization.findUnique({
+      where: { id: organizationId },
+      include: { plan: true, _count: { select: { salons: true } } },
+    });
+    if (!organization) throw new BusinessError("المؤسسة غير موجودة");
+    const maxSalons = organization.plan?.maxSalons ?? 1;
+    if (organization._count.salons >= maxSalons) {
+      throw new BusinessError(`باقتك تسمح بـ ${maxSalons} صالون. رقّ باقتك لإضافة فروع أكثر.`);
+    }
+    const duplicate = await tx.salon.findFirst({ where: { organizationId, slug: input.slug }, select: { id: true } });
+    if (duplicate) throw new BusinessError("معرّف الصالون مستخدم مسبقًا داخل مؤسستك");
     const salon = await tx.salon.create({
       data: { organizationId, name: input.name, slug: input.slug, isActive: true },
     });
     await tx.systemSettings.create({ data: defaultSettings(organizationId, salon.id, input.name) });
     return salon;
-  });
+  }, { isolationLevel: "Serializable" });
 }
 
 export async function updateSalon(

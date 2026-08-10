@@ -48,6 +48,15 @@ type AppointmentRow = {
   canCancel: boolean;
 };
 
+type BookingPolicy = {
+  noShowCount: number;
+  maxNoShows: number;
+  remainingBeforeBlock: number;
+  blocked: boolean;
+  blockedAt: string | null;
+  reason: string | null;
+};
+
 const WEEKDAY_NAMES = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
 
 /** `2026-08-09` → «الأحد ٩ أغسطس» بلا إنشاء Date من نص ISO (يتفادى انزياح المنطقة). */
@@ -92,10 +101,12 @@ export function PortalBooking({
   token,
   salons,
   initialAppointments,
+  bookingPolicy,
 }: {
   token: string;
   salons: BookableSalon[];
   initialAppointments: AppointmentRow[];
+  bookingPolicy: BookingPolicy;
 }) {
   const [appointments, setAppointments] = useState(initialAppointments);
   const [salonId, setSalonId] = useState(salons[0]?.id ?? "");
@@ -260,7 +271,40 @@ export function PortalBooking({
         </section>
       ) : null}
 
-      {salons.length === 0 ? null : (
+      {bookingPolicy.blocked ? (
+        <section className="overflow-hidden rounded-2xl border border-red-200 bg-red-50 shadow-[var(--shadow-sm)]" role="alert">
+          <div className="border-b border-red-200/70 bg-red-100/60 px-5 py-3">
+            <p className="text-xs font-bold text-red-700">الحجز الإلكتروني معلّق</p>
+          </div>
+          <div className="px-5 py-5">
+            <h2 className="text-lg font-bold text-red-950">تم تسجيل عدم حضور لموعدين</h2>
+            <p className="mt-2 text-sm font-semibold leading-6 text-red-900/75">
+              حفاظًا على أوقات الحلاقين، لا يمكن إنشاء حجز جديد حاليًا. تواصل مع الصالون لمراجعة الحالات وإعادة تفعيل الحجز.
+            </p>
+          </div>
+        </section>
+      ) : bookingPolicy.noShowCount > 0 ? (
+        <section className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4" role="status">
+          <div className="flex items-start gap-3">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-900 text-sm font-bold text-white" aria-hidden="true">!</span>
+            <div>
+              <h2 className="text-sm font-bold text-amber-950">تنبيه مهم قبل الحجز</h2>
+              <p className="mt-1 text-xs font-semibold leading-5 text-amber-900/80">
+                لديك حالة عدم حضور واحدة. عدم الحضور للموعد القادم دون إلغائه سيؤدي إلى تعليق الحجز الإلكتروني.
+              </p>
+            </div>
+          </div>
+        </section>
+      ) : salons.length > 0 ? (
+        <section className="rounded-2xl border border-salon-line bg-white px-5 py-4">
+          <h2 className="text-sm font-bold text-salon-ink">سياسة الحضور</h2>
+          <p className="mt-1 text-xs font-semibold leading-5 text-salon-charcoal/70">
+            إذا تعذر حضورك، ألغِ الموعد من هذه الصفحة. عدم الحضور لموعدين يؤدي إلى تعليق الحجز الإلكتروني.
+          </p>
+        </section>
+      ) : null}
+
+      {salons.length === 0 || bookingPolicy.blocked ? null : (
         <section className="barber-card px-5 py-5">
           <h2 className="text-base font-bold">احجز موعدك</h2>
 

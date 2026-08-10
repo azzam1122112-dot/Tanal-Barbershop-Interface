@@ -13,15 +13,18 @@ import { getOpenAttendance } from "@/lib/attendance/attendance-service";
 import { listAppointments } from "@/lib/appointments/appointment-service";
 import { AttendancePanel } from "@/components/barber/attendance-panel";
 import { BarberNotificationCenter } from "@/components/barber/notification-center";
+import { BarberAppointmentsPanel } from "@/components/barber/appointments-panel";
 import { prisma } from "@/lib/db/prisma";
+import { getBarberMonthlyCommission } from "@/lib/commissions/barber-monthly-commission";
 
 export default async function BarberHomePage() {
   const session = await getRequestSession();
 
   if (!session) redirect("/barber/login");
   if (!canAccessBarberApp(session)) redirect("/dashboard");
-  const [summary, organization, salon] = await Promise.all([
+  const [summary, monthlyCommission, organization, salon] = await Promise.all([
     getBarberTodaySummary(prisma, session.barber.id),
+    getBarberMonthlyCommission(prisma, session.barber.id),
     session.organizationId
       ? prisma.organization.findUnique({ where: { id: session.organizationId }, select: { name: true } })
       : null,
@@ -93,33 +96,12 @@ export default async function BarberHomePage() {
 
             {summary.cashSession && !subscription.blockReason ? <CustomerSearch /> : null}
 
-            {upcomingAppointments.length > 0 && !subscription.blockReason ? (
-              <div id="appointments" className="barber-card scroll-mt-24 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <h2 className="font-bold">مواعيدك اليوم</h2>
-                  <span className="rounded-full bg-salon-mist px-3 py-1 text-xs font-bold text-salon-charcoal">
-                    {upcomingAppointments.length}
-                  </span>
-                </div>
-                <div className="mt-3 space-y-2">
-                  {upcomingAppointments.map((appointment) => (
-                    <div key={appointment.id} className="rounded-2xl border border-salon-line bg-salon-pearl px-3 py-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-bold">{appointment.customerName}</span>
-                        <span className="text-sm font-bold text-salon-forest">
-                          {new Date(appointment.startAt).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-xs font-semibold text-salon-charcoal/75" dir="ltr">
-                        {appointment.customerPhone}
-                      </p>
-                      {appointment.notes ? (
-                        <p className="mt-1 text-xs font-semibold text-salon-charcoal/75">{appointment.notes}</p>
-                      ) : null}
-                    </div>
-                  ))}
-                </div>
-              </div>
+            {!subscription.blockReason ? (
+              <BarberAppointmentsPanel
+                initialAppointments={upcomingAppointments}
+                barberName={session.barber.name}
+                salonName={salon?.name ?? organization?.name}
+              />
             ) : null}
           </div>
 
@@ -127,6 +109,33 @@ export default async function BarberHomePage() {
             {subscription.blockReason ? null : (
               <CashSessionPanel initialSession={summary.cashSession} initialExpenses={sessionExpenses} />
             )}
+
+            {monthlyCommission ? (
+              <section className="relative overflow-hidden rounded-3xl border border-salon-gold/40 bg-gradient-to-br from-salon-ink via-salon-forest to-salon-ink p-5 text-white shadow-lg">
+                <div aria-hidden="true" className="absolute -left-8 -top-10 h-32 w-32 rounded-full bg-salon-gold/20 blur-2xl" />
+                <div className="relative">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-black tracking-wide text-salon-gold">مستحقات العمولة</p>
+                      <h2 className="mt-1 text-lg font-bold">عمولة {monthlyCommission.monthLabel}</h2>
+                    </div>
+                    <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-bold">مفعّلة</span>
+                  </div>
+                  <p className="mt-5 text-4xl font-black tabular-nums text-white">{formatMoney(monthlyCommission.commissionAmount)}</p>
+                  <p className="mt-1 text-xs font-semibold text-white/65">المبلغ المسجل من الزيارات المكتملة خلال الشهر</p>
+                  <div className="mt-4 grid grid-cols-2 gap-2 border-t border-white/15 pt-4 text-center">
+                    <div className="rounded-2xl bg-white/10 px-3 py-2.5">
+                      <p className="text-lg font-black tabular-nums">{monthlyCommission.visitsCount}</p>
+                      <p className="text-[11px] font-bold text-white/65">زيارة مكتملة</p>
+                    </div>
+                    <div className="rounded-2xl bg-white/10 px-3 py-2.5">
+                      <p className="text-lg font-black tabular-nums">{monthlyCommission.effectiveRate}%</p>
+                      <p className="text-[11px] font-bold text-white/65">النسبة الفعلية</p>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            ) : null}
 
             <div className="barber-card p-5">
               <div className="flex items-center justify-between gap-3">

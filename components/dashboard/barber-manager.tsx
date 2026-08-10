@@ -4,6 +4,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import type { SafeBarber } from "@/lib/auth/sanitize";
+import { buildBarberLoginMessage, toWhatsAppPhone } from "@/lib/barbers/login-share";
 import { InlineEmpty } from "@/components/dashboard/ui";
 
 type BarberResponse = {
@@ -20,6 +21,7 @@ type BarberDraft = {
   pin: string;
   isActive: boolean;
   salonId: string;
+  commissionEnabled: boolean;
   /** فارغ = استخدم النسبة الافتراضية للفرع. */
   commissionRate: string;
   workScheduleEnabled: boolean;
@@ -62,6 +64,9 @@ export function BarberManager({
   const [drafts, setDrafts] = useState<Record<string, BarberDraft>>({});
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<BarberFilter>("all");
+  const [newCommissionEnabled, setNewCommissionEnabled] = useState(false);
+  // لا نخزّن الرمز الخام في الخادم. نحتفظ مؤقتًا فقط بالرمز الذي أُنشئ أو تغيّر في هذه الصفحة.
+  const [issuedPins, setIssuedPins] = useState<Record<string, string>>({});
 
   const activeCount = barbers.filter((barber) => barber.isActive).length;
   const inactiveCount = barbers.length - activeCount;
@@ -86,6 +91,8 @@ export function BarberManager({
     setToast(null);
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
+    const commissionRate = String(form.get("commissionRate") ?? "").trim();
+    const pin = String(form.get("pin") ?? "");
 
     const response = await fetch("/api/dashboard/barbers", {
       method: "POST",
@@ -93,15 +100,19 @@ export function BarberManager({
       body: JSON.stringify({
         name: form.get("name"),
         phone: form.get("phone"),
-        pin: form.get("pin"),
+        pin,
         salonId: form.get("salonId"),
+        commissionEnabled: form.get("commissionEnabled") === "on",
+        commissionRate: commissionRate === "" ? null : Number(commissionRate),
       }),
     });
     const data = (await response.json().catch(() => ({}))) as BarberResponse;
 
     if (response.ok && data.barber) {
       setBarbers((current) => [data.barber!, ...current]);
+      setIssuedPins((current) => ({ ...current, [data.barber!.id]: pin }));
       formElement.reset();
+      setNewCommissionEnabled(false);
       setToast({ message: "تم إضافة الحلاق بنجاح", tone: "success" });
     } else {
       setToast({ message: data.message ?? "تعذر حفظ الحلاق", tone: "error" });
@@ -123,6 +134,7 @@ export function BarberManager({
         pin: "",
         isActive: Boolean(barber.isActive),
         salonId: barber.salonId ?? "",
+        commissionEnabled: Boolean(barber.commissionEnabled),
         commissionRate: barber.commissionRate == null ? "" : String(barber.commissionRate),
         workScheduleEnabled: Boolean(barber.workScheduleEnabled),
         workStartTime: minutesToTimeValue(barber.workStartMinute ?? 16 * 60),
@@ -178,6 +190,7 @@ export function BarberManager({
 
     if (response.ok && data.barber) {
       setBarbers((current) => current.map((barber) => (barber.id === id ? data.barber! : barber)));
+      setIssuedPins((current) => ({ ...current, [id]: pin }));
       return true;
     }
 
@@ -197,6 +210,9 @@ export function BarberManager({
     if (draft.phone.trim() !== barber.phone) updateBody.phone = draft.phone;
     if (draft.isActive !== Boolean(barber.isActive)) updateBody.isActive = draft.isActive;
     if (draft.salonId && draft.salonId !== (barber.salonId ?? "")) updateBody.salonId = draft.salonId;
+    if (draft.commissionEnabled !== Boolean(barber.commissionEnabled)) {
+      updateBody.commissionEnabled = draft.commissionEnabled;
+    }
     const draftRate = draft.commissionRate.trim();
     const currentRate = barber.commissionRate == null ? "" : String(barber.commissionRate);
     if (draftRate !== currentRate) updateBody.commissionRate = draftRate === "" ? null : Number(draftRate);
@@ -268,6 +284,30 @@ export function BarberManager({
     setToast(null);
     await patchBarber(barber.id, { isActive: !barber.isActive });
     setPendingId(null);
+  }
+
+  function loginMessage(barber: SafeBarber) {
+    return buildBarberLoginMessage({
+      name: barber.name,
+      phone: barber.phone,
+      loginUrl: `${window.location.origin}/barber/login`,
+      pin: issuedPins[barber.id],
+    });
+  }
+
+  async function copyLoginDetails(barber: SafeBarber) {
+    try {
+      await navigator.clipboard.writeText(loginMessage(barber));
+      setToast({ message: `تم نسخ بيانات دخول ${barber.name}`, tone: "success" });
+    } catch {
+      setToast({ message: "تعذر النسخ تلقائيًا. تحقق من سماح المتصفح بالوصول إلى الحافظة.", tone: "error" });
+    }
+  }
+
+  function shareLoginOnWhatsApp(barber: SafeBarber) {
+    const phone = toWhatsAppPhone(barber.phone);
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(loginMessage(barber))}`;
+    window.open(url, "_blank", "noopener,noreferrer");
   }
 
   async function deleteBarber(barber: SafeBarber) {
@@ -357,6 +397,37 @@ export function BarberManager({
                 ))}
               </select>
             </label>
+            <div className="rounded-2xl border border-salon-line bg-salon-pearl p-4">
+              <label className="flex cursor-pointer items-center justify-between gap-4">
+                <span>
+                  <span className="block text-sm font-bold text-salon-ink">تفعيل عمولة الحلاق</span>
+                  <span className="mt-1 block text-xs font-semibold leading-5 text-salon-charcoal/70">
+                    عند الإيقاف لا تُحتسب عمولة ولا تظهر مستحقاتها للحلاق.
+                  </span>
+                </span>
+                <input
+                  name="commissionEnabled"
+                  type="checkbox"
+                  checked={newCommissionEnabled}
+                  onChange={(event) => setNewCommissionEnabled(event.target.checked)}
+                  className="h-5 w-5 shrink-0 accent-salon-forest"
+                />
+              </label>
+              {newCommissionEnabled ? (
+                <label className="mt-4 block border-t border-salon-line pt-4">
+                  <span className="mb-2 block text-xs font-bold text-salon-charcoal">نسبة الحلاق الخاصة %</span>
+                  <input
+                    name="commissionRate"
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={0.5}
+                    placeholder="فارغ = نسبة الفرع الافتراضية"
+                    className="dashboard-field"
+                  />
+                </label>
+              ) : null}
+            </div>
             <button disabled={loading} className="dashboard-button w-full">
               {loading ? "جاري الحفظ..." : "حفظ الحلاق"}
             </button>
@@ -442,19 +513,6 @@ export function BarberManager({
                             className="dashboard-field py-2.5"
                           />
                         </label>
-                        <label className="block">
-                          <span className="mb-2 block text-xs font-bold text-salon-charcoal">نسبة العمولة %</span>
-                          <input
-                            value={draft.commissionRate}
-                            onChange={(event) => updateDraft(barber.id, { commissionRate: event.target.value })}
-                            type="number"
-                            min={0}
-                            max={100}
-                            step={0.5}
-                            placeholder="اتركه فارغًا لاستخدام نسبة الفرع"
-                            className="dashboard-field py-2.5"
-                          />
-                        </label>
                         <label className="flex items-center justify-between gap-3 rounded-xl border border-salon-line bg-salon-pearl px-3 py-2.5">
                           <span className="text-sm font-bold text-salon-charcoal">الحساب نشط</span>
                           <input
@@ -464,6 +522,37 @@ export function BarberManager({
                             className="h-5 w-5 accent-salon-forest"
                           />
                         </label>
+                        <div className="rounded-xl border border-salon-line bg-salon-pearl p-4 md:col-span-2">
+                          <label className="flex cursor-pointer items-center justify-between gap-4">
+                            <span>
+                              <span className="block text-sm font-bold text-salon-ink">تفعيل عمولة الحلاق</span>
+                              <span className="mt-1 block text-xs font-semibold leading-5 text-salon-charcoal/70">
+                                الإيقاف يمنع احتساب العمولة للزيارات الجديدة ويخفي بطاقة المستحقات من صفحة الحلاق.
+                              </span>
+                            </span>
+                            <input
+                              type="checkbox"
+                              checked={draft.commissionEnabled}
+                              onChange={(event) => updateDraft(barber.id, { commissionEnabled: event.target.checked })}
+                              className="h-5 w-5 shrink-0 accent-salon-forest"
+                            />
+                          </label>
+                          {draft.commissionEnabled ? (
+                            <label className="mt-4 block border-t border-salon-line pt-4">
+                              <span className="mb-2 block text-xs font-bold text-salon-charcoal">نسبة الحلاق الخاصة %</span>
+                              <input
+                                value={draft.commissionRate}
+                                onChange={(event) => updateDraft(barber.id, { commissionRate: event.target.value })}
+                                type="number"
+                                min={0}
+                                max={100}
+                                step={0.5}
+                                placeholder="فارغ = نسبة الفرع الافتراضية"
+                                className="dashboard-field py-2.5"
+                              />
+                            </label>
+                          ) : null}
+                        </div>
                         {hasMultipleSalons ? (
                           <label className="block md:col-span-2">
                             <span className="mb-2 block text-xs font-bold text-salon-charcoal">الفرع</span>
@@ -567,9 +656,13 @@ export function BarberManager({
                             <dd className="mt-1 text-salon-ink">{salonName(barber.salonId)}</dd>
                           </div>
                           <div>
-                            <dt className="text-xs font-bold text-salon-charcoal/70">نسبة العمولة</dt>
-                            <dd className="mt-1 text-salon-ink">
-                              {barber.commissionRate == null ? "نسبة الفرع الافتراضية" : `${barber.commissionRate}%`}
+                            <dt className="text-xs font-bold text-salon-charcoal/70">العمولة</dt>
+                            <dd className={`mt-1 ${barber.commissionEnabled ? "text-green-700" : "text-salon-charcoal/65"}`}>
+                              {barber.commissionEnabled
+                                ? barber.commissionRate == null
+                                  ? "مفعّلة · نسبة الفرع الافتراضية"
+                                  : `مفعّلة · ${barber.commissionRate}%`
+                                : "غير مفعّلة"}
                             </dd>
                           </div>
                           <div>
@@ -581,6 +674,39 @@ export function BarberManager({
                             <dd className="mt-1 text-salon-ink">{formatBarberSchedule(barber)}</dd>
                           </div>
                         </dl>
+                        {canManage ? (
+                          <div className="mt-4 rounded-2xl border border-violet-200/70 bg-violet-50/60 p-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div>
+                                <p className="text-xs font-black text-violet-950">دخول تطبيق الحلاق</p>
+                                <p className="mt-1 text-[11px] font-semibold text-violet-900/65">
+                                  الرابط والجوال{issuedPins[barber.id] ? " والرمز الجديد" : " مع الرمز المسلّم سابقًا"}
+                                </p>
+                              </div>
+                              {issuedPins[barber.id] ? (
+                                <span className="rounded-full bg-violet-700 px-2.5 py-1 text-[10px] font-black text-white">
+                                  الرمز جاهز للمشاركة
+                                </span>
+                              ) : null}
+                            </div>
+                            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                              <button
+                                type="button"
+                                onClick={() => void copyLoginDetails(barber)}
+                                className="dashboard-button-soft min-h-11 px-3 text-xs"
+                              >
+                                نسخ بيانات الدخول
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => shareLoginOnWhatsApp(barber)}
+                                className="min-h-11 rounded-xl bg-[#128c7e] px-3 text-xs font-black text-white shadow-sm transition hover:bg-[#0f796d] active:scale-[0.99]"
+                              >
+                                إرسال عبر واتساب
+                              </button>
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
                     )}
                   </div>

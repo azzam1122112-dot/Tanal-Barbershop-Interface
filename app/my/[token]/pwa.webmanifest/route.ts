@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { resolveCustomerByPortalToken } from "@/lib/customers/customer-portal";
 import { getEffectiveSettings } from "@/lib/settings/system-settings";
+import { getRequestMeta } from "@/lib/auth/http";
+import { consumeRateLimit } from "@/lib/auth/rate-limit";
 
 /**
  * بيان تثبيت خاص بكل عميل.
@@ -19,6 +21,11 @@ import { getEffectiveSettings } from "@/lib/settings/system-settings";
  * معروض كأنه حالي خطأ لا تحسين.
  */
 export async function GET(_request: Request, context: { params: Promise<{ token: string }> }) {
+  const meta = await getRequestMeta();
+  const limit = await consumeRateLimit(prisma, `portal-manifest:${meta.ipAddress ?? "unknown"}`, undefined, {
+    windowMs: 5 * 60_000, maxAttempts: 60, lockMs: 5 * 60_000,
+  });
+  if (limit.limited) return NextResponse.json({ message: "طلبات كثيرة" }, { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } });
   const { token } = await context.params;
   const customer = await resolveCustomerByPortalToken(prisma, token);
   if (!customer) {

@@ -75,12 +75,17 @@ export async function getActiveManagerRewards(
 
 export async function getRedeemableManagerRewardOrThrow(
   prisma: ManagerRewardPrisma,
-  input: { managerRewardId: string; customerId: string; grossAmount: number; now?: Date },
+  input: { organizationId: string; managerRewardId: string; customerId: string; grossAmount: number; now?: Date },
 ) {
   const now = input.now ?? new Date();
-  const reward = await prisma.managerReward.findUnique({ where: { id: input.managerRewardId } });
+  const reward = await prisma.managerReward.findFirst({
+    where: {
+      id: input.managerRewardId,
+      organizationId: input.organizationId,
+      customerId: input.customerId,
+    },
+  });
   if (!reward) throw new BusinessError("مكافأة الإدارة غير موجودة");
-  if (reward.customerId !== input.customerId) throw new BusinessError("مكافأة الإدارة لا تخص هذا العميل");
   if (reward.redeemedAt || reward.redeemedVisitId) throw new BusinessError("مكافأة الإدارة مستخدمة مسبقًا");
   if (reward.revokedAt) throw new BusinessError("مكافأة الإدارة ملغاة");
   if (reward.expiresAt && reward.expiresAt < now) throw new BusinessError("مكافأة الإدارة منتهية");

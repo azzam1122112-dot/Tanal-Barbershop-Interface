@@ -6,20 +6,28 @@ import { BrandLogo } from "@/components/brand-logo";
 export default function PlatformLoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [challengeToken, setChallengeToken] = useState("");
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     setLoading(true);
     const form = new FormData(event.currentTarget);
-    const response = await fetch("/api/platform/auth/login", {
+    const response = await fetch(challengeToken ? "/api/platform/auth/mfa/verify" : "/api/platform/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: form.get("email"), password: form.get("password") }),
+      body: JSON.stringify(challengeToken
+        ? { challengeToken, code: form.get("code") }
+        : { email: form.get("email"), password: form.get("password") }),
     });
-    const data = (await response.json().catch(() => ({}))) as { message?: string; redirectTo?: string };
+    const data = (await response.json().catch(() => ({}))) as { message?: string; redirectTo?: string; requiresMfa?: boolean; challengeToken?: string };
     if (!response.ok) {
       setError(data.message ?? "بيانات الدخول غير صحيحة");
+      setLoading(false);
+      return;
+    }
+    if (data.requiresMfa && data.challengeToken) {
+      setChallengeToken(data.challengeToken);
       setLoading(false);
       return;
     }
@@ -43,17 +51,32 @@ export default function PlatformLoginPage() {
         </div>
         <form onSubmit={submit} className="relative space-y-4 rounded-2xl border border-white/10 bg-white/95 p-6 text-salon-ink shadow-[0_40px_90px_-40px_rgba(0,0,0,0.75)]">
           <span className="absolute inset-x-0 top-0 h-1 bg-royal-gold" aria-hidden="true" />
-          <label className="block text-sm font-semibold">
-            البريد الإلكتروني
-            <input name="email" type="email" required autoComplete="email" dir="ltr" className="dashboard-field mt-2" />
-          </label>
-          <label className="block text-sm font-semibold">
-            كلمة المرور
-            <input name="password" type="password" required autoComplete="current-password" className="dashboard-field mt-2" />
-          </label>
+          {challengeToken ? (
+            <>
+              <div className="rounded-xl border border-salon-gold/30 bg-salon-gold/10 p-4 text-sm leading-6">
+                خطوة الحماية الثانية: افتح تطبيق المصادقة وأدخل الرمز الحالي. يمكنك أيضًا استخدام رمز استرداد لمرة واحدة.
+              </div>
+              <label className="block text-sm font-semibold">
+                رمز المصادقة
+                <input name="code" inputMode="numeric" autoComplete="one-time-code" required autoFocus dir="ltr" className="dashboard-field mt-2 text-center text-xl tracking-[0.35em]" />
+              </label>
+              <button type="button" onClick={() => { setChallengeToken(""); setError(""); }} className="text-sm font-bold text-salon-gold">العودة إلى تسجيل الدخول</button>
+            </>
+          ) : (
+            <>
+              <label className="block text-sm font-semibold">
+                البريد الإلكتروني
+                <input name="email" type="email" required autoComplete="email" dir="ltr" className="dashboard-field mt-2" />
+              </label>
+              <label className="block text-sm font-semibold">
+                كلمة المرور
+                <input name="password" type="password" required autoComplete="current-password" className="dashboard-field mt-2" />
+              </label>
+            </>
+          )}
           {error ? <p className="rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{error}</p> : null}
           <button type="submit" disabled={loading} aria-busy={loading} className="dashboard-button-gold w-full py-3.5 text-base">
-            {loading ? "جاري الدخول..." : "دخول"}
+            {loading ? "جاري التحقق..." : challengeToken ? "تحقق ودخول" : "دخول آمن"}
           </button>
         </form>
       </section>
