@@ -64,8 +64,9 @@ export function getBarberPushPublicConfig() {
 }
 
 /**
- * اشتراك واحد لكل جلسة حلاق: تسجيل الخروج يحذف الجلسة، وON DELETE CASCADE
- * يحذف الاشتراك حتى لا تصل تفاصيل عميل إلى جهاز لم تعد جلسته فعّالة.
+ * اشتراك واحد لكل جلسة حلاق. عند دخول الحلاق من جهاز سبق أن اشترك، ننقل
+ * نقطة النهاية بأمان إذا كانت الجلسة القديمة له أو كانت منتهية/ملغاة.
+ * لا نسمح لجلسة حلاق بالاستيلاء على اشتراك نشط لحلاق آخر.
  */
 export async function saveBarberPushSubscription(
   prisma: PushPrisma,
@@ -80,10 +81,24 @@ export async function saveBarberPushSubscription(
   return prisma.$transaction(async (tx) => {
     const existingOwner = await tx.barberPushSubscription.findUnique({
       where: { endpoint: input.subscription.endpoint },
-      select: { sessionId: true },
+      select: {
+        sessionId: true,
+        organizationId: true,
+        barberId: true,
+        session: { select: { revokedAt: true, expiresAt: true } },
+      },
     });
     if (existingOwner && existingOwner.sessionId !== input.sessionId) {
-      throw new BusinessError("تعذر تسجيل اشتراك التنبيهات", 409);
+      const sameBarber =
+        existingOwner.organizationId === input.organizationId && existingOwner.barberId === input.barberId;
+      const oldSessionInactive = Boolean(existingOwner.session?.revokedAt) ||
+        Boolean(existingOwner.session?.expiresAt && existingOwner.session.expiresAt <= new Date());
+      if (!sameBarber && !oldSessionInactive) {
+        throw new BusinessError("هذا الجهاز مرتبط بجلسة حلاق نشطة أخرى", 409);
+      }
+      await tx.barberPushSubscription.deleteMany({
+        where: { endpoint: input.subscription.endpoint },
+      });
     }
 
     await tx.barberPushSubscription.deleteMany({
@@ -194,7 +209,13 @@ async function sendToBarber(
     select: { id: true, endpoint: true, p256dh: true, auth: true },
   });
 
-  if (subscriptions.length === 0) return { sent: 0, stale: 0 };
+  if (subscriptions.length === 0) {
+    logger.info("barber_push_skipped_no_active_subscription", {
+      barberId: input.barberId,
+      kind: input.payload.kind,
+    });
+    return { sent: 0, stale: 0 };
+  }
 
   const results = await Promise.all(
     subscriptions.map(async (subscription) => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { parseDateKeyParts, RIYADH_TIME_ZONE } from "@/lib/datetime/riyadh";
 
 /**
  * حجز موعد من بوابة العميل.
@@ -61,11 +62,17 @@ const WEEKDAY_NAMES = ["الأحد", "الإثنين", "الثلاثاء", "ال
 
 /** `2026-08-09` → «الأحد ٩ أغسطس» بلا إنشاء Date من نص ISO (يتفادى انزياح المنطقة). */
 function formatDayLabel(dateKey: string) {
-  const [year, month, day] = dateKey.split("-").map(Number);
-  const date = new Date(year, month - 1, day);
+  const { year, month, day } = parseDateKeyParts(dateKey);
+  const date = new Date(0);
+  date.setUTCFullYear(year, month - 1, day);
+  date.setUTCHours(12, 0, 0, 0);
   return {
-    weekday: WEEKDAY_NAMES[date.getDay()],
-    day: new Intl.DateTimeFormat("ar-SA-u-nu-latn", { day: "numeric", month: "short" }).format(date),
+    weekday: WEEKDAY_NAMES[date.getUTCDay()],
+    day: new Intl.DateTimeFormat("ar-SA-u-nu-latn", {
+      timeZone: "UTC",
+      day: "numeric",
+      month: "short",
+    }).format(date),
   };
 }
 
@@ -89,6 +96,7 @@ function formatLeadDuration(minutes: number) {
 function formatAppointment(startAt: string) {
   const date = new Date(startAt);
   return new Intl.DateTimeFormat("ar-SA-u-nu-latn", {
+    timeZone: RIYADH_TIME_ZONE,
     weekday: "long",
     day: "numeric",
     month: "short",

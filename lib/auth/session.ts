@@ -217,8 +217,12 @@ export async function revokeSession(prisma: PrismaClient, token?: string | null)
     return null;
   }
 
-  return prisma.session.update({
-    where: { id: session.id },
-    data: { revokedAt: new Date() },
+  return prisma.$transaction(async (tx) => {
+    // الاشتراك يحمل بيانات مواعيد شخصية؛ يُحذف في نفس معاملة إلغاء الجلسة.
+    await tx.barberPushSubscription.deleteMany({ where: { sessionId: session.id } });
+    return tx.session.update({
+      where: { id: session.id },
+      data: { revokedAt: new Date() },
+    });
   });
 }

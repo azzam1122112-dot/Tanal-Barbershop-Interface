@@ -66,7 +66,12 @@ describe("tenant-boundary regression controls", () => {
     const deleteMany = vi.fn();
     const tx = {
       barberPushSubscription: {
-        findUnique: vi.fn().mockResolvedValue({ sessionId: "session-b" }),
+        findUnique: vi.fn().mockResolvedValue({
+          sessionId: "session-b",
+          organizationId: "org-b",
+          barberId: "barber-b",
+          session: { revokedAt: null, expiresAt: new Date(Date.now() + 60_000) },
+        }),
         deleteMany,
         create: vi.fn(),
       },
@@ -82,7 +87,47 @@ describe("tenant-boundary regression controls", () => {
         sessionId: "session-a",
         subscription: { endpoint: "https://fcm.googleapis.com/fcm/send/shared", keys: { p256dh: "key", auth: "auth" } },
       }),
-    ).rejects.toThrow("تعذر تسجيل اشتراك التنبيهات");
+    ).rejects.toThrow("هذا الجهاز مرتبط بجلسة حلاق نشطة أخرى");
     expect(deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("reclaims a push endpoint from a revoked session", async () => {
+    const deleteMany = vi.fn().mockResolvedValue({ count: 1 });
+    const create = vi.fn().mockResolvedValue({ id: "subscription-new" });
+    const tx = {
+      barberPushSubscription: {
+        findUnique: vi.fn().mockResolvedValue({
+          sessionId: "session-old",
+          organizationId: "org-b",
+          barberId: "barber-b",
+          session: { revokedAt: new Date(), expiresAt: new Date(Date.now() + 60_000) },
+        }),
+        deleteMany,
+        create,
+      },
+    };
+    const fakePrisma = {
+      $transaction: (callback: (client: typeof tx) => unknown) => callback(tx),
+    } as unknown as PrismaClient;
+
+    await saveBarberPushSubscription(fakePrisma, {
+      organizationId: "org-a",
+      barberId: "barber-a",
+      sessionId: "session-new",
+      subscription: {
+        endpoint: "https://fcm.googleapis.com/fcm/send/reused",
+        keys: { p256dh: "public-key-value-long-enough", auth: "auth-value" },
+      },
+    });
+
+    expect(deleteMany).toHaveBeenNthCalledWith(1, {
+      where: { endpoint: "https://fcm.googleapis.com/fcm/send/reused" },
+    });
+    expect(deleteMany).toHaveBeenNthCalledWith(2, { where: { sessionId: "session-new" } });
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ organizationId: "org-a", barberId: "barber-a", sessionId: "session-new" }),
+      }),
+    );
   });
 });

@@ -1,0 +1,44 @@
+import { describe, expect, it } from "vitest";
+import {
+  addRiyadhDays,
+  getRiyadhMinuteOfDay,
+  getRiyadhWeekday,
+  isSameRiyadhDay,
+  parseRiyadhDateKey,
+  riyadhDateTimeForDay,
+  startOfRiyadhDay,
+  toRiyadhDateKey,
+} from "../lib/datetime/riyadh";
+
+describe("Riyadh operational dates", () => {
+  it("uses the Riyadh day around UTC midnight", () => {
+    const instant = new Date("2026-08-10T21:30:00.000Z");
+
+    expect(toRiyadhDateKey(instant)).toBe("2026-08-11");
+    expect(getRiyadhWeekday(instant)).toBe(2);
+    expect(getRiyadhMinuteOfDay(instant)).toBe(30);
+    expect(startOfRiyadhDay(instant).toISOString()).toBe("2026-08-10T21:00:00.000Z");
+  });
+
+  it("constructs branch wall-clock slots as the matching UTC instant", () => {
+    const day = parseRiyadhDateKey("2026-08-11");
+    const fourPm = riyadhDateTimeForDay(day, 16 * 60);
+
+    expect(day.toISOString()).toBe("2026-08-10T21:00:00.000Z");
+    expect(fourPm.toISOString()).toBe("2026-08-11T13:00:00.000Z");
+    expect(getRiyadhMinuteOfDay(fourPm)).toBe(16 * 60);
+  });
+
+  it("adds civil Riyadh days without inheriting the host timezone", () => {
+    const lateNight = new Date("2026-12-31T22:30:00.000Z");
+    const nextDay = addRiyadhDays(lateNight, 1);
+
+    expect(toRiyadhDateKey(lateNight)).toBe("2027-01-01");
+    expect(nextDay.toISOString()).toBe("2027-01-01T21:00:00.000Z");
+    expect(isSameRiyadhDay(lateNight, new Date("2026-12-31T21:01:00.000Z"))).toBe(true);
+  });
+
+  it("rejects impossible civil dates", () => {
+    expect(() => parseRiyadhDateKey("2026-02-30")).toThrow("Invalid date key");
+  });
+});

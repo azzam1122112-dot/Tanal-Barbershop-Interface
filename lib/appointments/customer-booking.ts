@@ -13,6 +13,7 @@ import {
 import { sendBarberAppointmentPush } from "@/lib/push/barber-push";
 import { effectiveBarberSchedule } from "@/lib/barbers/work-schedule";
 import { assertCustomerBookingAllowed } from "@/lib/appointments/booking-discipline";
+import { addRiyadhDays, startOfRiyadhDay } from "@/lib/datetime/riyadh";
 
 /**
  * الحجز الذاتي من بوابة العميل.
@@ -236,10 +237,8 @@ export async function bookCustomerAppointment(
   const appointment = await prisma.$transaction(
     async (tx) => {
       const endAt = new Date(slot.startAt.getTime() + slot.durationMinutes * 60_000);
-      const dayStart = new Date(slot.startAt);
-      dayStart.setHours(0, 0, 0, 0);
-      const dayEnd = new Date(dayStart);
-      dayEnd.setDate(dayEnd.getDate() + 1);
+      const dayStart = startOfRiyadhDay(slot.startAt);
+      const dayEnd = addRiyadhDays(dayStart, 1);
 
       const sameDay = await tx.appointment.findMany({
         where: {
