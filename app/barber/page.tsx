@@ -16,6 +16,7 @@ import { BarberNotificationCenter } from "@/components/barber/notification-cente
 import { BarberAppointmentsPanel } from "@/components/barber/appointments-panel";
 import { prisma } from "@/lib/db/prisma";
 import { getBarberMonthlyCommission } from "@/lib/commissions/barber-monthly-commission";
+import Link from "next/link";
 
 export default async function BarberHomePage() {
   const session = await getRequestSession();
@@ -94,7 +95,21 @@ export default async function BarberHomePage() {
 
             {subscription.blockReason ? null : <BarberNotificationCenter />}
 
-            {summary.cashSession && !subscription.blockReason ? <CustomerSearch /> : null}
+            {summary.cashSession && !subscription.blockReason ? (
+              <>
+                <section className="barber-card lux-edge overflow-hidden p-5">
+                  <p className="lux-eyebrow">نقطة البيع</p>
+                  <h2 className="mt-2 text-2xl font-bold text-salon-ink">سجّل الخدمة أولًا</h2>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-salon-charcoal/70">
+                    بيانات العميل اختيارية. اربط عضو الولاء قبل الدفع أو أكمل كزائر بلا أي بيانات شخصية.
+                  </p>
+                  <Link href="/barber/visits/new" className="barber-gold-button mt-5 flex h-16 items-center justify-center text-xl">
+                    + عملية جديدة
+                  </Link>
+                </section>
+                <CustomerSearch />
+              </>
+            ) : null}
 
             {!subscription.blockReason ? (
               <BarberAppointmentsPanel
@@ -107,7 +122,11 @@ export default async function BarberHomePage() {
 
           <div className="space-y-4">
             {subscription.blockReason ? null : (
-              <CashSessionPanel initialSession={summary.cashSession} initialExpenses={sessionExpenses} />
+              <CashSessionPanel
+                initialSession={summary.cashSession}
+                initialExpenses={sessionExpenses}
+                initialCustodyBalance={summary.custodyInitialized ? summary.custodyBalance : 0}
+              />
             )}
 
             {monthlyCommission ? (

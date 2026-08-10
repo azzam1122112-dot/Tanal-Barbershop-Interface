@@ -172,6 +172,7 @@ function buildRevenueSummary(visits: VisitForReport[], range: { from: Date; to: 
   const grossAmount = sum(visits.map((visit) => Number(visit.grossAmount)));
   const discountAmount = sum(visits.map((visit) => Number(visit.discountAmount)));
   const netAmount = sum(visits.map((visit) => Number(visit.netAmount)));
+  const commissionAmount = sum(visits.map((visit) => Number(visit.commissionAmount)));
   const cashAmount = sum(visits.filter((visit) => visit.paymentMethod === "CASH").map((visit) => Number(visit.netAmount)));
   const networkAmount = sum(visits.filter((visit) => visit.paymentMethod === "NETWORK").map((visit) => Number(visit.netAmount)));
   const pointsEarned = sum(visits.flatMap((visit) => visit.loyaltyTransactions.filter((transaction) => transaction.type === "EARN").map((transaction) => transaction.points)));
@@ -180,12 +181,13 @@ function buildRevenueSummary(visits: VisitForReport[], range: { from: Date; to: 
   );
   const customers = new Map<string, { firstVisitAt: Date | null }>();
   for (const visit of visits) {
+    if (!visit.customerId || !visit.customer) continue;
     const current = customers.get(visit.customerId);
     if (!current || visit.visitedAt < (current.firstVisitAt ?? visit.visitedAt)) {
       customers.set(visit.customerId, { firstVisitAt: visit.visitedAt });
     }
   }
-  const newCustomerIds = new Set(visits.filter((visit) => visit.customer.visitCount <= 1 || visit.customer.createdAt >= range.from).map((visit) => visit.customerId));
+  const newCustomerIds = new Set(visits.flatMap((visit) => visit.customerId && visit.customer && (visit.customer.visitCount <= 1 || visit.customer.createdAt >= range.from) ? [visit.customerId] : []));
 
   return {
     from: range.from.toISOString(),
@@ -193,6 +195,7 @@ function buildRevenueSummary(visits: VisitForReport[], range: { from: Date; to: 
     grossAmount,
     discountAmount,
     netAmount,
+    commissionAmount,
     cashAmount,
     networkAmount,
     visitsCount: visits.length,
@@ -259,6 +262,7 @@ function buildServiceReport(visits: VisitForReport[]) {
 function buildTopCustomers(visits: VisitForReport[]) {
   const byCustomer = new Map<string, { customer: VisitForReport["customer"]; visits: VisitForReport[] }>();
   for (const visit of visits) {
+    if (!visit.customerId || !visit.customer) continue;
     byCustomer.set(visit.customerId, {
       customer: visit.customer,
       visits: [...(byCustomer.get(visit.customerId)?.visits ?? []), visit],
@@ -266,6 +270,7 @@ function buildTopCustomers(visits: VisitForReport[]) {
   }
 
   return [...byCustomer.values()]
+    .filter((row): row is { customer: NonNullable<VisitForReport["customer"]>; visits: VisitForReport[] } => Boolean(row.customer))
     .map(({ customer, visits: customerVisits }) => ({
       customer: {
         id: customer.id,

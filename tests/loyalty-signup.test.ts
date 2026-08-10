@@ -7,6 +7,7 @@ const prisma = new PrismaClient();
 const ORG = "org_default";
 const createdCustomerIds: string[] = [];
 const rateKeys: string[] = [];
+const privacyNotice = { privacyNoticeAcknowledged: true as const, privacyNoticeControllerName: "صالون الاختبار" };
 
 function randomLocalPhone() {
   return `05${Math.floor(10000000 + Math.random() * 89999999)}`;
@@ -38,6 +39,7 @@ describe("التسجيل الذاتي في برنامج الولاء", () => {
       name: "عميل تسجيل ذاتي",
       phone: randomLocalPhone(),
       rateLimitKey,
+      ...privacyNotice,
     });
 
     expect(result.outcome).toBe("CREATED");
@@ -62,6 +64,7 @@ describe("التسجيل الذاتي في برنامج الولاء", () => {
       name: "عميل أول",
       phone,
       rateLimitKey: firstKey,
+      ...privacyNotice,
     });
     expect(first.outcome).toBe("CREATED");
     if (first.outcome === "CREATED") createdCustomerIds.push(first.customerId);
@@ -72,6 +75,7 @@ describe("التسجيل الذاتي في برنامج الولاء", () => {
       name: "متطفّل",
       phone,
       rateLimitKey: secondKey,
+      ...privacyNotice,
     });
     expect(second.outcome).toBe("ALREADY_REGISTERED");
     expect(second).not.toHaveProperty("portalPath");
@@ -86,6 +90,7 @@ describe("التسجيل الذاتي في برنامج الولاء", () => {
       name: "عميل البوابة",
       phone: randomLocalPhone(),
       rateLimitKey,
+      ...privacyNotice,
     });
     if (result.outcome !== "CREATED") throw new Error("expected CREATED");
     createdCustomerIds.push(result.customerId);
@@ -116,6 +121,7 @@ describe("التسجيل الذاتي في برنامج الولاء", () => {
         name: "  ",
         phone: randomLocalPhone(),
         rateLimitKey,
+        ...privacyNotice,
       }),
     ).rejects.toThrow("الاسم مطلوب");
   });

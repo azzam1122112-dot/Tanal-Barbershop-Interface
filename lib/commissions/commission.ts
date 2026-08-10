@@ -12,7 +12,7 @@ export type CommissionLineInput = {
 
 export type CommissionLineResult<TLine extends CommissionLineInput = CommissionLineInput> = TLine & {
   commissionRate: number;
-  /** حصة السطر من الوعاء بعد الخصم وقبل الضريبة. */
+  /** حصة السطر من المبلغ بعد الخصم. */
   commissionBase: number;
   commissionAmount: number;
 };
@@ -21,15 +21,14 @@ export type CommissionLineResult<TLine extends CommissionLineInput = CommissionL
  * يحسب عمولة الحلاق على زيارة.
  *
  * القواعد الجوهرية:
- * - الوعاء هو **المبلغ بعد الخصم وقبل الضريبة** (`subtotalAmount`) — لا عمولة على الضريبة،
- *   ولا على خصم لم يدفعه العميل.
+ * - الوعاء هو **المبلغ بعد الخصم** — لا عمولة على خصم لم يدفعه العميل.
  * - أسبقية النسبة: نسبة الخدمة ← نسبة الحلاق ← النسبة الافتراضية للفرع.
  * - الوعاء يُوزَّع على الخدمات بنسبة قيمة كل سطر، فتُطبَّق نسبة كل خدمة على حصتها فقط.
  * - عند تعطيل عمولة الحلاق تصبح كل النسب صفرًا، بما فيها نسبة الخدمة.
  */
 export function calculateVisitCommission<TLine extends CommissionLineInput>(input: {
   lines: TLine[];
-  /** المبلغ بعد الخصم وقبل الضريبة. */
+  /** المبلغ بعد الخصم. */
   commissionBase: number;
   /** بوابة العمولة للحلاق. القيمة الافتراضية true للتوافق مع الاستدعاءات القديمة. */
   enabled?: boolean;

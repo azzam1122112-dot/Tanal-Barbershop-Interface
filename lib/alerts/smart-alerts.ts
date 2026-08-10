@@ -217,7 +217,7 @@ async function getRepeatedCashGaps(
   const byBarber = new Map<string, { barberId: string; barberName: string; count: number; totalDifference: number }>();
 
   for (const session of sessions) {
-    const expected = Number(session.cashTotal) - Number(session.expensesTotal);
+    const expected = Number(session.openingCashAmount) + Number(session.cashTotal) - Number(session.expensesTotal) - Number(session.collectionsTotal);
     const received = session.cashReceivedAmount == null ? expected : Number(session.cashReceivedAmount);
     const difference = roundMoney(received - expected);
     if (Math.abs(difference) < 1) continue;

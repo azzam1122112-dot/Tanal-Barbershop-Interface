@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { parseJsonBody, requireAdminApi } from "@/lib/auth/http";
+import { updateDataSubjectRequest } from "@/lib/privacy/execute-data-subject-request";
+import { toErrorResponse } from "@/lib/http/error-response";
 
 const schema = z.object({
   status: z.enum(["IN_PROGRESS", "COMPLETED", "REJECTED"]),
@@ -15,8 +17,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const parsed = schema.safeParse(await parseJsonBody(request));
   if (!parsed.success) return NextResponse.json({ message: parsed.error.issues[0]?.message ?? "البيانات غير صحيحة" }, { status: 400 });
   const { id } = await params;
-  const existing = await prisma.dataSubjectRequest.findFirst({ where: { id, organizationId: auth.session.organizationId }, select: { id: true } });
-  if (!existing) return NextResponse.json({ message: "الطلب غير موجود" }, { status: 404 });
-  const updated = await prisma.dataSubjectRequest.update({ where: { id }, data: { status: parsed.data.status, resolutionNote: parsed.data.resolutionNote, resolvedAt: parsed.data.status === "IN_PROGRESS" ? null : new Date() } });
-  return NextResponse.json({ request: { id: updated.id, status: updated.status, resolutionNote: updated.resolutionNote, resolvedAt: updated.resolvedAt?.toISOString() ?? null } });
+  try {
+    const updated = await updateDataSubjectRequest(prisma, {
+      requestId: id,
+      organizationId: auth.session.organizationId,
+      status: parsed.data.status,
+      resolutionNote: parsed.data.resolutionNote,
+      actorUserId: auth.session.user.id,
+      actorType: auth.session.user.role,
+    });
+    return NextResponse.json({ request: { id: updated.id, status: updated.status, resolutionNote: updated.resolutionNote, resolvedAt: updated.resolvedAt?.toISOString() ?? null, executedAt: updated.executedAt?.toISOString() ?? null, ...(updated.customerId === null ? { customer: null } : {}) } });
+  } catch (error) {
+    return toErrorResponse(error, "تعذر تنفيذ طلب الخصوصية");
+  }
 }

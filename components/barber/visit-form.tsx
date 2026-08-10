@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useState } from "react";
+import { ShareReceiptPdfButton } from "@/components/receipt/share-pdf-button";
 import { useModalDismiss } from "@/components/use-modal-dismiss";
 import { calculateVisitTotals } from "@/lib/loyalty/calculations";
 import { formatDate } from "@/lib/format";
@@ -19,18 +20,16 @@ type ProductOption = {
 };
 
 type VisitPreview = {
-  customer: { id: string; name: string; phone: string };
+  customer: { id: string; name: string; phone: string } | null;
   barber: { id: string; name: string };
   services: ServiceOption[];
   grossAmount: number;
   discountAmount: number;
   netAmount: number;
   paymentMethod: "CASH" | "NETWORK";
+  loyaltyEnabled: boolean;
   expectedPointsEarned: number;
   pointsBalance: number;
-  vatEnabled: boolean;
-  vatRate: number;
-  vatInclusive: boolean;
   pointsPerCurrencyUnit: number;
   pointsCalculatedAfterDiscount: boolean;
   productsTotal: number;
@@ -64,11 +63,20 @@ export function VisitForm({
   services,
   products = [],
 }: {
-  customerId: string;
+  customerId?: string | null;
   services: ServiceOption[];
   products?: ProductOption[];
 }) {
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [linkedCustomerId, setLinkedCustomerId] = useState<string | null>(customerId ?? null);
+  const [linkedCustomer, setLinkedCustomer] = useState<{ id: string; name: string; phone: string; loyaltyEnabled: boolean; pointsBalance: number } | null>(null);
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [customerLookupState, setCustomerLookupState] = useState<"idle" | "missing">("idle");
+  const [joinName, setJoinName] = useState("");
+  const [transactionalConsent, setTransactionalConsent] = useState(false);
+  const [marketingConsent, setMarketingConsent] = useState(false);
+  const [customerMessage, setCustomerMessage] = useState("");
+  const [loadingCustomer, setLoadingCustomer] = useState(false);
   // كمية كل منتج مباع مع الزيارة؛ الأسعار تُحسب في الخادم لا هنا.
   const [productQuantities, setProductQuantities] = useState<Record<string, number>>({});
   const [paymentMethod, setPaymentMethod] = useState<"CASH" | "NETWORK">("CASH");
@@ -79,6 +87,8 @@ export function VisitForm({
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [loadingConfirm, setLoadingConfirm] = useState(false);
   const [confirmedVisitId, setConfirmedVisitId] = useState<string | null>(null);
+  const [cashTenderedAmount, setCashTenderedAmount] = useState("");
+  const [networkAccepted, setNetworkAccepted] = useState(false);
 
   const closePreview = useCallback(() => {
     setPreview(null);
@@ -108,6 +118,79 @@ export function VisitForm({
     .filter(([, quantity]) => quantity > 0)
     .map(([productId, quantity]) => ({ productId, quantity }));
 
+  async function lookupCustomer() {
+    if (!/^05\d{8}$/.test(customerPhone)) {
+      setCustomerMessage("أدخل رقمًا يبدأ بـ 05 ويتكون من 10 أرقام");
+      return;
+    }
+    setLoadingCustomer(true);
+    setCustomerMessage("");
+    const response = await fetch(`/api/barber/customers/search?phone=${encodeURIComponent(customerPhone)}`);
+    const data = (await response.json().catch(() => ({}))) as {
+      found?: boolean;
+      customer?: { id: string; name: string; phone: string; loyaltyEnabled: boolean; pointsBalance: number };
+      message?: string;
+    };
+    if (response.ok && data.found && data.customer) {
+      setLinkedCustomer(data.customer);
+      setLinkedCustomerId(data.customer.id);
+      setCustomerLookupState("idle");
+      setCustomerMessage(data.customer.loyaltyEnabled ? `تم ربط ${data.customer.name} — ${data.customer.pointsBalance} نقطة` : `تم ربط ${data.customer.name} كعميل عادي`);
+      setPreview(null);
+    } else if (response.ok) {
+      setLinkedCustomer(null);
+      setLinkedCustomerId(null);
+      setCustomerLookupState("missing");
+      setCustomerMessage("الرقم غير مسجل. يمكن التسجيل في الولاء أو المتابعة كزائر دون حفظه.");
+    } else {
+      setCustomerMessage(data.message ?? "تعذر البحث عن العميل");
+    }
+    setLoadingCustomer(false);
+  }
+
+  async function enrollCustomer() {
+    if (joinName.trim().length < 2) {
+      setCustomerMessage("اكتب اسم العميل للتسجيل في الولاء");
+      return;
+    }
+    setLoadingCustomer(true);
+    const response = await fetch("/api/barber/customers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: joinName,
+        phone: customerPhone,
+        enrollInLoyalty: true,
+        whatsappTransactionalOptIn: transactionalConsent,
+        whatsappMarketingOptIn: marketingConsent,
+      }),
+    });
+    const data = (await response.json().catch(() => ({}))) as {
+      customer?: { id: string; name: string; phone: string; loyaltyEnabled: boolean; pointsBalance: number };
+      message?: string;
+    };
+    if (response.ok && data.customer) {
+      setLinkedCustomer(data.customer);
+      setLinkedCustomerId(data.customer.id);
+      setCustomerLookupState("idle");
+      setCustomerMessage("تم التسجيل في الولاء وربط العميل بالعملية");
+      setPreview(null);
+    } else {
+      setCustomerMessage(data.message ?? "تعذر تسجيل العميل");
+    }
+    setLoadingCustomer(false);
+  }
+
+  function continueAsGuest() {
+    setLinkedCustomer(null);
+    setLinkedCustomerId(null);
+    setCustomerPhone("");
+    setJoinName("");
+    setCustomerLookupState("idle");
+    setCustomerMessage("ستُحفظ العملية كزائر بلا اسم أو رقم جوال أو نقاط");
+    setPreview(null);
+  }
+
   async function submitPreview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage("");
@@ -117,7 +200,7 @@ export function VisitForm({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        customerId,
+        customerId: linkedCustomerId,
         serviceIds: selectedServices,
         products: selectedProducts,
         grossAmount,
@@ -128,6 +211,8 @@ export function VisitForm({
 
     if (response.ok && data.preview) {
       setPreview(data.preview);
+      setCashTenderedAmount(String(data.preview.netAmount));
+      setNetworkAccepted(false);
       setSelectedDiscount("NONE");
       setIdempotencyKey(crypto.randomUUID());
     } else {
@@ -144,7 +229,7 @@ export function VisitForm({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        customerId,
+        customerId: linkedCustomerId,
         serviceIds: selectedServices,
         products: selectedProducts,
         grossAmount,
@@ -153,9 +238,11 @@ export function VisitForm({
         managerRewardId: selectedDiscount.startsWith("MANAGER_REWARD:") ? selectedDiscount.replace("MANAGER_REWARD:", "") : undefined,
         campaignId: selectedDiscount.startsWith("CAMPAIGN:") ? selectedDiscount.replace("CAMPAIGN:", "") : undefined,
         idempotencyKey,
+        paymentConfirmed: true,
+        cashTenderedAmount: paymentMethod === "CASH" ? cashTenderedAmount : undefined,
       }),
     });
-    const data = (await response.json().catch(() => ({}))) as { visit?: { id: string; customer: { id: string } }; message?: string };
+    const data = (await response.json().catch(() => ({}))) as { visit?: { id: string; customer: { id: string } | null }; message?: string };
 
     if (response.ok && data.visit) {
       // لا نعود للرئيسية مباشرة: الحلاق يحتاج خيار تسليم الإيصال للعميل أولًا.
@@ -185,13 +272,13 @@ export function VisitForm({
         discountAmount: displayDiscount,
         pointsPerCurrencyUnit: preview.pointsPerCurrencyUnit,
         pointsCalculatedAfterDiscount: preview.pointsCalculatedAfterDiscount,
-        vatEnabled: preview.vatEnabled,
-        vatRate: preview.vatRate,
-        vatInclusive: preview.vatInclusive,
       })
     : null;
   const displayNetAmount = displayTotals?.netAmount ?? 0;
-  const displayExpectedPoints = displayTotals?.pointsEarned ?? 0;
+  const displayExpectedPoints = preview?.loyaltyEnabled ? (displayTotals?.pointsEarned ?? 0) : 0;
+  const parsedCashTendered = Number(cashTenderedAmount);
+  const cashChange = Number.isFinite(parsedCashTendered) ? Math.max(0, Math.round((parsedCashTendered - displayNetAmount) * 100) / 100) : 0;
+  const paymentReady = paymentMethod === "NETWORK" ? networkAccepted : Number.isFinite(parsedCashTendered) && parsedCashTendered >= displayNetAmount;
   const selectedServicesTotal = services
     .filter((service) => selectedServices.includes(service.id))
     .reduce((total, service) => total + service.defaultPrice, 0);
@@ -213,10 +300,19 @@ export function VisitForm({
         <p className="mt-1 text-sm font-semibold text-salon-charcoal/70">
           {displayExpectedPoints > 0 ? `أضيفت ${displayExpectedPoints} نقطة لرصيد العميل` : "بلا نقاط لهذه الزيارة"}
         </p>
+        {paymentMethod === "CASH" && cashChange > 0 ? (
+          <p className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-950">
+            سلّم العميل الباقي: <span className="font-black tabular-nums">{cashChange.toFixed(2)} ريال</span>
+          </p>
+        ) : null}
 
         <div className="mt-6 grid gap-3">
+          <ShareReceiptPdfButton
+            visitId={confirmedVisitId}
+            className="barber-primary-button block w-full py-4 text-center text-lg"
+          />
           <a href={`/receipt/${confirmedVisitId}`} className="barber-primary-button block py-4 text-center text-lg">
-            عرض وطباعة الإيصال
+            عرض الإيصال وطباعته
           </a>
           <a
             href="/barber"
@@ -325,6 +421,86 @@ export function VisitForm({
         </div>
       ) : null}
 
+      <section className="barber-card overflow-hidden">
+        <div className="barber-card-head flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold text-salon-forest">قبل الدفع · اختياري</p>
+            <h2 className="mt-1 text-lg font-bold">العميل والولاء</h2>
+          </div>
+          <span className="rounded-xl border border-salon-line bg-white px-3 py-1 text-xs font-bold text-salon-charcoal">
+            {linkedCustomerId ? "عميل مرتبط" : "زائر"}
+          </span>
+        </div>
+        <div className="space-y-3 p-4">
+          {linkedCustomerId ? (
+            <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-bold text-violet-950">{linkedCustomer?.name ?? "العميل المحدد"}</p>
+                  <p className="mt-1 text-xs font-semibold text-violet-800/75">
+                    {linkedCustomer
+                      ? linkedCustomer.loyaltyEnabled
+                        ? `${linkedCustomer.phone} · ${linkedCustomer.pointsBalance} نقطة`
+                        : `${linkedCustomer.phone} · غير مشترك في الولاء`
+                      : "سيتم التحقق من الرصيد والمكافآت في المعاينة"}
+                  </p>
+                </div>
+                <button type="button" onClick={continueAsGuest} className="rounded-xl border border-violet-200 bg-white px-3 py-2 text-xs font-bold text-violet-900">
+                  تحويل لزائر
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="rounded-2xl border border-salon-line bg-salon-pearl p-3">
+                <p className="text-sm font-bold">الافتراضي: عملية زائر بلا بيانات</p>
+                <p className="mt-1 text-xs font-semibold leading-5 text-salon-charcoal/65">
+                  أدخل الجوال فقط إذا أراد العميل احتساب نقاطه أو استبدال مكافأة. الرقم غير المسجل لا يُحفظ عند المتابعة كزائر.
+                </p>
+              </div>
+              <div className="grid grid-cols-[1fr_96px] gap-2">
+                <input
+                  value={customerPhone}
+                  onChange={(event) => {
+                    setCustomerPhone(event.target.value.replace(/\D/g, "").slice(0, 10));
+                    setCustomerLookupState("idle");
+                    setCustomerMessage("");
+                  }}
+                  inputMode="numeric"
+                  placeholder="05xxxxxxxx"
+                  className="barber-field h-14 text-center text-lg"
+                />
+                <button type="button" onClick={lookupCustomer} disabled={loadingCustomer} className="barber-ghost-button h-14">
+                  {loadingCustomer ? "..." : "تحقق"}
+                </button>
+              </div>
+            </>
+          )}
+
+          {customerLookupState === "missing" ? (
+            <div className="space-y-3 rounded-2xl border border-violet-200 bg-violet-50/70 p-3">
+              <input value={joinName} onChange={(event) => setJoinName(event.target.value)} placeholder="اسم العميل للتسجيل في الولاء" className="barber-field bg-white" />
+              <div className="grid gap-2 text-xs font-semibold text-violet-950 sm:grid-cols-2">
+                <label className="flex items-center gap-2 rounded-xl bg-white px-3 py-2.5">
+                  <input type="checkbox" checked={transactionalConsent} onChange={(event) => setTransactionalConsent(event.target.checked)} />
+                  رسائل الخدمة والمواعيد
+                </label>
+                <label className="flex items-center gap-2 rounded-xl bg-white px-3 py-2.5">
+                  <input type="checkbox" checked={marketingConsent} onChange={(event) => setMarketingConsent(event.target.checked)} />
+                  العروض والمكافآت
+                </label>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={enrollCustomer} disabled={loadingCustomer} className="barber-gold-button h-12">تسجيل في الولاء</button>
+                <button type="button" onClick={continueAsGuest} className="barber-ghost-button h-12">متابعة كزائر</button>
+              </div>
+            </div>
+          ) : null}
+
+          {customerMessage ? <p className="rounded-xl bg-salon-mist px-3 py-2 text-xs font-bold text-salon-charcoal">{customerMessage}</p> : null}
+        </div>
+      </section>
+
       <div className="barber-card p-4">
         <div className="rounded-2xl border border-salon-forest/20 bg-salon-forest/5 px-4 py-4 text-center">
           <p className="text-xs font-bold text-salon-charcoal/70">مبلغ الخدمات — محسوب آليًا من قائمة الأسعار</p>
@@ -393,12 +569,16 @@ export function VisitForm({
               </div>
               <p className="mt-4 text-sm font-bold text-salon-charcoal/65">المطلوب تحصيله</p>
               <p className="mt-1 text-5xl font-black text-salon-forest">{displayNetAmount} ريال</p>
-              <p className="mt-2 text-sm font-semibold text-salon-charcoal/70">النقاط المتوقعة: {displayExpectedPoints}</p>
+              <p className="mt-2 text-sm font-semibold text-salon-charcoal/70">
+                {preview.loyaltyEnabled ? `النقاط المتوقعة: ${displayExpectedPoints}` : "عملية عادية بلا نقاط ولاء"}
+              </p>
             </div>
             <div className="min-h-0 overflow-y-auto p-4">
               <div className="rounded-2xl border border-salon-line bg-salon-pearl p-3">
                 <p className="text-sm font-bold">الخصومات المتاحة</p>
-                <p className="mt-1 text-xs font-semibold text-salon-charcoal/70">رصيد النقاط: {preview.pointsBalance}</p>
+                <p className="mt-1 text-xs font-semibold text-salon-charcoal/70">
+                  {preview.loyaltyEnabled ? `رصيد النقاط: ${preview.pointsBalance}` : "العميل غير مشترك في برنامج الولاء"}
+                </p>
                 <div className="mt-3 grid gap-2">
                   <DiscountButton
                     selected={selectedDiscount === "NONE"}
@@ -439,7 +619,7 @@ export function VisitForm({
                 ) : null}
               </div>
               <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                <SummaryCell label="العميل" value={preview.customer.name} />
+                <SummaryCell label="العميل" value={preview.customer?.name ?? "عميل زائر"} />
                 <SummaryCell label="طريقة الدفع" value={paymentMethod === "CASH" ? "كاش" : "شبكة"} />
                 <SummaryCell label="قبل الخصم" value={`${preview.grossAmount} ريال`} />
                 <SummaryCell label="الخصم" value={`${displayDiscount} ريال`} />
@@ -448,16 +628,46 @@ export function VisitForm({
                 <SummaryCell label="مكافأة الإدارة" value={selectedManagerReward ? selectedManagerReward.title : "-"} />
               </dl>
               <p className="mt-3 rounded-2xl bg-salon-mist px-3 py-3 text-sm font-semibold text-salon-charcoal">{preview.services.map((service) => service.name).join("، ")}</p>
+              {paymentMethod === "CASH" ? (
+                <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3">
+                  <label className="text-sm font-bold text-emerald-950">
+                    المبلغ المستلم من العميل
+                    <input
+                      lang="en"
+                      type="number"
+                      min={displayNetAmount}
+                      step="0.01"
+                      value={cashTenderedAmount}
+                      onChange={(event) => setCashTenderedAmount(event.target.value)}
+                      className="barber-field mt-2 bg-white text-center text-xl"
+                    />
+                  </label>
+                  <div className="mt-2 flex items-center justify-between rounded-xl bg-white px-3 py-2 text-sm font-bold text-emerald-950">
+                    <span>الباقي للعميل</span>
+                    <span className="text-lg font-black tabular-nums">{cashChange.toFixed(2)} ريال</span>
+                  </div>
+                </div>
+              ) : (
+                <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm font-bold text-sky-950">
+                  <input
+                    type="checkbox"
+                    checked={networkAccepted}
+                    onChange={(event) => setNetworkAccepted(event.target.checked)}
+                    className="mt-0.5 h-5 w-5 accent-sky-700"
+                  />
+                  <span>أؤكد أن جهاز الشبكة وافق على العملية وتم تحصيل المبلغ.</span>
+                </label>
+              )}
             </div>
             <div className="border-t border-salon-line bg-white p-4">
               <button
                 type="button"
                 onClick={confirmVisit}
-                disabled={loadingConfirm}
+                disabled={loadingConfirm || !paymentReady}
                 aria-busy={loadingConfirm}
                 className="barber-gold-button h-14 w-full text-lg"
               >
-                {loadingConfirm ? "جاري الحفظ..." : "تأكيد واستقبال العميل التالي"}
+                {loadingConfirm ? "جاري إتمام العملية..." : paymentMethod === "CASH" ? "تم استلام الكاش — إتمام العملية" : "تم قبول الشبكة — إتمام العملية"}
               </button>
             </div>
           </div>

@@ -22,6 +22,7 @@ let rewardCustomerId = "";
 let inactiveCustomerId = "";
 let activeCustomerId = "";
 let pointsCustomerId = "";
+let ordinaryCustomerId = "";
 let activeServiceId = "";
 let lowPriceServiceId = "";
 let inactiveServiceId = "";
@@ -129,6 +130,17 @@ describe("visit preview and confirm", () => {
       data: { points: 300, lifetimeEarned: 300 },
     });
 
+    const ordinaryCustomer = await createCustomerWithLoyalty({
+      prisma,
+      organizationId: "org_default",
+      name: "عميل بدون ولاء",
+      phone: `9665${(Date.now() + 5).toString().slice(-8)}`,
+      createdByBarberId: barberId,
+      enrollInLoyalty: false,
+    });
+    ordinaryCustomerId = ordinaryCustomer.customer.id;
+    createdCustomerIds.push(ordinaryCustomerId);
+
     const rewardRule = await prisma.rewardRule.findFirstOrThrow({
       where: { requiredPoints: 500, isActive: true },
     });
@@ -184,6 +196,83 @@ describe("visit preview and confirm", () => {
     expect(after).toBe(before);
     expect(preview.netAmount).toBe(70);
     expect(preview.discountAmount).toBe(0);
+  });
+
+  it("records a paid visit for a non-loyalty customer without creating points or membership", async () => {
+    const preview = await buildVisitPreview(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
+      customerId: ordinaryCustomerId,
+      barberId,
+      serviceIds: [activeServiceId],
+      grossAmount: 70,
+      paymentMethod: "CASH",
+    });
+
+    expect(preview.loyaltyEnabled).toBe(false);
+    expect(preview.expectedPointsEarned).toBe(0);
+    expect(preview.availableRewards).toHaveLength(0);
+
+    const result = await confirmVisit(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
+      customerId: ordinaryCustomerId,
+      barberId,
+      serviceIds: [activeServiceId],
+      grossAmount: 70,
+      paymentMethod: "CASH",
+      idempotencyKey: `ordinary-${Date.now()}`,
+    });
+    createdVisitIds.push(result.visit.id);
+
+    const [account, transactions, visit] = await Promise.all([
+      prisma.loyaltyAccount.findUnique({ where: { customerId: ordinaryCustomerId } }),
+      prisma.loyaltyTransaction.findMany({ where: { visitId: result.visit.id } }),
+      prisma.visit.findUniqueOrThrow({ where: { id: result.visit.id } }),
+    ]);
+    expect(account).toBeNull();
+    expect(transactions).toHaveLength(0);
+    expect(visit.pointsEarned).toBe(0);
+    expect(visit.cashSessionId).toBeTruthy();
+    expect(Number(visit.netAmount)).toBe(70);
+  });
+
+  it("records a guest sale without retaining personal data and stores cash change", async () => {
+    const preview = await buildVisitPreview(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
+      customerId: null,
+      barberId,
+      serviceIds: [activeServiceId],
+      grossAmount: 70,
+      paymentMethod: "CASH",
+    });
+    expect(preview.customer).toBeNull();
+    expect(preview.loyaltyEnabled).toBe(false);
+    expect(preview.availableRewards).toHaveLength(0);
+
+    const result = await confirmVisit(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
+      customerId: null,
+      barberId,
+      serviceIds: [activeServiceId],
+      grossAmount: 70,
+      paymentMethod: "CASH",
+      cashTenderedAmount: 100,
+      paymentConfirmed: true,
+      idempotencyKey: `guest-${Date.now()}`,
+    });
+    createdVisitIds.push(result.visit.id);
+
+    const visit = await prisma.visit.findUniqueOrThrow({ where: { id: result.visit.id } });
+    const transactions = await prisma.loyaltyTransaction.findMany({ where: { visitId: result.visit.id } });
+    expect(result.visit.customer).toBeNull();
+    expect(visit.customerId).toBeNull();
+    expect(Number(visit.cashTenderedAmount)).toBe(100);
+    expect(Number(visit.cashChangeAmount)).toBe(30);
+    expect(visit.pointsEarned).toBe(0);
+    expect(transactions).toHaveLength(0);
   });
 
   it("preview rejects zero or negative amount", async () => {
@@ -725,7 +814,7 @@ describe("visit preview and confirm", () => {
 
     expect("passwordHash" in safe).toBe(false);
     expect("accessPinHash" in safe).toBe(false);
-    expect(safe.customer.phone).toBeTruthy();
+    expect(safe.customer?.phone).toBeTruthy();
   });
 });
 

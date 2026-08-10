@@ -32,7 +32,7 @@ export default async function DashboardDailyClosePage({
   ]);
 
   return (
-    <DashboardShell title="جلسات الصندوق" description="الجلسات ليست مرتبطة بتاريخ أو جدول دوام. يفتح الحلاق جلسة، ويغلقها المدير عند استلام الكاش.">
+    <DashboardShell title="جلسات الصندوق" description="يفتح الحلاق جلسة تشغيلية ويغلقها المدير لتثبيت العد. التحصيل ونقل العهدة مستقلان تمامًا في شاشة عهدة الكاش.">
         <form className="dashboard-panel mt-6 flex flex-col gap-3 p-4 sm:flex-row sm:items-end">
           <label className="text-sm font-bold text-salon-charcoal">
             تاريخ سجل الجلسات
@@ -74,11 +74,13 @@ export default async function DashboardDailyClosePage({
                   <th className="px-3 py-3 text-right">أغلقت</th>
                   <th className="px-3 py-3 text-right">الزيارات</th>
                   <th className="px-3 py-3 text-right">الكاش المتوقع</th>
-                  <th className="px-3 py-3 text-right">المستلم</th>
+                  <th className="px-3 py-3 text-right">مصروفات الدرج</th>
+                  <th className="px-3 py-3 text-right">تحصيلات الإدارة</th>
+                  <th className="px-3 py-3 text-right">المعدود عند الإغلاق</th>
                   <th className="px-3 py-3 text-right">الفرق</th>
                   <th className="px-3 py-3 text-right">الشبكة</th>
                   <th className="px-3 py-3 text-right">الصافي</th>
-                  <th className="px-3 py-3 text-right">استلم بواسطة</th>
+                  <th className="px-3 py-3 text-right">أغلق بواسطة</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-salon-line">
@@ -89,7 +91,9 @@ export default async function DashboardDailyClosePage({
                     <td className="px-3 py-3">{formatDateTime(close.openedAt)}</td>
                     <td className="px-3 py-3">{close.closedAt ? formatDateTime(close.closedAt) : "-"}</td>
                     <td className="px-3 py-3">{close.visitsCount}</td>
-                    <td className="px-3 py-3">{formatMoney(close.cashTotal)}</td>
+                    <td className="px-3 py-3">{formatMoney(close.expectedCash)}</td>
+                    <td className="px-3 py-3 text-salon-ruby">{formatMoney(close.expensesTotal)}</td>
+                    <td className="px-3 py-3 text-salon-steel">{formatMoney(close.collectionsTotal)}</td>
                     <td className="px-3 py-3">{formatMoney(close.cashReceivedAmount)}</td>
                     <td className="px-3 py-3">{formatMoney(close.cashDifference)}</td>
                     <td className="px-3 py-3">{formatMoney(close.cardTotal)}</td>
@@ -97,7 +101,7 @@ export default async function DashboardDailyClosePage({
                     <td className="px-3 py-3">{close.closedBy?.name ?? "-"}</td>
                   </tr>
                 ))}
-                {history.length === 0 ? <tr><td colSpan={11} className="px-4 py-8"><EmptyState title="لا توجد جلسات مغلقة" description="لا يوجد سجل مطابق للفترة أو الحلاق المحدد." /></td></tr> : null}
+                {history.length === 0 ? <tr><td colSpan={13} className="px-4 py-8"><EmptyState title="لا توجد جلسات مغلقة" description="لا يوجد سجل مطابق للفترة أو الحلاق المحدد." /></td></tr> : null}
               </tbody>
             </table>
           </TablePanel>

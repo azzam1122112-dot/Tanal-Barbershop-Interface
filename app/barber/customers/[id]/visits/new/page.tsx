@@ -15,7 +15,10 @@ export default async function NewVisitPage({ params }: { params: Promise<{ id: s
   const { id } = await params;
   // مقيّد بمؤسسة الحلاق وفرعه: لا يُسجَّل عميل أو خدمة من مستأجر آخر.
   const [customer, services, products] = await Promise.all([
-    prisma.customer.findFirst({ where: { id, organizationId: session.organizationId } }),
+    prisma.customer.findFirst({
+      where: { id, organizationId: session.organizationId },
+      include: { loyaltyAccount: { select: { id: true } } },
+    }),
     prisma.service.findMany({
       where: { organizationId: session.organizationId, salonId: session.salonId },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
@@ -38,7 +41,12 @@ export default async function NewVisitPage({ params }: { params: Promise<{ id: s
         <div className="barber-card lux-edge p-5">
           <p className="text-xs font-bold tracking-[0.18em] text-salon-forest">تسجيل زيارة</p>
           <h1 className="mt-3 text-3xl font-bold text-salon-ink">{customer.name}</h1>
-          <p className="mt-1 font-semibold text-salon-charcoal/75">{customer.phone}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <p className="font-semibold text-salon-charcoal/75">{customer.phone}</p>
+            <span className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${customer.loyaltyAccount ? "border-violet-200 bg-violet-50 text-violet-700" : "border-salon-line bg-salon-mist text-salon-charcoal"}`}>
+              {customer.loyaltyAccount ? "مشترك في الولاء" : "عملية بدون ولاء"}
+            </span>
+          </div>
           <div className="mt-4 rounded-2xl border border-salon-line bg-salon-pearl px-4 py-3 text-sm font-semibold text-salon-charcoal">
             اختر الخدمات، أدخل المبلغ، ثم اعرض المعاينة قبل التأكيد.
           </div>

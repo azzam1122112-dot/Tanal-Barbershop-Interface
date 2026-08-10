@@ -51,7 +51,9 @@ export default async function BarberCustomerPage({ params }: { params: Promise<{
 
   const summary = toCustomerSummary({ ...customer, visits: customer.visits.slice(0, 1) });
   const activeServices = onlyActiveServices(services).map((service) => toSafeService(service));
-  const availableRewards = rewardRules.filter((reward) => reward.requiredPoints <= summary.pointsBalance);
+  const availableRewards = summary.loyaltyEnabled
+    ? rewardRules.filter((reward) => reward.requiredPoints <= summary.pointsBalance)
+    : [];
 
   return (
     <main className="barber-shell">
@@ -65,9 +67,11 @@ export default async function BarberCustomerPage({ params }: { params: Promise<{
                 <h1 className="mt-2 text-3xl font-bold text-salon-ink">{summary.name}</h1>
                 <p className="mt-1 font-semibold text-salon-charcoal/75">{summary.phone}</p>
               </div>
-              <div className="rounded-2xl border border-salon-gold/40 bg-white px-4 py-3 text-center">
-                <p className="text-xs font-bold text-salon-charcoal/65">النقاط</p>
-                <p className="text-2xl font-black text-salon-forest">{formatNumber(summary.pointsBalance)}</p>
+              <div className={`rounded-2xl border px-4 py-3 text-center ${summary.loyaltyEnabled ? "border-salon-gold/40 bg-white" : "border-salon-line bg-salon-mist"}`}>
+                <p className="text-xs font-bold text-salon-charcoal/65">{summary.loyaltyEnabled ? "النقاط" : "الولاء"}</p>
+                <p className={`${summary.loyaltyEnabled ? "text-2xl" : "mt-1 text-xs"} font-black text-salon-forest`}>
+                  {summary.loyaltyEnabled ? formatNumber(summary.pointsBalance) : "غير مشترك"}
+                </p>
               </div>
             </div>
           </div>
@@ -108,17 +112,25 @@ export default async function BarberCustomerPage({ params }: { params: Promise<{
           </div>
         </SectionCard>
 
-        <SectionCard title="المكافآت المتاحة">
-          <p className="mt-2 text-sm font-semibold text-salon-charcoal">رصيد النقاط: {formatNumber(summary.pointsBalance)}</p>
-          <div className="mt-3 grid gap-2">
-            {availableRewards.map((reward) => (
-              <div key={reward.id} className="rounded-2xl border border-salon-gold/30 bg-salon-gold/10 px-3 py-3 text-sm font-bold">
-                خصم {formatMoney(Number(reward.discountAmount))} مقابل {formatNumber(reward.requiredPoints)} نقطة
-              </div>
-            ))}
-            {availableRewards.length === 0 ? <p className="rounded-2xl bg-salon-mist py-4 text-center text-sm font-semibold text-salon-charcoal">لا توجد مكافآت متاحة حاليًا</p> : null}
-          </div>
-        </SectionCard>
+        {summary.loyaltyEnabled ? (
+          <SectionCard title="المكافآت المتاحة">
+            <p className="mt-2 text-sm font-semibold text-salon-charcoal">رصيد النقاط: {formatNumber(summary.pointsBalance)}</p>
+            <div className="mt-3 grid gap-2">
+              {availableRewards.map((reward) => (
+                <div key={reward.id} className="rounded-2xl border border-salon-gold/30 bg-salon-gold/10 px-3 py-3 text-sm font-bold">
+                  خصم {formatMoney(Number(reward.discountAmount))} مقابل {formatNumber(reward.requiredPoints)} نقطة
+                </div>
+              ))}
+              {availableRewards.length === 0 ? <p className="rounded-2xl bg-salon-mist py-4 text-center text-sm font-semibold text-salon-charcoal">لا توجد مكافآت متاحة حاليًا</p> : null}
+            </div>
+          </SectionCard>
+        ) : (
+          <SectionCard title="برنامج الولاء">
+            <p className="mt-2 rounded-2xl border border-salon-line bg-salon-mist px-4 py-4 text-sm font-semibold leading-7 text-salon-charcoal">
+              هذا عميل عادي وغير مشترك في الولاء. يمكن تسجيل زياراته وفواتيره بصورة طبيعية دون إضافة نقاط.
+            </p>
+          </SectionCard>
+        )}
 
         <SectionCard title="مكافآت الإدارة">
           <div className="mt-3 grid gap-2">
@@ -137,12 +149,14 @@ export default async function BarberCustomerPage({ params }: { params: Promise<{
           <p className="mt-2 text-sm leading-6 text-salon-charcoal">قد تظهر حملات متاحة عند تسجيل الزيارة حسب المبلغ والخدمات وحالة العميل.</p>
         </SectionCard>
 
-        <SectionCard title="صفحة نقاط العميل">
-          <p className="mt-2 text-sm leading-6 text-salon-charcoal">
-            سلّم العميل رابطه ليتابع رصيده ومكافآته بنفسه في أي وقت.
-          </p>
-          <CustomerPortalShare customerId={summary.id} customerName={summary.name} customerPhone={summary.phone} />
-        </SectionCard>
+        {summary.loyaltyEnabled ? (
+          <SectionCard title="صفحة نقاط العميل">
+            <p className="mt-2 text-sm leading-6 text-salon-charcoal">
+              سلّم العميل رابطه ليتابع رصيده ومكافآته بنفسه في أي وقت.
+            </p>
+            <CustomerPortalShare customerId={summary.id} customerName={summary.name} customerPhone={summary.phone} />
+          </SectionCard>
+        ) : null}
         </div>
       </section>
       {/* شريط الإجراء الأساسي: ثابت أسفل الشاشة ليبقى «تسجيل زيارة» على بُعد لمسة

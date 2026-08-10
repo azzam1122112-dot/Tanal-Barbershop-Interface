@@ -61,11 +61,11 @@ export default async function WhatsAppPage({
           initialTemplates={templates}
           initialMessages={messages}
           customers={customers.map(toCustomerDashboardRow)}
-          visits={visits.map((visit) => ({
+        visits={visits.flatMap((visit) => visit.customerId && visit.customer ? [{
             id: visit.id,
             customerId: visit.customerId,
             label: `${visit.customer.name} - ${Number(visit.netAmount)} ريال - ${formatDate(visit.visitedAt)}`,
-          }))}
+          }] : [])}
           campaigns={campaigns.map((campaign) => ({ id: campaign.id, name: campaign.name }))}
           inactiveAudience={inactiveAudience}
           rewardAudience={rewardAudience}

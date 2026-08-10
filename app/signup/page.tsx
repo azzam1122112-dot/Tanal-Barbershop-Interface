@@ -208,7 +208,8 @@ export default function SignupPage() {
               <span>
                 قرأت وأوافق على <Link href="/terms" target="_blank" className="font-bold text-violet-800 underline">شروط الاشتراك</Link>
                 {" "}و<Link href="/privacy" target="_blank" className="font-bold text-violet-800 underline">سياسة الخصوصية</Link>
-                {" "}و<Link href="/refund-policy" target="_blank" className="font-bold text-violet-800 underline">سياسة الإلغاء والاسترداد</Link>.
+                {" "}و<Link href="/refund-policy" target="_blank" className="font-bold text-violet-800 underline">سياسة الإلغاء والاسترداد</Link>
+                {" "}و<Link href="/digital-service-policy" target="_blank" className="font-bold text-violet-800 underline">سياسة تقديم الخدمة الرقمية</Link>.
               </span>
             </label>
             <label className="flex items-start gap-3 text-xs font-semibold leading-6 text-salon-charcoal">

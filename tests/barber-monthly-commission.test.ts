@@ -16,7 +16,7 @@ describe("مستحق عمولة الحلاق الشهري", () => {
   it("يجمع المستحق المخزن للزيارات المكتملة في الشهر الحالي", async () => {
     const aggregate = vi.fn().mockResolvedValue({
       _count: { _all: 8 },
-      _sum: { subtotalAmount: 1250, commissionAmount: 187.5 },
+      _sum: { netAmount: 1250, commissionAmount: 187.5 },
     });
     const db = {
       barber: { findUnique: vi.fn().mockResolvedValue({ commissionEnabled: true, commissionRate: 15 }) },

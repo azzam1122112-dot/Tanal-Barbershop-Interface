@@ -16,8 +16,7 @@ const receiptInclude = {
 
 /**
  * يبني بيانات الإيصال الجاهزة للعرض.
- * المستند إيصال زيارة تشغيلي فقط. لا يدّعي التوافق مع ZATCA ولا يحل محل
- * الفاتورة الضريبية التي قد يكون الصالون ملزمًا بإصدارها عبر حل آخر.
+ * يبني إيصال الزيارة التشغيلي من سجل العملية المحفوظ.
  */
 export async function buildReceipt(
   prisma: PrismaClient,
@@ -43,9 +42,6 @@ export async function buildReceipt(
     salonId: visit.salonId,
   });
 
-  const vatAmount = Number(visit.vatAmount);
-  const netAmount = Number(visit.netAmount);
-  const subtotalAmount = Number(visit.subtotalAmount) || netAmount;
   const sellerName = settings?.legalName?.trim() || settings?.salonName || visit.salon?.name || "";
 
   const earnedPoints = visit.loyaltyTransactions
@@ -58,17 +54,18 @@ export async function buildReceipt(
   );
 
   return {
-    documentTitle: "إيصال زيارة",
+    visitId: visit.id,
+    documentTitle: "إيصال مبيعات",
     seller: {
       name: sellerName,
       organizationName: visit.organization?.name ?? "",
       salonName: visit.salon?.name ?? settings?.salonName ?? "",
-      vatNumber: settings?.vatNumber ?? null,
+      city: visit.organization?.city ?? "",
     },
     invoiceNumber: visit.invoiceNumber,
     visitedAt: visit.visitedAt.toISOString(),
     status: visit.status,
-    customer: { name: visit.customer.name, phone: visit.customer.phone },
+    customer: visit.customer ? { name: visit.customer.name, phone: visit.customer.phone } : { name: "عميل زائر", phone: "" },
     barber: { name: visit.barber.name },
     services: [
       ...visit.services.map((service) => ({
@@ -88,16 +85,15 @@ export async function buildReceipt(
     totals: {
       grossAmount: Number(visit.grossAmount),
       discountAmount: Number(visit.discountAmount),
-      subtotalAmount,
-      vatRate: Number(visit.vatRate),
-      vatAmount,
-      netAmount,
+      netAmount: Number(visit.netAmount),
     },
     paymentMethod: visit.paymentMethod,
+    cashTenderedAmount: visit.cashTenderedAmount != null ? Number(visit.cashTenderedAmount) : null,
+    cashChangeAmount: visit.cashChangeAmount != null ? Number(visit.cashChangeAmount) : null,
     loyalty: {
       earnedPoints,
       redeemedPoints,
-      balance: visit.customer.loyaltyAccount?.points ?? 0,
+      balance: visit.customer?.loyaltyAccount?.points ?? 0,
     },
   };
 }

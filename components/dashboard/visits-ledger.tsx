@@ -15,7 +15,7 @@ type DiscountMaps = {
 /**
  * سجل الزيارات بعرضين لنفس البيانات:
  * - جوال/تابلت: بطاقات. ثمانية أعمدة لا تُقرأ على شاشة جوال، والسحب الأفقي
- *   في أكثر شاشة تشغيلية استخدامًا ضريبة يومية على المدير.
+ *   في أكثر شاشة تشغيلية استخدامًا عبء يومي على المدير.
  * - ديسكتوب (lg فما فوق): الجدول الكامل حيث تتّسع الشاشة للمقارنة بين الصفوف.
  *
  * تفاصيل الزيارة وأزرارها مشتركة بين العرضين (`VisitDetails`) فلا يتفرّع السلوك.
@@ -35,10 +35,10 @@ export function VisitsLedger({ visits, discounts }: { visits: VisitDashboardRow[
               <div className="px-4 py-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate text-base font-bold">{visit.customer.name}</p>
-                    <p className="mt-0.5 text-xs font-semibold text-salon-charcoal/70" dir="ltr">
+                    <p className="truncate text-base font-bold">{visit.customer?.name ?? "عميل زائر"}</p>
+                    {visit.customer ? <p className="mt-0.5 text-xs font-semibold text-salon-charcoal/70" dir="ltr">
                       {visit.customer.phone}
-                    </p>
+                    </p> : null}
                   </div>
                   <div className="shrink-0 text-left">
                     <p className="whitespace-nowrap text-lg font-bold tabular-nums text-salon-forest">
@@ -124,8 +124,8 @@ export function VisitsLedger({ visits, discounts }: { visits: VisitDashboardRow[
                           <p className="mt-1 text-xs font-semibold text-salon-charcoal/70">{formatTime(visit.visitedAt)}</p>
                         </td>
                         <td className="px-4 py-3 align-middle">
-                          <p className="max-w-[190px] truncate font-bold">{visit.customer.name}</p>
-                          <p className="mt-1 text-xs font-semibold text-salon-charcoal/70">{visit.customer.phone}</p>
+                          <p className="max-w-[190px] truncate font-bold">{visit.customer?.name ?? "عميل زائر"}</p>
+                          {visit.customer ? <p className="mt-1 text-xs font-semibold text-salon-charcoal/70">{visit.customer.phone}</p> : null}
                         </td>
                         <td className="px-4 py-3 align-middle font-bold">{visit.barber.name}</td>
                         <td className="px-4 py-3 align-middle">
@@ -177,7 +177,6 @@ function VisitDetails({ visit, discounts }: { visit: VisitDashboardRow; discount
       <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
         <DetailTile label="المبلغ" value={formatMoney(visit.grossAmount)} />
         <DetailTile label="الخصم" value={formatMoney(visit.discountAmount)} />
-        {visit.vatRate > 0 ? <DetailTile label={`الضريبة (${visit.vatRate}%)`} value={formatMoney(visit.vatAmount)} /> : null}
         <DetailTile label="النقاط" value={formatNumber(visit.pointsEarned)} />
         {visit.invoiceNumber ? <DetailTile label="رقم الفاتورة" value={visit.invoiceNumber} /> : null}
         <DetailTile label="نوع الخصم" value={discountLabel(visit, discounts)} />
@@ -186,12 +185,12 @@ function VisitDetails({ visit, discounts }: { visit: VisitDashboardRow; discount
         <Link href={`/receipt/${visit.id}`} className="dashboard-button min-h-11 py-3 text-center">
           الإيصال / الفاتورة
         </Link>
-        <Link
+        {visit.customer ? <Link
           href={`/dashboard/whatsapp?customerId=${visit.customer.id}&visitId=${visit.id}`}
           className="dashboard-button-soft min-h-11 py-3 text-center"
         >
           رسالة واتساب
-        </Link>
+        </Link> : null}
         <VisitAdminActions visit={visit} />
       </div>
     </div>

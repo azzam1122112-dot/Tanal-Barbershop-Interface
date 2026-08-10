@@ -22,7 +22,7 @@ export default function ProviderPage() {
           paragraphs: [
             legalInfo.ecommerceVerificationNumber
               ? `رقم توثيق التجارة الإلكترونية: ${legalInfo.ecommerceVerificationNumber}.`
-              : "لم يضف رقم توثيق التجارة الإلكترونية إلى إعدادات النشر بعد. يجب إضافته قبل بدء البيع إذا صدر من المركز السعودي للأعمال.",
+              : "لم يُعلن رقم توثيق التجارة الإلكترونية للمنصة حتى الآن.",
             "لا يعرض الموقع رقم الهوية الوطنية أو صورة وثيقة العمل الحر حمايةً لخصوصية مقدم الخدمة.",
           ],
           links: legalInfo.ecommerceVerificationUrl

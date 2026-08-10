@@ -24,7 +24,7 @@ export default async function DashboardSettingsPage() {
   return (
     <DashboardShell title="إعدادات النظام">
       <p className="mt-5 max-w-2xl text-sm text-salon-charcoal">
-        إعدادات تشغيلية لكل فرع. حساب الضريبة - إن فُعّل - داخلي فقط ولا يمثل دعم ZATCA. قواعد المكافآت والخصومات تدار من صفحة الولاء والحملات.
+        إعدادات تشغيلية لكل فرع. قواعد المكافآت والخصومات تدار من صفحة الولاء والحملات.
       </p>
 
       {isAggregate ? (

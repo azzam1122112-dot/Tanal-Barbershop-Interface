@@ -8,10 +8,6 @@ type Settings = {
   currency: string;
   pointsPerCurrencyUnit: number;
   whatsappEnabled: boolean;
-  vatEnabled: boolean;
-  vatRate: number;
-  vatInclusive: boolean;
-  vatNumber: string | null;
   legalName: string | null;
   defaultCommissionRate: number;
   bookingEnabled: boolean;
@@ -32,7 +28,6 @@ function minutesToTimeValue(minutes: number) {
   const minute = minutes % 60;
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
-
 function timeValueToMinutes(value: FormDataEntryValue | null, fallback: number) {
   if (typeof value !== "string") return fallback;
   const match = /^(\d{1,2}):(\d{2})$/.exec(value);
@@ -44,9 +39,6 @@ export function SettingsForm({ initialSettings }: { initialSettings: Settings })
   const [settings, setSettings] = useState(initialSettings);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [loading, setLoading] = useState(false);
-  // نتابع التفعيل في الحالة حتى تظهر حقول الضريبة فور تحديد الخيار.
-  const [vatEnabled, setVatEnabled] = useState(initialSettings.vatEnabled);
-  const [vatInclusive, setVatInclusive] = useState(initialSettings.vatInclusive);
   const [bookingEnabled, setBookingEnabled] = useState(initialSettings.bookingEnabled);
   const [closedWeekdays, setClosedWeekdays] = useState<number[]>(initialSettings.bookingClosedWeekdays);
 
@@ -64,15 +56,7 @@ export function SettingsForm({ initialSettings }: { initialSettings: Settings })
         pointsPerCurrencyUnit: form.get("pointsPerCurrencyUnit"),
         whatsappEnabled: form.get("whatsappEnabled") === "on",
         defaultCommissionRate: form.get("defaultCommissionRate"),
-        vatEnabled,
-        ...(vatEnabled
-          ? {
-              vatRate: form.get("vatRate"),
-              vatInclusive,
-              vatNumber: form.get("vatNumber"),
-              legalName: form.get("legalName"),
-            }
-          : {}),
+        legalName: form.get("legalName"),
         bookingEnabled,
         ...(bookingEnabled
           ? {
@@ -90,8 +74,6 @@ export function SettingsForm({ initialSettings }: { initialSettings: Settings })
     const data = (await response.json().catch(() => ({}))) as { settings?: Settings; message?: string };
     if (response.ok && data.settings) {
       setSettings(data.settings);
-      setVatEnabled(data.settings.vatEnabled);
-      setVatInclusive(data.settings.vatInclusive);
       setBookingEnabled(data.settings.bookingEnabled);
       setClosedWeekdays(data.settings.bookingClosedWeekdays);
       setToast({ message: "تم تحديث الإعدادات", tone: "success" });
@@ -111,6 +93,10 @@ export function SettingsForm({ initialSettings }: { initialSettings: Settings })
           <label className="text-sm font-bold text-salon-charcoal">
             اسم الصالون
             <input name="salonName" defaultValue={settings.salonName} className="dashboard-field mt-2 h-12" />
+          </label>
+          <label className="text-sm font-bold text-salon-charcoal">
+            الاسم الظاهر للعملاء
+            <input name="legalName" defaultValue={settings.legalName ?? settings.salonName} className="dashboard-field mt-2 h-12" />
           </label>
           <label className="text-sm font-bold text-salon-charcoal">
             العملة
@@ -147,96 +133,6 @@ export function SettingsForm({ initialSettings }: { initialSettings: Settings })
             تفعيل واتساب في النظام
           </label>
         </div>
-      </section>
-
-      <section className="dashboard-panel p-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
-            <h2 className="text-lg font-bold tracking-tight">ضريبة القيمة المضافة</h2>
-            <p className="dashboard-muted mt-1.5 max-w-md text-sm leading-6">
-              اختيارية للحساب والتقارير الداخلية فقط. تفعيلها لا يحوّل الإيصال إلى فاتورة ضريبية، ولا تدعم XMANSX
-              متطلبات ZATCA أو الربط مع منصة فاتورة.
-            </p>
-          </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={vatEnabled}
-            onClick={() => setVatEnabled((current) => !current)}
-            className={`relative h-8 w-16 shrink-0 rounded-full border transition-colors ${
-              vatEnabled ? "border-salon-forest bg-salon-forest" : "border-salon-line bg-salon-mist"
-            }`}
-          >
-            <span className="sr-only">{vatEnabled ? "تعطيل الضريبة" : "تفعيل الضريبة"}</span>
-            <span
-              className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-[right] ${
-                vatEnabled ? "right-9" : "right-1"
-              }`}
-            />
-          </button>
-        </div>
-
-        {vatEnabled ? (
-          <div className="mt-5 grid gap-4 border-t border-salon-line pt-5 md:grid-cols-2">
-            <label className="text-sm font-bold text-salon-charcoal">
-              الاسم النظامي للمنشأة
-              <input
-                name="legalName"
-                defaultValue={settings.legalName ?? settings.salonName}
-                placeholder="كما في الشهادة الضريبية"
-                className="dashboard-field mt-2 h-12"
-              />
-            </label>
-            <label className="text-sm font-bold text-salon-charcoal">
-              الرقم الضريبي (15 رقمًا)
-              <input
-                name="vatNumber"
-                defaultValue={settings.vatNumber ?? ""}
-                inputMode="numeric"
-                maxLength={15}
-                dir="ltr"
-                placeholder="300000000000003"
-                onInput={(event) => {
-                  event.currentTarget.value = event.currentTarget.value.replace(/\D/g, "").slice(0, 15);
-                }}
-                className="dashboard-field mt-2 h-12"
-              />
-            </label>
-            <label className="text-sm font-bold text-salon-charcoal">
-              نسبة الضريبة %
-              <input lang="en"
-                name="vatRate"
-                defaultValue={settings.vatRate}
-                type="number"
-                step="0.01"
-                min="0"
-                max="100"
-                className="dashboard-field mt-2 h-12"
-              />
-            </label>
-            <fieldset className="text-sm font-bold text-salon-charcoal">
-              <legend className="mb-2">الأسعار المدخلة</legend>
-              <div className="grid grid-cols-2 gap-2 rounded-xl border border-salon-line bg-white p-1">
-                <PriceModeOption
-                  active={vatInclusive}
-                  onClick={() => setVatInclusive(true)}
-                  label="شاملة الضريبة"
-                  hint="المبلغ لا يتغير"
-                />
-                <PriceModeOption
-                  active={!vatInclusive}
-                  onClick={() => setVatInclusive(false)}
-                  label="غير شاملة"
-                  hint="تُضاف فوق السعر"
-                />
-              </div>
-            </fieldset>
-            <p className="dashboard-muted md:col-span-2 text-xs leading-6">
-              النقاط تُحتسب دائمًا على المبلغ <strong>قبل</strong> الضريبة. الإيصالات الصادرة سابقًا تحتفظ بنسبة الحساب
-              وقت إصدارها، لكنها تبقى إيصالات تشغيلية غير ضريبية.
-            </p>
-          </div>
-        ) : null}
       </section>
 
       <section className="dashboard-panel p-5">
@@ -388,33 +284,5 @@ export function SettingsForm({ initialSettings }: { initialSettings: Settings })
         {loading ? "جاري الحفظ..." : "حفظ الإعدادات"}
       </button>
     </form>
-  );
-}
-
-function PriceModeOption({
-  active,
-  onClick,
-  label,
-  hint,
-}: {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-  hint: string;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={`rounded-md px-3 py-2 text-right transition ${
-        active ? "bg-salon-ink text-white" : "text-salon-charcoal hover:bg-salon-pearl"
-      }`}
-    >
-      <span className="block text-sm font-bold">{label}</span>
-      <span className={`mt-0.5 block text-[11px] font-semibold ${active ? "text-white/70" : "text-salon-charcoal/70"}`}>
-        {hint}
-      </span>
-    </button>
   );
 }

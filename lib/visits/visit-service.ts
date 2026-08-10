@@ -3,13 +3,14 @@ import { Prisma } from "@prisma/client";
 import type { PaymentMethod, PrismaClient } from "@prisma/client";
 import { getAvailableCampaigns, getEligibleCampaignOrThrow } from "@/lib/campaigns/campaign-eligibility";
 import { assertOpenCashSession } from "@/lib/cash-sessions/cash-session-service";
-import { calculateVisitTotals, readVatSettings } from "@/lib/loyalty/calculations";
+import { calculateVisitTotals } from "@/lib/loyalty/calculations";
 import { getEffectiveSettings } from "@/lib/settings/system-settings";
 import { issueInvoiceNumber } from "@/lib/invoicing/invoice-number";
 import { assertSubscriptionActive } from "@/lib/plans/subscription-guard";
 import { calculateVisitCommission } from "@/lib/commissions/commission";
 import { recordStockMovement } from "@/lib/products/product-service";
 import { roundMoney } from "@/lib/visits/visit-totals";
+import { recordBarberCashDelta } from "@/lib/cash-custody/cash-custody-service";
 
 /** يحوّل قيمة Decimal اختيارية إلى رقم، أو null إن كانت غائبة. */
 function numberOrNull(value: { toString(): string } | number | null | undefined) {
@@ -77,13 +78,15 @@ type VisitPrisma = PrismaClient | Prisma.TransactionClient;
 type VisitInput = {
   organizationId: string;
   salonId: string;
-  customerId: string;
+  customerId?: string | null;
   barberId: string;
   serviceIds: string[];
   /** منتجات تُباع مع الزيارة. أسعارها من الكتالوج وتُضاف فوق مبلغ الخدمات. */
   products?: { productId: string; quantity: number }[];
   grossAmount: number;
   paymentMethod: PaymentMethod;
+  paymentConfirmed?: boolean;
+  cashTenderedAmount?: number | null;
   rewardRuleId?: string;
   managerRewardId?: string;
   campaignId?: string;
@@ -101,12 +104,14 @@ export async function buildVisitPreview(prisma: VisitPrisma, input: VisitInput) 
     throw new BusinessError("اختر خدمة واحدة على الأقل");
   }
 
-  const [customer, barber, services, settings] = await Promise.all([
-    // مقيّد بالمؤسسة: لا تُسجَّل زيارة لعميل مستأجر آخر حتى لو عُرف معرّفه.
-    prisma.customer.findFirst({
-      where: { id: input.customerId, organizationId: input.organizationId },
-      include: { loyaltyAccount: true },
-    }),
+  // الاستعلام منفصل ليبقى نوع العميل وعلاقة الولاء دقيقين حتى عندما تكون العملية نقدية بلا عميل.
+  const customer = input.customerId
+    ? await prisma.customer.findFirst({
+        where: { id: input.customerId, organizationId: input.organizationId },
+        include: { loyaltyAccount: true },
+      })
+    : null;
+  const [barber, services, settings] = await Promise.all([
     prisma.barber.findFirst({
       where: { id: input.barberId, organizationId: input.organizationId, salonId: input.salonId },
     }),
@@ -117,7 +122,7 @@ export async function buildVisitPreview(prisma: VisitPrisma, input: VisitInput) 
     getEffectiveSettings(prisma, { organizationId: input.organizationId, salonId: input.salonId }),
   ]);
 
-  if (!customer) {
+  if (input.customerId && !customer) {
     throw new BusinessError("العميل غير موجود");
   }
 
@@ -146,34 +151,29 @@ export async function buildVisitPreview(prisma: VisitPrisma, input: VisitInput) 
     discountAmount: 0,
     pointsPerCurrencyUnit: settings ? Number(settings.pointsPerCurrencyUnit) : 1,
     pointsCalculatedAfterDiscount: settings?.pointsCalculatedAfterDiscount ?? true,
-    ...readVatSettings(settings),
   });
-  const pointsBalance = customer.loyaltyAccount?.points ?? 0;
-  const rewards = await prisma.rewardRule.findMany({
-    where: {
-      organizationId: input.organizationId,
-      isActive: true,
-      requiredPoints: { lte: pointsBalance },
-      discountAmount: { lte: totals.grossAmount },
-    },
-    orderBy: [{ requiredPoints: "asc" }, { discountAmount: "asc" }],
-  });
-  const campaigns = await getAvailableCampaigns({
-    prisma,
-    organizationId: input.organizationId,
-    customer,
-    grossAmount: totals.grossAmount,
-  });
-  const managerRewards = await getActiveManagerRewards(prisma, customer.id, {
-    grossAmount: totals.grossAmount,
-  });
+  const pointsBalance = customer?.loyaltyAccount?.points ?? 0;
+  const loyaltyEnabled = customer?.loyaltyAccount != null;
+  const [rewards, campaigns, managerRewards] = customer
+    ? await Promise.all([
+        loyaltyEnabled
+          ? prisma.rewardRule.findMany({
+              where: {
+                organizationId: input.organizationId,
+                isActive: true,
+                requiredPoints: { lte: pointsBalance },
+                discountAmount: { lte: totals.grossAmount },
+              },
+              orderBy: [{ requiredPoints: "asc" }, { discountAmount: "asc" }],
+            })
+          : Promise.resolve([]),
+        getAvailableCampaigns({ prisma, organizationId: input.organizationId, customer, grossAmount: totals.grossAmount }),
+        getActiveManagerRewards(prisma, customer.id, { grossAmount: totals.grossAmount }),
+      ])
+    : [[], [], []];
 
   return {
-    customer: {
-      id: customer.id,
-      name: customer.name,
-      phone: customer.phone,
-    },
+    customer: customer ? { id: customer.id, name: customer.name, phone: customer.phone } : null,
     barber: {
       id: barber.id,
       name: barber.name,
@@ -190,18 +190,14 @@ export async function buildVisitPreview(prisma: VisitPrisma, input: VisitInput) 
     servicesAmount,
     grossAmount: totals.grossAmount,
     discountAmount: 0,
-    subtotalAmount: totals.subtotalAmount,
-    vatAmount: totals.vatAmount,
-    vatRate: totals.vatRate,
-    vatEnabled: totals.vatRate > 0,
-    vatInclusive: settings?.vatInclusive ?? true,
     netAmount: totals.netAmount,
     paymentMethod: input.paymentMethod,
+    loyaltyEnabled,
     // تُمرَّر للواجهة لتحسب المعاينة بنفس دالة الخادم `calculateVisitTotals`
     // بدل تكرار منطق المال في العميل.
     pointsPerCurrencyUnit: settings ? Number(settings.pointsPerCurrencyUnit) : 1,
     pointsCalculatedAfterDiscount: settings?.pointsCalculatedAfterDiscount ?? true,
-    expectedPointsEarned: totals.pointsEarned,
+    expectedPointsEarned: loyaltyEnabled ? totals.pointsEarned : 0,
     pointsBalance,
     availableRewards: rewards.map((reward) => ({
       id: reward.id,
@@ -243,12 +239,18 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
     if (!input.idempotencyKey) {
       throw new BusinessError("مفتاح منع التكرار مطلوب");
     }
+    if (input.paymentConfirmed === false) {
+      throw new BusinessError("أكد استلام الدفع قبل إتمام العملية");
+    }
     const selectedDiscounts = [input.rewardRuleId, input.managerRewardId, input.campaignId].filter(Boolean);
     if (selectedDiscounts.length > 1) {
       if (input.rewardRuleId && input.campaignId && !input.managerRewardId) {
         throw new BusinessError("لا يمكن جمع مكافأة نقاط مع حملة في نفس الزيارة");
       }
       throw new BusinessError("لا يمكن جمع أكثر من خصم في نفس الزيارة");
+    }
+    if (!input.customerId && selectedDiscounts.length > 0) {
+      throw new BusinessError("الخصومات والمكافآت تتطلب عميلًا مسجلًا");
     }
 
     const existingVisit = await tx.visit.findFirst({
@@ -281,11 +283,13 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
       organizationId: input.organizationId,
       salonId: input.salonId,
     });
-    const customer = await tx.customer.findFirst({
-      where: { id: input.customerId, organizationId: input.organizationId },
-      include: { loyaltyAccount: true },
-    });
-    if (!customer) {
+    const customer = input.customerId
+      ? await tx.customer.findFirst({
+          where: { id: input.customerId, organizationId: input.organizationId },
+          include: { loyaltyAccount: true },
+        })
+      : null;
+    if (input.customerId && !customer) {
       throw new BusinessError("العميل غير موجود");
     }
     const reward = input.rewardRuleId
@@ -297,7 +301,7 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
       ? await getRedeemableManagerRewardOrThrow(tx, {
           organizationId: input.organizationId,
           managerRewardId: input.managerRewardId,
-          customerId: input.customerId,
+          customerId: customer!.id,
           grossAmount: preview.grossAmount,
           now,
         })
@@ -307,7 +311,7 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
           prisma: tx,
           organizationId: input.organizationId,
           campaignId: input.campaignId,
-          customer,
+          customer: customer!,
           grossAmount: preview.grossAmount,
           now,
         })
@@ -317,19 +321,16 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
       throw new BusinessError("المكافأة غير متاحة");
     }
 
-    const loyaltyAccount = await tx.loyaltyAccount.upsert({
-      where: { customerId: input.customerId },
-      update: {},
-      create: {
-        organizationId: input.organizationId,
-        customerId: input.customerId,
-        points: 0,
-        lifetimeEarned: 0,
-      },
-    });
-    const startingBalance = loyaltyAccount.points;
+    // لا نحول العميل العادي إلى عضو ولاء بمجرد تسجيل عملية. العضوية قرار صريح
+    // عند إنشاء العميل، بينما تبقى الزيارة والفاتورة والصندوق صالحة بدونه.
+    const loyaltyAccount = customer?.loyaltyAccount ?? null;
+    const startingBalance = loyaltyAccount?.points ?? 0;
     const redeemedPoints = reward?.requiredPoints ?? 0;
     const discountAmount = reward ? Number(reward.discountAmount) : managerReward ? Number(managerReward.discountAmount) : campaignSelection?.discountAmount ?? 0;
+
+    if (reward && !loyaltyAccount) {
+      throw new BusinessError("العميل غير مشترك في برنامج الولاء");
+    }
 
     if (reward && startingBalance < reward.requiredPoints) {
       throw new BusinessError("رصيد النقاط غير كافٍ");
@@ -344,15 +345,22 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
       discountAmount,
       pointsPerCurrencyUnit: settings ? Number(settings.pointsPerCurrencyUnit) : 1,
       pointsCalculatedAfterDiscount: settings?.pointsCalculatedAfterDiscount ?? true,
-      ...readVatSettings(settings),
     });
+    const earnedPoints = loyaltyAccount ? totals.pointsEarned : 0;
+    const cashTenderedAmount = input.paymentMethod === "CASH"
+      ? roundMoney(input.cashTenderedAmount ?? totals.netAmount)
+      : null;
+    if (cashTenderedAmount !== null && cashTenderedAmount < totals.netAmount) {
+      throw new BusinessError("المبلغ المستلم أقل من المبلغ المطلوب");
+    }
+    const cashChangeAmount = cashTenderedAmount === null ? null : roundMoney(cashTenderedAmount - totals.netAmount);
 
     const balanceAfterRedeem = startingBalance - redeemedPoints;
     if (balanceAfterRedeem < 0) {
       throw new BusinessError("رصيد النقاط لا يمكن أن يكون سالبًا");
     }
 
-    // العمولة تُحسب وقت الزيارة على المبلغ بعد الخصم وقبل الضريبة، وتُخزَّن
+    // العمولة تُحسب وقت الزيارة على المبلغ بعد الخصم، وتُخزَّن
     // مع نسبتها فلا يتغيّر المستحق التاريخي عند تعديل النسب لاحقًا.
     const barberRecord = await tx.barber.findUnique({
       where: { id: input.barberId },
@@ -386,7 +394,7 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
           serviceRate: product.commissionRate,
         })),
       ],
-      commissionBase: totals.subtotalAmount,
+      commissionBase: totals.netAmount,
       enabled: barberRecord?.commissionEnabled === true,
       barberRate: numberOrNull(barberRecord?.commissionRate),
       defaultRate: numberOrNull(settings?.defaultCommissionRate),
@@ -405,23 +413,22 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
       data: {
         organizationId: input.organizationId,
         salonId: input.salonId,
-        customerId: input.customerId,
+        customerId: customer?.id,
         barberId: input.barberId,
         status: "COMPLETED",
         grossAmount: totals.grossAmount,
         discountAmount: totals.discountAmount,
-        subtotalAmount: totals.subtotalAmount,
-        vatAmount: totals.vatAmount,
-        vatRate: totals.vatRate,
         invoiceNumber,
         commissionAmount: commission.totalCommission,
         netAmount: totals.netAmount,
         paymentMethod: input.paymentMethod,
+        cashTenderedAmount,
+        cashChangeAmount,
         discountType: reward ? "REWARD" : managerReward ? "MANAGER_REWARD" : campaignSelection ? "CAMPAIGN" : "NONE",
         discountSourceId: reward?.id ?? managerReward?.id ?? campaignSelection?.campaign.id,
         cashSessionId: cashSession.id,
         idempotencyKey: input.idempotencyKey,
-        pointsEarned: totals.pointsEarned,
+        pointsEarned: earnedPoints,
         visitedAt: now,
         services: {
           create: serviceCommissionLines.map((line) => ({
@@ -455,6 +462,23 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
       },
     });
 
+    // البيع النقدي يزيد عهدة الحلاق فقط؛ لا ينشئ إيرادًا ثانيًا ولا يغيّر تقرير المبيعات.
+    if (visit.paymentMethod === "CASH" && Number(visit.netAmount) > 0) {
+      await recordBarberCashDelta(tx, {
+        organizationId: visit.organizationId,
+        salonId: visit.salonId,
+        barberId: visit.barberId,
+        cashSessionId: visit.cashSessionId,
+        amount: Number(visit.netAmount),
+        type: "CASH_SALE",
+        referenceKey: `VISIT:CASH:${visit.id}`,
+        referenceId: visit.id,
+        note: `فاتورة ${visit.invoiceNumber ?? visit.id}`,
+        actorType: "BARBER",
+        actorBarberId: visit.barberId,
+      });
+    }
+
     // خصم المخزون داخل المعاملة نفسها: إما تُحفظ الزيارة ويُخصم المخزون معًا، أو لا شيء.
     for (const line of productCommissionLines) {
       await recordStockMovement(tx, {
@@ -473,7 +497,7 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
           data: {
             organizationId: input.organizationId,
             campaignId: campaignSelection.campaign.id,
-            customerId: input.customerId,
+            customerId: customer!.id,
             visitId: visit.id,
             discountAmount: totals.discountAmount,
           },
@@ -496,7 +520,7 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
         await tx.loyaltyTransaction.create({
           data: {
             organizationId: input.organizationId,
-            customerId: input.customerId,
+            customerId: customer!.id,
             visitId: visit.id,
             type: "REDEEM",
             points: -redeemedPoints,
@@ -507,16 +531,16 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
       );
     }
 
-    const finalBalance = balanceAfterRedeem + totals.pointsEarned;
-    if (totals.pointsEarned > 0) {
+    const finalBalance = balanceAfterRedeem + earnedPoints;
+    if (loyaltyAccount && earnedPoints > 0) {
       createdTransactions.push(
         await tx.loyaltyTransaction.create({
           data: {
             organizationId: input.organizationId,
-            customerId: input.customerId,
+            customerId: customer!.id,
             visitId: visit.id,
             type: "EARN",
-            points: totals.pointsEarned,
+            points: earnedPoints,
             balanceAfter: finalBalance,
             description: "نقاط زيارة",
           },
@@ -524,24 +548,28 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
       );
     }
 
-    await tx.loyaltyAccount.update({
-      where: { customerId: input.customerId },
-      data: {
-        points: finalBalance,
-        lifetimeEarned: totals.pointsEarned > 0 ? { increment: totals.pointsEarned } : undefined,
-        lifetimeRedeemed: redeemedPoints > 0 ? { increment: redeemedPoints } : undefined,
-      },
-    });
+    if (loyaltyAccount) {
+      await tx.loyaltyAccount.update({
+        where: { customerId: customer!.id },
+        data: {
+          points: finalBalance,
+          lifetimeEarned: earnedPoints > 0 ? { increment: earnedPoints } : undefined,
+          lifetimeRedeemed: redeemedPoints > 0 ? { increment: redeemedPoints } : undefined,
+        },
+      });
+    }
 
-    await tx.customer.update({
-      where: { id: input.customerId },
-      data: {
-        visitCount: { increment: 1 },
-        totalPaid: { increment: totals.netAmount },
-        lastVisitAt: now,
-        lastBarberId: input.barberId,
-      },
-    });
+    if (customer) {
+      await tx.customer.update({
+        where: { id: customer.id },
+        data: {
+          visitCount: { increment: 1 },
+          totalPaid: { increment: totals.netAmount },
+          lastVisitAt: now,
+          lastBarberId: input.barberId,
+        },
+      });
+    }
 
     await tx.auditLog.create({
       data: {
@@ -554,12 +582,11 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
         entityId: visit.id,
         after: {
           barberId: input.barberId,
-          customerId: input.customerId,
+          customerId: customer?.id ?? null,
           visitId: visit.id,
           cashSessionId: cashSession.id,
           grossAmount: totals.grossAmount,
           discountAmount: totals.discountAmount,
-          vatAmount: totals.vatAmount,
           netAmount: totals.netAmount,
           commissionAmount: commission.totalCommission,
           invoiceNumber,
@@ -569,7 +596,7 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
           managerRewardId: managerReward?.id ?? null,
           campaignId: campaignSelection?.campaign.id ?? null,
           redeemedPoints,
-          pointsEarned: totals.pointsEarned,
+          pointsEarned: earnedPoints,
         },
         ipAddress: input.auditMeta?.ipAddress,
         userAgent: input.auditMeta?.userAgent,
@@ -588,12 +615,12 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
           entityId: campaignSelection.campaign.id,
           after: {
             campaignId: campaignSelection.campaign.id,
-            customerId: input.customerId,
+            customerId: customer!.id,
             visitId: visit.id,
             grossAmount: totals.grossAmount,
             discountAmount: totals.discountAmount,
             netAmount: totals.netAmount,
-            pointsEarned: totals.pointsEarned,
+            pointsEarned: earnedPoints,
           },
           ipAddress: input.auditMeta?.ipAddress,
           userAgent: input.auditMeta?.userAgent,
@@ -613,12 +640,12 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
           entityId: managerReward.id,
           after: {
             managerRewardId: managerReward.id,
-            customerId: input.customerId,
+            customerId: customer!.id,
             visitId: visit.id,
             grossAmount: totals.grossAmount,
             discountAmount: totals.discountAmount,
             netAmount: totals.netAmount,
-            pointsEarned: totals.pointsEarned,
+            pointsEarned: earnedPoints,
           },
           ipAddress: input.auditMeta?.ipAddress,
           userAgent: input.auditMeta?.userAgent,
@@ -663,11 +690,9 @@ function toConfirmedVisitSummary(visit: ConfirmedVisit) {
     id: visit.id,
     status: visit.status,
     visitedAt: visit.visitedAt.toISOString(),
-    customer: {
-      id: visit.customer.id,
-      name: visit.customer.name,
-      phone: visit.customer.phone,
-    },
+    customer: visit.customer
+      ? { id: visit.customer.id, name: visit.customer.name, phone: visit.customer.phone }
+      : null,
     barber: {
       id: visit.barber.id,
       name: visit.barber.name,
@@ -679,12 +704,11 @@ function toConfirmedVisitSummary(visit: ConfirmedVisit) {
     })),
     grossAmount: Number(visit.grossAmount),
     discountAmount: Number(visit.discountAmount),
-    subtotalAmount: Number(visit.subtotalAmount),
-    vatAmount: Number(visit.vatAmount),
-    vatRate: Number(visit.vatRate),
     invoiceNumber: visit.invoiceNumber,
     netAmount: Number(visit.netAmount),
     paymentMethod: visit.paymentMethod,
+    cashTenderedAmount: visit.cashTenderedAmount ? Number(visit.cashTenderedAmount) : null,
+    cashChangeAmount: visit.cashChangeAmount ? Number(visit.cashChangeAmount) : 0,
     discountType: visit.discountType,
     cashSessionId: visit.cashSessionId,
     pointsEarned: visit.pointsEarned,

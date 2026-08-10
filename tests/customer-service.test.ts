@@ -6,8 +6,10 @@ import { toCustomerSummary } from "../lib/customers/customer-summary";
 const prisma = new PrismaClient();
 const unique = Date.now().toString().slice(-8);
 const phone = `9665${unique}`;
+const ordinaryPhone = `9666${unique}`;
 let barberId = "";
 let customerId = "";
+let ordinaryCustomerId = "";
 
 describe("customer creation service", () => {
   beforeAll(async () => {
@@ -19,9 +21,7 @@ describe("customer creation service", () => {
   });
 
   afterAll(async () => {
-    if (customerId) {
-      await prisma.customer.delete({ where: { id: customerId } }).catch(() => undefined);
-    }
+    await prisma.customer.deleteMany({ where: { id: { in: [customerId, ordinaryCustomerId].filter(Boolean) } } });
     await prisma.$disconnect();
   });
 
@@ -52,6 +52,21 @@ describe("customer creation service", () => {
 
     expect(result.created).toBe(false);
     expect(result.customer.id).toBe(customerId);
+  });
+
+  it("creates an operational customer without forcing a loyalty membership", async () => {
+    const result = await createCustomerWithLoyalty({
+      prisma,
+      organizationId: "org_default",
+      name: "عميل عادي",
+      phone: ordinaryPhone,
+      createdByBarberId: barberId,
+      enrollInLoyalty: false,
+    });
+
+    ordinaryCustomerId = result.customer.id;
+    expect(result.created).toBe(true);
+    expect(result.customer.loyaltyAccount).toBeNull();
   });
 
   it("returns a safe customer summary without sensitive data", async () => {

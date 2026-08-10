@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { getOpenCashSession, calculateCashSessionSnapshot } from "@/lib/cash-sessions/cash-session-service";
+import { sumSessionCollections } from "@/lib/cash-custody/cash-custody-service";
 
 type BarberSummaryPrisma = PrismaClient | Prisma.TransactionClient;
 
@@ -24,17 +25,26 @@ export async function getBarberTodaySummary(prisma: BarberSummaryPrisma, barberI
 
   const cashTotal = sum(visits.filter((visit) => visit.paymentMethod === "CASH").map((visit) => Number(visit.netAmount)));
   const networkTotal = sum(visits.filter((visit) => visit.paymentMethod === "NETWORK").map((visit) => Number(visit.netAmount)));
-  const openCashSession = await getOpenCashSession(prisma, barberId);
-  const cashSessionTotals = openCashSession ? await calculateCashSessionSnapshot(prisma, openCashSession.id) : null;
+  const [openCashSession, custody] = await Promise.all([
+    getOpenCashSession(prisma, barberId),
+    prisma.barberCashBalance.findUnique({ where: { barberId }, select: { balance: true, isInitialized: true } }),
+  ]);
+  const [cashSessionTotals, collectionsTotal] = openCashSession
+    ? await Promise.all([calculateCashSessionSnapshot(prisma, openCashSession.id), sumSessionCollections(prisma, openCashSession.id)])
+    : [null, 0];
 
   return {
     visitsCount: visits.length,
     cashTotal,
     networkTotal,
     netTotal: sum(visits.map((visit) => Number(visit.netAmount))),
+    custodyBalance: Number(custody?.balance ?? 0),
+    custodyInitialized: custody?.isInitialized ?? false,
     latestVisits: visits.slice(0, 5).map((visit) => ({
       id: visit.id,
-      customer: { id: visit.customer.id, name: visit.customer.name, phone: visit.customer.phone },
+      customer: visit.customer
+        ? { id: visit.customer.id, name: visit.customer.name, phone: visit.customer.phone }
+        : { id: null, name: "عميل زائر", phone: null },
       netAmount: Number(visit.netAmount),
       paymentMethod: visit.paymentMethod,
       visitedAt: visit.visitedAt.toISOString(),
@@ -45,10 +55,12 @@ export async function getBarberTodaySummary(prisma: BarberSummaryPrisma, barberI
           id: openCashSession.id,
           status: openCashSession.status,
           openedAt: openCashSession.openedAt.toISOString(),
+          openingCashAmount: Number(openCashSession.openingCashAmount),
           visitsCount: cashSessionTotals?.visitsCount ?? 0,
           cashTotal: cashSessionTotals?.cashTotal ?? 0,
           networkTotal: cashSessionTotals?.cardTotal ?? 0,
           netTotal: cashSessionTotals?.netTotal ?? 0,
+          collectionsTotal,
         }
       : null,
   };

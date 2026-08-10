@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, type SVGProps, useState } from "react";
+import Link from "next/link";
 import { Icon } from "@/components/icons";
 import { buildCustomerPortalShareMessage } from "@/lib/customers/portal-share";
 import { toSaudiWhatsAppPhone } from "@/lib/phone/saudi-phone";
@@ -31,9 +32,13 @@ function FieldIcon({ children, ...props }: SVGProps<SVGSVGElement>) {
 export function LoyaltyJoinForm({
   organizationSlug,
   brandName,
+  controllerEmail,
+  controllerPhone,
 }: {
   organizationSlug?: string;
   brandName?: string;
+  controllerEmail?: string | null;
+  controllerPhone?: string | null;
 }) {
   const [state, setState] = useState<JoinState>({ kind: "idle" });
   const [loading, setLoading] = useState(false);
@@ -57,6 +62,7 @@ export function LoyaltyJoinForm({
           phone,
           whatsappTransactionalOptIn: form.get("whatsappTransactionalOptIn") === "on",
           whatsappMarketingOptIn: form.get("whatsappMarketingOptIn") === "on",
+          privacyNoticeAcknowledged: form.get("privacyNoticeAcknowledged") === "on",
           ...(organizationSlug ? { organizationSlug } : {}),
         }),
       });
@@ -289,6 +295,25 @@ export function LoyaltyJoinForm({
             </label>
           </div>
         </fieldset>
+
+        <section className="mt-6 rounded-2xl border border-violet-200 bg-violet-50/75 p-4 text-xs font-semibold leading-6 text-violet-950" aria-labelledby="loyalty-privacy-title">
+          <h3 id="loyalty-privacy-title" className="text-sm font-bold">إشعار الخصوصية قبل التسجيل</h3>
+          <ul className="mt-2 list-disc space-y-1 pr-5">
+            <li><strong>{brandName || "الصالون"}</strong> هو جهة التحكم في بيانات زبائنه، وXMANSX معالج تقني يعمل بتعليماته.</li>
+            <li>الاسم والجوال إلزاميان لإنشاء العضوية وربط الزيارات والنقاط والحجوزات وخدمة طلباتك؛ تفضيلات واتساب اختيارية.</li>
+            <li>المسوغ هو تنفيذ خدمة العضوية التي تطلبها، أما الرسائل التسويقية فتعتمد على موافقتك المنفصلة.</li>
+            <li>تُحفظ البيانات طوال العضوية والحاجة التشغيلية. عند انتهاء علاقة الصالون بالمنصة يمكنه تصديرها، ثم تُحذف من قاعدة البيانات التشغيلية بعد مهلة 60 يومًا من عدم النشاط، وقد تبقى ضمن نسخة احتياطية معزولة مدة لا تتجاوز 30 يومًا إضافية.</li>
+            <li>لك طلب الوصول والنسخة والتصحيح والحذف وسحب موافقة التواصل من بطاقتك الشخصية أو بالتواصل مع الصالون.</li>
+          </ul>
+          {controllerEmail || controllerPhone ? (
+            <p className="mt-2">تواصل جهة التحكم: {[controllerEmail, controllerPhone].filter(Boolean).join(" · ")}</p>
+          ) : null}
+          <p className="mt-2">التفاصيل في <Link href="/privacy" target="_blank" className="font-bold text-violet-800 underline">سياسة الخصوصية</Link>.</p>
+          <label className="mt-3 flex cursor-pointer items-start gap-2 rounded-xl bg-white px-3 py-2.5">
+            <input name="privacyNoticeAcknowledged" type="checkbox" required className="mt-1 h-4 w-4 accent-violet-700" />
+            <span>اطلعت على إشعار الخصوصية وفهمت دور الصالون وXMANSX وحقوقي.</span>
+          </label>
+        </section>
 
         {state.kind === "error" ? (
           <p role="alert" aria-live="assertive" className="mt-4 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold leading-6 text-red-700">

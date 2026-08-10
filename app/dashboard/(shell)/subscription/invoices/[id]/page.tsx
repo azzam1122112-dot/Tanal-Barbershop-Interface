@@ -29,11 +29,12 @@ export default async function SubscriptionInvoicePage({ params }: { params: Prom
           <div>
             <p className="text-xs font-bold text-violet-700" dir="ltr">XMANSX</p>
             <h1 className="mt-2 text-2xl font-bold">فاتورة اشتراك</h1>
-            <p className="mt-2 text-sm font-semibold text-salon-charcoal">فاتورة تجارية غير ضريبية</p>
+            <p className="mt-2 text-sm font-semibold text-salon-charcoal">خدمة برمجية سحابية تقدم إلكترونيًا</p>
           </div>
           <dl className="space-y-1 text-sm font-semibold">
             <InvoiceRow label="رقم الفاتورة" value={invoice.invoiceNumber ?? invoice.id} ltr />
             <InvoiceRow label="تاريخ الإصدار" value={formatDate(invoice.issuedAt ?? invoice.paidAt ?? invoice.createdAt)} />
+            <InvoiceRow label="تاريخ تقديم الخدمة" value={formatDate(invoice.periodStart ?? invoice.issuedAt ?? invoice.paidAt ?? invoice.createdAt)} />
             <InvoiceRow label="حالة السداد" value="مدفوعة" />
           </dl>
         </header>
@@ -62,13 +63,13 @@ export default async function SubscriptionInvoicePage({ params }: { params: Prom
 
         <dl className="mr-auto mt-6 max-w-sm space-y-2 border-t border-salon-line pt-5 text-sm font-semibold">
           <InvoiceRow label="المجموع" value={formatMoney(invoice.amount)} />
-          <InvoiceRow label="ضريبة القيمة المضافة" value={formatMoney(0)} />
           <div className="flex items-baseline justify-between gap-4 border-t border-salon-line pt-3 text-base font-bold"><dt>الإجمالي المدفوع</dt><dd>{formatMoney(invoice.amount)}</dd></div>
         </dl>
 
         <footer className="mt-8 border-t border-dashed border-salon-line pt-5 text-xs font-semibold leading-6 text-salon-charcoal">
           <p>طريقة الدفع: {invoice.providerLabel}{invoice.reference ? ` · مرجع التحويل ${invoice.reference}` : ""}</p>
-          <p>هذه فاتورة تجارية غير ضريبية ولا تتضمن ضريبة قيمة مضافة ولا تمثل مستند ZATCA.</p>
+          <p>طريقة ومكان تقديم الخدمة: إلكترونيًا إلى حساب العميل على منصة XMANSX.</p>
+          <p>صدرت هذه الفاتورة عند اعتماد الاشتراك، ويمكن الرجوع إليها من حساب المالك.</p>
           <p>للتواصل: {legalInfo.supportEmail} · <span dir="ltr">{legalInfo.supportPhone}</span></p>
         </footer>
       </article>

@@ -74,8 +74,8 @@ export default async function DashboardSubscriptionPage() {
       <section className="dashboard-panel mt-6 p-5">
         <h2 className="text-xl font-bold">بيانات الحساب والاحتفاظ</h2>
         <p className="mt-2 max-w-2xl text-sm font-semibold leading-7 text-salon-charcoal">
-          يستطيع المالك تنزيل نسخة JSON من بيانات النشاط. بعد توقف التجربة أو الاشتراك 60 يومًا يحذف النظام الحساب
-          وجميع بياناته نهائيًا، لذلك نزّل النسخة قبل موعد الحذف.
+          يستطيع المالك تنزيل نسخة JSON من بيانات النشاط. بعد توقف التجربة أو الاشتراك 60 يومًا يحذف النظام بيانات الحساب
+          من قاعدة البيانات التشغيلية، وقد تبقى نسخة احتياطية معزولة مدة لا تتجاوز 30 يومًا إضافية. نزّل النسخة قبل الموعد إذا كنت تحتاجها.
         </p>
         {scheduledDeletionAt ? <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-800">موعد الحذف المتوقع إذا بقي الحساب غير نشط: {formatDate(scheduledDeletionAt)}</p> : null}
         {session.role === "OWNER" ? <a href="/api/dashboard/account/export" className="dashboard-button mt-4 inline-flex">تصدير جميع بيانات الحساب</a> : <p className="mt-3 text-xs font-semibold text-salon-charcoal">التصدير متاح لمالك الحساب فقط.</p>}

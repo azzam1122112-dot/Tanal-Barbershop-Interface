@@ -73,11 +73,12 @@ describe("cash sessions", () => {
   it("requires one open cash session for visits and allows a new session after closing", async () => {
     await expect(createVisit("without-session")).rejects.toThrow("لا توجد جلسة صندوق مفتوحة");
 
-    const firstOpen = await openCashSession(prisma, { barberId });
+    const firstOpen = await openCashSession(prisma, { barberId, openingCashAmount: 150 });
     createdCashSessionIds.push(firstOpen.cashSession.id);
     const secondOpen = await openCashSession(prisma, { barberId });
     expect(secondOpen.alreadyOpen).toBe(true);
     expect(secondOpen.cashSession.id).toBe(firstOpen.cashSession.id);
+    expect(firstOpen.cashSession.openingCashAmount).toBe(150);
     expect(await prisma.cashSession.count({ where: { barberId, status: "OPEN" } })).toBe(1);
 
     const firstVisit = await createVisit("first-open-session");
@@ -86,6 +87,7 @@ describe("cash sessions", () => {
 
     const closed = await closeCashSession(prisma, { barberId, closedByUserId: adminUserId });
     expect(closed.status).toBe("CLOSED");
+    expect(closed.expectedCash).toBe(210);
     await expect(createVisit("closed-session")).rejects.toThrow("لا توجد جلسة صندوق مفتوحة");
 
     const newOpen = await openCashSession(prisma, { barberId });

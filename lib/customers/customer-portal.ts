@@ -117,7 +117,7 @@ export async function getCustomerPortalView(prisma: PrismaClient, token: string)
       dataSubjectRequests: {
         orderBy: { createdAt: "desc" },
         take: 10,
-        select: { id: true, type: true, status: true, createdAt: true },
+        select: { id: true, type: true, status: true, createdAt: true, identityVerifiedAt: true, executedAt: true },
       },
     },
   });
@@ -180,6 +180,8 @@ export async function getCustomerPortalView(prisma: PrismaClient, token: string)
       type: request.type,
       status: request.status,
       createdAt: request.createdAt.toISOString(),
+      identityVerifiedAt: request.identityVerifiedAt?.toISOString() ?? null,
+      executedAt: request.executedAt?.toISOString() ?? null,
     })),
     recentVisits: customer.visits.map((visit) => ({
       id: visit.id,

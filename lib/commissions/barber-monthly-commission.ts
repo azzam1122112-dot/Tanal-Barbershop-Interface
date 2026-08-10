@@ -28,10 +28,10 @@ export async function getBarberMonthlyCommission(
       visitedAt: { gte: from, lt: to },
     },
     _count: { _all: true },
-    _sum: { subtotalAmount: true, commissionAmount: true },
+    _sum: { netAmount: true, commissionAmount: true },
   });
 
-  const commissionBase = roundMoney(Number(result._sum.subtotalAmount ?? 0));
+  const commissionBase = roundMoney(Number(result._sum.netAmount ?? 0));
   const commissionAmount = roundMoney(Number(result._sum.commissionAmount ?? 0));
 
   return {

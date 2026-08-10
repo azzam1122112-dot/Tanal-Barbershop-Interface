@@ -12,10 +12,6 @@ describe("loyalty visit calculations", () => {
     ).toEqual({
       grossAmount: 120,
       discountAmount: 25,
-      // بلا ضريبة: الصافي هو نفسه المبلغ قبل الضريبة والضريبة صفر.
-      subtotalAmount: 95,
-      vatAmount: 0,
-      vatRate: 0,
       netAmount: 95,
       pointsEarned: 95,
     });

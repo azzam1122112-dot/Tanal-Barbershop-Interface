@@ -8,34 +8,17 @@ describe("عمولة الحلاق", () => {
     { serviceId: "s2", lineTotal: 40 },
   ];
 
-  it("تحسب على المبلغ بعد الخصم وقبل الضريبة", () => {
+  it("تحسب على المبلغ بعد الخصم", () => {
     const result = calculateVisitCommission({ lines, commissionBase: 100, barberRate: 20 });
     expect(result.totalCommission).toBe(20);
     expect(result.lines.map((line) => line.commissionAmount)).toEqual([12, 8]);
-  });
-
-  it("لا تُحتسب على الضريبة", () => {
-    const totals = calculateVisitTotals({
-      grossAmount: 115,
-      vatEnabled: true,
-      vatRate: 15,
-      vatInclusive: true,
-    });
-    const result = calculateVisitCommission({
-      lines: [{ serviceId: "s1", lineTotal: 115 }],
-      commissionBase: totals.subtotalAmount,
-      barberRate: 20,
-    });
-    // الوعاء 100 لا 115، فالعمولة 20 لا 23.
-    expect(totals.subtotalAmount).toBe(100);
-    expect(result.totalCommission).toBe(20);
   });
 
   it("لا تُحتسب على خصم لم يدفعه العميل", () => {
     const totals = calculateVisitTotals({ grossAmount: 100, discountAmount: 40 });
     const result = calculateVisitCommission({
       lines: [{ serviceId: "s1", lineTotal: 100 }],
-      commissionBase: totals.subtotalAmount,
+      commissionBase: totals.netAmount,
       barberRate: 25,
     });
     expect(result.totalCommission).toBe(15);

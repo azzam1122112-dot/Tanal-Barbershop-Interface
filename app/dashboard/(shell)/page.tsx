@@ -9,6 +9,7 @@ import { dashboardScope } from "@/lib/auth/salon-scope";
 import { getDashboardRoleCopy } from "@/lib/auth/role-copy";
 import { getOperationAlerts } from "@/lib/daily-close/operation-alerts";
 import { prisma } from "@/lib/db/prisma";
+import { getExpensesReport } from "@/lib/expenses/expense-service";
 import { formatMoney, formatNumber } from "@/lib/format";
 import { getDashboardSummary, getTodayRange } from "@/lib/reports/dashboard-reports";
 
@@ -24,8 +25,9 @@ export default async function DashboardPage() {
   const salonFilter = salonIds && salonIds.length > 0 ? { salonId: { in: salonIds } } : {};
   const appointmentBase = { organizationId, ...salonFilter, startAt: { gte: from, lt: to } };
 
-  const [summary, operationAlerts, smartAlerts, bookedAppointments, arrivedAppointments, noShows, activeSalon] = await Promise.all([
+  const [summary, expenses, operationAlerts, smartAlerts, bookedAppointments, arrivedAppointments, noShows, activeSalon] = await Promise.all([
     getDashboardSummary(prisma, organizationId, salonIds),
+    getExpensesReport(prisma, { organizationId, salonIds, from, to }),
     getOperationAlerts(prisma, new Date(), organizationId, salonIds),
     getSmartAlerts(prisma, { organizationId, salonIds }),
     prisma.appointment.count({ where: { ...appointmentBase, status: "BOOKED" } }),
@@ -38,6 +40,7 @@ export default async function DashboardPage() {
   const isBranchManager = session.role === "SUPERVISOR";
   const scopeLabel = activeSalon?.name ?? (isBranchManager ? (isAggregate ? "الفروع المسندة" : "الفرع المسند") : "جميع الفروع");
   const pageTitle = isBranchManager ? "تشغيل الفرع اليوم" : session.role === "OWNER" ? "مركز قيادة المؤسسة" : "مركز إدارة المؤسسة";
+  const operatingNet = summary.netAmount - expenses.total;
 
   return (
     <DashboardShell
@@ -47,6 +50,8 @@ export default async function DashboardPage() {
       actions={
         <div className="flex flex-wrap gap-2">
           <Link href="/dashboard/appointments" className="dashboard-button-soft px-3.5 py-2.5 text-xs">المواعيد</Link>
+          <Link href="/dashboard/expenses" className="dashboard-button-soft px-3.5 py-2.5 text-xs">المصروفات</Link>
+          <Link href="/dashboard/cash-custody" className="dashboard-button-soft px-3.5 py-2.5 text-xs">عهدة الكاش</Link>
           <Link href="/dashboard/reports" className="dashboard-button-gold px-3.5 py-2.5 text-xs">التقارير</Link>
         </div>
       }
@@ -82,11 +87,11 @@ export default async function DashboardPage() {
 
         <aside className="dashboard-panel relative overflow-hidden bg-salon-ink p-5 text-white">
           <div className="absolute -left-16 -top-16 h-48 w-48 rounded-full bg-salon-gold/20 blur-3xl" aria-hidden="true" />
-          <p className="relative text-xs font-bold text-salon-goldlight">صافي دخل اليوم</p>
-          <p className="relative mt-3 text-4xl font-black tabular-nums tracking-tight sm:text-5xl">{formatMoney(summary.netAmount)}</p>
+          <p className="relative text-xs font-bold text-salon-goldlight">صافي التشغيل اليوم</p>
+          <p className="relative mt-3 text-4xl font-black tabular-nums tracking-tight sm:text-5xl">{formatMoney(operatingNet)}</p>
           <div className="relative mt-6 grid grid-cols-2 gap-3 border-t border-white/10 pt-4 text-sm">
-            <MetricMini label="متوسط الفاتورة" value={formatMoney(summary.averageTicket)} />
-            <MetricMini label="الزيارات" value={formatNumber(summary.visitsCount)} />
+            <MetricMini label="إيرادات المبيعات" value={formatMoney(summary.netAmount)} />
+            <MetricMini label="مصروفات اليوم" value={formatMoney(expenses.total)} />
             <MetricMini label="الكاش" value={formatMoney(summary.cashAmount)} />
             <MetricMini label="الشبكة" value={formatMoney(summary.networkAmount)} />
           </div>
@@ -114,8 +119,8 @@ export default async function DashboardPage() {
       <SectionPanel title={isBranchManager ? "اختصارات تشغيل الفرع" : "اختصارات الإدارة"}>
         <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-4">
           <CommandLink href="/dashboard/appointments" icon="visits" title="إدارة المواعيد" description="الوصول والحجز وعدم الحضور" />
+          <CommandLink href="/dashboard/expenses" icon="cash" title="تسجيل مصروف" description="البنود والقيم وصافي التشغيل" />
           <CommandLink href="/dashboard/daily-close" icon="cash" title="مراجعة الصندوق" description="الجلسات والتحصيل والفروقات" />
-          <CommandLink href="/dashboard/customers" icon="customers" title="العملاء" description="السجل والولاء والتواصل" />
           <CommandLink href={isBranchManager ? "/dashboard/attendance" : "/dashboard/reports"} icon={isBranchManager ? "staff" : "reports"} title={isBranchManager ? "حضور الفريق" : "التقارير المتقدمة"} description={isBranchManager ? "الحضور والانصراف اليومي" : "تحليل الفترات والفروع"} />
         </div>
       </SectionPanel>

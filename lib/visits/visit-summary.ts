@@ -13,11 +13,11 @@ export function toVisitDashboardRow(visit: VisitWithDetails) {
   return {
     id: visit.id,
     visitedAt: visit.visitedAt.toISOString(),
-    customer: {
+    customer: visit.customer ? {
       id: visit.customer.id,
       name: visit.customer.name,
       phone: visit.customer.phone,
-    },
+    } : null,
     barber: {
       id: visit.barber.id,
       name: visit.barber.name,
@@ -25,9 +25,6 @@ export function toVisitDashboardRow(visit: VisitWithDetails) {
     services: visit.services.map((service) => service.serviceName),
     grossAmount: Number(visit.grossAmount),
     discountAmount: Number(visit.discountAmount),
-    subtotalAmount: Number(visit.subtotalAmount),
-    vatAmount: Number(visit.vatAmount),
-    vatRate: Number(visit.vatRate),
     invoiceNumber: visit.invoiceNumber,
     netAmount: Number(visit.netAmount),
     paymentMethod: visit.paymentMethod,
