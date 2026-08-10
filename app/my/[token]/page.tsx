@@ -33,11 +33,11 @@ export default async function CustomerPortalPage({ params }: { params: Promise<{
   if (!view) notFound();
 
   return (
-    <main className="min-h-screen bg-salon-mist px-4 py-8">
-      <div className="mx-auto max-w-md space-y-4">
+    <main className="min-h-screen overflow-x-hidden bg-salon-mist px-4 py-8">
+      <div className="mx-auto min-w-0 max-w-md space-y-4">
         <header className="lux-edge rounded-2xl border border-white/10 bg-sidebar-onyx px-6 py-7 text-center text-white shadow-[var(--shadow-lg)]">
           <p className="text-xs font-bold uppercase tracking-eyebrow text-salon-goldlight">{view.brandName}</p>
-          <h1 className="mt-3 text-2xl font-bold">أهلًا {view.customer.name}</h1>
+          <h1 className="mt-3 break-words text-2xl font-bold [overflow-wrap:anywhere]">أهلًا {view.customer.name}</h1>
           <p className="mt-6 text-6xl font-black tabular-nums text-salon-goldlight">{formatNumber(view.points)}</p>
           <p className="mt-1 text-sm font-bold text-white/70">نقطة في رصيدك</p>
           <div className="mt-6 grid grid-cols-2 gap-3 text-sm">
@@ -66,6 +66,13 @@ export default async function CustomerPortalPage({ params }: { params: Promise<{
             </div>
             <p className="mt-2 text-sm font-bold text-salon-forest">
               باقٍ {formatNumber(view.nextReward.pointsRemaining)} نقطة فقط
+            </p>
+          </section>
+        ) : view.unlockedRewards.length === 0 && view.managerRewards.length === 0 ? (
+          <section className="barber-card px-5 py-5">
+            <h2 className="text-base font-bold">مكافآتك</h2>
+            <p className="mt-2 text-sm font-semibold leading-6 text-salon-charcoal">
+              ستظهر مكافآتك هنا فور إضافة قواعد المكافآت وبدء جمع النقاط.
             </p>
           </section>
         ) : null}
@@ -109,15 +116,13 @@ export default async function CustomerPortalPage({ params }: { params: Promise<{
           </section>
         ) : null}
 
-        {/* الحجز والمواعيد. القسم يختفي كليًا إن لم يفعّل أي فرع الحجز الذاتي. */}
-        {view.bookableSalons.length > 0 || view.appointments.length > 0 ? (
-          <PortalBooking
-            token={token}
-            salons={view.bookableSalons}
-            initialAppointments={view.appointments}
-            bookingPolicy={view.bookingPolicy}
-          />
-        ) : null}
+        {/* يبقى قسم الحجوزات ظاهرًا دائمًا كي يعرف العميل حالة الخدمة بدل أن تختفي بصمت. */}
+        <PortalBooking
+          token={token}
+          salons={view.bookableSalons}
+          initialAppointments={view.appointments}
+          bookingPolicy={view.bookingPolicy}
+        />
 
         <section className="barber-card px-5 py-5">
           <h2 className="text-base font-bold">آخر زياراتك</h2>

@@ -150,7 +150,7 @@ export default async function LoyaltyJoinPage({
             </div>
           </section>
 
-          <aside className="loyalty-form-shell mx-auto w-full max-w-lg lg:mx-0" aria-label="نموذج الانضمام">
+          <aside className="loyalty-form-shell mx-auto w-full min-w-0 max-w-lg lg:mx-0" aria-label="نموذج الانضمام">
             <LoyaltyJoinForm
               organizationSlug={organization.slug}
               brandName={brandName}
