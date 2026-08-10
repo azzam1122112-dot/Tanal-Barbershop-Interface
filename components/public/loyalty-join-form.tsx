@@ -110,16 +110,16 @@ export function LoyaltyJoinForm({
     const whatsappUrl = `https://wa.me/${toSaudiWhatsAppPhone(state.phone)}?text=${encodeURIComponent(whatsappMessage)}`;
 
     return (
-      <section className="loyalty-success relative overflow-hidden rounded-[2rem] border border-white/80 bg-white px-5 pb-5 pt-8 text-center text-salon-ink shadow-[0_35px_100px_-40px_rgba(0,0,0,0.85)] sm:px-7 sm:pb-7">
+      <section className="loyalty-success relative w-full min-w-0 overflow-hidden rounded-[2rem] border border-white/80 bg-white px-5 pb-5 pt-8 text-center text-salon-ink shadow-[0_35px_100px_-40px_rgba(0,0,0,0.85)] sm:px-7 sm:pb-7">
         <div aria-hidden="true" className="absolute inset-x-0 top-0 h-1 bg-gradient-to-l from-violet-700 via-violet-400 to-fuchsia-400" />
         <div aria-hidden="true" className="absolute -right-20 -top-20 h-48 w-48 rounded-full bg-violet-100 blur-3xl" />
 
-        <div className="relative">
+        <div className="relative min-w-0">
           <div className="loyalty-success-mark mx-auto grid h-20 w-20 place-items-center rounded-full border-[7px] border-emerald-50 bg-emerald-500 text-white shadow-[0_16px_35px_-16px_rgba(16,185,129,0.8)]">
             <Icon name="check" className="h-9 w-9" />
           </div>
           <p className="mt-5 text-[11px] font-black tracking-[0.2em] text-emerald-600">أهلًا بك في النادي</p>
-          <h2 className="mt-2 text-3xl font-bold tracking-tight">بطاقتك جاهزة، {state.customerName}</h2>
+          <h2 className="mt-2 break-words text-3xl font-bold tracking-tight [overflow-wrap:anywhere]">بطاقتك جاهزة، {state.customerName}</h2>
           <p className="mx-auto mt-3 max-w-sm text-sm font-medium leading-7 text-salon-charcoal">
             احتفظ برابطك الشخصي لتتابع نقاطك ومكافآتك وحجوزاتك في أي وقت.
           </p>
@@ -136,8 +136,8 @@ export function LoyaltyJoinForm({
             </div>
           </div>
 
-          <div className="mt-3 overflow-hidden rounded-xl border border-salon-line/70 bg-salon-mist/70 px-3.5 py-3 text-left" dir="ltr">
-            <p className="truncate text-xs font-semibold text-salon-charcoal">{state.portalUrl}</p>
+          <div className="mt-3 min-w-0 max-w-full overflow-hidden rounded-xl border border-salon-line/70 bg-salon-mist/70 px-3.5 py-3 text-left" dir="ltr">
+            <p className="block min-w-0 truncate text-xs font-semibold text-salon-charcoal">{state.portalUrl}</p>
           </div>
 
           <a

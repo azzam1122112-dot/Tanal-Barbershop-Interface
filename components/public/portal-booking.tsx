@@ -243,10 +243,19 @@ export function PortalBooking({
     : [];
 
   return (
-    <div className="space-y-4">
-      {upcoming.length > 0 ? (
-        <section className="rounded-2xl border border-salon-forest/25 bg-salon-forest/[0.07] px-5 py-5">
-          <h2 className="text-base font-bold">مواعيدك القادمة</h2>
+    <div id="appointments" className="min-w-0 space-y-4">
+      <section className={`rounded-2xl px-5 py-5 ${
+        upcoming.length > 0
+          ? "border border-salon-forest/25 bg-salon-forest/[0.07]"
+          : "barber-card"
+      }`}>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-base font-bold">حجوزاتك القادمة</h2>
+          <span className="rounded-full bg-salon-mist px-2.5 py-1 text-xs font-black tabular-nums text-salon-charcoal">
+            {upcoming.length}
+          </span>
+        </div>
+        {upcoming.length > 0 ? (
           <ul className="mt-3 space-y-3">
             {upcoming.map((appointment) => (
               <li key={appointment.id} className="rounded-2xl bg-white px-4 py-3">
@@ -268,8 +277,10 @@ export function PortalBooking({
               </li>
             ))}
           </ul>
-        </section>
-      ) : null}
+        ) : (
+          <p className="mt-3 text-sm font-semibold text-salon-charcoal">لا توجد حجوزات قادمة.</p>
+        )}
+      </section>
 
       {bookingPolicy.blocked ? (
         <section className="overflow-hidden rounded-2xl border border-red-200 bg-red-50 shadow-[var(--shadow-sm)]" role="alert">
@@ -304,7 +315,14 @@ export function PortalBooking({
         </section>
       ) : null}
 
-      {salons.length === 0 || bookingPolicy.blocked ? null : (
+      {salons.length === 0 && !bookingPolicy.blocked ? (
+        <section className="barber-card px-5 py-5">
+          <h2 className="text-base font-bold">احجز موعدك</h2>
+          <p className="mt-2 text-sm font-semibold leading-6 text-salon-charcoal">
+            الحجز الإلكتروني غير مفعّل حاليًا لهذا الفرع. تواصل مع الصالون لحجز موعدك.
+          </p>
+        </section>
+      ) : salons.length === 0 || bookingPolicy.blocked ? null : (
         <section className="barber-card px-5 py-5">
           <h2 className="text-base font-bold">احجز موعدك</h2>
 
