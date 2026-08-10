@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { absoluteBrowserUrl } from "../lib/public-url";
+import { resolveSiteUrl } from "../lib/site";
 
 describe("public browser URLs", () => {
   it("uses the production origin that is open in the browser", () => {
@@ -17,6 +18,15 @@ describe("public browser URLs", () => {
   it("still supports localhost during local development", () => {
     expect(absoluteBrowserUrl("dashboard/login", "http://localhost:3000")).toBe(
       "http://localhost:3000/dashboard/login",
+    );
+  });
+
+  it("never falls back to localhost for production metadata", () => {
+    expect(resolveSiteUrl(undefined, "production")).toBe("https://xmansx.com");
+    expect(resolveSiteUrl("http://localhost:3000", "production")).toBe("https://xmansx.com");
+    expect(resolveSiteUrl("http://127.0.0.1:3000", "production")).toBe("https://xmansx.com");
+    expect(resolveSiteUrl("https://tenant.example.com/", "production")).toBe(
+      "https://tenant.example.com",
     );
   });
 });
