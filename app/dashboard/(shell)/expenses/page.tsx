@@ -32,6 +32,7 @@ export default async function ExpensesPage({
   const category = isExpenseCategory(params.category) ? params.category : null;
   const paymentSource = isPaymentSource(params.paymentSource) ? params.paymentSource : null;
   const baseFilters = { organizationId, salonIds, from, to };
+  const salonRecordWhere = salonIds ? { id: { in: salonIds } } : {};
   const hasListFilters = Boolean(category || paymentSource);
   const fullReportPromise = getExpensesReport(prisma, baseFilters);
   const filteredReportPromise = hasListFilters
@@ -40,7 +41,7 @@ export default async function ExpensesPage({
 
   const [salons, openSessions, revenue, fullReport, report] = await Promise.all([
     prisma.salon.findMany({
-      where: { ...orgWhere, ...salonWhere, isActive: true },
+      where: { ...orgWhere, ...salonRecordWhere, isActive: true },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
