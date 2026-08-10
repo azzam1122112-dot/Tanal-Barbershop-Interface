@@ -29,26 +29,36 @@ export function ServiceManager({ initialServices }: { initialServices: ManagedSe
     setLoading(true);
     setToast(null);
 
-    const form = new FormData(event.currentTarget);
-    const response = await fetch("/api/dashboard/services", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: form.get("name"),
-        defaultPrice: form.get("defaultPrice"),
-        sortOrder: form.get("sortOrder"),
-      }),
-    });
-    const data = (await response.json().catch(() => ({}))) as ServiceResponse;
+    try {
+      const form = new FormData(event.currentTarget);
+      const name = String(form.get("name") ?? "").trim();
+      const defaultPrice = Number(form.get("defaultPrice"));
+      const sortOrder = Number(form.get("sortOrder") || 0);
 
-    if (response.ok && data.service) {
-      setServices((current) => [...current, data.service!].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name, "ar")));
-      event.currentTarget.reset();
-      setToast({ message: "تم إنشاء الخدمة بنجاح", tone: "success" });
-    } else {
-      setToast({ message: data.message ?? "تعذر إنشاء الخدمة", tone: "error" });
+      if (!name || !Number.isFinite(defaultPrice) || defaultPrice < 0 || !Number.isInteger(sortOrder)) {
+        setToast({ message: "أدخل اسم الخدمة وسعرًا صحيحًا وترتيبًا رقميًا صحيحًا", tone: "error" });
+        return;
+      }
+
+      const response = await fetch("/api/dashboard/services", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, defaultPrice, sortOrder }),
+      });
+      const data = (await response.json().catch(() => ({}))) as ServiceResponse;
+
+      if (response.ok && data.service) {
+        setServices((current) => [...current, data.service!].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name, "ar")));
+        event.currentTarget.reset();
+        setToast({ message: "تم إنشاء الخدمة بنجاح", tone: "success" });
+      } else {
+        setToast({ message: data.message ?? "تعذر إنشاء الخدمة", tone: "error" });
+      }
+    } catch {
+      setToast({ message: "تعذر الاتصال بالخادم. حاول مرة أخرى", tone: "error" });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   async function updateService(id: string, body: Record<string, unknown>) {

@@ -16,23 +16,52 @@ export function middleware(request: NextRequest) {
   const hasSession = Boolean(request.cookies.get(SESSION_COOKIE_NAME)?.value);
 
   if (pathname.startsWith("/dashboard") && pathname !== "/dashboard/login" && !hasSession) {
-    return NextResponse.redirect(new URL("/dashboard/login", request.url));
+    return redirectToPublicOrigin(request, "/dashboard/login");
   }
 
   if (pathname.startsWith("/barber") && pathname !== "/barber/login" && !hasSession) {
-    return NextResponse.redirect(new URL("/barber/login", request.url));
+    return redirectToPublicOrigin(request, "/barber/login");
   }
 
   if (pathname.startsWith("/platform") && pathname !== "/platform/login" && !hasSession) {
-    return NextResponse.redirect(new URL("/platform/login", request.url));
+    return redirectToPublicOrigin(request, "/platform/login");
   }
 
   // الإيصالات تحمل بيانات عميل ومبالغ — لا تُفتح بلا جلسة.
   if (pathname.startsWith("/receipt") && !hasSession) {
-    return NextResponse.redirect(new URL("/dashboard/login", request.url));
+    return redirectToPublicOrigin(request, "/dashboard/login");
   }
 
   return NextResponse.next();
+}
+
+/**
+ * لا نبني التحويل من `request.url`: خلف reverse proxy قد يكون أصله
+ * `http://localhost:3000`. وفي الوقت نفسه يشترط Next.js عنوانًا مطلقًا داخل
+ * middleware، لذلك نعيد بناء الأصل العام من ترويسات البروكسي التي يثبتها Nginx.
+ */
+function redirectToPublicOrigin(request: NextRequest, pathname: `/${string}`) {
+  return NextResponse.redirect(new URL(pathname, `${getPublicRequestOrigin(request)}/`));
+}
+
+function getPublicRequestOrigin(request: NextRequest) {
+  const host = firstForwardedValue(request.headers.get("x-forwarded-host") ?? request.headers.get("host"));
+  const protocol = firstForwardedValue(request.headers.get("x-forwarded-proto")) ??
+    request.nextUrl.protocol.replace(":", "");
+
+  if (host && (protocol === "http" || protocol === "https")) {
+    try {
+      return new URL(`${protocol}://${host}`).origin;
+    } catch {
+      // نعود إلى أصل Next بعد فشل ترويسة مشوهة.
+    }
+  }
+
+  return request.nextUrl.origin;
+}
+
+function firstForwardedValue(value: string | null) {
+  return value?.split(",", 1)[0]?.trim() || null;
 }
 
 function getRequestOrigins(request: NextRequest) {
