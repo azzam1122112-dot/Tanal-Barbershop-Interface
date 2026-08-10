@@ -2,6 +2,7 @@ import type { AuditActorType, PaymentProvider, Prisma, PrismaClient } from "@pri
 import { BusinessError } from "@/lib/errors";
 import { roundMoney } from "@/lib/visits/visit-totals";
 import { legalInfo } from "@/lib/legal";
+import { startOfRiyadhMonth } from "@/lib/datetime/riyadh";
 
 type BillingPrisma = PrismaClient | Prisma.TransactionClient;
 
@@ -459,7 +460,7 @@ export async function getInvoiceForOrganization(prisma: BillingPrisma, organizat
 
 /** ملخّص إيرادات المنصّة — ما حُصِّل فعلًا لا ما هو مستحق نظريًا. */
 export async function getPlatformRevenueSummary(prisma: BillingPrisma, now: Date = new Date()) {
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthStart = startOfRiyadhMonth(now);
   const [thisMonth, allTime, expiringSoon] = await Promise.all([
     prisma.billingInvoice.aggregate({
       where: { status: "PAID", paidAt: { gte: monthStart } },

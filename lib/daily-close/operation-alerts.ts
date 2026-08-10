@@ -2,12 +2,13 @@ import type { PrismaClient } from "@prisma/client";
 import { getCashSessionSummary } from "@/lib/cash-sessions/cash-session-service";
 import { getTodayRange } from "@/lib/reports/dashboard-reports";
 import { getCachedJson, redisKey, setCachedJson } from "@/lib/cache/redis";
+import { toRiyadhDateKey } from "@/lib/datetime/riyadh";
 
 export async function getOperationAlerts(prisma: PrismaClient, date: Date | string = new Date(), organizationId?: string, salonIds?: string[] | null) {
   const normalizedDate = new Date(date);
   const scopeKey = salonIds && salonIds.length > 0 ? [...salonIds].sort().join(",") : "all";
   const cacheKey = organizationId
-    ? redisKey("dashboard", "operation-alerts", organizationId, scopeKey, normalizedDate.toISOString().slice(0, 10))
+    ? redisKey("dashboard", "operation-alerts", organizationId, scopeKey, toRiyadhDateKey(normalizedDate))
     : null;
   if (cacheKey) {
     const cached = await getCachedJson<Awaited<ReturnType<typeof buildOperationAlerts>>>(cacheKey);

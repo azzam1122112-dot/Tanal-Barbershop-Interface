@@ -1,13 +1,12 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { getOpenCashSession, calculateCashSessionSnapshot } from "@/lib/cash-sessions/cash-session-service";
 import { sumSessionCollections } from "@/lib/cash-custody/cash-custody-service";
+import { getRiyadhDayRange } from "@/lib/datetime/riyadh";
 
 type BarberSummaryPrisma = PrismaClient | Prisma.TransactionClient;
 
 export async function getBarberTodaySummary(prisma: BarberSummaryPrisma, barberId: string, date = new Date()) {
-  const from = startOfDay(date);
-  const to = new Date(from);
-  to.setDate(to.getDate() + 1);
+  const { from, to } = getRiyadhDayRange(date);
 
   const visits = await prisma.visit.findMany({
     where: {
@@ -64,12 +63,6 @@ export async function getBarberTodaySummary(prisma: BarberSummaryPrisma, barberI
         }
       : null,
   };
-}
-
-function startOfDay(date: Date) {
-  const next = new Date(date);
-  next.setHours(0, 0, 0, 0);
-  return next;
 }
 
 function sum(values: number[]) {

@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
+import { getRiyadhDateParts } from "@/lib/datetime/riyadh";
 
 type InvoicePrisma = PrismaClient | Prisma.TransactionClient;
 
@@ -13,7 +14,7 @@ export async function issueInvoiceNumber(
   prisma: InvoicePrisma,
   input: { organizationId: string; salonId: string; date?: Date },
 ) {
-  const year = (input.date ?? new Date()).getFullYear();
+  const year = getRiyadhDateParts(input.date ?? new Date()).year;
 
   const counter = await prisma.invoiceCounter.upsert({
     where: { salonId_year: { salonId: input.salonId, year } },

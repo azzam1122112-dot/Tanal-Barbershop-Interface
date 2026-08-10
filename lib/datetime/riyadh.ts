@@ -41,6 +41,33 @@ export function startOfRiyadhDay(value: Date) {
   return riyadhDateTime(parts.year, parts.month, parts.day, 0);
 }
 
+/** يحوّل تاريخ واجهة `YYYY-MM-DD` أو لحظة زمنية إلى بداية يوم الرياض. */
+export function normalizeRiyadhDay(value: Date | string) {
+  return typeof value === "string" ? parseRiyadhDateKey(value) : startOfRiyadhDay(value);
+}
+
+/** نطاق يوم تشغيلي كامل: البداية مشمولة والنهاية غير مشمولة. */
+export function getRiyadhDayRange(value: Date | string) {
+  const from = normalizeRiyadhDay(value);
+  return { from, to: addRiyadhDays(from, 1) };
+}
+
+/** بداية الشهر الميلادي الذي تقع فيه اللحظة بحسب تقويم الرياض. */
+export function startOfRiyadhMonth(value: Date = new Date()) {
+  const { year, month } = getRiyadhDateParts(value);
+  return riyadhDateTime(year, month, 1, 0);
+}
+
+/** نطاق الشهر الميلادي بحسب الرياض، مستقل عن منطقة خادم Node. */
+export function getRiyadhMonthRange(value: Date = new Date()) {
+  const { year, month } = getRiyadhDateParts(value);
+  const from = riyadhDateTime(year, month, 1, 0);
+  const nextMonthCivil = createUtcDate(year, month, 1, 0);
+  nextMonthCivil.setUTCMonth(nextMonthCivil.getUTCMonth() + 1);
+  const to = riyadhDateTime(nextMonthCivil.getUTCFullYear(), nextMonthCivil.getUTCMonth() + 1, 1, 0);
+  return { from, to };
+}
+
 /** يعيد منتصف ليل الرياض بعد عدد من الأيام المدنية من تاريخ القيمة. */
 export function addRiyadhDays(value: Date, days: number) {
   const parts = getRiyadhDateParts(value);

@@ -6,6 +6,12 @@ import {
   type PrismaClient,
 } from "@prisma/client";
 import { BusinessError } from "@/lib/errors";
+import {
+  addRiyadhDays,
+  getRiyadhDateParts,
+  riyadhDateTimeForDay,
+  startOfRiyadhDay,
+} from "@/lib/datetime/riyadh";
 import { roundMoney } from "@/lib/visits/visit-totals";
 
 type CustodyPrisma = PrismaClient | Prisma.TransactionClient;
@@ -577,9 +583,7 @@ export function calculateCollectionDue(input: {
   const base = input.lastCollectionAt ? new Date(input.lastCollectionAt) : input.initializedAt ? new Date(input.initializedAt) : null;
   if (input.policy.mode === "INTERVAL") {
     if (!base) return { dueStatus: "DUE", dueAt: now.toISOString(), dueReason: "لم يُسجل تحصيل سابق" };
-    const dueAt = new Date(base);
-    dueAt.setDate(dueAt.getDate() + input.policy.intervalDays);
-    dueAt.setHours(input.policy.reminderHour, 0, 0, 0);
+    const dueAt = riyadhDateTimeForDay(addRiyadhDays(base, input.policy.intervalDays), input.policy.reminderHour * 60);
     if (now >= dueAt) {
       const overdue = now.getTime() - dueAt.getTime() >= 24 * 60 * 60 * 1000;
       return { dueStatus: overdue ? "OVERDUE" : "DUE", dueAt: dueAt.toISOString(), dueReason: `موعد التحصيل كل ${input.policy.intervalDays} يوم` };
@@ -587,11 +591,11 @@ export function calculateCollectionDue(input: {
     return { dueStatus: "CLEAR", dueAt: dueAt.toISOString(), dueReason: "لم يحن موعد التحصيل" };
   }
 
-  const startToday = new Date(now);
-  startToday.setHours(0, 0, 0, 0);
+  const startToday = startOfRiyadhDay(now);
+  const nowParts = getRiyadhDateParts(now);
   const collectedToday = Boolean(base && base >= startToday);
-  const scheduledToday = input.policy.weekdays.includes(now.getDay());
-  if (scheduledToday && !collectedToday && now.getHours() >= input.policy.reminderHour) {
+  const scheduledToday = input.policy.weekdays.includes(nowParts.weekday);
+  if (scheduledToday && !collectedToday && nowParts.hour >= input.policy.reminderHour) {
     return { dueStatus: "DUE", dueAt: now.toISOString(), dueReason: "اليوم ضمن أيام التحصيل المحددة" };
   }
   return { dueStatus: "CLEAR", dueAt: nextWeekdayDue(now, input.policy.weekdays, input.policy.reminderHour).toISOString(), dueReason: "ليس موعد التحصيل الآن" };
@@ -658,15 +662,12 @@ function toMovementRow(movement: { id: string; salonId: string; type: CashCustod
 }
 
 function nextWeekdayDue(now: Date, weekdays: number[], hour: number) {
-  const result = new Date(now);
   for (let add = 0; add <= 7; add += 1) {
-    result.setTime(now.getTime());
-    result.setDate(now.getDate() + add);
-    result.setHours(hour, 0, 0, 0);
-    if (weekdays.includes(result.getDay()) && result > now) return result;
+    const day = addRiyadhDays(now, add);
+    const result = riyadhDateTimeForDay(day, hour * 60);
+    if (weekdays.includes(getRiyadhDateParts(result).weekday) && result > now) return result;
   }
-  result.setDate(result.getDate() + 1);
-  return result;
+  return riyadhDateTimeForDay(addRiyadhDays(now, 8), hour * 60);
 }
 
 async function writeAudit(

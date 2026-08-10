@@ -11,7 +11,7 @@ export default async function DashboardSettingsPage() {
   const session = await getRequestSession();
   if (!session) redirect("/dashboard/login");
   if (!canAccessDashboard(session)) redirect("/barber");
-  if (!canManageStaff(session)) redirect("/dashboard");
+  if (!canManageStaff(session)) redirect("/dashboard/forbidden");
 
   const { organizationId, activeSalonId, isAggregate } = dashboardScope(session);
   const settings = await getEffectiveSettings(prisma, { organizationId, salonId: activeSalonId });

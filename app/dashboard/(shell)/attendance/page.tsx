@@ -40,8 +40,8 @@ export default async function AttendancePage({
       description="سجل دوام الحلاقين. مستقل عن جلسة الصندوق: الجلسة أداة مالية والحضور أداة إدارية."
     >
       <FilterBar className="md:grid-cols-[160px_160px_1fr_120px]">
-        <Field label="من تاريخ"><input lang="en" name="from" type="date" defaultValue={params.from ?? ""} className="dashboard-field" /></Field>
-        <Field label="إلى تاريخ"><input lang="en" name="to" type="date" defaultValue={params.to ?? ""} className="dashboard-field" /></Field>
+        <Field label="من تاريخ"><input dir="ltr" lang="en" name="from" type="date" defaultValue={params.from ?? ""} className="dashboard-field" /></Field>
+        <Field label="إلى تاريخ"><input dir="ltr" lang="en" name="to" type="date" defaultValue={params.to ?? ""} className="dashboard-field" /></Field>
         <Field label="الحلاق"><select name="barberId" defaultValue={params.barberId ?? ""} className="dashboard-field">
           <option value="">كل الحلاقين</option>
           {barbers.map((barber) => (

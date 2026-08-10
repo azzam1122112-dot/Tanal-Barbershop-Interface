@@ -169,6 +169,7 @@ export function SettingsForm({ initialSettings }: { initialSettings: Settings })
               <input
                 name="bookingOpenTime"
                 type="time"
+                dir="ltr"
                 lang="en"
                 defaultValue={minutesToTimeValue(settings.bookingOpenMinute)}
                 className="dashboard-field mt-2 h-12"
@@ -179,6 +180,7 @@ export function SettingsForm({ initialSettings }: { initialSettings: Settings })
               <input
                 name="bookingCloseTime"
                 type="time"
+                dir="ltr"
                 lang="en"
                 defaultValue={minutesToTimeValue(settings.bookingCloseMinute)}
                 className="dashboard-field mt-2 h-12"
@@ -254,6 +256,7 @@ export function SettingsForm({ initialSettings }: { initialSettings: Settings })
                       key={label}
                       type="button"
                       aria-pressed={closed}
+                      aria-label={`${label}: ${closed ? "مغلق" : "مفتوح"}`}
                       onClick={() =>
                         setClosedWeekdays((current) =>
                           current.includes(index)
@@ -261,13 +264,14 @@ export function SettingsForm({ initialSettings }: { initialSettings: Settings })
                             : [...current, index],
                         )
                       }
-                      className={`rounded-lg border px-3 py-2 text-xs font-bold transition ${
+                      className={`min-w-24 rounded-lg border px-3 py-2 text-xs font-bold transition ${
                         closed
                           ? "border-salon-ruby bg-salon-ruby text-white"
                           : "border-salon-line bg-white text-salon-charcoal hover:bg-salon-pearl"
                       }`}
                     >
-                      {label}
+                      <span className="block">{label}</span>
+                      <span className="mt-1 block text-[10px] opacity-80">{closed ? "مغلق" : "مفتوح"}</span>
                     </button>
                   );
                 })}

@@ -164,6 +164,14 @@ select {
     box-shadow: inset 0 1px 2px rgba(16, 25, 22, 0.05);
   }
 
+  /* قيمة التاريخ نفسها لاتينية ثابتة الاتجاه داخل واجهة RTL؛ هذا يمنع
+     انقلاب شرطات اليوم/الشهر في Chrome مع بقاء التسمية العربية خارج الحقل. */
+  .dashboard-field:is(input[type="date"], input[type="datetime-local"], input[type="time"]) {
+    direction: ltr !important;
+    text-align: left;
+    unicode-bidi: isolate;
+  }
+
   /* ===== Buttons =====
      كل زر: تدرّج عمودي (لا لون مسطّح) + خط ضوء علوي داخلي + ظل ملوّن بلون الزر.
      الظل الملوّن هو ما يجعل الزر يبدو مضيئًا لا ملصقًا. */

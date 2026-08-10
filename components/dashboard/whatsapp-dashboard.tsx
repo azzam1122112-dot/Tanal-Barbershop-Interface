@@ -162,7 +162,8 @@ export function WhatsAppDashboard({
   async function createTemplate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setToast(null);
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const response = await fetch("/api/dashboard/whatsapp/templates", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -175,7 +176,7 @@ export function WhatsAppDashboard({
     const data = (await response.json().catch(() => ({}))) as { template?: Template; message?: string };
     if (response.ok && data.template) {
       setTemplates((current) => [data.template!, ...current]);
-      event.currentTarget.reset();
+      formElement.reset();
       setToast({ message: "تم حفظ القالب بنجاح", tone: "success" });
     } else {
       setToast({ message: data.message ?? "تعذر حفظ القالب", tone: "error" });

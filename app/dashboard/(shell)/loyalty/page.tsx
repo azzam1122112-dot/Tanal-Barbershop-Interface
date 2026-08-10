@@ -13,7 +13,7 @@ export default async function DashboardLoyaltyPage() {
   const session = await getRequestSession();
   if (!session) redirect("/dashboard/login");
   if (!canAccessDashboard(session)) redirect("/barber");
-  if (!canOperateLoyalty(session)) redirect("/dashboard");
+  if (!canOperateLoyalty(session)) redirect("/dashboard/forbidden");
 
   const canEditPolicy = canSetLoyaltyPolicy(session);
   const { organizationId, orgWhere, activeSalonId } = dashboardScope(session);

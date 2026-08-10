@@ -2,6 +2,7 @@ import { BusinessError } from "@/lib/errors";
 import { Prisma } from "@prisma/client";
 import type { AuditActorType, PrismaClient } from "@prisma/client";
 import { aggregateVisitTotals, roundMoney } from "@/lib/visits/visit-totals";
+import { addRiyadhDays, normalizeRiyadhDay } from "@/lib/datetime/riyadh";
 
 type DailyClosePrisma = PrismaClient | Prisma.TransactionClient;
 
@@ -22,15 +23,12 @@ export type DailyCloseInput = {
 };
 
 export function normalizeCloseDate(date: Date | string) {
-  const normalized = new Date(date);
-  normalized.setHours(0, 0, 0, 0);
-  return normalized;
+  return normalizeRiyadhDay(date);
 }
 
 export function getCloseDateRange(date: Date | string) {
   const from = normalizeCloseDate(date);
-  const to = new Date(from);
-  to.setDate(to.getDate() + 1);
+  const to = addRiyadhDays(from, 1);
   return { from, to };
 }
 

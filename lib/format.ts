@@ -6,6 +6,8 @@
  * 2) اختلاط النظامين في الشاشة الواحدة، لأن العدّادات كانت تُطبع بـ `toString()`.
  * لاحقة `-u-nu-latn` تبقي التنسيق العربي (الفواصل والاتجاه) وتجعل الأرقام لاتينية.
  */
+import { RIYADH_TIME_ZONE } from "@/lib/datetime/riyadh";
+
 const LOCALE = "ar-SA-u-nu-latn";
 
 /** رقم مالي بدون عملة، مثل لوحات الحلاق المدمجة. */
@@ -30,17 +32,17 @@ export function formatPercent(value: number, fractionDigits = 0) {
 
 export function formatDate(value: Date | string | null | undefined) {
   if (!value) return "-";
-  return new Date(value).toLocaleDateString(LOCALE);
+  return new Date(value).toLocaleDateString(LOCALE, { timeZone: RIYADH_TIME_ZONE });
 }
 
 export function formatTime(value: Date | string | null | undefined) {
   if (!value) return "-";
-  return new Date(value).toLocaleTimeString(LOCALE, { hour: "2-digit", minute: "2-digit" });
+  return new Date(value).toLocaleTimeString(LOCALE, { timeZone: RIYADH_TIME_ZONE, hour: "2-digit", minute: "2-digit" });
 }
 
 export function formatDateTime(value: Date | string | null | undefined) {
   if (!value) return "-";
-  return new Date(value).toLocaleString(LOCALE);
+  return new Date(value).toLocaleString(LOCALE, { timeZone: RIYADH_TIME_ZONE });
 }
 
 /**

@@ -5,6 +5,7 @@ import { aggregateVisitTotals, roundMoney } from "@/lib/visits/visit-totals";
 import { assertSubscriptionActive } from "@/lib/plans/subscription-guard";
 import { sumSessionExpenses } from "@/lib/expenses/expense-service";
 import { sumSessionCollections } from "@/lib/cash-custody/cash-custody-service";
+import { addRiyadhDays, normalizeRiyadhDay } from "@/lib/datetime/riyadh";
 
 type CashSessionPrisma = PrismaClient | Prisma.TransactionClient;
 
@@ -250,8 +251,8 @@ export async function getCashSessionSummary(prisma: CashSessionPrisma, organizat
 }
 
 export async function getCashSessionHistory(prisma: CashSessionPrisma, filters: { organizationId?: string | null; salonIds?: string[] | null; from?: Date | string | null; to?: Date | string | null; barberId?: string | null } = {}) {
-  const from = filters.from ? new Date(filters.from) : undefined;
-  const to = filters.to ? endOfDay(filters.to) : undefined;
+  const from = filters.from ? normalizeRiyadhDay(filters.from) : undefined;
+  const to = filters.to ? addRiyadhDays(normalizeRiyadhDay(filters.to), 1) : undefined;
   const sessions = await prisma.cashSession.findMany({
     where: {
       status: "CLOSED",
@@ -356,13 +357,6 @@ function storedTotals(session: Prisma.CashSessionGetPayload<{ include: { barber:
     rewardRedemptionsCount: session.rewardRedemptionsCount,
     campaignRedemptionsCount: session.campaignRedemptionsCount,
   };
-}
-
-function endOfDay(date: Date | string) {
-  const next = new Date(date);
-  next.setHours(0, 0, 0, 0);
-  next.setDate(next.getDate() + 1);
-  return next;
 }
 
 async function runSerializableTransaction<T>(prisma: PrismaClient, callback: (tx: Prisma.TransactionClient) => Promise<T>) {

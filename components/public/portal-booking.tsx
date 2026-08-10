@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { parseDateKeyParts, RIYADH_TIME_ZONE } from "@/lib/datetime/riyadh";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 /**
  * حجز موعد من بوابة العميل.
@@ -127,6 +128,7 @@ export function PortalBooking({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>("");
   const [confirmation, setConfirmation] = useState<string>("");
+  const { confirm, confirmDialog } = useConfirm();
 
   const salon = salons.find((item) => item.id === salonId) ?? null;
 
@@ -214,6 +216,14 @@ export function PortalBooking({
   }
 
   async function cancelAppointment(id: string) {
+    const appointment = appointments.find((item) => item.id === id);
+    if (!appointment || !(await confirm({
+      title: "إلغاء الموعد؟",
+      description: `سيُلغى موعد ${formatAppointment(appointment.startAt)} مع ${appointment.barberName ?? "الحلاق المحدد"}.`,
+      confirmLabel: "نعم، إلغاء الموعد",
+      tone: "danger",
+    }))) return;
+
     setError("");
     setConfirmation("");
     try {
@@ -252,6 +262,7 @@ export function PortalBooking({
 
   return (
     <div id="appointments" className="min-w-0 space-y-4">
+      {confirmDialog}
       <section className={`rounded-2xl px-5 py-5 ${
         upcoming.length > 0
           ? "border border-salon-forest/25 bg-salon-forest/[0.07]"

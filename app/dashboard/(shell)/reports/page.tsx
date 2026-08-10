@@ -5,6 +5,7 @@ import { DashboardShell, Notice, SectionPanel, StatCard } from "@/components/das
 import { canAccessDashboard } from "@/lib/auth/access";
 import { dashboardScope } from "@/lib/auth/salon-scope";
 import { getRequestSession } from "@/lib/auth/http";
+import { addRiyadhDays, parseRiyadhDateKey } from "@/lib/datetime/riyadh";
 import { prisma } from "@/lib/db/prisma";
 import { getExpensesReport } from "@/lib/expenses/expense-service";
 import {
@@ -52,8 +53,8 @@ export default async function DashboardReportsPage({
             <option value="month">هذا الشهر</option>
             <option value="custom">فترة مخصصة</option>
           </select>
-          <input lang="en" name="from" type="date" defaultValue={params.from ?? ""} className="dashboard-field" />
-          <input lang="en" name="to" type="date" defaultValue={params.to ?? ""} className="dashboard-field" />
+          <input dir="ltr" lang="en" name="from" type="date" defaultValue={params.from ?? ""} className="dashboard-field" />
+          <input dir="ltr" lang="en" name="to" type="date" defaultValue={params.to ?? ""} className="dashboard-field" />
           <select name="barberId" defaultValue={params.barberId ?? ""} className="dashboard-field">
             <option value="">كل الحلاقين</option>
             {barbers.map((barber) => <option key={barber.id} value={barber.id}>{barber.name}</option>)}
@@ -233,13 +234,9 @@ function EmptyRow({ colSpan }: { colSpan: number }) {
 }
 
 function startOfDay(value: string) {
-  const date = new Date(value);
-  date.setHours(0, 0, 0, 0);
-  return date;
+  return parseRiyadhDateKey(value);
 }
 
 function endExclusive(value: string) {
-  const date = startOfDay(value);
-  date.setDate(date.getDate() + 1);
-  return date;
+  return addRiyadhDays(parseRiyadhDateKey(value), 1);
 }

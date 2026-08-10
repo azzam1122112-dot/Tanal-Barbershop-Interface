@@ -33,8 +33,8 @@ export default async function PostCloseAdjustmentsPage({
   return (
     <DashboardShell title="تصحيحات ما بعد الإغلاق" description="سجل رقابي لكل تعديل يحدث بعد إغلاق جلسات الصندوق، مع الأثر المالي وأثر النقاط.">
         <FilterBar className="md:grid-cols-[150px_150px_1fr_220px_120px]">
-          <Field label="من تاريخ"><input lang="en" name="from" type="date" defaultValue={params.from ?? ""} className="dashboard-field" /></Field>
-          <Field label="إلى تاريخ"><input lang="en" name="to" type="date" defaultValue={params.to ?? ""} className="dashboard-field" /></Field>
+          <Field label="من تاريخ"><input dir="ltr" lang="en" name="from" type="date" defaultValue={params.from ?? ""} className="dashboard-field" /></Field>
+          <Field label="إلى تاريخ"><input dir="ltr" lang="en" name="to" type="date" defaultValue={params.to ?? ""} className="dashboard-field" /></Field>
           <Field label="الحلاق"><select name="barberId" defaultValue={params.barberId ?? ""} className="dashboard-field">
             <option value="">كل الحلاقين</option>
             {barbers.map((barber) => <option key={barber.id} value={barber.id}>{barber.name}</option>)}
