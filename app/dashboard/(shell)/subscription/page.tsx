@@ -1,99 +1,25 @@
 import { redirect } from "next/navigation";
-import { DashboardShell, SectionPanel, StatCard } from "@/components/dashboard/ui";
+import { DashboardShell, StatCard } from "@/components/dashboard/ui";
+import { SubscriptionSelfService } from "@/components/dashboard/subscription-self-service";
 import { canAccessDashboard } from "@/lib/auth/access";
 import { getRequestSession } from "@/lib/auth/http";
 import { prisma } from "@/lib/db/prisma";
-import { formatDate, formatMoney, formatNumber } from "@/lib/format";
-import { getOrganizationSubscriptionOverview, type PlanSummary } from "@/lib/plans/subscription-service";
+import { formatDate, formatNumber } from "@/lib/format";
+import { getOrganizationSubscriptionOverview } from "@/lib/plans/subscription-service";
 import { listInvoices } from "@/lib/billing/billing-service";
 
-function limitText(value: number | null, unit: string) {
-  return value === null ? `غير محدود ${unit}` : `${formatNumber(value)} ${unit}`;
-}
-
 function usageText(used: number, limit: number | null, unit: string) {
-  return limit === null ? `${formatNumber(used)} ${unit} مستخدم` : `${formatNumber(used)} من ${formatNumber(limit)} ${unit}`;
+  return limit === null ? `${formatNumber(used)} ${unit}` : `${formatNumber(used)} من ${formatNumber(limit)} ${unit}`;
 }
 
 function statusLabel(status: string) {
   const labels: Record<string, string> = {
-    TRIALING: "تجربة",
-    ACTIVE: "نشط",
+    TRIALING: "تجربة مجانية",
+    ACTIVE: "اشتراك نشط",
     PAST_DUE: "متأخر الدفع",
-    CANCELED: "ملغي",
+    CANCELED: "التجديد ملغي",
   };
   return labels[status] ?? status;
-}
-
-function PlanCard({
-  plan,
-  currentPlanId,
-  usage,
-}: {
-  plan: PlanSummary;
-  currentPlanId: string | null;
-  usage: { salons: number; barbers: number; customers: number };
-}) {
-  const isCurrent = plan.id === currentPlanId;
-  const canFitCurrentUsage =
-    usage.salons <= plan.maxSalons &&
-    (plan.maxBarbers === null || usage.barbers <= plan.maxBarbers) &&
-    (plan.maxCustomers === null || usage.customers <= plan.maxCustomers);
-
-  return (
-    <article className={`dashboard-panel flex h-full flex-col p-5 ${isCurrent ? "ring-2 ring-salon-gold/60" : ""}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-lg font-bold text-salon-ink">{plan.name}</p>
-          <p className="mt-1 text-xs font-bold text-salon-charcoal/65" dir="ltr">{plan.slug}</p>
-        </div>
-        <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${isCurrent ? "bg-salon-gold/15 text-salon-gold" : "bg-salon-mist text-salon-charcoal"}`}>
-          {isCurrent ? "باقتك الحالية" : plan.priceMonthly === 0 ? "مجانية" : "ترقية"}
-        </span>
-      </div>
-
-      {plan.description ? <p className="dashboard-muted mt-4">{plan.description}</p> : null}
-
-      <p className="mt-5 text-3xl font-black tracking-tight">{plan.priceMonthly === 0 ? "مجانية" : formatMoney(plan.priceMonthly)}</p>
-      <p className="mt-1 text-xs font-bold text-salon-charcoal/60">شهريًا</p>
-
-      <div className="lux-rule my-5" />
-
-      <dl className="space-y-3 text-sm">
-        <div className="flex items-center justify-between gap-3">
-          <dt className="font-bold text-salon-charcoal">الفروع</dt>
-          <dd className="font-bold">{limitText(plan.maxSalons, "فرع")}</dd>
-        </div>
-        <div className="flex items-center justify-between gap-3">
-          <dt className="font-bold text-salon-charcoal">الحلاقون</dt>
-          <dd className="font-bold">{limitText(plan.maxBarbers, "حلاق")}</dd>
-        </div>
-        <div className="flex items-center justify-between gap-3">
-          <dt className="font-bold text-salon-charcoal">العملاء</dt>
-          <dd className="font-bold">{limitText(plan.maxCustomers, "عميل")}</dd>
-        </div>
-      </dl>
-
-      <div className="mt-5 flex-1 rounded-xl border border-salon-line/70 bg-salon-pearl/80 p-3 text-xs font-bold leading-6 text-salon-charcoal">
-        {canFitCurrentUsage ? "هذه الباقة تستوعب استخدامك الحالي." : "استخدامك الحالي يتجاوز حدود هذه الباقة."}
-      </div>
-
-      {isCurrent ? (
-        <button type="button" disabled className="dashboard-button-soft mt-4 w-full opacity-70">
-          مستخدمة الآن
-        </button>
-      ) : (
-        <a
-          href={`https://wa.me/966537720207?text=${encodeURIComponent(`السلام عليكم، أرغب بترقية اشتراك مؤسستي إلى باقة «${plan.name}».`)}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="dashboard-button-gold mt-4 w-full"
-        >
-          طلب الترقية عبر واتساب
-        </a>
-      )}
-    </article>
-  );
 }
 
 export default async function DashboardSubscriptionPage() {
@@ -104,97 +30,56 @@ export default async function DashboardSubscriptionPage() {
 
   const [overview, invoices] = await Promise.all([
     getOrganizationSubscriptionOverview(prisma, session.organizationId),
-    listInvoices(prisma, session.organizationId, 12),
+    listInvoices(prisma, session.organizationId, 24),
   ]);
   if (!overview) redirect("/dashboard/login");
 
   const currentPlan = overview.organization.plan;
   const usage = overview.organization.usage;
+  const deadline = overview.organization.subscriptionStatus === "TRIALING"
+    ? overview.organization.trialEndsAt
+    : overview.organization.currentPeriodEnd;
+  const inactivityStartedAt = overview.organization.inactiveSince
+    ?? (deadline && new Date(deadline) <= new Date() ? deadline : null);
+  const scheduledDeletionAt = inactivityStartedAt
+    ? new Date(new Date(inactivityStartedAt).getTime() + 60 * 24 * 60 * 60 * 1000).toISOString()
+    : null;
 
   return (
     <DashboardShell
-      title="الباقة والترقية"
-      description="حدود باقتك الحالية وخيارات الترقية تأتي مباشرة من لوحة المنصة."
+      title="اشتراكي"
+      description="اختر باقتك، أرسل مرجع الدفع، تابع حالة الطلب، وتحكم في تجديد اشتراك مؤسستك من مكان واحد."
     >
       <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="الباقة الحالية" value={currentPlan?.name ?? "غير محددة"} subValue={statusLabel(overview.organization.subscriptionStatus)} />
+        <StatCard label="الباقة الحالية" value={currentPlan?.name ?? "التجربة"} subValue={statusLabel(overview.organization.subscriptionStatus)} />
         <StatCard label="الفروع" value={usageText(usage.salons, currentPlan?.maxSalons ?? null, "فرع")} />
         <StatCard label="الحلاقون" value={usageText(usage.barbers, currentPlan?.maxBarbers ?? null, "حلاق")} />
-        <StatCard label="العملاء" value={usageText(usage.customers, currentPlan?.maxCustomers ?? null, "عميل")} />
+        <StatCard label="سريان الاشتراك" value={formatDate(deadline)} subValue={deadline ? "تبقى بياناتك محفوظة بعد الانتهاء" : "لا توجد فترة مدفوعة"} />
       </div>
 
-      <SectionPanel title="تفاصيل المؤسسة">
-        <div className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-4">
-          <div>
-            <p className="text-xs font-bold text-salon-charcoal/65">اسم المؤسسة</p>
-            <p className="mt-1 font-bold">{overview.organization.name}</p>
-          </div>
-          <div>
-            <p className="text-xs font-bold text-salon-charcoal/65">المعرّف</p>
-            <p className="mt-1 font-bold" dir="ltr">{overview.organization.slug}</p>
-          </div>
-          <div>
-            <p className="text-xs font-bold text-salon-charcoal/65">نهاية التجربة</p>
-            <p className="mt-1 font-bold">{formatDate(overview.organization.trialEndsAt)}</p>
-          </div>
-          <div>
-            <p className="text-xs font-bold text-salon-charcoal/65">نهاية الفترة الحالية</p>
-            <p className="mt-1 font-bold">{formatDate(overview.organization.currentPeriodEnd)}</p>
-          </div>
-        </div>
-      </SectionPanel>
+      <SubscriptionSelfService
+        plans={overview.plans}
+        currentPlanId={currentPlan?.id ?? null}
+        initialStatus={overview.organization.subscriptionStatus}
+        currentPeriodEnd={overview.organization.currentPeriodEnd}
+        usage={usage}
+        initialInvoices={invoices}
+        bank={{
+          bankName: process.env.SUBSCRIPTION_BANK_NAME?.trim() || "مصرف الراجحي",
+          accountName: process.env.SUBSCRIPTION_ACCOUNT_NAME?.trim() || "MANSOUR ALGHAMDI",
+          iban: process.env.SUBSCRIPTION_IBAN?.trim() || "SA85 8000 0660 6080 1622 0957",
+        }}
+      />
 
-      <SectionPanel title="الباقات المتاحة">
-        <div className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-3">
-          {overview.plans.map((plan) => (
-            <PlanCard key={plan.id} plan={plan} currentPlanId={currentPlan?.id ?? null} usage={usage} />
-          ))}
-          {overview.plans.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-salon-line bg-white/80 px-5 py-8 text-center text-sm font-bold text-salon-charcoal">
-              لا توجد باقات فعّالة حاليًا. فعّل باقة واحدة على الأقل من لوحة المنصة.
-            </p>
-          ) : null}
-        </div>
-      </SectionPanel>
-
-      <SectionPanel title="سجل الدفعات">
-        {invoices.length === 0 ? (
-          <p className="px-5 py-8 text-center text-sm font-bold text-salon-charcoal">
-            لا توجد دفعات مسجّلة بعد. تُسجَّل الدفعات من إدارة المنصة بعد تحويلك المبلغ.
-          </p>
-        ) : (
-          <div className="table-scroll-wrap">
-            <div className="table-scroll">
-            <table className="dashboard-table min-w-[720px]">
-              <thead>
-                <tr>
-                  <th>التاريخ</th>
-                  <th>الباقة</th>
-                  <th>المبلغ</th>
-                  <th>المدة</th>
-                  <th>تغطي حتى</th>
-                  <th>الحالة</th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoices.map((invoice) => (
-                  <tr key={invoice.id} className={invoice.status === "CANCELLED" ? "opacity-55" : undefined}>
-                    <td className="px-4 py-3">{formatDate(invoice.paidAt ?? invoice.createdAt)}</td>
-                    <td className="px-4 py-3 font-bold">{invoice.planName ?? "-"}</td>
-                    <td className="px-4 py-3 tabular-nums">{formatMoney(invoice.amount)}</td>
-                    <td className="px-4 py-3 tabular-nums">{invoice.periodMonths} شهر</td>
-                    <td className="px-4 py-3">{formatDate(invoice.periodEnd)}</td>
-                    <td className="px-4 py-3 font-bold">
-                      {invoice.status === "PAID" ? "مدفوعة" : invoice.status === "CANCELLED" ? "ملغاة" : invoice.status}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            </div>
-          </div>
-        )}
-      </SectionPanel>
+      <section className="dashboard-panel mt-6 p-5">
+        <h2 className="text-xl font-bold">بيانات الحساب والاحتفاظ</h2>
+        <p className="mt-2 max-w-2xl text-sm font-semibold leading-7 text-salon-charcoal">
+          يستطيع المالك تنزيل نسخة JSON من بيانات النشاط. بعد توقف التجربة أو الاشتراك 60 يومًا يحذف النظام الحساب
+          وجميع بياناته نهائيًا، لذلك نزّل النسخة قبل موعد الحذف.
+        </p>
+        {scheduledDeletionAt ? <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-800">موعد الحذف المتوقع إذا بقي الحساب غير نشط: {formatDate(scheduledDeletionAt)}</p> : null}
+        {session.role === "OWNER" ? <a href="/api/dashboard/account/export" className="dashboard-button mt-4 inline-flex">تصدير جميع بيانات الحساب</a> : <p className="mt-3 text-xs font-semibold text-salon-charcoal">التصدير متاح لمالك الحساب فقط.</p>}
+      </section>
     </DashboardShell>
   );
 }

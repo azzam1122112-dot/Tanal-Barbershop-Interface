@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import webPush from "web-push";
+import { BusinessError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 
 type PushPrisma = PrismaClient;
@@ -16,6 +17,36 @@ export type BrowserPushSubscription = {
   endpoint: string;
   keys: { p256dh: string; auth: string };
 };
+
+const DEFAULT_PUSH_HOSTS = new Set([
+  "fcm.googleapis.com",
+  "updates.push.services.mozilla.com",
+  "push.services.mozilla.com",
+  "web.push.apple.com",
+]);
+
+/** يمنع تحويل Web Push إلى HTTP client عام/SSRF. */
+export function isTrustedPushEndpoint(endpoint: string) {
+  let url: URL;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "https:" || url.username || url.password || url.port) return false;
+
+  const hostname = url.hostname.toLowerCase().replace(/\.$/, "");
+  const configuredHosts = (process.env.WEB_PUSH_ALLOWED_HOSTS ?? "")
+    .split(",")
+    .map((host) => host.trim().toLowerCase().replace(/\.$/, ""))
+    .filter(Boolean);
+
+  return (
+    DEFAULT_PUSH_HOSTS.has(hostname) ||
+    hostname.endsWith(".notify.windows.com") ||
+    configuredHosts.includes(hostname)
+  );
+}
 
 function getVapidConfig() {
   const publicKey = process.env.WEB_PUSH_PUBLIC_KEY?.trim() ?? "";
@@ -47,13 +78,16 @@ export async function saveBarberPushSubscription(
   },
 ) {
   return prisma.$transaction(async (tx) => {
+    const existingOwner = await tx.barberPushSubscription.findUnique({
+      where: { endpoint: input.subscription.endpoint },
+      select: { sessionId: true },
+    });
+    if (existingOwner && existingOwner.sessionId !== input.sessionId) {
+      throw new BusinessError("تعذر تسجيل اشتراك التنبيهات", 409);
+    }
+
     await tx.barberPushSubscription.deleteMany({
-      where: {
-        OR: [
-          { sessionId: input.sessionId },
-          { endpoint: input.subscription.endpoint },
-        ],
-      },
+      where: { sessionId: input.sessionId },
     });
 
     return tx.barberPushSubscription.create({

@@ -1,0 +1,11 @@
+[Unit]
+Description=Nightly XMANSX PostgreSQL backup
+
+[Timer]
+OnCalendar=*-*-* 01:17:00 UTC
+RandomizedDelaySec=900
+Persistent=true
+Unit=xmansx-backup.service
+
+[Install]
+WantedBy=timers.target

@@ -10,12 +10,13 @@ type PlanOption = { id: string; name: string; maxSalons: number; maxBarbers: num
 type OrgRow = {
   id: string;
   name: string;
+  city: string | null;
   slug: string;
   status: "ACTIVE" | "SUSPENDED";
   subscriptionStatus: "TRIALING" | "ACTIVE" | "PAST_DUE" | "CANCELED";
   plan: PlanOption | null;
   trialEndsAt: string | null;
-  counts: { salons: number; users: number; barbers: number; customers: number };
+  counts: { salons: number; users: number; barbers: number; customers: number; billingInvoices: number };
 };
 
 const SUB_LABELS: Record<OrgRow["subscriptionStatus"], string> = {
@@ -83,7 +84,55 @@ export function PlatformOrganizations({
     <div className="mt-4">
       {confirmDialog}
       <DashboardToast toast={toast} onClose={() => setToast(null)} />
-      <div className="dashboard-panel table-scroll-wrap overflow-hidden">
+      <div className="grid gap-3 lg:hidden">
+        {orgs.map((org) => {
+          const days = trialDaysLeft(org.trialEndsAt);
+          return (
+            <article key={org.id} className="dashboard-panel overflow-hidden">
+              <div className="flex items-start justify-between gap-3 border-b border-salon-line/70 bg-gradient-to-b from-white to-salon-pearl/60 px-4 py-4">
+                <div className="min-w-0">
+                  <Link href={`/platform/organizations/${org.id}`} className="block truncate text-lg font-bold text-salon-ink">{org.name}</Link>
+                  <p className="mt-1 truncate text-xs font-semibold text-salon-charcoal/60" dir="ltr">{org.slug}</p>
+                  {org.city ? <p className="mt-1 text-xs font-bold text-salon-charcoal/70">{org.city}</p> : null}
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-1.5">
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${org.status === "ACTIVE" ? "bg-green-50 text-green-700 ring-green-200/70" : "bg-red-50 text-red-700 ring-red-200/70"}`}>{org.status === "ACTIVE" ? "نشطة" : "موقوفة"}</span>
+                  {org.counts.billingInvoices > 0 ? <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-bold text-violet-700">طلب دفع</span> : null}
+                </div>
+              </div>
+              <div className="grid grid-cols-3 divide-x divide-x-reverse divide-salon-line/70 border-b border-salon-line/70 px-2 py-3 text-center">
+                <MobileCount label="فروع" value={org.counts.salons} />
+                <MobileCount label="حلاقون" value={org.counts.barbers} />
+                <MobileCount label="عملاء" value={org.counts.customers} />
+              </div>
+              <div className="space-y-3 p-4">
+                <label className="block text-xs font-bold text-salon-charcoal">حالة الاشتراك
+                  <div className="mt-1.5 flex items-center gap-2">
+                    <select value={org.subscriptionStatus} onChange={(event) => patch(org.id, { subscriptionStatus: event.target.value }, "تم تحديث حالة الاشتراك")} className="dashboard-field py-2 text-xs">
+                      {(Object.keys(SUB_LABELS) as OrgRow["subscriptionStatus"][]).map((key) => <option key={key} value={key}>{SUB_LABELS[key]}</option>)}
+                    </select>
+                    {org.subscriptionStatus === "TRIALING" && days !== null ? <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-bold ${days <= 2 ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-700"}`}>{days >= 0 ? `${days} يوم` : "انتهت"}</span> : null}
+                  </div>
+                </label>
+                <label className="block text-xs font-bold text-salon-charcoal">الباقة
+                  <select value={org.plan?.id ?? ""} onChange={(event) => patch(org.id, { planId: event.target.value || null }, "تم تحديث باقة المؤسسة")} className="dashboard-field mt-1.5 py-2 text-xs">
+                    <option value="">بدون باقة</option>
+                    {plans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name}</option>)}
+                  </select>
+                </label>
+                <div className="grid grid-cols-3 gap-2 pt-1">
+                  <Link href={`/platform/organizations/${org.id}`} className="dashboard-button-soft px-2 py-2 text-xs">التفاصيل</Link>
+                  <button type="button" onClick={() => patch(org.id, { extendTrialDays: 14 }, "تم تمديد التجربة 14 يومًا")} className="dashboard-button-soft px-2 py-2 text-xs">+14 يوم</button>
+                  {org.status === "ACTIVE" ? <button type="button" onClick={() => suspend(org)} className="dashboard-danger-button px-2 py-2 text-xs">إيقاف</button> : <button type="button" onClick={() => patch(org.id, { status: "ACTIVE" }, "تم تفعيل المؤسسة")} className="dashboard-button px-2 py-2 text-xs">تفعيل</button>}
+                </div>
+              </div>
+            </article>
+          );
+        })}
+        {orgs.length === 0 ? <div className="dashboard-panel px-5 py-10 text-center text-sm font-semibold text-salon-charcoal">لا توجد مؤسسات مطابقة.</div> : null}
+      </div>
+
+      <div className="dashboard-panel table-scroll-wrap hidden overflow-hidden lg:block">
         <div className="table-scroll">
         <table className="dashboard-table min-w-[1080px]">
           <thead>
@@ -104,6 +153,7 @@ export function PlatformOrganizations({
                   <td>
                     <Link href={`/platform/organizations/${org.id}`} className="font-bold text-salon-ink hover:text-salon-gold hover:underline">{org.name}</Link>
                     <p className="text-xs font-medium text-salon-charcoal/70" dir="ltr">{org.slug}</p>
+                    {org.city ? <p className="mt-1 text-xs font-semibold text-salon-charcoal/70">{org.city}</p> : null}
                   </td>
                   <td>
                     <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${org.status === "ACTIVE" ? "bg-green-50 text-green-700 ring-green-200/70" : "bg-red-50 text-red-700 ring-red-200/70"}`}>
@@ -126,6 +176,7 @@ export function PlatformOrganizations({
                           {days >= 0 ? `${days} يوم` : "انتهت"}
                         </span>
                       ) : null}
+                      {org.counts.billingInvoices > 0 ? <span className="shrink-0 rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-bold text-violet-700">دفع معلق</span> : null}
                     </div>
                   </td>
                   <td className="text-xs tabular-nums text-salon-charcoal">
@@ -171,4 +222,8 @@ export function PlatformOrganizations({
       </div>
     </div>
   );
+}
+
+function MobileCount({ label, value }: { label: string; value: number }) {
+  return <div><p className="text-lg font-black tabular-nums text-salon-ink">{value}</p><p className="mt-0.5 text-[10px] font-bold text-salon-charcoal/60">{label}</p></div>;
 }

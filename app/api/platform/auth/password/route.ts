@@ -23,7 +23,13 @@ export async function POST(request: Request) {
   }
 
   try {
-    await changePlatformAdminPassword(prisma, session.admin.id, parsed.data.currentPassword, parsed.data.newPassword);
+    await changePlatformAdminPassword(
+      prisma,
+      session.admin.id,
+      parsed.data.currentPassword,
+      parsed.data.newPassword,
+      session.id,
+    );
     return NextResponse.json({ ok: true });
   } catch (error) {
     return toErrorResponse(error, "تعذر تغيير كلمة المرور");

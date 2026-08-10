@@ -80,6 +80,7 @@ describe("dashboard reports", () => {
     rewardRuleId = rewardRule.id;
     const campaign = await prisma.campaign.create({
       data: {
+        organizationId: "org_default",
         name: `حملة تقارير ${Date.now()}`,
         discountType: "FIXED_AMOUNT",
         discountValue: 20,
@@ -102,6 +103,7 @@ describe("dashboard reports", () => {
       data: { points: 520, lifetimeEarned: 520 },
     });
 
+    await prisma.service.update({ where: { id: serviceId }, data: { defaultPrice: 100 } });
     const cashVisit = await confirmVisit(prisma, {
       organizationId: "org_default",
       salonId: "salon_default",
@@ -112,6 +114,7 @@ describe("dashboard reports", () => {
       paymentMethod: "CASH",
       idempotencyKey: `report-cash-${Date.now()}`,
     });
+    await prisma.service.update({ where: { id: serviceId }, data: { defaultPrice: 70 } });
     const rewardVisit = await confirmVisit(prisma, {
       organizationId: "org_default",
       salonId: "salon_default",
@@ -123,6 +126,7 @@ describe("dashboard reports", () => {
       rewardRuleId,
       idempotencyKey: `report-reward-${Date.now()}`,
     });
+    await prisma.service.update({ where: { id: secondServiceId }, data: { defaultPrice: 80 } });
     const campaignVisit = await confirmVisit(prisma, {
       organizationId: "org_default",
       salonId: "salon_default",
@@ -215,7 +219,7 @@ describe("dashboard reports", () => {
   it("reports the most used services", async () => {
     const services = await getServiceReport(prisma, { from: reportFrom, to: reportTo });
 
-    expect(services[0]).toMatchObject({ serviceId, usageCount: 2, visitsCount: 2, linkedSales: 100 });
+    expect(services[0]).toMatchObject({ serviceId, usageCount: 2, visitsCount: 2, linkedSales: 170 });
     expect(services.some((service) => service.serviceId === secondServiceId && service.usageCount === 1)).toBe(true);
   });
 
@@ -243,6 +247,8 @@ describe("dashboard reports", () => {
   it("dashboard summary uses confirmed visits only and does not expose sensitive fields", async () => {
     const cancelled = await prisma.visit.create({
       data: {
+        organizationId: "org_default",
+        salonId: "salon_default",
         customerId: topCustomerId,
         barberId,
         grossAmount: 999,
@@ -267,6 +273,8 @@ describe("dashboard reports", () => {
     const legacyTo = new Date("2030-02-02T00:00:00.000Z");
     const legacyVisit = await prisma.visit.create({
       data: {
+        organizationId: "org_default",
+        salonId: "salon_default",
         customerId: topCustomerId,
         barberId,
         grossAmount: 40,

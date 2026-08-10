@@ -151,10 +151,13 @@ export async function listAvailableSlots(
     config: BookingConfig;
     from?: Date;
     days?: number;
+    durationMinutes?: number;
+    excludeAppointmentId?: string | null;
   },
 ): Promise<BookingDay[]> {
   const { config } = input;
   if (!config.enabled) return [];
+  const durationMinutes = validDurationMinutes(input.durationMinutes ?? config.slotMinutes);
 
   const now = input.from ?? new Date();
   const firstDay = startOfLocalDay(now);
@@ -188,6 +191,7 @@ export async function listAvailableSlots(
       salonId: input.salonId,
       status: { in: ACTIVE_STATUSES },
       startAt: { gte: firstDay, lt: rangeEnd },
+      ...(input.excludeAppointmentId ? { id: { not: input.excludeAppointmentId } } : {}),
       // موعد بلا حلاق محدَّد لا يحجز حلاقًا بعينه، فلا يُسقط فترة من الشبكة.
       barberId: { in: barberIds },
     },
@@ -217,7 +221,7 @@ export async function listAvailableSlots(
         if (!schedule?.enabled || schedule.closedWeekdays.includes(weekday)) continue;
         for (
           let minute = schedule.openMinute;
-          minute + config.slotMinutes <= schedule.closeMinute;
+          minute + durationMinutes <= schedule.closeMinute;
           minute += config.slotMinutes
         ) {
           candidateMinutes.add(minute);
@@ -228,11 +232,11 @@ export async function listAvailableSlots(
         const start = new Date(day);
         start.setMinutes(minute, 0, 0);
         const startMs = start.getTime();
-        const endMs = startMs + config.slotMinutes * 60_000;
+        const endMs = startMs + durationMinutes * 60_000;
         const barberStatuses = barbers.map((barber) => {
           const schedule = schedules.get(barber.id);
           let status: BookingSlotStatus;
-          if (!schedule || !isBarberOnDuty(schedule, weekday, minute, config.slotMinutes)) {
+          if (!schedule || !isBarberOnDuty(schedule, weekday, minute, durationMinutes, config.slotMinutes)) {
             status = "OFF_DUTY";
           } else if (startMs < earliest) {
             status = "TOO_SOON";
@@ -281,6 +285,8 @@ export async function resolveBookableSlot(
     startAt: Date;
     config: BookingConfig;
     now?: Date;
+    durationMinutes?: number;
+    excludeAppointmentId?: string | null;
   },
 ): Promise<{ barberId: string; startAt: Date; durationMinutes: number }> {
   const { config } = input;
@@ -291,6 +297,7 @@ export async function resolveBookableSlot(
 
   const now = input.now ?? new Date();
   const minuteOfDay = startAt.getHours() * 60 + startAt.getMinutes();
+  const durationMinutes = validDurationMinutes(input.durationMinutes ?? config.slotMinutes);
 
   if (startAt.getSeconds() !== 0 || startAt.getMilliseconds() !== 0) {
     throw new BusinessError("الوقت المختار ليس ضمن الفترات المتاحة");
@@ -333,6 +340,7 @@ export async function resolveBookableSlot(
       effectiveBarberSchedule(config, barber),
       startAt.getDay(),
       minuteOfDay,
+      durationMinutes,
       config.slotMinutes,
     ),
   );
@@ -343,12 +351,13 @@ export async function resolveBookableSlot(
     );
   }
 
-  const endAt = new Date(startAt.getTime() + config.slotMinutes * 60_000);
+  const endAt = new Date(startAt.getTime() + durationMinutes * 60_000);
   const sameWindow = await prisma.appointment.findMany({
     where: {
       salonId: input.salonId,
       status: { in: ACTIVE_STATUSES },
       barberId: { in: onDutyBarbers.map((barber) => barber.id) },
+      ...(input.excludeAppointmentId ? { id: { not: input.excludeAppointmentId } } : {}),
       // نافذة يوم كامل حول الموعد: المدد أعمدة لا تعبير SQL، فالتداخل يُفحص حسابيًا.
       startAt: { gte: startOfLocalDay(startAt), lt: addDays(startOfLocalDay(startAt), 1) },
     },
@@ -369,7 +378,7 @@ export async function resolveBookableSlot(
     throw new BusinessError("هذه الفترة حُجزت للتو — اختر فترة أخرى", 409);
   }
 
-  return { barberId: free.id, startAt, durationMinutes: config.slotMinutes };
+  return { barberId: free.id, startAt, durationMinutes };
 }
 
 function addDays(value: Date, days: number) {
@@ -382,15 +391,23 @@ function isBarberOnDuty(
   schedule: { enabled: boolean; openMinute: number; closeMinute: number; closedWeekdays: number[] },
   weekday: number,
   minuteOfDay: number,
-  slotMinutes: number,
+  durationMinutes: number,
+  intervalMinutes: number,
 ) {
   return (
     schedule.enabled &&
     !schedule.closedWeekdays.includes(weekday) &&
     minuteOfDay >= schedule.openMinute &&
-    minuteOfDay + slotMinutes <= schedule.closeMinute &&
-    (minuteOfDay - schedule.openMinute) % slotMinutes === 0
+    minuteOfDay + durationMinutes <= schedule.closeMinute &&
+    (minuteOfDay - schedule.openMinute) % intervalMinutes === 0
   );
+}
+
+function validDurationMinutes(value: number) {
+  if (!Number.isInteger(value) || value < 5 || value > 8 * 60) {
+    throw new BusinessError("مدة الحجز غير صحيحة");
+  }
+  return value;
 }
 
 function combinedSlotStatus(statuses: BookingSlotStatus[]): BookingSlotStatus {

@@ -292,7 +292,9 @@ export async function updateVisitAmount(prisma: PrismaClient, visitId: string, g
 async function calculateUpdatedDiscount(tx: AdminVisitPrisma, visit: VisitForAdmin, grossAmount: number) {
   if (visit.discountType === "NONE") return 0;
   if (visit.discountType === "REWARD") {
-    const reward = visit.discountSourceId ? await tx.rewardRule.findUnique({ where: { id: visit.discountSourceId } }) : null;
+    const reward = visit.discountSourceId
+      ? await tx.rewardRule.findFirst({ where: { id: visit.discountSourceId, organizationId: visit.organizationId } })
+      : null;
     const discountAmount = reward ? Number(reward.discountAmount) : Number(visit.discountAmount);
     if (discountAmount > grossAmount) {
       throw new BusinessError("قيمة خصم المكافأة أكبر من مبلغ الزيارة الجديد");
@@ -300,14 +302,22 @@ async function calculateUpdatedDiscount(tx: AdminVisitPrisma, visit: VisitForAdm
     return discountAmount;
   }
   if (visit.discountType === "MANAGER_REWARD") {
-    const managerReward = visit.managerReward ?? (visit.discountSourceId ? await tx.managerReward.findUnique({ where: { id: visit.discountSourceId } }) : null);
+    const managerReward =
+      visit.managerReward ??
+      (visit.discountSourceId
+        ? await tx.managerReward.findFirst({ where: { id: visit.discountSourceId, organizationId: visit.organizationId } })
+        : null);
     const discountAmount = managerReward ? Number(managerReward.discountAmount) : Number(visit.discountAmount);
     if (discountAmount > grossAmount) {
       throw new BusinessError("قيمة مكافأة الإدارة أكبر من مبلغ الزيارة الجديد");
     }
     return discountAmount;
   }
-  const campaign = visit.campaignRedemption?.campaign ?? (visit.discountSourceId ? await tx.campaign.findUnique({ where: { id: visit.discountSourceId } }) : null);
+  const campaign =
+    visit.campaignRedemption?.campaign ??
+    (visit.discountSourceId
+      ? await tx.campaign.findFirst({ where: { id: visit.discountSourceId, organizationId: visit.organizationId } })
+      : null);
   if (!campaign) {
     const discountAmount = Number(visit.discountAmount);
     if (discountAmount > grossAmount) throw new BusinessError("قيمة خصم الحملة أكبر من مبلغ الزيارة الجديد");
@@ -343,10 +353,11 @@ async function getCompletedVisitForAdmin(tx: AdminVisitPrisma, visitId: string, 
 }
 
 async function getBalance(tx: AdminVisitPrisma, customerId: string) {
+  const customer = await tx.customer.findUniqueOrThrow({ where: { id: customerId }, select: { organizationId: true } });
   const account = await tx.loyaltyAccount.upsert({
     where: { customerId },
     update: {},
-    create: { customerId, points: 0, lifetimeEarned: 0 },
+    create: { customerId, organizationId: customer.organizationId, points: 0, lifetimeEarned: 0 },
   });
   return account.points;
 }

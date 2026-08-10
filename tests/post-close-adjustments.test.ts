@@ -152,6 +152,7 @@ async function createBarber(name: string) {
 
 async function createVisit(targetBarberId: string, name: string, grossAmount: number, paymentMethod: "CASH" | "NETWORK") {
   const customer = await createCustomer(name, targetBarberId);
+  await prisma.service.update({ where: { id: serviceId }, data: { defaultPrice: grossAmount } });
   const result = await confirmVisit(prisma, {
       organizationId: "org_default",
       salonId: "salon_default",

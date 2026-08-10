@@ -1,0 +1,39 @@
+[Unit]
+Description=XMANSX Salon Platform
+After=network-online.target postgresql.service redis-server.service
+Wants=network-online.target
+Requires=postgresql.service redis-server.service
+
+[Service]
+Type=simple
+User=tanal
+Group=tanal
+WorkingDirectory=/srv/tanal/app
+EnvironmentFile=/etc/tanal/tanal.env
+Environment=NODE_ENV=production
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStartPre=/usr/local/bin/npm run prisma:deploy
+ExecStart=/usr/local/bin/node /srv/tanal/app/node_modules/next/dist/bin/next start -H 127.0.0.1 -p 3000
+Restart=always
+RestartSec=5
+TimeoutStartSec=120
+TimeoutStopSec=30
+KillMode=control-group
+KillSignal=SIGTERM
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+ProtectKernelModules=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/srv/tanal
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

@@ -44,7 +44,7 @@ export function TeamLoginLinks({ slug }: { slug: string }) {
   }, []);
 
   const paths: LinkItem[] = [
-    { key: "dashboard", label: "رابط دخول الإدارة (مدراء/مشرفون)", href: `/dashboard/login?org=${slug}` },
+    { key: "dashboard", label: "رابط دخول المؤسسة (المالك ومديرو المؤسسة والفروع)", href: `/dashboard/login?org=${slug}` },
     { key: "barber", label: "رابط دخول الحلاقين", href: `/barber/login?org=${slug}` },
   ];
 

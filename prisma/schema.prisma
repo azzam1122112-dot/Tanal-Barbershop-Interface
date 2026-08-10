@@ -167,53 +167,108 @@ enum BillingInvoiceStatus {
   CANCELLED
 }
 
+enum DataSubjectRequestType {
+  ACCESS
+  COPY
+  CORRECTION
+  DELETION
+  WITHDRAW_CONSENT
+}
+
+enum DataSubjectRequestStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  REJECTED
+}
+
 // ===== Platform / Tenancy =====
 
 // مدير المنصة (super-admin) — يدير كل المؤسسات والباقات. خارج أي مستأجر.
 model PlatformAdmin {
-  id           String    @id @default(cuid())
-  name         String
-  email        String    @unique
-  passwordHash String
-  isActive     Boolean   @default(true)
-  lastLoginAt  DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  sessions     Session[]
+  id                    String                 @id @default(cuid())
+  name                  String
+  email                 String                 @unique
+  passwordHash          String
+  isActive              Boolean                @default(true)
+  mfaEnabledAt          DateTime?
+  mfaSecretCiphertext   String?
+  mfaPendingCiphertext  String?
+  mfaRecoveryCodeHashes String[]               @default([])
+  mfaLastUsedStep       BigInt?
+  lastLoginAt           DateTime?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  sessions              Session[]
+  mfaChallenges         PlatformMfaChallenge[]
 }
 
-// الباقة — يضبطها السوبر-آدمن من لوحة المنصة (بلا بوابة دفع حاليًا).
+model PlatformMfaChallenge {
+  id              String        @id @default(cuid())
+  tokenHash       String        @unique
+  platformAdminId String
+  expiresAt       DateTime
+  attempts        Int           @default(0)
+  consumedAt      DateTime?
+  ipAddress       String?
+  userAgent       String?
+  createdAt       DateTime      @default(now())
+  platformAdmin   PlatformAdmin @relation(fields: [platformAdminId], references: [id], onDelete: Cascade)
+
+  @@index([platformAdminId, expiresAt])
+  @@index([expiresAt, consumedAt])
+}
+
+// الباقة هي مصدر الحقيقة للوحة المنصة وصفحة الهبوط وصفحة اشتراك المؤسسة.
 model Plan {
   id              String           @id @default(cuid())
   name            String           @unique
   slug            String           @unique
   description     String?
   priceMonthly    Decimal          @default(0) @db.Decimal(10, 2)
+  priceYearly     Decimal?         @db.Decimal(10, 2)
+  features        String[]         @default([])
   maxSalons       Int              @default(1)
   maxBarbers      Int? // null = غير محدود
   maxCustomers    Int?
   isActive        Boolean          @default(true)
+  isPublic        Boolean          @default(true)
+  isFeatured      Boolean          @default(false)
+  isSignupDefault Boolean          @default(false)
+  // مدة التجربة التي يحصل عليها التسجيل الذاتي عند جعل الباقة افتراضية.
+  trialDays       Int              @default(14)
   sortOrder       Int              @default(0)
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   organizations   Organization[]
   billingInvoices BillingInvoice[]
 
-  @@index([isActive, sortOrder])
+  @@index([isActive, isPublic, sortOrder])
 }
 
 // المؤسسة (المالك) — حدّ العزل الأساسي + العميل/الولاء + الفوترة.
 model Organization {
-  id                 String             @id @default(cuid())
-  name               String
-  slug               String             @unique // النطاق الفرعي
-  status             OrganizationStatus @default(ACTIVE)
-  planId             String?
-  subscriptionStatus SubscriptionStatus @default(TRIALING)
-  trialEndsAt        DateTime?
-  currentPeriodEnd   DateTime?
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
+  id                     String             @id @default(cuid())
+  name                   String
+  city                   String?
+  slug                   String             @unique // النطاق الفرعي
+  status                 OrganizationStatus @default(ACTIVE)
+  planId                 String?
+  subscriptionStatus     SubscriptionStatus @default(TRIALING)
+  trialEndsAt            DateTime?
+  currentPeriodEnd       DateTime?
+  // يبدأ عند توقف التجربة/الاشتراك فعليًا. بعد 60 يومًا تحذف الصيانة الحساب وبياناته.
+  inactiveSince          DateTime?
+  termsAcceptedAt        DateTime?
+  termsVersion           String?
+  privacyAcceptedAt      DateTime?
+  privacyVersion         String?
+  dpaAcceptedAt          DateTime?
+  dpaVersion             String?
+  legalAcceptedIp        String?
+  legalAcceptedUserAgent String?
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
 
   plan                    Plan?                    @relation(fields: [planId], references: [id])
   salons                  Salon[]
@@ -244,9 +299,11 @@ model Organization {
   attendance              AttendanceRecord[]
   billingInvoices         BillingInvoice[]
   barberPushSubscriptions BarberPushSubscription[]
+  dataSubjectRequests     DataSubjectRequest[]
 
   @@index([status])
   @@index([planId])
+  @@index([subscriptionStatus, inactiveSince])
 }
 
 // الصالون — الوحدة التشغيلية داخل المؤسسة.
@@ -300,7 +357,7 @@ model StaffSalon {
 
 model User {
   id                         String               @id @default(cuid())
-  organizationId             String?
+  organizationId             String
   name                       String
   email                      String?
   phone                      String
@@ -310,7 +367,7 @@ model User {
   lastLoginAt                DateTime?
   createdAt                  DateTime             @default(now())
   updatedAt                  DateTime             @updatedAt
-  organization               Organization?        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization               Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   auditLogs                  AuditLog[]
   sessions                   Session[]
   dailyCloses                DailyClose[]         @relation("DailyCloseReceivedBy")
@@ -328,13 +385,15 @@ model User {
 
 model Barber {
   id                  String                   @id @default(cuid())
-  organizationId      String?
-  salonId             String?
+  organizationId      String
+  salonId             String
   name                String
   phone               String
   accessPinHash       String
   role                UserRole                 @default(BARBER)
   isActive            Boolean                  @default(true)
+  // بوابة صريحة لحساب العمولة وإظهار مستحقاتها للحلاق.
+  commissionEnabled   Boolean                  @default(false)
   // نسبة عمولة الحلاق %. null = استخدم النسبة الافتراضية للفرع.
   commissionRate      Decimal?                 @db.Decimal(5, 2)
   // دوام الحلاق للحجز الذاتي. عند التعطيل يرث دوام الفرع وإجازاته.
@@ -345,8 +404,8 @@ model Barber {
   lastLoginAt         DateTime?
   createdAt           DateTime                 @default(now())
   updatedAt           DateTime                 @updatedAt
-  organization        Organization?            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  salon               Salon?                   @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  organization        Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  salon               Salon                    @relation(fields: [salonId], references: [id], onDelete: Cascade)
   createdCustomers    Customer[]               @relation("CustomerCreatedByBarber")
   visits              Visit[]
   auditLogs           AuditLog[]               @relation("BarberAuditLogs")
@@ -377,6 +436,8 @@ model Session {
   expiresAt              DateTime
   lastUsedAt             DateTime?
   revokedAt              DateTime?
+  mfaVerifiedAt          DateTime?
+  mfaSetupOnly           Boolean                 @default(false)
   userAgent              String?
   ipAddress              String?
   user                   User?                   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -419,7 +480,7 @@ model BarberPushSubscription {
 
 model Customer {
   id                             String                 @id @default(cuid())
-  organizationId                 String?
+  organizationId                 String
   name                           String
   phone                          String
   // المفتاح العام مشتق من وجود موافقة واحدة على الأقل، ويُبقى للتوافق مع الواجهات القديمة.
@@ -433,8 +494,14 @@ model Customer {
   whatsappOptOutReason           String?
   whatsappLastContactedAt        DateTime?
   whatsappLastMarketingAt        DateTime?
-  // رمز بوابة العميل — سرّ يُرسل في رابط واتساب ليطّلع العميل على رصيده. قابل للتدوير.
-  portalToken                    String?                @unique
+  // لا يُخزّن رمز البوابة الصريح؛ SHA-256 فقط مع صلاحية محدودة.
+  portalTokenHash                String?                @unique
+  portalTokenIssuedAt            DateTime?
+  portalTokenExpiresAt           DateTime?
+  // سياسة الحجز: عند الغياب عن موعدين يُعلَّق الحجز الذاتي حتى تصحيح إحدى الحالتين.
+  bookingNoShowCount             Int                    @default(0)
+  bookingBlockedAt               DateTime?
+  bookingBlockReason             String?
   visitCount                     Int                    @default(0)
   totalPaid                      Decimal                @default(0) @db.Decimal(12, 2)
   lastVisitAt                    DateTime?
@@ -442,7 +509,7 @@ model Customer {
   createdByBarberId              String?
   createdAt                      DateTime               @default(now())
   updatedAt                      DateTime               @updatedAt
-  organization                   Organization?          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization                   Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdByBarber                Barber?                @relation("CustomerCreatedByBarber", fields: [createdByBarberId], references: [id])
   visits                         Visit[]
   loyaltyAccount                 LoyaltyAccount?
@@ -451,19 +518,21 @@ model Customer {
   managerRewards                 ManagerReward[]
   whatsappMessages               WhatsAppMessageLog[]
   appointments                   Appointment[]
+  dataSubjectRequests            DataSubjectRequest[]
 
   @@unique([organizationId, phone])
   @@index([organizationId, lastVisitAt])
   @@index([organizationId, whatsappOptIn])
   @@index([organizationId, whatsappMarketingOptIn])
   @@index([organizationId, whatsappLastMarketingAt])
+  @@index([organizationId, bookingBlockedAt])
   @@index([createdByBarberId])
 }
 
 model Service {
   id              String         @id @default(cuid())
-  organizationId  String?
-  salonId         String?
+  organizationId  String
+  salonId         String
   name            String
   defaultPrice    Decimal        @db.Decimal(10, 2)
   isActive        Boolean        @default(true)
@@ -474,8 +543,8 @@ model Service {
   commissionRate  Decimal?       @db.Decimal(5, 2)
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
-  organization    Organization?  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  salon           Salon?         @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  salon           Salon          @relation(fields: [salonId], references: [id], onDelete: Cascade)
   visitServices   VisitService[]
 
   @@unique([salonId, name])
@@ -485,8 +554,8 @@ model Service {
 
 model Visit {
   id                  String               @id @default(cuid())
-  organizationId      String?
-  salonId             String?
+  organizationId      String
+  salonId             String
   customerId          String
   barberId            String
   status              VisitStatus          @default(COMPLETED)
@@ -514,8 +583,8 @@ model Visit {
   visitedAt           DateTime             @default(now())
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
-  organization        Organization?        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  salon               Salon?               @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  organization        Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  salon               Salon                @relation(fields: [salonId], references: [id], onDelete: Cascade)
   customer            Customer             @relation(fields: [customerId], references: [id])
   barber              Barber               @relation(fields: [barberId], references: [id])
   services            VisitService[]
@@ -533,7 +602,9 @@ model Visit {
   @@unique([barberId, idempotencyKey])
   @@unique([salonId, invoiceNumber])
   @@index([organizationId, visitedAt])
+  @@index([organizationId, status, visitedAt])
   @@index([salonId, visitedAt])
+  @@index([salonId, status, visitedAt])
   @@index([visitedAt])
   @@index([barberId, visitedAt])
   @@index([customerId, visitedAt])
@@ -560,23 +631,23 @@ model VisitService {
 }
 
 model LoyaltyAccount {
-  id               String        @id @default(cuid())
-  organizationId   String?
-  customerId       String        @unique
-  points           Int           @default(0)
-  lifetimeEarned   Int           @default(0)
-  lifetimeRedeemed Int           @default(0)
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-  organization     Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  customer         Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  id               String       @id @default(cuid())
+  organizationId   String
+  customerId       String       @unique
+  points           Int          @default(0)
+  lifetimeEarned   Int          @default(0)
+  lifetimeRedeemed Int          @default(0)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer         Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@index([organizationId, points])
 }
 
 model LoyaltyTransaction {
   id             String                 @id @default(cuid())
-  organizationId String?
+  organizationId String
   customerId     String
   visitId        String?
   type           LoyaltyTransactionType
@@ -584,7 +655,7 @@ model LoyaltyTransaction {
   balanceAfter   Int
   description    String?
   createdAt      DateTime               @default(now())
-  organization   Organization?          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   customer       Customer               @relation(fields: [customerId], references: [id])
   visit          Visit?                 @relation(fields: [visitId], references: [id])
 
@@ -595,16 +666,16 @@ model LoyaltyTransaction {
 }
 
 model RewardRule {
-  id             String        @id @default(cuid())
-  organizationId String?
+  id             String       @id @default(cuid())
+  organizationId String
   name           String
   requiredPoints Int
-  discountAmount Decimal       @db.Decimal(10, 2)
-  isActive       Boolean       @default(true)
-  sortOrder      Int           @default(0)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  discountAmount Decimal      @db.Decimal(10, 2)
+  isActive       Boolean      @default(true)
+  sortOrder      Int          @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, name])
   @@unique([organizationId, requiredPoints])
@@ -613,7 +684,7 @@ model RewardRule {
 
 model Campaign {
   id                 String               @id @default(cuid())
-  organizationId     String?
+  organizationId     String
   name               String
   description        String?
   discountType       CampaignDiscountType
@@ -627,7 +698,7 @@ model Campaign {
   isActive           Boolean              @default(true)
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
-  organization       Organization?        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization       Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   redemptions        CampaignRedemption[]
   whatsappMessages   WhatsAppMessageLog[]
 
@@ -636,17 +707,17 @@ model Campaign {
 }
 
 model CampaignRedemption {
-  id             String        @id @default(cuid())
-  organizationId String?
+  id             String       @id @default(cuid())
+  organizationId String
   campaignId     String
   customerId     String
-  visitId        String        @unique
-  discountAmount Decimal       @db.Decimal(10, 2)
-  createdAt      DateTime      @default(now())
-  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  campaign       Campaign      @relation(fields: [campaignId], references: [id])
-  customer       Customer      @relation(fields: [customerId], references: [id])
-  visit          Visit         @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  visitId        String       @unique
+  discountAmount Decimal      @db.Decimal(10, 2)
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaign       Campaign     @relation(fields: [campaignId], references: [id])
+  customer       Customer     @relation(fields: [customerId], references: [id])
+  visit          Visit        @relation(fields: [visitId], references: [id], onDelete: Cascade)
 
   @@index([campaignId, customerId])
   @@index([customerId, createdAt])
@@ -654,23 +725,23 @@ model CampaignRedemption {
 }
 
 model ManagerReward {
-  id              String        @id @default(cuid())
-  organizationId  String?
+  id              String       @id @default(cuid())
+  organizationId  String
   customerId      String
   issuedByUserId  String
-  redeemedVisitId String?       @unique
+  redeemedVisitId String?      @unique
   title           String
   description     String?
-  discountAmount  Decimal       @db.Decimal(10, 2)
+  discountAmount  Decimal      @db.Decimal(10, 2)
   expiresAt       DateTime?
   redeemedAt      DateTime?
   revokedAt       DateTime?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  customer        Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  issuedBy        User          @relation("ManagerRewardIssuedBy", fields: [issuedByUserId], references: [id])
-  redeemedVisit   Visit?        @relation(fields: [redeemedVisitId], references: [id])
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer        Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  issuedBy        User         @relation("ManagerRewardIssuedBy", fields: [issuedByUserId], references: [id])
+  redeemedVisit   Visit?       @relation(fields: [redeemedVisitId], references: [id])
 
   @@index([customerId, redeemedAt, revokedAt, expiresAt])
   @@index([issuedByUserId, createdAt])
@@ -679,31 +750,31 @@ model ManagerReward {
 }
 
 model DailyClose {
-  id                       String        @id @default(cuid())
-  organizationId           String?
-  salonId                  String?
+  id                       String       @id @default(cuid())
+  organizationId           String
+  salonId                  String
   barberId                 String
   date                     DateTime
-  visitsCount              Int           @default(0)
-  grossTotal               Decimal       @default(0) @db.Decimal(12, 2)
-  discountTotal            Decimal       @default(0) @db.Decimal(12, 2)
-  netTotal                 Decimal       @default(0) @db.Decimal(12, 2)
-  cashTotal                Decimal       @default(0) @db.Decimal(12, 2)
-  cardTotal                Decimal       @default(0) @db.Decimal(12, 2)
-  pointsEarnedTotal        Int           @default(0)
-  pointsRedeemedTotal      Int           @default(0)
-  rewardRedemptionsCount   Int           @default(0)
-  campaignRedemptionsCount Int           @default(0)
-  cashReceivedAmount       Decimal       @default(0) @db.Decimal(12, 2)
+  visitsCount              Int          @default(0)
+  grossTotal               Decimal      @default(0) @db.Decimal(12, 2)
+  discountTotal            Decimal      @default(0) @db.Decimal(12, 2)
+  netTotal                 Decimal      @default(0) @db.Decimal(12, 2)
+  cashTotal                Decimal      @default(0) @db.Decimal(12, 2)
+  cardTotal                Decimal      @default(0) @db.Decimal(12, 2)
+  pointsEarnedTotal        Int          @default(0)
+  pointsRedeemedTotal      Int          @default(0)
+  rewardRedemptionsCount   Int          @default(0)
+  campaignRedemptionsCount Int          @default(0)
+  cashReceivedAmount       Decimal      @default(0) @db.Decimal(12, 2)
   receivedByUserId         String
-  receivedAt               DateTime      @default(now())
+  receivedAt               DateTime     @default(now())
   notes                    String?
-  createdAt                DateTime      @default(now())
-  updatedAt                DateTime      @updatedAt
-  organization             Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  salon                    Salon?        @relation(fields: [salonId], references: [id], onDelete: Cascade)
-  barber                   Barber        @relation(fields: [barberId], references: [id])
-  receivedBy               User          @relation("DailyCloseReceivedBy", fields: [receivedByUserId], references: [id])
+  createdAt                DateTime     @default(now())
+  updatedAt                DateTime     @updatedAt
+  organization             Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  salon                    Salon        @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  barber                   Barber       @relation(fields: [barberId], references: [id])
+  receivedBy               User         @relation("DailyCloseReceivedBy", fields: [receivedByUserId], references: [id])
 
   @@unique([barberId, date])
   @@index([organizationId, date])
@@ -714,8 +785,8 @@ model DailyClose {
 
 model CashSession {
   id                       String            @id @default(cuid())
-  organizationId           String?
-  salonId                  String?
+  organizationId           String
+  salonId                  String
   barberId                 String
   status                   CashSessionStatus @default(OPEN)
   openedAt                 DateTime          @default(now())
@@ -737,15 +808,17 @@ model CashSession {
   notes                    String?
   createdAt                DateTime          @default(now())
   updatedAt                DateTime          @updatedAt
-  organization             Organization?     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  salon                    Salon?            @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  organization             Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  salon                    Salon             @relation(fields: [salonId], references: [id], onDelete: Cascade)
   barber                   Barber            @relation(fields: [barberId], references: [id])
   closedBy                 User?             @relation("CashSessionClosedBy", fields: [closedByUserId], references: [id])
   visits                   Visit[]
   expenses                 CashExpense[]
 
   @@index([organizationId, status])
+  @@index([organizationId, status, closedAt])
   @@index([salonId, status])
+  @@index([salonId, status, closedAt])
   @@index([barberId, status])
   @@index([openedAt])
   @@index([closedAt])
@@ -753,48 +826,48 @@ model CashSession {
 }
 
 model SystemSettings {
-  id                            String        @id @default(cuid())
-  organizationId                String?
-  salonId                       String?       @unique
+  id                            String       @id @default(cuid())
+  organizationId                String
+  salonId                       String?      @unique
   singletonKey                  String?
   salonName                     String
-  currency                      String        @default("SAR")
-  pointsPerCurrencyUnit         Decimal       @default(1) @db.Decimal(8, 2)
-  pointsCalculatedAfterDiscount Boolean       @default(true)
-  allowMultipleDiscounts        Boolean       @default(false)
-  whatsappDefaultCountryCode    String        @default("966")
-  whatsappEnabled               Boolean       @default(true)
+  currency                      String       @default("SAR")
+  pointsPerCurrencyUnit         Decimal      @default(1) @db.Decimal(8, 2)
+  pointsCalculatedAfterDiscount Boolean      @default(true)
+  allowMultipleDiscounts        Boolean      @default(false)
+  whatsappDefaultCountryCode    String       @default("966")
+  whatsappEnabled               Boolean      @default(true)
   // ضريبة القيمة المضافة — اختيارية بالكامل، يفعّلها المالك لكل فرع.
-  vatEnabled                    Boolean       @default(false)
-  vatRate                       Decimal       @default(15) @db.Decimal(5, 2)
+  vatEnabled                    Boolean      @default(false)
+  vatRate                       Decimal      @default(15) @db.Decimal(5, 2)
   // true = الأسعار المعروضة شاملة الضريبة (المعتاد في التجزئة السعودية).
-  vatInclusive                  Boolean       @default(true)
+  vatInclusive                  Boolean      @default(true)
   vatNumber                     String?
   // الاسم النظامي للمنشأة كما في الشهادة الضريبية (يظهر في الفاتورة و QR).
   legalName                     String?
   // نسبة العمولة الافتراضية للفرع %. تُستخدم إن لم تُحدَّد للحلاق أو الخدمة.
-  defaultCommissionRate         Decimal       @default(0) @db.Decimal(5, 2)
+  defaultCommissionRate         Decimal      @default(0) @db.Decimal(5, 2)
   // الحجز الذاتي من بوابة العميل — معطّل افتراضيًا حتى يفعّله المالك صراحةً.
   // تعطيله يعيد سلوك النظام السابق حرفيًا: الحجز من الموظفين فقط.
-  bookingEnabled                Boolean       @default(false)
+  bookingEnabled                Boolean      @default(false)
   // ساعات استقبال الحجز كدقائق من منتصف الليل (0..1439) بتوقيت الصالون المحلي.
   // دقائق لا نص: تُقارن وتُولَّد حسابيًا بلا تحليل نصوص في كل فترة.
-  bookingOpenMinute             Int           @default(960)
-  bookingCloseMinute            Int           @default(1380)
+  bookingOpenMinute             Int          @default(960)
+  bookingCloseMinute            Int          @default(1380)
   // طول الفترة المعروضة للعميل بالدقائق (هي أيضًا مدة الموعد الافتراضية).
-  bookingSlotMinutes            Int           @default(30)
+  bookingSlotMinutes            Int          @default(30)
   // أيام الإغلاق الأسبوعية: 0=الأحد .. 6=السبت.
-  bookingClosedWeekdays         Int[]         @default([])
+  bookingClosedWeekdays         Int[]        @default([])
   // أقل مهلة بين الآن وبداية الموعد — تمنع حجزًا بعد دقيقتين والحلاق على الكرسي.
-  bookingLeadMinutes            Int           @default(120)
+  bookingLeadMinutes            Int          @default(120)
   // مدى الحجز المستقبلي بالأيام.
-  bookingHorizonDays            Int           @default(14)
+  bookingHorizonDays            Int          @default(14)
   // أقصى عدد مواعيد قائمة للعميل الواحد — يمنع حجز مقاعد وهمية.
-  bookingMaxActivePerCustomer   Int           @default(2)
-  createdAt                     DateTime      @default(now())
-  updatedAt                     DateTime      @updatedAt
-  organization                  Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  salon                         Salon?        @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  bookingMaxActivePerCustomer   Int          @default(2)
+  createdAt                     DateTime     @default(now())
+  updatedAt                     DateTime     @updatedAt
+  organization                  Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  salon                         Salon?       @relation(fields: [salonId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
 }
@@ -814,14 +887,14 @@ model InvoiceCounter {
 
 model WhatsAppTemplate {
   id             String               @id @default(cuid())
-  organizationId String?
+  organizationId String
   name           String
   type           WhatsAppTemplateType
   body           String
   isActive       Boolean              @default(true)
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @updatedAt
-  organization   Organization?        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   messages       WhatsAppMessageLog[]
 
   @@index([organizationId, type, isActive])
@@ -829,7 +902,7 @@ model WhatsAppTemplate {
 
 model WhatsAppMessageLog {
   id                 String                  @id @default(cuid())
-  organizationId     String?
+  organizationId     String
   customerId         String
   templateId         String?
   campaignId         String?
@@ -847,7 +920,7 @@ model WhatsAppMessageLog {
   skippedReason      String?
   createdAt          DateTime                @default(now())
   updatedAt          DateTime                @updatedAt
-  organization       Organization?           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization       Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   customer           Customer                @relation(fields: [customerId], references: [id], onDelete: Cascade)
   template           WhatsAppTemplate?       @relation(fields: [templateId], references: [id])
   campaign           Campaign?               @relation(fields: [campaignId], references: [id])
@@ -940,6 +1013,7 @@ model Appointment {
 
   @@index([salonId, startAt])
   @@index([organizationId, startAt])
+  @@index([organizationId, salonId, status, startAt])
   @@index([barberId, startAt])
   @@index([status, startAt])
   @@index([customerId])
@@ -1050,6 +1124,14 @@ model BillingInvoice {
   // بالريال. يُخزَّن كما حُصِّل فعلًا لا كما هو في الباقة اليوم.
   amount                    Decimal              @db.Decimal(10, 2)
   currency                  String               @default("SAR")
+  // رقم فاتورة اشتراك XMANSX؛ يصدر عند اعتماد الدفعة ويظل ثابتًا.
+  invoiceNumber             String?              @unique
+  issuedAt                  DateTime?
+  sellerName                String?
+  sellerFreelanceDocument   String?
+  sellerActivity            String?
+  buyerName                 String?
+  buyerCity                 String?
   periodMonths              Int                  @default(1)
   // مرجع العملية (رقم الحوالة/الإيصال) — فريد لمنع تسجيل الدفعة مرتين.
   reference                 String?              @unique
@@ -1068,6 +1150,31 @@ model BillingInvoice {
   @@index([organizationId, createdAt])
   @@index([status, createdAt])
   @@index([planId])
+}
+
+model BillingInvoiceCounter {
+  year      Int      @id
+  lastValue Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+model DataSubjectRequest {
+  id             String                   @id @default(cuid())
+  organizationId String
+  customerId     String
+  type           DataSubjectRequestType
+  status         DataSubjectRequestStatus @default(OPEN)
+  details        String?
+  resolutionNote String?
+  resolvedAt     DateTime?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status, createdAt])
+  @@index([customerId, createdAt])
 }
 
 model LoginAttempt {

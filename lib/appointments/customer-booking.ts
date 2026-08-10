@@ -12,6 +12,7 @@ import {
 } from "@/lib/appointments/booking-slots";
 import { sendBarberAppointmentPush } from "@/lib/push/barber-push";
 import { effectiveBarberSchedule } from "@/lib/barbers/work-schedule";
+import { assertCustomerBookingAllowed } from "@/lib/appointments/booking-discipline";
 
 /**
  * الحجز الذاتي من بوابة العميل.
@@ -190,9 +191,17 @@ export async function bookCustomerAppointment(
 
   const customer = await prisma.customer.findFirst({
     where: { id: input.customerId, organizationId: input.organizationId },
-    select: { id: true, name: true, phone: true },
+    select: {
+      id: true,
+      name: true,
+      phone: true,
+      bookingNoShowCount: true,
+      bookingBlockedAt: true,
+      bookingBlockReason: true,
+    },
   });
   if (!customer) throw new BusinessError("العميل غير موجود", 404);
+  assertCustomerBookingAllowed(customer);
 
   const config = await getSalonBookingConfig(prisma, input.organizationId, input.salonId);
   if (!config.enabled) throw new BusinessError("الحجز الذاتي غير مفعّل في هذا الفرع", 409);

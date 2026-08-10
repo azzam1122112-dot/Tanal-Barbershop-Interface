@@ -59,12 +59,11 @@ type AudienceCustomer = {
 
 type MessageLog = {
   id: string;
-  customer: { id: string; name: string; phone: string };
+  customer: CustomerConsentState & { id: string; name: string; phone: string };
   template: { id: string; name: string; type: TemplateType } | null;
   campaign: { id: string; name: string } | null;
   phone: string;
   message: string;
-  waUrl: string;
   status: MessageStatus;
   category: MessageCategory;
   createdAt: string;
@@ -72,12 +71,17 @@ type MessageLog = {
 
 type GeneratedMessage = {
   messageLogId: string;
-  customer: { id: string; name: string; phone: string };
+  customer: CustomerConsentState & { id: string; name: string; phone: string };
   phone: string;
   message: string;
-  waUrl: string;
   status: MessageStatus;
   category: MessageCategory;
+};
+
+type CustomerConsentState = {
+  whatsappOptIn: boolean;
+  whatsappTransactionalOptIn: boolean;
+  whatsappMarketingOptIn: boolean;
 };
 
 const TEMPLATE_TYPE_OPTIONS: { value: TemplateType; label: string }[] = [
@@ -131,6 +135,9 @@ export function WhatsAppDashboard({
   const [toast, setToast] = useState<ToastState | null>(null);
   const [selectedCustomerId, setSelectedCustomerId] = useState(prefillCustomerId ?? "");
   const [selectedVisitId, setSelectedVisitId] = useState(prefillVisitId ?? "");
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [selectedCampaignId, setSelectedCampaignId] = useState("");
+  const [selectedMessageCategory, setSelectedMessageCategory] = useState<MessageCategory>("SERVICE");
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [templateDraft, setTemplateDraft] = useState<{ name: string; type: TemplateType; body: string }>({
     name: "",
@@ -143,6 +150,14 @@ export function WhatsAppDashboard({
     () => visits.filter((visit) => visit.customerId === selectedCustomerId),
     [visits, selectedCustomerId],
   );
+  const selectedCustomer = useMemo(() => customers.find((customer) => customer.id === selectedCustomerId) ?? null, [customers, selectedCustomerId]);
+  const selectedTemplate = useMemo(() => activeTemplates.find((template) => template.id === selectedTemplateId) ?? null, [activeTemplates, selectedTemplateId]);
+  const effectiveCategory: MessageCategory = selectedCampaignId
+    ? "MARKETING"
+    : selectedTemplate
+      ? templateCategory(selectedTemplate.type)
+      : selectedMessageCategory;
+  const consentDecision = getConsentDecision(selectedCustomer, effectiveCategory);
 
   async function createTemplate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -240,14 +255,14 @@ export function WhatsAppDashboard({
     }
   }
 
-  async function openWhatsApp(message: Pick<GeneratedMessage, "messageLogId" | "waUrl">) {
+  async function openWhatsApp(message: Pick<GeneratedMessage, "messageLogId">) {
     const response = await fetch(`/api/dashboard/whatsapp/messages/${message.messageLogId}/opened`, { method: "POST" });
-    const data = (await response.json().catch(() => ({}))) as { waUrl?: string; message?: MessageLog };
-    if (response.ok) {
-      window.open(data.waUrl ?? message.waUrl, "_blank", "noopener,noreferrer");
+    const data = (await response.json().catch(() => ({}))) as { waUrl?: string; message?: MessageLog | string };
+    if (response.ok && data.waUrl) {
+      window.open(data.waUrl, "_blank", "noopener,noreferrer");
       await refreshMessages();
     } else {
-      setToast({ message: "تعذر تحديث حالة فتح واتساب", tone: "error" });
+      setToast({ message: typeof data.message === "string" ? data.message : "مُنِع فتح واتساب لأن الموافقة غير صالحة", tone: "error" });
     }
   }
 
@@ -324,6 +339,7 @@ export function WhatsAppDashboard({
             onChange={(event) => {
               setSelectedCustomerId(event.target.value);
               setSelectedVisitId("");
+              setGenerated(null);
             }}
             required
             className="dashboard-field"
@@ -335,15 +351,15 @@ export function WhatsAppDashboard({
               </option>
             ))}
           </select>
-          <select name="messageCategory" defaultValue="SERVICE" className="dashboard-field">
+          <select name="messageCategory" value={selectedMessageCategory} onChange={(event) => { setSelectedMessageCategory(event.target.value as MessageCategory); setGenerated(null); }} disabled={Boolean(selectedTemplateId || selectedCampaignId)} className="dashboard-field disabled:cursor-not-allowed disabled:opacity-60">
             <option value="SERVICE">خدمة ودعم</option>
             <option value="TRANSACTIONAL">موعد أو تحديث زيارة</option>
             <option value="MARKETING">عرض أو رسالة تسويقية</option>
           </select>
-          <p className="rounded-xl bg-violet-50 px-3 py-2 text-xs font-semibold leading-5 text-violet-800">القالب أو الحملة يحددان الفئة تلقائيًا. هذا الاختيار يطبق على الرسائل المخصصة فقط.</p>
-          <select name="templateId" className="dashboard-field">
+          <p className="rounded-xl bg-violet-50 px-3 py-2 text-xs font-semibold leading-5 text-violet-800">الحملة والقالب يحددان نوع الموافقة إجباريًا من الخادم. القوالب المخصصة تُعامل كتسويقية للحماية.</p>
+          <select name="templateId" value={selectedTemplateId} onChange={(event) => { setSelectedTemplateId(event.target.value); setGenerated(null); }} className="dashboard-field">
             <option value="">رسالة مخصصة بدون قالب</option>
-            {activeTemplates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
+            {activeTemplates.map((template) => <option key={template.id} value={template.id}>{template.name} — {consentRequirementLabel(templateCategory(template.type))}</option>)}
           </select>
           <select
             name="visitId"
@@ -357,12 +373,13 @@ export function WhatsAppDashboard({
             </option>
             {customerVisits.map((visit) => <option key={visit.id} value={visit.id}>{visit.label}</option>)}
           </select>
-          <select name="campaignId" className="dashboard-field">
+          <select name="campaignId" value={selectedCampaignId} onChange={(event) => { setSelectedCampaignId(event.target.value); setGenerated(null); }} className="dashboard-field">
             <option value="">بدون حملة</option>
             {campaigns.map((campaign) => <option key={campaign.id} value={campaign.id}>{campaign.name}</option>)}
           </select>
           <textarea name="customMessage" rows={4} placeholder="رسالة مخصصة اختيارية. يمكنك استخدام {name} و {salon_name}" className="dashboard-field" />
-          <button className="dashboard-button-gold w-full">تجهيز الرسالة</button>
+          <ConsentDecisionCard category={effectiveCategory} decision={consentDecision} hasCustomer={Boolean(selectedCustomer)} />
+          <button disabled={!selectedCustomer || !consentDecision.allowed} className="dashboard-button-gold w-full disabled:cursor-not-allowed disabled:opacity-45">{selectedCustomer && !consentDecision.allowed ? "الإرسال ممنوع بالموافقة" : "تجهيز الرسالة بأمان"}</button>
         </form>
 
         <div className="dashboard-panel p-5">
@@ -375,7 +392,8 @@ export function WhatsAppDashboard({
               <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => openWhatsApp(generated)}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#128c4a] px-5 py-3 text-sm font-bold text-white shadow-sm transition-[filter,transform] hover:brightness-110 active:scale-[0.99]"
+                  disabled={!canCustomerReceive(generated.customer, generated.category)}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#128c4a] px-5 py-3 text-sm font-bold text-white shadow-sm transition-[filter,transform] hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600"
                 >
                   <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden="true">
                     <path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5.1-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Z" />
@@ -473,6 +491,7 @@ export function WhatsAppDashboard({
                         <div className="min-w-0">
                           <p className="truncate font-bold">{template.name}</p>
                           <span className="text-xs font-bold text-salon-gold">{templateTypeLabel(template.type)}</span>
+                          <span className={`mr-2 inline-flex rounded-full px-2 py-1 text-[10px] font-black ${templateCategory(template.type) === "MARKETING" ? "bg-fuchsia-50 text-fuchsia-700" : "bg-violet-50 text-violet-700"}`}>{consentRequirementLabel(templateCategory(template.type))}</span>
                         </div>
                         <button
                           type="button"
@@ -542,7 +561,7 @@ export function WhatsAppDashboard({
               <div className="col-span-2 grid gap-1 lg:col-span-1 lg:block">
                 <span className="text-xs font-bold text-salon-charcoal lg:hidden">إجراء</span>
                 <div className="flex flex-wrap gap-2">
-                  <button onClick={() => openWhatsApp({ messageLogId: message.id, waUrl: message.waUrl })} className="rounded-lg bg-salon-forest px-3 py-2 font-bold text-white">فتح</button>
+                  <button disabled={!canCustomerReceive(message.customer, message.category)} onClick={() => openWhatsApp({ messageLogId: message.id })} className="rounded-lg bg-salon-forest px-3 py-2 font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500">{canCustomerReceive(message.customer, message.category) ? "فتح" : "موقوف بالموافقة"}</button>
                   <button onClick={() => markSent(message.id)} className="dashboard-button px-3 py-2">تم الإرسال</button>
                 </div>
               </div>
@@ -606,6 +625,50 @@ function MessageCell({ label, children }: { label: string; children: React.React
       <span>{children}</span>
     </div>
   );
+}
+
+function ConsentDecisionCard({ category, decision, hasCustomer }: { category: MessageCategory; decision: ReturnType<typeof getConsentDecision>; hasCustomer: boolean }) {
+  const allowed = hasCustomer && decision.allowed;
+  return (
+    <div className={`rounded-2xl border p-4 ${!hasCustomer ? "border-slate-200 bg-slate-50" : allowed ? "border-emerald-200 bg-emerald-50" : "border-rose-200 bg-rose-50"}`} role={hasCustomer && !allowed ? "alert" : "status"}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className={`text-xs font-black ${!hasCustomer ? "text-slate-700" : allowed ? "text-emerald-800" : "text-rose-800"}`}>{!hasCustomer ? "اختر العميل لفحص الموافقة" : decision.title}</p>
+          <p className={`mt-1 text-xs font-semibold leading-5 ${!hasCustomer ? "text-slate-500" : allowed ? "text-emerald-700" : "text-rose-700"}`}>{!hasCustomer ? "لن يُجهّز أي رابط إرسال قبل تحديد العميل." : decision.detail}</p>
+        </div>
+        <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black ${!hasCustomer ? "bg-slate-200 text-slate-700" : allowed ? "bg-emerald-200 text-emerald-800" : "bg-rose-200 text-rose-800"}`}>{categoryLabel(category)}</span>
+      </div>
+    </div>
+  );
+}
+
+function getConsentDecision(customer: CustomerConsentState | null, category: MessageCategory) {
+  if (!customer) return { allowed: false, title: "الموافقة غير مفحوصة", detail: "اختر العميل أولًا." };
+  if (!customer.whatsappOptIn) return { allowed: false, title: "العميل أوقف واتساب بالكامل", detail: "لا يمكن تجهيز أو فتح أي رسالة لهذا العميل." };
+  if (category === "MARKETING" && !customer.whatsappMarketingOptIn) {
+    return { allowed: false, title: "العروض ممنوعة لهذا العميل", detail: "لا توجد موافقة تسويقية صريحة؛ لن يُنشأ رابط واتساب." };
+  }
+  if (category !== "MARKETING" && !customer.whatsappTransactionalOptIn) {
+    return { allowed: false, title: "رسائل الخدمة ممنوعة لهذا العميل", detail: "لا توجد موافقة على رسائل الخدمة والمعاملات." };
+  }
+  return {
+    allowed: true,
+    title: category === "MARKETING" ? "العميل موافق على العروض" : "العميل موافق على رسائل الخدمة",
+    detail: category === "MARKETING" ? "سيستمر فحص التهدئة والحدود قبل فتح واتساب." : "سيُعاد فحص الموافقة مرة أخرى لحظة فتح واتساب.",
+  };
+}
+
+function canCustomerReceive(customer: CustomerConsentState, category: MessageCategory) {
+  return getConsentDecision(customer, category).allowed;
+}
+
+function templateCategory(type: TemplateType): MessageCategory {
+  if (type === "POST_VISIT") return "TRANSACTIONAL";
+  return "MARKETING";
+}
+
+function consentRequirementLabel(category: MessageCategory) {
+  return category === "MARKETING" ? "يتطلب موافقة العروض" : "يتطلب موافقة الخدمة";
 }
 
 function templateTypeLabel(type: TemplateType) {

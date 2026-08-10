@@ -83,7 +83,7 @@ describe("whatsapp templates and message logs", () => {
     const service = await prisma.service.create({
       data: {
         organizationId: "org_default",
-        salonId: "salon_default", name: `خدمة واتساب ${Date.now()}`, defaultPrice: 50, isActive: true, sortOrder: 400 },
+        salonId: "salon_default", name: `خدمة واتساب ${Date.now()}`, defaultPrice: 80, isActive: true, sortOrder: 400 },
     });
     serviceId = service.id;
     createdServiceIds.push(serviceId);
@@ -112,6 +112,7 @@ describe("whatsapp templates and message logs", () => {
     });
     await prisma.managerReward.create({
       data: {
+        organizationId: "org_default",
         customerId: managerRewardCustomerId,
         issuedByUserId: adminUserId,
         title: "هدية عودة",
@@ -147,6 +148,7 @@ describe("whatsapp templates and message logs", () => {
 
     const campaign = await prisma.campaign.create({
       data: {
+        organizationId: "org_default",
         name: `حملة واتساب ${Date.now()}`,
         discountType: "FIXED_AMOUNT",
         discountValue: 20,
@@ -223,15 +225,16 @@ describe("whatsapp templates and message logs", () => {
     expect(log.status).toBe("DRAFTED");
     expect(log.phone).toMatch(/^05\d{8}$/);
     expect(generated.phone).toBe(log.phone);
-    expect(generated.waUrl).toContain("https://wa.me/9665");
-    expect(generated.waUrl).toContain(`https://wa.me/966${log.phone.slice(1)}`);
-    expect(decodeURIComponent(generated.waUrl)).toContain("مبلغ الزيارة 80");
+    expect("waUrl" in generated).toBe(false);
+    const opened = await markWhatsAppMessageOpened(prisma, generated.messageLogId, adminMeta());
+    expect(opened.waUrl).toContain(`https://wa.me/966${log.phone.slice(1)}`);
+    expect(decodeURIComponent(opened.waUrl)).toContain("مبلغ الزيارة 80");
     expect(JSON.stringify(generated)).not.toContain("passwordHash");
     expect(JSON.stringify(generated)).not.toContain("accessPinHash");
   });
 
   it("rejects message generation when customer disabled whatsapp", async () => {
-    await expect(generateWhatsAppMessage(prisma, { customerId: optOutCustomerId, templateId }, adminMeta())).rejects.toThrow("لا توجد موافقة على رسائل الخدمة");
+    await expect(generateWhatsAppMessage(prisma, { customerId: optOutCustomerId, templateId }, adminMeta())).rejects.toThrow("لم يوافق على رسائل الخدمة");
   });
 
   it("rejects message generation when whatsapp is disabled in system settings", async () => {
@@ -279,10 +282,10 @@ describe("whatsapp templates and message logs", () => {
   });
 
   it("lists inactive customers, reward-ready customers, campaign audience, and message logs", async () => {
-    const inactive = await getInactiveWhatsAppAudience(prisma, 30);
-    const rewards = await getRewardReadyWhatsAppAudience(prisma);
-    const campaignAudience = await getCampaignWhatsAppAudience(prisma, campaignId);
-    const logs = await getWhatsAppMessages(prisma, { customerId });
+    const inactive = await getInactiveWhatsAppAudience(prisma, 30, "org_default");
+    const rewards = await getRewardReadyWhatsAppAudience(prisma, "org_default");
+    const campaignAudience = await getCampaignWhatsAppAudience(prisma, campaignId, "org_default");
+    const logs = await getWhatsAppMessages(prisma, { organizationId: "org_default", customerId });
 
     expect(inactive.some((customer) => customer.customerId === inactiveCustomerId)).toBe(true);
     expect(rewards.some((customer) => customer.customerId === rewardCustomerId)).toBe(true);
@@ -309,7 +312,7 @@ describe("whatsapp templates and message logs", () => {
     );
     await expect(
       generateWhatsAppMessage(prisma, { customerId: rewardCustomerId, customMessage: "عرض خاص", messageCategory: "MARKETING" }, adminMeta()),
-    ).rejects.toThrow("موافقة تسويقية");
+    ).rejects.toThrow("لم يوافق على الرسائل التسويقية");
 
     await updateCustomerWhatsappPreference(
       prisma,
@@ -329,6 +332,77 @@ describe("whatsapp templates and message logs", () => {
     await expect(
       generateWhatsAppMessage(prisma, { customerId: rewardCustomerId, customMessage: "عرض ثانٍ", messageCategory: "MARKETING" }, adminMeta()),
     ).rejects.toThrow("فترة تهدئة");
+  });
+
+  it("requires marketing consent for every promotional template type", async () => {
+    await updateCustomerWhatsappPreference(
+      prisma,
+      inactiveCustomerId,
+      { transactionalOptIn: true, marketingOptIn: false, consentSource: "IN_PERSON" },
+      adminMeta(),
+    );
+
+    for (const type of ["REWARD_READY", "CAMPAIGN", "INACTIVE_CUSTOMER", "CUSTOM"] as const) {
+      const template = await createWhatsAppTemplate(
+        prisma,
+        { name: `قالب حماية ${type} ${Date.now()}`, type, body: "عرض خاص للعميل {name}" },
+        adminMeta(),
+      );
+      createdTemplateIds.push(template.id);
+      await expect(
+        generateWhatsAppMessage(prisma, { customerId: inactiveCustomerId, templateId: template.id }, adminMeta()),
+      ).rejects.toThrow("لم يوافق على الرسائل التسويقية");
+    }
+
+    const serviceMessage = await generateWhatsAppMessage(
+      prisma,
+      { customerId: inactiveCustomerId, templateId },
+      adminMeta(),
+    );
+    createdMessageIds.push(serviceMessage.messageLogId);
+    expect(serviceMessage.category).toBe("TRANSACTIONAL");
+  });
+
+  it("treats custom content as marketing even when paired with a transactional template", async () => {
+    await updateCustomerWhatsappPreference(
+      prisma,
+      optOutCustomerId,
+      { transactionalOptIn: true, marketingOptIn: false, consentSource: "IN_PERSON" },
+      adminMeta(),
+    );
+
+    await expect(
+      generateWhatsAppMessage(
+        prisma,
+        {
+          customerId: optOutCustomerId,
+          templateId,
+          customMessage: "عرض مخصص لا يجوز تمريره كرسالة خدمة",
+          messageCategory: "TRANSACTIONAL",
+        },
+        adminMeta(),
+      ),
+    ).rejects.toThrow("لم يوافق على الرسائل التسويقية");
+  });
+
+  it("rechecks current consent before exposing the WhatsApp link", async () => {
+    await updateCustomerWhatsappPreference(
+      prisma,
+      optOutCustomerId,
+      { transactionalOptIn: true, marketingOptIn: false, consentSource: "IN_PERSON" },
+      adminMeta(),
+    );
+    const drafted = await generateWhatsAppMessage(prisma, { customerId: optOutCustomerId, templateId }, adminMeta());
+    createdMessageIds.push(drafted.messageLogId);
+    expect("waUrl" in drafted).toBe(false);
+
+    await updateCustomerWhatsappPreference(
+      prisma,
+      optOutCustomerId,
+      { transactionalOptIn: false, marketingOptIn: false, optOutReason: "رفض قبل الإرسال" },
+      adminMeta(),
+    );
+    await expect(markWhatsAppMessageOpened(prisma, drafted.messageLogId, adminMeta())).rejects.toThrow("لم يوافق على رسائل الخدمة");
   });
 });
 

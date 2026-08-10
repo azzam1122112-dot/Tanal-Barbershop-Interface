@@ -154,8 +154,8 @@ export function SettingsForm({ initialSettings }: { initialSettings: Settings })
           <div className="min-w-0">
             <h2 className="text-lg font-bold tracking-tight">ضريبة القيمة المضافة</h2>
             <p className="dashboard-muted mt-1.5 max-w-md text-sm leading-6">
-              اختيارية. فعّلها فقط إذا كانت منشأتك مسجّلة في ضريبة القيمة المضافة. عند التفعيل يتحول إيصال الزيارة إلى
-              فاتورة ضريبية مبسّطة برمز QR.
+              اختيارية للحساب والتقارير الداخلية فقط. تفعيلها لا يحوّل الإيصال إلى فاتورة ضريبية، ولا تدعم XMANSX
+              متطلبات ZATCA أو الربط مع منصة فاتورة.
             </p>
           </div>
           <button
@@ -232,8 +232,8 @@ export function SettingsForm({ initialSettings }: { initialSettings: Settings })
               </div>
             </fieldset>
             <p className="dashboard-muted md:col-span-2 text-xs leading-6">
-              النقاط تُحتسب دائمًا على المبلغ <strong>قبل</strong> الضريبة. الفواتير الصادرة سابقًا تحتفظ بنسبتها وقت
-              إصدارها ولا تتأثر بتغيير النسبة الآن.
+              النقاط تُحتسب دائمًا على المبلغ <strong>قبل</strong> الضريبة. الإيصالات الصادرة سابقًا تحتفظ بنسبة الحساب
+              وقت إصدارها، لكنها تبقى إيصالات تشغيلية غير ضريبية.
             </p>
           </div>
         ) : null}

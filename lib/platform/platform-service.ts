@@ -30,7 +30,7 @@ function generateTempPin() {
 
 const orgInclude = {
   plan: { select: { id: true, name: true, maxSalons: true, maxBarbers: true, maxCustomers: true, priceMonthly: true } },
-  _count: { select: { salons: true, users: true, barbers: true, customers: true } },
+  _count: { select: { salons: true, users: true, barbers: true, customers: true, billingInvoices: { where: { status: "PENDING" } } } },
 } satisfies Prisma.OrganizationInclude;
 
 type OrgWithInclude = Prisma.OrganizationGetPayload<{ include: typeof orgInclude }>;
@@ -39,6 +39,7 @@ function toOrgRow(org: OrgWithInclude) {
   return {
     id: org.id,
     name: org.name,
+    city: org.city,
     slug: org.slug,
     status: org.status,
     subscriptionStatus: org.subscriptionStatus,
@@ -54,14 +55,34 @@ function toOrgRow(org: OrgWithInclude) {
 
 export async function listOrganizations(
   prisma: PrismaClient,
-  filters: { q?: string; status?: OrganizationStatus; planId?: string; page?: number } = {},
+  filters: {
+    q?: string;
+    status?: OrganizationStatus;
+    subscriptionStatus?: SubscriptionStatus;
+    expiredTrial?: boolean;
+    pendingPayment?: boolean;
+    planId?: string;
+    page?: number;
+  } = {},
 ) {
   const page = Math.max(1, filters.page ?? 1);
   const where: Prisma.OrganizationWhereInput = {
     ...(filters.q
-      ? { OR: [{ name: { contains: filters.q, mode: "insensitive" } }, { slug: { contains: filters.q.toLowerCase() } }] }
+      ? {
+          OR: [
+            { name: { contains: filters.q, mode: "insensitive" } },
+            { city: { contains: filters.q, mode: "insensitive" } },
+            { slug: { contains: filters.q.toLowerCase() } },
+          ],
+        }
       : {}),
     ...(filters.status ? { status: filters.status } : {}),
+    ...(filters.expiredTrial
+      ? { subscriptionStatus: "TRIALING", trialEndsAt: { lt: new Date() } }
+      : filters.subscriptionStatus
+        ? { subscriptionStatus: filters.subscriptionStatus }
+        : {}),
+    ...(filters.pendingPayment ? { billingInvoices: { some: { status: "PENDING" } } } : {}),
     ...(filters.planId ? { planId: filters.planId } : {}),
   };
 
@@ -88,8 +109,30 @@ export async function listOrganizations(
 export async function getPlatformOverview(prisma: PrismaClient) {
   const now = new Date();
   const soon = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const renewalWindow = new Date(now.getTime() + 14 * DAY_MS);
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  const [totalOrgs, activeOrgs, suspendedOrgs, trialingOrgs, salons, barbers, customers, payingOrgs, expiringTrials, recentOrgs] =
+  const [
+    totalOrgs,
+    activeOrgs,
+    suspendedOrgs,
+    trialingOrgs,
+    salons,
+    barbers,
+    customers,
+    payingOrgs,
+    expiringTrials,
+    recentOrgs,
+    pendingPayments,
+    expiredTrials,
+    pastDueOrganizations,
+    expiringSubscriptions,
+    organizationsThisMonth,
+    recentPlatformActivity,
+    pendingPaymentsCount,
+    expiredTrialsCount,
+    pastDueCount,
+  ] =
     await Promise.all([
       prisma.organization.count(),
       prisma.organization.count({ where: { status: "ACTIVE" } }),
@@ -109,12 +152,49 @@ export async function getPlatformOverview(prisma: PrismaClient) {
         select: { id: true, name: true, slug: true, trialEndsAt: true },
       }),
       prisma.organization.findMany({ orderBy: { createdAt: "desc" }, take: 6, include: orgInclude }),
+      prisma.billingInvoice.findMany({
+        where: { status: "PENDING" },
+        orderBy: { createdAt: "asc" },
+        take: 8,
+        include: {
+          organization: { select: { id: true, name: true, slug: true } },
+          plan: { select: { name: true } },
+        },
+      }),
+      prisma.organization.findMany({
+        where: { subscriptionStatus: "TRIALING", trialEndsAt: { lt: now } },
+        orderBy: { trialEndsAt: "asc" },
+        take: 8,
+        select: { id: true, name: true, slug: true, trialEndsAt: true },
+      }),
+      prisma.organization.findMany({
+        where: { subscriptionStatus: "PAST_DUE" },
+        orderBy: { updatedAt: "asc" },
+        take: 8,
+        select: { id: true, name: true, slug: true, currentPeriodEnd: true },
+      }),
+      prisma.organization.findMany({
+        where: { subscriptionStatus: "ACTIVE", currentPeriodEnd: { gte: now, lte: renewalWindow } },
+        orderBy: { currentPeriodEnd: "asc" },
+        take: 8,
+        select: { id: true, name: true, slug: true, currentPeriodEnd: true },
+      }),
+      prisma.organization.count({ where: { createdAt: { gte: monthStart } } }),
+      prisma.auditLog.findMany({
+        where: { actorType: "PLATFORM_ADMIN" },
+        orderBy: { createdAt: "desc" },
+        take: 8,
+        select: { id: true, action: true, entityType: true, createdAt: true, organization: { select: { id: true, name: true } } },
+      }),
+      prisma.billingInvoice.count({ where: { status: "PENDING" } }),
+      prisma.organization.count({ where: { subscriptionStatus: "TRIALING", trialEndsAt: { lt: now } } }),
+      prisma.organization.count({ where: { subscriptionStatus: "PAST_DUE" } }),
     ]);
 
   const estimatedMrr = payingOrgs.reduce((total, org) => total + Number(org.plan?.priceMonthly ?? 0), 0);
 
   return {
-    totals: { organizations: totalOrgs, active: activeOrgs, suspended: suspendedOrgs, trialing: trialingOrgs, salons, barbers, customers },
+    totals: { organizations: totalOrgs, active: activeOrgs, suspended: suspendedOrgs, trialing: trialingOrgs, salons, barbers, customers, organizationsThisMonth },
     estimatedMrr,
     expiringTrials: expiringTrials.map((org) => ({
       id: org.id,
@@ -124,6 +204,28 @@ export async function getPlatformOverview(prisma: PrismaClient) {
       daysLeft: org.trialEndsAt ? Math.ceil((org.trialEndsAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)) : null,
     })),
     recentOrganizations: recentOrgs.map(toOrgRow),
+    attention: { pendingPayments: pendingPaymentsCount, expiredTrials: expiredTrialsCount, pastDue: pastDueCount },
+    pendingPayments: pendingPayments.map((invoice) => ({
+      id: invoice.id,
+      organizationId: invoice.organization.id,
+      organizationName: invoice.organization.name,
+      organizationSlug: invoice.organization.slug,
+      planName: invoice.plan?.name ?? null,
+      amount: Number(invoice.amount),
+      periodMonths: invoice.periodMonths,
+      reference: invoice.reference,
+      createdAt: invoice.createdAt.toISOString(),
+    })),
+    expiredTrials: expiredTrials.map((org) => ({ ...org, trialEndsAt: org.trialEndsAt?.toISOString() ?? null })),
+    pastDueOrganizations: pastDueOrganizations.map((org) => ({ ...org, currentPeriodEnd: org.currentPeriodEnd?.toISOString() ?? null })),
+    expiringSubscriptions: expiringSubscriptions.map((org) => ({ ...org, currentPeriodEnd: org.currentPeriodEnd?.toISOString() ?? null })),
+    recentPlatformActivity: recentPlatformActivity.map((entry) => ({
+      id: entry.id,
+      action: entry.action,
+      entityType: entry.entityType,
+      createdAt: entry.createdAt.toISOString(),
+      organization: entry.organization,
+    })),
   };
 }
 
@@ -199,11 +301,18 @@ export async function listPlans(prisma: PrismaClient) {
     id: plan.id,
     name: plan.name,
     slug: plan.slug,
+    description: plan.description,
     priceMonthly: Number(plan.priceMonthly),
+    priceYearly: plan.priceYearly == null ? null : Number(plan.priceYearly),
+    features: plan.features,
     maxSalons: plan.maxSalons,
     maxBarbers: plan.maxBarbers,
     maxCustomers: plan.maxCustomers,
     isActive: plan.isActive,
+    isPublic: plan.isPublic,
+    isFeatured: plan.isFeatured,
+    isSignupDefault: plan.isSignupDefault,
+    trialDays: plan.trialDays,
     sortOrder: plan.sortOrder,
     organizationsCount: plan._count.organizations,
   }));
@@ -211,7 +320,22 @@ export async function listPlans(prisma: PrismaClient) {
 
 export async function createPlan(
   prisma: PrismaClient,
-  input: { name: string; slug: string; priceMonthly: number; maxSalons: number; maxBarbers?: number | null; maxCustomers?: number | null; sortOrder?: number },
+  input: {
+    name: string;
+    slug: string;
+    description?: string | null;
+    priceMonthly: number;
+    priceYearly?: number | null;
+    features?: string[];
+    maxSalons: number;
+    maxBarbers?: number | null;
+    maxCustomers?: number | null;
+    isPublic?: boolean;
+    isFeatured?: boolean;
+    isSignupDefault?: boolean;
+    trialDays?: number;
+    sortOrder?: number;
+  },
 ) {
   const duplicate = await prisma.plan.findFirst({
     where: { OR: [{ slug: input.slug }, { name: input.name }] },
@@ -219,28 +343,60 @@ export async function createPlan(
   });
   if (duplicate) throw new BusinessError("اسم أو معرّف الباقة مستخدم مسبقًا");
 
-  return prisma.plan.create({
-    data: {
-      name: input.name,
-      slug: input.slug,
-      priceMonthly: input.priceMonthly,
-      maxSalons: input.maxSalons,
-      maxBarbers: input.maxBarbers ?? null,
-      maxCustomers: input.maxCustomers ?? null,
-      sortOrder: input.sortOrder ?? 0,
-      isActive: true,
-    },
+  return prisma.$transaction(async (tx) => {
+    if (input.isSignupDefault) {
+      await tx.plan.updateMany({ data: { isSignupDefault: false } });
+    }
+    return tx.plan.create({
+      data: {
+        name: input.name,
+        slug: input.slug,
+        description: input.description?.trim() || null,
+        priceMonthly: input.priceMonthly,
+        priceYearly: input.priceYearly ?? null,
+        features: input.features ?? [],
+        maxSalons: input.maxSalons,
+        maxBarbers: input.maxBarbers ?? null,
+        maxCustomers: input.maxCustomers ?? null,
+        isPublic: input.isPublic ?? true,
+        isFeatured: input.isFeatured ?? false,
+        isSignupDefault: input.isSignupDefault ?? false,
+        trialDays: input.trialDays ?? 14,
+        sortOrder: input.sortOrder ?? 0,
+        isActive: true,
+      },
+    });
   });
 }
 
 export async function updatePlan(
   prisma: PrismaClient,
   planId: string,
-  input: { name?: string; priceMonthly?: number; maxSalons?: number; maxBarbers?: number | null; maxCustomers?: number | null; isActive?: boolean; sortOrder?: number },
+  input: {
+    name?: string;
+    description?: string | null;
+    priceMonthly?: number;
+    priceYearly?: number | null;
+    features?: string[];
+    maxSalons?: number;
+    maxBarbers?: number | null;
+    maxCustomers?: number | null;
+    isActive?: boolean;
+    isPublic?: boolean;
+    isFeatured?: boolean;
+    isSignupDefault?: boolean;
+    trialDays?: number;
+    sortOrder?: number;
+  },
 ) {
   const plan = await prisma.plan.findUnique({ where: { id: planId }, select: { id: true } });
   if (!plan) throw new BusinessError("الباقة غير موجودة");
-  return prisma.plan.update({ where: { id: planId }, data: input });
+  return prisma.$transaction(async (tx) => {
+    if (input.isSignupDefault) {
+      await tx.plan.updateMany({ where: { id: { not: planId } }, data: { isSignupDefault: false } });
+    }
+    return tx.plan.update({ where: { id: planId }, data: input });
+  });
 }
 
 export async function getOrganizationDetail(prisma: PrismaClient, organizationId: string) {
@@ -273,6 +429,7 @@ export async function getOrganizationDetail(prisma: PrismaClient, organizationId
   return {
     id: org.id,
     name: org.name,
+    city: org.city,
     slug: org.slug,
     status: org.status,
     subscriptionStatus: org.subscriptionStatus,
@@ -333,9 +490,13 @@ export async function resetMemberPassword(prisma: PrismaClient, organizationId: 
   if (!user) throw new BusinessError("العضو غير موجود في هذه المؤسسة");
 
   const password = generateTempPassword();
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { passwordHash: await hashAdminPassword(password) },
+  const passwordHash = await hashAdminPassword(password);
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({ where: { id: user.id }, data: { passwordHash } });
+    await tx.session.updateMany({
+      where: { userId: user.id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
   });
 
   return { id: user.id, name: user.name, email: user.email, password };
@@ -350,9 +511,13 @@ export async function resetBarberPin(prisma: PrismaClient, organizationId: strin
   if (!barber) throw new BusinessError("الحلاق غير موجود في هذه المؤسسة");
 
   const pin = generateTempPin();
-  await prisma.barber.update({
-    where: { id: barber.id },
-    data: { accessPinHash: await hashBarberPin(pin) },
+  const accessPinHash = await hashBarberPin(pin);
+  await prisma.$transaction(async (tx) => {
+    await tx.barber.update({ where: { id: barber.id }, data: { accessPinHash } });
+    await tx.session.updateMany({
+      where: { barberId: barber.id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
   });
 
   return { id: barber.id, name: barber.name, phone: barber.phone, pin };

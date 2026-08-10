@@ -8,7 +8,7 @@ import { formatDate } from "@/lib/format";
 type Member = { id: string; name: string; email: string | null; phone: string | null; role: string; isActive: boolean; lastLoginAt: string | null };
 type Barber = { id: string; name: string; phone: string; salonName: string | null; isActive: boolean; lastLoginAt: string | null };
 
-const ROLE_LABELS: Record<string, string> = { OWNER: "مالك", ADMIN: "مدير", SUPERVISOR: "مشرف" };
+const ROLE_LABELS: Record<string, string> = { OWNER: "مالك المؤسسة", ADMIN: "مدير المؤسسة", SUPERVISOR: "مدير فرع" };
 
 type Issued = { name: string; login: string; secret: string; kind: "password" | "pin" };
 

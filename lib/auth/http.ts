@@ -7,6 +7,7 @@ import {
   canAccessBarberApp,
   canAccessDashboard,
   canAccessPlatform,
+  canSetupPlatformMfa,
   canManageBarbers,
   canManageOrganization,
   canManageStaff,
@@ -79,12 +80,15 @@ export async function requireAdminApi() {
   return { session, response: null };
 }
 
-/** تشغيل برنامج الولاء (مكافآت، حملات، واتساب، متابعة عملاء) — يشمل المشرف. */
+/** تشغيل برنامج الولاء والحملات والرسائل — مالك/مدير فقط. */
 export async function requireLoyaltyOperatorApi() {
   const session = await getRequestSession();
 
-  if (!canOperateLoyalty(session)) {
+  if (!canAccessDashboard(session)) {
     return { session: null, response: NextResponse.json({ message: "غير مصرح" }, { status: 401 }) };
+  }
+  if (!canOperateLoyalty(session)) {
+    return { session, response: NextResponse.json({ message: "صلاحية المدير مطلوبة لإدارة العملاء والحملات والرسائل" }, { status: 403 }) };
   }
 
   return { session, response: null };
@@ -141,6 +145,14 @@ export async function requirePlatformApi() {
   return { session, response: null };
 }
 
+export async function requirePlatformMfaSetupApi() {
+  const session = await getRequestSession();
+  if (!canSetupPlatformMfa(session)) {
+    return { session: null, response: NextResponse.json({ message: "جلسة إعداد المصادقة الثنائية غير صالحة" }, { status: 401 }) };
+  }
+  return { session, response: null };
+}
+
 export async function requireOwnerApi() {
   const session = await getRequestSession();
 
@@ -167,9 +179,11 @@ export async function requireBarberApi() {
 
 export async function getRequestMeta() {
   const headerStore = await headers();
+  const forwardedFor = headerStore.get("x-forwarded-for");
   return {
     userAgent: headerStore.get("user-agent"),
-    ipAddress: headerStore.get("x-forwarded-for")?.split(",")[0]?.trim() ?? headerStore.get("x-real-ip"),
+    // أقرب proxy موثوق هو آخر عنصر. إعداد Nginx المرفق يستبدل السلسلة أصلًا.
+    ipAddress: forwardedFor?.split(",").at(-1)?.trim() ?? headerStore.get("x-real-ip"),
   };
 }
 

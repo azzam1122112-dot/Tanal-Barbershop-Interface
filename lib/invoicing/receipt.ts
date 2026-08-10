@@ -1,7 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { BusinessError } from "@/lib/errors";
 import { getEffectiveSettings } from "@/lib/settings/system-settings";
-import { buildZatcaQrSvg } from "./zatca-qr";
 
 export type ReceiptData = Awaited<ReturnType<typeof buildReceipt>>;
 
@@ -17,8 +16,8 @@ const receiptInclude = {
 
 /**
  * يبني بيانات الإيصال الجاهزة للعرض.
- * إن كانت الضريبة مفعّلة للفرع يصبح المستند **فاتورة ضريبية مبسّطة** مع رمز QR
- * وفق متطلبات هيئة الزكاة والضريبة؛ وإلا فهو إيصال عادي بلا رمز.
+ * المستند إيصال زيارة تشغيلي فقط. لا يدّعي التوافق مع ZATCA ولا يحل محل
+ * الفاتورة الضريبية التي قد يكون الصالون ملزمًا بإصدارها عبر حل آخر.
  */
 export async function buildReceipt(
   prisma: PrismaClient,
@@ -47,7 +46,6 @@ export async function buildReceipt(
   const vatAmount = Number(visit.vatAmount);
   const netAmount = Number(visit.netAmount);
   const subtotalAmount = Number(visit.subtotalAmount) || netAmount;
-  const isTaxInvoice = Number(visit.vatRate) > 0 && Boolean(settings?.vatNumber);
   const sellerName = settings?.legalName?.trim() || settings?.salonName || visit.salon?.name || "";
 
   const earnedPoints = visit.loyaltyTransactions
@@ -60,8 +58,7 @@ export async function buildReceipt(
   );
 
   return {
-    isTaxInvoice,
-    documentTitle: isTaxInvoice ? "فاتورة ضريبية مبسّطة" : "إيصال زيارة",
+    documentTitle: "إيصال زيارة",
     seller: {
       name: sellerName,
       organizationName: visit.organization?.name ?? "",
@@ -102,16 +99,5 @@ export async function buildReceipt(
       redeemedPoints,
       balance: visit.customer.loyaltyAccount?.points ?? 0,
     },
-    // الرمز يُبنى فقط للفاتورة الضريبية — الإيصال العادي لا يحتاجه.
-    qrSvg:
-      isTaxInvoice && settings?.vatNumber
-        ? buildZatcaQrSvg({
-            sellerName,
-            vatNumber: settings.vatNumber,
-            timestamp: visit.visitedAt,
-            totalWithVat: netAmount,
-            vatTotal: vatAmount,
-          })
-        : null,
   };
 }

@@ -7,18 +7,20 @@
  */
 export function DashboardShell({
   title,
-  eyebrow = "لوحة الإدارة",
+  eyebrow = "XMANSX · الإدارة والتشغيل",
   description,
+  actions,
   children,
 }: {
   title: string;
   eyebrow?: string;
   description?: string;
+  actions?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <>
-      <PageHeader eyebrow={eyebrow} title={title} description={description} />
+      <PageHeader eyebrow={eyebrow} title={title} description={description} actions={actions} />
       {children}
     </>
   );

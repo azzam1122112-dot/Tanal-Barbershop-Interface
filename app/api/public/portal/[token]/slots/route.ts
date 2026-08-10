@@ -4,6 +4,8 @@ import { prisma } from "@/lib/db/prisma";
 import { getCustomerBookingSlots } from "@/lib/appointments/customer-booking";
 import { resolveCustomerByPortalToken } from "@/lib/customers/customer-portal";
 import { toErrorResponse } from "@/lib/http/error-response";
+import { getRequestMeta } from "@/lib/auth/http";
+import { consumeRateLimit } from "@/lib/auth/rate-limit";
 
 /**
  * الفترات المتاحة لعميل البوابة.
@@ -18,11 +20,20 @@ const querySchema = z.object({
 });
 
 export async function GET(request: Request, context: { params: Promise<{ token: string }> }) {
+  const meta = await getRequestMeta();
+  const publicLimit = await consumeRateLimit(prisma, `portal-public:${meta.ipAddress ?? "unknown"}`, undefined, {
+    windowMs: 5 * 60_000, maxAttempts: 120, lockMs: 5 * 60_000,
+  });
+  if (publicLimit.limited) return NextResponse.json({ message: "طلبات كثيرة. حاول بعد قليل." }, { status: 429, headers: { "Retry-After": String(publicLimit.retryAfterSeconds) } });
   const { token } = await context.params;
   const customer = await resolveCustomerByPortalToken(prisma, token);
   if (!customer) {
     return NextResponse.json({ message: "الرابط غير صالح" }, { status: 404 });
   }
+  const limit = await consumeRateLimit(prisma, `portal-slots:${customer.id}:${meta.ipAddress ?? "unknown"}`, undefined, {
+    windowMs: 5 * 60_000, maxAttempts: 60, lockMs: 5 * 60_000,
+  });
+  if (limit.limited) return NextResponse.json({ message: "طلبات كثيرة. حاول بعد قليل." }, { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } });
 
   const url = new URL(request.url);
   const parsed = querySchema.safeParse({

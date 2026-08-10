@@ -41,11 +41,14 @@ export const signupSchema = z.object({
   organizationName: z.string().trim().min(2, "اسم المؤسسة مطلوب"),
   // المعرّف اختياري: يُولَّد تلقائيًا إن لم يُرسَل (الدخول يعتمد على البريد/الجوال لا المعرّف).
   slug: organizationSlugSchema.optional(),
-  salonName: z.string().trim().min(2, "اسم الصالون مطلوب").optional(),
+  salonName: z.string().trim().min(2, "اسم الصالون مطلوب"),
   ownerName: z.string().trim().min(2, "اسم المالك مطلوب"),
+  city: z.string().trim().min(2, "المدينة مطلوبة").max(80, "اسم المدينة طويل جدًا"),
   email: emailSchema,
   phone: phoneSchema,
   password: adminPasswordSchema,
+  acceptPolicies: z.boolean().refine(Boolean, "يجب قبول الشروط وسياسة الخصوصية"),
+  acceptDataProcessingAgreement: z.boolean().refine(Boolean, "يجب قبول اتفاقية معالجة البيانات"),
 });
 
 export const salonCreateSchema = z.object({
@@ -74,6 +77,14 @@ export const createBarberSchema = z.object({
   phone: phoneSchema,
   pin: barberPinSchema,
   salonId: z.string().trim().min(1, "الفرع مطلوب"),
+  commissionEnabled: z.boolean().default(false),
+  // null = استخدم النسبة الافتراضية للفرع عند تفعيل العمولة.
+  commissionRate: z.coerce
+    .number()
+    .min(0, "نسبة العمولة لا تقل عن صفر")
+    .max(100, "نسبة العمولة لا تتجاوز 100")
+    .nullable()
+    .optional(),
 });
 
 export const updateBarberSchema = z.object({
@@ -81,6 +92,7 @@ export const updateBarberSchema = z.object({
   phone: phoneSchema.optional(),
   isActive: z.boolean().optional(),
   salonId: z.string().trim().min(1, "الفرع مطلوب").optional(),
+  commissionEnabled: z.boolean().optional(),
   // null = ارجع للنسبة الافتراضية للفرع.
   commissionRate: z.coerce
     .number()
@@ -116,7 +128,7 @@ export const createStaffSchema = z
   })
   .superRefine((data, ctx) => {
     if (data.role === "SUPERVISOR" && (!data.salonIds || data.salonIds.length === 0)) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["salonIds"], message: "اختر فرعًا واحدًا على الأقل للمشرف" });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["salonIds"], message: "اختر فرعًا واحدًا على الأقل لمدير الفرع" });
     }
   });
 
@@ -328,6 +340,9 @@ export const whatsappGenerateSchema = z.object({
 }).refine((data) => data.templateId || data.customMessage, {
   message: "اختر قالبًا أو اكتب رسالة مخصصة",
   path: ["templateId"],
+}).refine((data) => data.templateId || data.messageCategory, {
+  message: "حدد نوع الرسالة المخصصة لفحص الموافقة المناسبة",
+  path: ["messageCategory"],
 });
 
 export const whatsappMessageListSchema = z.object({

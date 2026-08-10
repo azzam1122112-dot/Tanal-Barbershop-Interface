@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { getRequestMeta, requireAdminApi } from "@/lib/auth/http";
+import { getRequestMeta, requirePlatformApi } from "@/lib/auth/http";
 import { writeAuditLog } from "@/lib/audit/audit-log";
 import { runMaintenanceCleanup } from "@/lib/maintenance/cleanup";
 import { logger } from "@/lib/logger";
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * صيانة دورية. تُستدعى إمّا:
- * - من مدير مسجّل دخول (لوحة التحكم)، أو
+ * - من مدير المنصة مسجّل الدخول، أو
  * - من cron عبر ترويسة x-maintenance-token مطابقة لـ MAINTENANCE_TOKEN.
  */
 export async function POST(request: Request) {
@@ -21,9 +21,9 @@ export async function POST(request: Request) {
   let actorUserId: string | null = null;
 
   if (!tokenOk) {
-    const auth = await requireAdminApi();
+    const auth = await requirePlatformApi();
     if (auth.response) return auth.response;
-    actorUserId = auth.session?.type === "dashboard" ? auth.session.user.id : null;
+    actorUserId = auth.session?.type === "platform" ? auth.session.admin.id : null;
   }
 
   const meta = await getRequestMeta();
@@ -33,11 +33,11 @@ export async function POST(request: Request) {
 
     await writeAuditLog({
       prisma,
-      actorType: tokenOk ? "SYSTEM" : "ADMIN",
-      actorUserId,
+      actorType: tokenOk ? "SYSTEM" : "PLATFORM_ADMIN",
+      actorUserId: null,
       action: "maintenance.cleanup",
       entityType: "System",
-      after: result,
+      after: { ...result, ...(actorUserId ? { initiatedByPlatformAdminId: actorUserId } : {}) },
       ...meta,
     });
 

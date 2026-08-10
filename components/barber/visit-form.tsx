@@ -71,7 +71,6 @@ export function VisitForm({
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   // كمية كل منتج مباع مع الزيارة؛ الأسعار تُحسب في الخادم لا هنا.
   const [productQuantities, setProductQuantities] = useState<Record<string, number>>({});
-  const [grossAmount, setGrossAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"CASH" | "NETWORK">("CASH");
   const [preview, setPreview] = useState<VisitPreview | null>(null);
   const [selectedDiscount, setSelectedDiscount] = useState("NONE");
@@ -196,11 +195,12 @@ export function VisitForm({
   const selectedServicesTotal = services
     .filter((service) => selectedServices.includes(service.id))
     .reduce((total, service) => total + service.defaultPrice, 0);
+  const grossAmount = selectedServicesTotal;
   const productsSubtotal = products.reduce(
     (total, product) => total + product.price * (productQuantities[product.id] ?? 0),
     0,
   );
-  const canPreview = selectedServices.length > 0 && Number(grossAmount) > 0 && !loadingPreview;
+  const canPreview = selectedServices.length > 0 && grossAmount > 0 && !loadingPreview;
 
   if (confirmedVisitId) {
     return (
@@ -326,26 +326,11 @@ export function VisitForm({
       ) : null}
 
       <div className="barber-card p-4">
-        <label className="block text-sm font-bold">
-          المبلغ قبل الخصم
-          <input
-            value={grossAmount}
-            onChange={(event) => {
-              setGrossAmount(event.target.value);
-              setPreview(null);
-              setSelectedDiscount("NONE");
-            }}
-            required
-            type="number"
-            // `inputMode="decimal"` يفتح لوحة أرقام بفاصلة عشرية على iOS —
-            // `type="number"` وحده يعطي لوحة بلا فاصلة في بعض اللغات.
-            inputMode="decimal"
-            min={0.01}
-            step="0.01"
-            placeholder="0"
-            className="barber-field lux-number mt-2 h-20 bg-salon-pearl px-3 text-center text-4xl"
-          />
-        </label>
+        <div className="rounded-2xl border border-salon-forest/20 bg-salon-forest/5 px-4 py-4 text-center">
+          <p className="text-xs font-bold text-salon-charcoal/70">مبلغ الخدمات — محسوب آليًا من قائمة الأسعار</p>
+          <p className="mt-1 text-4xl font-black tabular-nums text-salon-forest">{grossAmount.toFixed(2)} <span className="text-base">ريال</span></p>
+          <p className="mt-2 text-xs font-semibold text-salon-charcoal/60">أي تصحيح استثنائي ينفذه المالك أو المدير فقط مع سبب موثق في سجل التدقيق.</p>
+        </div>
         <div className="mt-4 grid grid-cols-2 gap-2">
           <button
             type="button"

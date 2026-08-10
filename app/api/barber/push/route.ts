@@ -6,12 +6,13 @@ import {
   deleteBarberPushSubscription,
   getBarberPushPublicConfig,
   hasBarberPushSubscription,
+  isTrustedPushEndpoint,
   saveBarberPushSubscription,
 } from "@/lib/push/barber-push";
 import { toErrorResponse } from "@/lib/http/error-response";
 
 const subscriptionSchema = z.object({
-  endpoint: z.string().url().max(4096),
+  endpoint: z.string().url().max(4096).refine(isTrustedPushEndpoint),
   keys: z.object({
     p256dh: z.string().min(20).max(512),
     auth: z.string().min(8).max(256),

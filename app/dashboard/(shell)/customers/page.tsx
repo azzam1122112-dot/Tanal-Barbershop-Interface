@@ -6,7 +6,7 @@ import { toCustomerDashboardRow } from "@/lib/customers/customer-summary";
 import { DashboardShell, EmptyState, FilterBar, SectionPanel, TablePanel } from "@/components/dashboard/ui";
 import { LoyaltyJoinPoster } from "@/components/dashboard/loyalty-join-poster";
 import { getEffectiveSettings } from "@/lib/settings/system-settings";
-import { buildQrSvg } from "@/lib/invoicing/zatca-qr";
+import { buildQrSvg } from "@/lib/qr";
 import { CustomerWhatsAppToggle } from "@/components/dashboard/customer-whatsapp-toggle";
 import { ManagerRewardButton } from "@/components/dashboard/manager-reward-button";
 import { CustomerPortalLink } from "@/components/dashboard/customer-portal-link";

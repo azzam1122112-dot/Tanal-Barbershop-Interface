@@ -10,7 +10,7 @@ type SettingsPrisma = PrismaClient | Prisma.TransactionClient;
  *
  * **استخدمها دائمًا بدل `systemSettings.findFirst({})`** — الاستعلام بلا قيد
  * قد يعيد إعدادات مؤسسة أخرى في بيئة متعددة المستأجرين، فتُحتسب النقاط
- * أو الضريبة بمعدّل خاطئ.
+ * أو إعدادات الحساب بمعدّل خاطئ.
  */
 export async function getEffectiveSettings(
   prisma: SettingsPrisma,
@@ -88,13 +88,13 @@ export async function updateSystemSettings(prisma: PrismaClient, data: SystemSet
   const before = await getEffectiveSettings(prisma, { organizationId: meta.organizationId, salonId: meta.salonId });
   if (!before) throw new BusinessError("إعدادات النظام غير موجودة");
 
-  // تفعيل الضريبة يتطلب رقمًا ضريبيًا واسمًا نظاميًا — بدونهما الفاتورة غير صالحة.
+  // حقول الضريبة للحساب الداخلي فقط؛ لا تنتج المنصة فاتورة ZATCA.
   const nextVatEnabled = data.vatEnabled ?? before.vatEnabled;
   if (nextVatEnabled) {
     const vatNumber = (data.vatNumber ?? before.vatNumber ?? "").trim();
     const legalName = (data.legalName ?? before.legalName ?? before.salonName ?? "").trim();
     if (!/^\d{15}$/.test(vatNumber)) {
-      throw new BusinessError("الرقم الضريبي يجب أن يتكوّن من 15 رقمًا لتفعيل الضريبة");
+      throw new BusinessError("الرقم الضريبي يجب أن يتكوّن من 15 رقمًا عند حفظ إعدادات الضريبة الداخلية");
     }
     if (!legalName) {
       throw new BusinessError("أدخل الاسم النظامي للمنشأة لتفعيل الضريبة");

@@ -9,6 +9,7 @@ import { OrgDelete } from "@/components/platform/org-delete";
 import { prisma } from "@/lib/db/prisma";
 import { getOrganizationDetail, listPlans } from "@/lib/platform/platform-service";
 import { formatDate, formatDateTime, formatMoney, formatNumber } from "@/lib/format";
+import { auditActionLabel, auditEntityLabel } from "@/lib/audit/presentation";
 
 const SUB_LABELS: Record<string, string> = { TRIALING: "تجربة", ACTIVE: "نشط", PAST_DUE: "متأخر", CANCELED: "ملغى" };
 
@@ -26,15 +27,28 @@ export default async function PlatformOrganizationDetailPage({ params }: { param
   if (!org) notFound();
 
   return (
-    <PlatformShell active="orgs" title={org.name} description={`تفاصيل المؤسسة ${org.slug} وفروعها وفريقها وسجلّها.`}>
+    <PlatformShell active="orgs" title={org.name} description={`تفاصيل المؤسسة ${org.slug}${org.city ? ` · ${org.city}` : ""} وفروعها وفريقها وسجلّها.`}>
       <div className="mt-4">
         <Link href="/platform/organizations" className="text-xs font-bold text-salon-gold hover:underline">→ كل المؤسسات</Link>
       </div>
 
+      <nav className="sticky top-[118px] z-20 mt-4 flex gap-1 overflow-x-auto rounded-xl border border-salon-line/70 bg-white/95 p-1.5 shadow-sm" aria-label="أقسام المؤسسة">
+        {[
+          ["overview", "الملخص"],
+          ["subscription", "الاشتراك"],
+          ["billing", "الدفعات"],
+          ["usage", "الاستخدام"],
+          ["access", "الوصول"],
+          ["branches", "الفروع"],
+          ["activity", "النشاط"],
+        ].map(([target, label]) => <a key={target} href={`#${target}`} className="shrink-0 rounded-lg px-3 py-2 text-xs font-bold text-salon-charcoal transition hover:bg-salon-pearl hover:text-salon-ink">{label}</a>)}
+      </nav>
+
       {/* الحالة + الاشتراك */}
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div id="overview" className="mt-4 scroll-mt-44 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {[
           { label: "الحالة", value: org.status === "ACTIVE" ? "نشطة" : "موقوفة", danger: org.status !== "ACTIVE" },
+          { label: "المدينة", value: org.city ?? "غير محددة" },
           {
             label: "الاشتراك",
             value: SUB_LABELS[org.subscriptionStatus] ?? org.subscriptionStatus,
@@ -58,28 +72,37 @@ export default async function PlatformOrganizationDetailPage({ params }: { param
       </div>
 
       {/* إدارة الاشتراك */}
-      <OrgSubscriptionManager
-        orgId={org.id}
-        initial={{
-          status: org.status,
-          subscriptionStatus: org.subscriptionStatus,
-          planId: org.plan?.id ?? null,
-          trialEndsAt: org.trialEndsAt,
-          currentPeriodEnd: org.currentPeriodEnd,
-        }}
-        plans={plans.map((plan) => ({ id: plan.id, name: plan.name, priceMonthly: plan.priceMonthly, maxSalons: plan.maxSalons, maxBarbers: plan.maxBarbers }))}
-      />
+      <div id="subscription" className="scroll-mt-44">
+        <OrgSubscriptionManager
+          orgId={org.id}
+          initial={{
+            status: org.status,
+            subscriptionStatus: org.subscriptionStatus,
+            planId: org.plan?.id ?? null,
+            trialEndsAt: org.trialEndsAt,
+            currentPeriodEnd: org.currentPeriodEnd,
+          }}
+          plans={plans.map((plan) => ({ id: plan.id, name: plan.name, priceMonthly: plan.priceMonthly, maxSalons: plan.maxSalons, maxBarbers: plan.maxBarbers }))}
+        />
+      </div>
 
-      <OrgBilling
-        organizationId={org.id}
-        currentPlanId={org.plan?.id ?? null}
-        currentPeriodEnd={org.currentPeriodEnd}
-        plans={plans.map((plan) => ({ id: plan.id, name: plan.name, priceMonthly: plan.priceMonthly }))}
-        initialInvoices={invoices}
-      />
+      <div id="billing" className="scroll-mt-44">
+        <OrgBilling
+          organizationId={org.id}
+          currentPlanId={org.plan?.id ?? null}
+          currentPeriodEnd={org.currentPeriodEnd}
+        plans={plans.map((plan) => ({
+          id: plan.id,
+          name: plan.name,
+          priceMonthly: plan.priceMonthly,
+          priceYearly: plan.priceYearly,
+        }))}
+          initialInvoices={invoices}
+        />
+      </div>
 
       {/* الاستهلاك مقابل الحدود */}
-      <section className="dashboard-panel mt-6 p-5">
+      <section id="usage" className="dashboard-panel mt-6 scroll-mt-44 p-5">
         <h2 className="text-lg font-bold tracking-tight">الاستهلاك مقابل حدود الباقة</h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           <UsageBar label="الفروع" used={org.usage.salons} limit={org.plan?.maxSalons ?? null} />
@@ -94,10 +117,10 @@ export default async function PlatformOrganizationDetailPage({ params }: { param
       </section>
 
       {/* بيانات الدخول وإعادة التعيين */}
-      <OrgAccessManager orgId={org.id} members={org.members} barbers={org.barbers} />
+      <div id="access" className="scroll-mt-44"><OrgAccessManager orgId={org.id} members={org.members} barbers={org.barbers} /></div>
 
       {/* الفروع */}
-      <section className="dashboard-panel mt-6 overflow-hidden">
+      <section id="branches" className="dashboard-panel mt-6 scroll-mt-44 overflow-hidden">
         <div className="border-b border-salon-line/70 px-5 py-4"><h2 className="text-lg font-bold tracking-tight">الفروع ({org.salons.length})</h2></div>
         <div className="divide-y divide-salon-line/70">
           {org.salons.map((salon) => (
@@ -115,13 +138,13 @@ export default async function PlatformOrganizationDetailPage({ params }: { param
       </section>
 
       {/* سجل التدقيق */}
-      <section className="dashboard-panel mt-6 overflow-hidden">
+      <section id="activity" className="dashboard-panel mt-6 scroll-mt-44 overflow-hidden">
         <div className="border-b border-salon-line/70 px-5 py-4"><h2 className="text-lg font-bold tracking-tight">آخر النشاط</h2></div>
         <div className="divide-y divide-salon-line/70">
           {org.recentAudit.map((log) => (
             <div key={log.id} className="flex items-center justify-between gap-3 px-5 py-3 text-sm">
-              <span className="font-bold text-salon-ink" dir="ltr">{log.action}</span>
-              <span className="text-xs font-medium text-salon-charcoal/60">{log.entityType} · {formatDateTime(log.createdAt)}</span>
+              <span className="font-bold text-salon-ink">{auditActionLabel(log.action)}</span>
+              <span className="text-xs font-medium text-salon-charcoal/60">{auditEntityLabel(log.entityType)} · {formatDateTime(log.createdAt)}</span>
             </div>
           ))}
           {org.recentAudit.length === 0 ? <p className="px-5 py-6 text-center text-sm text-salon-charcoal">لا يوجد نشاط مسجّل.</p> : null}

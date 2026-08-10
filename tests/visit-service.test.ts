@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, type Prisma } from "@prisma/client";
 import { hashBarberPin } from "../lib/auth/barber-pin";
 import { createCustomerWithLoyalty } from "../lib/customers/customer-service";
 import { canAccessDashboard } from "../lib/auth/access";
@@ -23,6 +23,7 @@ let inactiveCustomerId = "";
 let activeCustomerId = "";
 let pointsCustomerId = "";
 let activeServiceId = "";
+let lowPriceServiceId = "";
 let inactiveServiceId = "";
 let rewardRuleId = "";
 let inactiveRewardRuleId = "";
@@ -47,15 +48,19 @@ describe("visit preview and confirm", () => {
     const activeService = await prisma.service.create({
       data: {
         organizationId: "org_default",
-        salonId: "salon_default", name: `visit-active-${Date.now()}`, defaultPrice: 25, sortOrder: 1, isActive: true },
+        salonId: "salon_default", name: `visit-active-${Date.now()}`, defaultPrice: 70, sortOrder: 1, isActive: true },
+    });
+    const lowPriceService = await prisma.service.create({
+      data: { organizationId: "org_default", salonId: "salon_default", name: `visit-low-${Date.now()}`, defaultPrice: 5, sortOrder: 2, isActive: true },
     });
     const inactiveService = await prisma.service.create({
       data: {
         organizationId: "org_default",
         salonId: "salon_default", name: `visit-inactive-${Date.now()}`, defaultPrice: 35, sortOrder: 2, isActive: false },
     });
-    createdServiceIds.push(activeService.id, inactiveService.id);
+    createdServiceIds.push(activeService.id, lowPriceService.id, inactiveService.id);
     activeServiceId = activeService.id;
+    lowPriceServiceId = lowPriceService.id;
     inactiveServiceId = inactiveService.id;
 
     const customerResult = await createCustomerWithLoyalty({
@@ -129,6 +134,7 @@ describe("visit preview and confirm", () => {
     });
     const inactiveRewardRule = await prisma.rewardRule.create({
       data: {
+        organizationId: "org_default",
         name: `reward-inactive-${Date.now()}`,
         requiredPoints: 900000 + Math.floor(Math.random() * 100000),
         discountAmount: 5,
@@ -170,13 +176,13 @@ describe("visit preview and confirm", () => {
       customerId,
       barberId,
       serviceIds: [activeServiceId],
-      grossAmount: 80,
+      grossAmount: 70,
       paymentMethod: "CASH",
     });
     const after = await prisma.visit.count({ where: { customerId, barberId } });
 
     expect(after).toBe(before);
-    expect(preview.netAmount).toBe(80);
+    expect(preview.netAmount).toBe(70);
     expect(preview.discountAmount).toBe(0);
   });
 
@@ -234,7 +240,7 @@ describe("visit preview and confirm", () => {
       customerId,
       barberId,
       serviceIds: [activeServiceId],
-      grossAmount: 90,
+      grossAmount: 70,
       paymentMethod: "NETWORK",
       idempotencyKey: `test-no-reward-${Date.now()}`,
     });
@@ -251,11 +257,11 @@ describe("visit preview and confirm", () => {
 
     expect(visit.services).toHaveLength(1);
     expect(visit.paymentMethod).toBe("NETWORK");
-    expect(Number(visit.netAmount)).toBe(90);
-    expect(Number(visit.grossAmount)).toBe(90);
-    expect(visit.pointsEarned).toBe(90);
+    expect(Number(visit.netAmount)).toBe(70);
+    expect(Number(visit.grossAmount)).toBe(70);
+    expect(visit.pointsEarned).toBe(70);
     expect(visit.loyaltyTransactions[0]?.type).toBe("EARN");
-    expect(afterCustomer.loyaltyAccount?.points).toBe((beforeCustomer.loyaltyAccount?.points ?? 0) + 90);
+    expect(afterCustomer.loyaltyAccount?.points).toBe((beforeCustomer.loyaltyAccount?.points ?? 0) + 70);
     expect(afterCustomer.lastVisitAt).toBeTruthy();
     expect(afterCustomer.visitCount).toBe(beforeCustomer.visitCount + 1);
   });
@@ -292,8 +298,8 @@ describe("visit preview and confirm", () => {
       salonId: "salon_default",
       customerId: rewardCustomerId,
       barberId,
-      serviceIds: [activeServiceId],
-      grossAmount: 20,
+      serviceIds: [lowPriceServiceId],
+      grossAmount: 5,
       paymentMethod: "CASH",
     });
 
@@ -386,8 +392,8 @@ describe("visit preview and confirm", () => {
       salonId: "salon_default",
         customerId: rewardCustomerId,
         barberId,
-        serviceIds: [activeServiceId],
-        grossAmount: 20,
+        serviceIds: [lowPriceServiceId],
+        grossAmount: 5,
         paymentMethod: "CASH",
         rewardRuleId,
         idempotencyKey: `too-large-reward-${Date.now()}`,
@@ -476,7 +482,7 @@ describe("visit preview and confirm", () => {
       salonId: "salon_default",
       customerId: activeCustomerId,
       barberId,
-      serviceIds: [activeServiceId],
+      serviceIds: [lowPriceServiceId],
       grossAmount: 5,
       paymentMethod: "CASH",
     });
@@ -630,16 +636,16 @@ describe("visit preview and confirm", () => {
       customerId: pointsCustomerId,
       barberId,
       serviceIds: [activeServiceId],
-      grossAmount: 80,
+      grossAmount: 70,
       paymentMethod: "NETWORK",
       campaignId: percentageCampaign.id,
       idempotencyKey: `campaign-percent-${Date.now()}`,
     });
     createdVisitIds.push(result.visit.id);
 
-    expect(result.visit.discountAmount).toBe(8);
-    expect(result.visit.netAmount).toBe(72);
-    expect(result.visit.pointsEarned).toBe(72);
+    expect(result.visit.discountAmount).toBe(7);
+    expect(result.visit.netAmount).toBe(63);
+    expect(result.visit.pointsEarned).toBe(63);
 
     await expect(
       confirmVisit(prisma, {
@@ -723,8 +729,8 @@ describe("visit preview and confirm", () => {
   });
 });
 
-async function createTestCampaign(data: Parameters<typeof prisma.campaign.create>[0]["data"]) {
-  const campaign = await prisma.campaign.create({ data });
+async function createTestCampaign(data: Omit<Prisma.CampaignUncheckedCreateInput, "organizationId">) {
+  const campaign = await prisma.campaign.create({ data: { ...data, organizationId: "org_default" } });
   createdCampaignIds.push(campaign.id);
   return campaign;
 }

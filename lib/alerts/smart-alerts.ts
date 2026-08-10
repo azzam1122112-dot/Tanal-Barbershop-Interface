@@ -2,6 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import { roundMoney } from "@/lib/visits/visit-totals";
 import { countAr, formatMoney } from "@/lib/format";
 import { getLowStockProducts } from "@/lib/products/product-service";
+import { getCachedJson, redisKey, setCachedJson } from "@/lib/cache/redis";
 
 export type SmartAlert = {
   id: string;
@@ -32,6 +33,11 @@ export async function getSmartAlerts(
   scope: { organizationId: string; salonIds?: string[] | null },
   now = new Date(),
 ): Promise<SmartAlert[]> {
+  const scopeKey = scope.salonIds && scope.salonIds.length > 0 ? [...scope.salonIds].sort().join(",") : "all";
+  const cacheKey = redisKey("dashboard", "smart-alerts", scope.organizationId, scopeKey);
+  const cached = await getCachedJson<SmartAlert[]>(cacheKey);
+  if (cached) return cached;
+
   const salonFilter = scope.salonIds && scope.salonIds.length > 0 ? { salonId: { in: scope.salonIds } } : {};
   const alerts: SmartAlert[] = [];
 
@@ -106,7 +112,9 @@ export async function getSmartAlerts(
   }
 
   const order = { critical: 0, warning: 1, info: 2 };
-  return alerts.sort((a, b) => order[a.severity] - order[b.severity]);
+  const sorted = alerts.sort((a, b) => order[a.severity] - order[b.severity]);
+  await setCachedJson(cacheKey, sorted, dashboardCacheTtl());
+  return sorted;
 }
 
 async function countInactiveCustomers(prisma: PrismaClient, organizationId: string, now: Date) {
@@ -226,4 +234,9 @@ async function getRepeatedCashGaps(
   }
 
   return [...byBarber.values()].filter((row) => row.count >= 3).sort((a, b) => b.count - a.count);
+}
+
+function dashboardCacheTtl() {
+  const configured = Number(process.env.DASHBOARD_CACHE_TTL_SECONDS);
+  return Number.isFinite(configured) ? Math.min(60, Math.max(2, Math.trunc(configured))) : 10;
 }

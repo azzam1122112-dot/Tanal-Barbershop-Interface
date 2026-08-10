@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Sans_Arabic } from "next/font/google";
+import { siteUrl } from "@/lib/site";
 import "./globals.css";
 
 const arabic = IBM_Plex_Sans_Arabic({
@@ -10,6 +11,7 @@ const arabic = IBM_Plex_Sans_Arabic({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: {
     default: "XMANSX | منصة إدارة الصالونات",
     template: "%s · XMANSX",

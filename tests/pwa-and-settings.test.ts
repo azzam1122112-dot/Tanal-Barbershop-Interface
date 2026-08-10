@@ -45,9 +45,10 @@ describe("pwa and settings polish", () => {
     createdServiceIds.push(serviceId);
     const customer = await prisma.customer.create({
       data: {
+        organizationId: "org_default",
         name: "عميل ملخص الحلاق",
         phone: randomSaudiPhone(),
-        loyaltyAccount: { create: { points: 0, lifetimeEarned: 0 } },
+        loyaltyAccount: { create: { organizationId: "org_default", points: 0, lifetimeEarned: 0 } },
       },
     });
     customerId = customer.id;
@@ -138,6 +139,8 @@ describe("pwa and settings polish", () => {
 async function createVisit(paymentMethod: "CASH" | "NETWORK", amount: number) {
   return prisma.visit.create({
     data: {
+      organizationId: "org_default",
+      salonId: "salon_default",
       customerId,
       barberId,
       grossAmount: amount,

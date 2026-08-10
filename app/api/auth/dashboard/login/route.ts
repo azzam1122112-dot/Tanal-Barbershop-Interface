@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   }
 
   const email = parsed.data.email;
-  const rateKey = `dashboard:${email}`;
+  const rateKey = `dashboard:${email}:${meta.ipAddress ?? "unknown"}`;
   const rate = await consumeRateLimit(prisma, rateKey);
   if (rate.limited) {
     await writeAuditLog({
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
       email,
       isActive: true,
       role: { in: [...ADMIN_LOGIN_ROLES] },
-      organizationId: scopedOrganizationId ? scopedOrganizationId : { not: null },
+      organizationId: scopedOrganizationId,
       organization: { status: "ACTIVE" },
     },
     include: { organization: { select: { id: true, name: true } } },
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
   const resolution = await resolveLoginIdentity(
     candidates,
     (candidate) => verifyAdminPassword(parsed.data.password, candidate.passwordHash),
-    (candidate) => (candidate.organization ? { id: candidate.organization.id, name: candidate.organization.name } : null),
+    (candidate) => ({ id: candidate.organization.id, name: candidate.organization.name }),
   );
 
   if (resolution.outcome === "NEEDS_CHOICE") {

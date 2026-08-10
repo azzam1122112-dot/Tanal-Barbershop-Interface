@@ -29,6 +29,11 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     return NextResponse.json({ message: "الموظف غير موجود" }, { status: 404 });
   }
 
+  // حساب المالك هو جذر المنشأة ولا يجوز لمدير أدنى تعديل بيانات دخوله أو دوره.
+  if (before.role === "OWNER") {
+    return NextResponse.json({ message: "لا يمكن تعديل حساب مالك المؤسسة من إدارة الموظفين" }, { status: 403 });
+  }
+
   if (id === session.user.id && (parsed.data.role === "SUPERVISOR" || parsed.data.isActive === false)) {
     return NextResponse.json({ message: "لا يمكن تغيير صلاحيتك أو تعطيل حسابك الحالي" }, { status: 400 });
   }
@@ -66,6 +71,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   }
 
   const { password, salonIds, ...profileData } = parsed.data;
+  const mustRevokeSessions = Boolean(
+    password ||
+      (parsed.data.role && parsed.data.role !== before.role) ||
+      (parsed.data.isActive !== undefined && parsed.data.isActive !== before.isActive) ||
+      (parsed.data.email && parsed.data.email !== before.email) ||
+      (parsed.data.phone && parsed.data.phone !== before.phone),
+  );
   const data: Prisma.UserUpdateInput = {
     ...profileData,
     ...(password ? { passwordHash: await hashAdminPassword(password) } : {}),
@@ -85,7 +97,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const willHaveNone = salonIdsToSet !== null && salonIdsToSet.length === 0;
     const becomingSupervisorWithoutSalons = before.role !== "SUPERVISOR" && (salonIdsToSet === null || salonIdsToSet.length === 0);
     if (willHaveNone || becomingSupervisorWithoutSalons) {
-      return NextResponse.json({ message: "اختر فرعًا واحدًا على الأقل للمشرف" }, { status: 400 });
+      return NextResponse.json({ message: "اختر فرعًا واحدًا على الأقل لمدير الفرع" }, { status: 400 });
     }
   } else {
     // مدير/مالك على كل الفروع: امسح أي إسناد سابق.
@@ -97,6 +109,12 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       const updated = await tx.user.update({ where: { id }, data });
       if (salonIdsToSet !== null) {
         await replaceStaffSalonAssignments(tx, session.organizationId, updated.id, salonIdsToSet);
+      }
+      if (mustRevokeSessions) {
+        await tx.session.updateMany({
+          where: { userId: updated.id, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
       }
       return tx.user.findUniqueOrThrow({ where: { id: updated.id }, include: staffWithSalonsInclude });
     });

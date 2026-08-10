@@ -6,12 +6,8 @@ import { dashboardScope } from "@/lib/auth/salon-scope";
 import { getRequestSession } from "@/lib/auth/http";
 import { prisma } from "@/lib/db/prisma";
 import {
-  getBarberPerformanceReport,
-  getCustomerReport,
-  getDiscountReport,
+  getDashboardReportsBundle,
   getPresetRange,
-  getRevenueReport,
-  getServiceReport,
   type ReportFilters,
 } from "@/lib/reports/dashboard-reports";
 
@@ -36,14 +32,11 @@ export default async function DashboardReportsPage({
     paymentMethod: params.paymentMethod === "CASH" || params.paymentMethod === "NETWORK" ? params.paymentMethod : undefined,
   };
 
-  const [barbers, revenue, barberPerformance, services, customers, discounts] = await Promise.all([
+  const [barbers, reports] = await Promise.all([
     prisma.barber.findMany({ where: { ...orgWhere, ...salonWhere }, orderBy: { name: "asc" } }),
-    getRevenueReport(prisma, filters),
-    getBarberPerformanceReport(prisma, filters),
-    getServiceReport(prisma, filters),
-    getCustomerReport(prisma, filters),
-    getDiscountReport(prisma, filters),
+    getDashboardReportsBundle(prisma, filters),
   ]);
+  const { revenue, barberPerformance, services, customers, discounts } = reports;
 
   return (
     <DashboardShell title="التقارير المالية والتشغيلية" description="قراءة واضحة للدخل، الأداء، الخصومات، العملاء، وحركة الخدمات حسب الفترة والحلاق وطريقة الدفع.">

@@ -1,7 +1,8 @@
-import type { AppointmentStatus, Prisma, PrismaClient } from "@prisma/client";
+import { Prisma, type AppointmentStatus, type PrismaClient } from "@prisma/client";
 import { BusinessError } from "@/lib/errors";
 import { normalizeSaudiPhone } from "@/lib/phone/saudi-phone";
 import { sendBarberAppointmentPush } from "@/lib/push/barber-push";
+import { nextBookingDisciplineState } from "@/lib/appointments/booking-discipline";
 
 type AppointmentPrisma = PrismaClient | Prisma.TransactionClient;
 
@@ -49,54 +50,57 @@ export async function createAppointment(
   const name = input.customerName.trim();
   if (!name) throw new BusinessError("اسم العميل مطلوب");
 
-  const salon = await prisma.salon.findFirst({
-    where: { id: input.salonId, organizationId: input.organizationId, isActive: true },
-    select: { id: true },
-  });
-  if (!salon) throw new BusinessError("الفرع غير موجود", 404);
-
-  if (input.barberId) {
-    const barber = await prisma.barber.findFirst({
-      where: { id: input.barberId, organizationId: input.organizationId, salonId: input.salonId, isActive: true },
+  const appointment = await runSerializableAppointmentTransaction(prisma, async (tx) => {
+    const salon = await tx.salon.findFirst({
+      where: { id: input.salonId, organizationId: input.organizationId, isActive: true },
       select: { id: true },
     });
-    if (!barber) throw new BusinessError("الحلاق غير موجود في هذا الفرع", 404);
-    await assertNoOverlap(prisma, { barberId: input.barberId, startAt, durationMinutes });
-  }
+    if (!salon) throw new BusinessError("الفرع غير موجود", 404);
 
-  // نربط الموعد بعميل قائم إن وُجد بنفس الجوال، دون إنشاء عميل جديد قبل الزيارة.
-  const existingCustomer = await prisma.customer.findFirst({
-    where: { organizationId: input.organizationId, phone },
-    select: { id: true },
-  });
+    if (input.barberId) {
+      const barber = await tx.barber.findFirst({
+        where: { id: input.barberId, organizationId: input.organizationId, salonId: input.salonId, isActive: true },
+        select: { id: true },
+      });
+      if (!barber) throw new BusinessError("الحلاق غير موجود في هذا الفرع", 404);
+      await assertNoOverlap(tx, { barberId: input.barberId, startAt, durationMinutes });
+    }
 
-  const appointment = await prisma.appointment.create({
-    data: {
-      organizationId: input.organizationId,
-      salonId: input.salonId,
-      barberId: input.barberId ?? null,
-      customerId: existingCustomer?.id ?? null,
-      customerName: name,
-      customerPhone: phone,
-      startAt,
-      durationMinutes,
-      notes: input.notes?.trim() || null,
-      source: input.source ?? "STAFF",
-    },
-    include: appointmentInclude,
-  });
+    // نربط الموعد بعميل قائم إن وُجد بنفس الجوال، دون إنشاء عميل جديد قبل الزيارة.
+    const existingCustomer = await tx.customer.findFirst({
+      where: { organizationId: input.organizationId, phone },
+      select: { id: true },
+    });
 
-  await prisma.auditLog.create({
-    data: {
-      organizationId: input.organizationId,
-      salonId: input.salonId,
-      actorType: input.actorType ?? "ADMIN",
-      actorUserId: input.actorUserId ?? null,
-      action: "appointment.created",
-      entityType: "Appointment",
-      entityId: appointment.id,
-      after: { startAt: startAt.toISOString(), barberId: input.barberId ?? null, customerPhone: phone },
-    },
+    const created = await tx.appointment.create({
+      data: {
+        organizationId: input.organizationId,
+        salonId: input.salonId,
+        barberId: input.barberId ?? null,
+        customerId: existingCustomer?.id ?? null,
+        customerName: name,
+        customerPhone: phone,
+        startAt,
+        durationMinutes,
+        notes: input.notes?.trim() || null,
+        source: input.source ?? "STAFF",
+      },
+      include: appointmentInclude,
+    });
+
+    await tx.auditLog.create({
+      data: {
+        organizationId: input.organizationId,
+        salonId: input.salonId,
+        actorType: input.actorType ?? "ADMIN",
+        actorUserId: input.actorUserId ?? null,
+        action: "appointment.created",
+        entityType: "Appointment",
+        entityId: created.id,
+        after: { startAt: startAt.toISOString(), barberId: input.barberId ?? null, customerPhone: phone },
+      },
+    });
+    return created;
   });
 
   // فشل مزود Push لا يلغي الحجز: دالة الإرسال تعزل أخطاء كل جهاز وتعيد ملخصًا.
@@ -109,6 +113,25 @@ export async function createAppointment(
   });
 
   return toAppointmentRow(appointment);
+}
+
+async function runSerializableAppointmentTransaction<T>(
+  prisma: PrismaClient,
+  callback: (tx: Prisma.TransactionClient) => Promise<T>,
+) {
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await prisma.$transaction(callback, {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      });
+    } catch (error) {
+      const retryable = error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034";
+      if (!retryable || attempt === maxAttempts) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 25 * attempt));
+    }
+  }
+  throw new BusinessError("تعذر حجز الموعد بعد عدة محاولات");
 }
 
 /** يمنع حجز موعدين متداخلين لنفس الحلاق — أكثر خطأ يقع في دفاتر المواعيد اليدوية. */
@@ -182,6 +205,8 @@ export async function updateAppointmentStatus(
   scope: {
     organizationId: string;
     salonIds?: string[] | null;
+    barberId?: string | null;
+    allowedCurrentStatuses?: AppointmentStatus[];
     actorUserId?: string | null;
     actorBarberId?: string | null;
     actorType?: "OWNER" | "ADMIN" | "SUPERVISOR" | "BARBER";
@@ -193,6 +218,8 @@ export async function updateAppointmentStatus(
       id: appointmentId,
       organizationId: scope.organizationId,
       ...(scope.salonIds && scope.salonIds.length > 0 ? { salonId: { in: scope.salonIds } } : {}),
+      ...(scope.barberId ? { barberId: scope.barberId } : {}),
+      ...(scope.allowedCurrentStatuses ? { status: { in: scope.allowedCurrentStatuses } } : {}),
     },
   });
   if (!appointment) throw new BusinessError("الموعد غير موجود", 404);
@@ -204,30 +231,76 @@ export async function updateAppointmentStatus(
     throw new BusinessError("يكتمل الموعد تلقائيًا عند تسجيل زيارته", 409);
   }
 
-  const updated = await prisma.appointment.update({
-    where: { id: appointment.id },
-    data: {
-      status,
-      ...(status === "CANCELLED"
-        ? { cancelledAt: new Date(), cancelReason: scope.reason?.trim() || null }
-        : { cancelledAt: null, cancelReason: null }),
-    },
-    include: appointmentInclude,
-  });
+  const updated = await prisma.$transaction(async (tx) => {
+    let disciplineAfter: ReturnType<typeof nextBookingDisciplineState> = null;
 
-  await prisma.auditLog.create({
-    data: {
-      organizationId: scope.organizationId,
-      salonId: appointment.salonId,
-      actorType: scope.actorType ?? "ADMIN",
-      actorUserId: scope.actorUserId ?? null,
-      actorBarberId: scope.actorBarberId ?? null,
-      action: "appointment.status_changed",
-      entityType: "Appointment",
-      entityId: appointment.id,
-      before: { status: appointment.status },
-      after: { status, reason: scope.reason ?? null },
-    },
+    // Claim the status transition atomically so concurrent requests cannot
+    // count the same no-show more than once.
+    const claimed = await tx.appointment.updateMany({
+      where: { id: appointment.id, status: appointment.status },
+      data: {
+        status,
+        ...(status === "CANCELLED"
+          ? { cancelledAt: new Date(), cancelReason: scope.reason?.trim() || null }
+          : { cancelledAt: null, cancelReason: null }),
+      },
+    });
+
+    if (claimed.count === 0) {
+      return tx.appointment.findUniqueOrThrow({
+        where: { id: appointment.id },
+        include: appointmentInclude,
+      });
+    }
+
+    if (appointment.customerId && appointment.status !== status) {
+      const customer = await tx.customer.findFirst({
+        where: { id: appointment.customerId, organizationId: scope.organizationId },
+        select: {
+          id: true,
+          bookingNoShowCount: true,
+          bookingBlockedAt: true,
+          bookingBlockReason: true,
+        },
+      });
+      if (customer) {
+        disciplineAfter = nextBookingDisciplineState(customer, appointment.status, status);
+        if (disciplineAfter) {
+          await tx.customer.update({ where: { id: customer.id }, data: disciplineAfter });
+        }
+      }
+    }
+
+    const changed = await tx.appointment.findUniqueOrThrow({
+      where: { id: appointment.id },
+      include: appointmentInclude,
+    });
+
+    await tx.auditLog.create({
+      data: {
+        organizationId: scope.organizationId,
+        salonId: appointment.salonId,
+        actorType: scope.actorType ?? "ADMIN",
+        actorUserId: scope.actorUserId ?? null,
+        actorBarberId: scope.actorBarberId ?? null,
+        action: "appointment.status_changed",
+        entityType: "Appointment",
+        entityId: appointment.id,
+        before: { status: appointment.status },
+        after: {
+          status,
+          reason: scope.reason ?? null,
+          ...(disciplineAfter
+            ? {
+                bookingNoShowCount: disciplineAfter.bookingNoShowCount,
+                bookingBlocked: Boolean(disciplineAfter.bookingBlockedAt),
+              }
+            : {}),
+        },
+      },
+    });
+
+    return changed;
   });
 
   return toAppointmentRow(updated);

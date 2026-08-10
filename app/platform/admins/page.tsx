@@ -4,10 +4,12 @@ import { PlatformAdmins } from "@/components/platform/platform-admins";
 import { prisma } from "@/lib/db/prisma";
 import { getRequestSession } from "@/lib/auth/http";
 import { listPlatformAdmins } from "@/lib/platform/platform-admin-service";
+import { canAccessPlatform } from "@/lib/auth/access";
 
 export default async function PlatformAdminsPage() {
   const session = await getRequestSession();
-  if (!session || session.type !== "platform") redirect("/platform/login");
+  if (session?.type === "platform" && session.mfaSetupRequired) redirect("/platform/mfa-setup");
+  if (!canAccessPlatform(session)) redirect("/platform/login");
 
   const admins = await listPlatformAdmins(prisma);
 

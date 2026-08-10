@@ -27,6 +27,8 @@ export type AuthSession =
   | {
       type: "platform";
       id: string;
+      mfaVerified: boolean;
+      mfaSetupRequired: boolean;
       admin: { id: string; name: string; email: string };
     };
 
@@ -49,6 +51,8 @@ export async function createStoredSession({
   activeSalonId,
   userAgent,
   ipAddress,
+  mfaVerifiedAt,
+  mfaSetupOnly,
 }: {
   prisma: PrismaClient;
   actorType: AuditActorType;
@@ -58,6 +62,8 @@ export async function createStoredSession({
   activeSalonId?: string | null;
   userAgent?: string | null;
   ipAddress?: string | null;
+  mfaVerifiedAt?: Date | null;
+  mfaSetupOnly?: boolean;
 }) {
   const token = createSessionToken();
   const tokenHash = hashSessionToken(token);
@@ -76,6 +82,8 @@ export async function createStoredSession({
       expiresAt: getSessionExpiresAt(),
       userAgent,
       ipAddress,
+      mfaVerifiedAt: mfaVerifiedAt ?? null,
+      mfaSetupOnly: mfaSetupOnly ?? false,
     },
   });
 
@@ -116,25 +124,26 @@ export async function getAuthSession(prisma: PrismaClient, token?: string | null
     return {
       type: "platform",
       id: session.id,
+      mfaVerified: Boolean(session.mfaVerifiedAt && session.platformAdmin.mfaEnabledAt && !session.mfaSetupOnly),
+      mfaSetupRequired: !session.platformAdmin.mfaEnabledAt && session.mfaSetupOnly,
       admin: { id: session.platformAdmin.id, name: session.platformAdmin.name, email: session.platformAdmin.email },
     } satisfies AuthSession;
   }
 
-  // امنع وصول مستأجري مؤسسة موقوفة.
-  if (session.organization && session.organization.status === "SUSPENDED") {
-    return null;
-  }
+  if (session.user && session.user.isActive) {
+    const liveRole = session.user.role;
+    if (liveRole !== "OWNER" && liveRole !== "ADMIN" && liveRole !== "SUPERVISOR") return null;
 
-  if (
-    session.user &&
-    session.user.isActive &&
-    (session.role === "OWNER" || session.role === "ADMIN" || session.role === "SUPERVISOR")
-  ) {
-    const organizationId = session.organizationId ?? session.user.organizationId;
-    if (!organizationId) return null;
+    const organizationId = session.user.organizationId;
+    if (!organizationId || (session.organizationId && session.organizationId !== organizationId)) return null;
+    const organization =
+      session.organizationId === organizationId
+        ? session.organization
+        : await prisma.organization.findUnique({ where: { id: organizationId }, select: { status: true } });
+    if (!organization || organization.status === "SUSPENDED") return null;
 
     // المالك والمدير على مستوى المؤسسة (كل الفروع). المشرف مقيّد بفروعه المسندة فقط.
-    if (session.role === "SUPERVISOR") {
+    if (liveRole === "SUPERVISOR") {
       const assignments = await prisma.staffSalon.findMany({
         where: { userId: session.user.id, salon: { isActive: true, organizationId } },
         select: { salonId: true },
@@ -149,7 +158,7 @@ export async function getAuthSession(prisma: PrismaClient, token?: string | null
       return {
         type: "dashboard",
         id: session.id,
-        role: session.role,
+        role: liveRole,
         organizationId,
         salonId,
         scopedSalonIds,
@@ -157,21 +166,32 @@ export async function getAuthSession(prisma: PrismaClient, token?: string | null
       } satisfies AuthSession;
     }
 
+    const activeSalon = session.activeSalonId
+      ? await prisma.salon.findFirst({
+          where: { id: session.activeSalonId, organizationId, isActive: true },
+          select: { id: true },
+        })
+      : null;
     return {
       type: "dashboard",
       id: session.id,
-      role: session.role,
+      role: liveRole,
       organizationId,
-      salonId: session.activeSalonId ?? null,
+      salonId: activeSalon?.id ?? null,
       scopedSalonIds: null,
       user: toSafeAdminUser(session.user),
     } satisfies AuthSession;
   }
 
   if (session.barber && session.barber.isActive && session.role === "BARBER") {
-    const organizationId = session.organizationId ?? session.barber.organizationId;
-    const salonId = session.activeSalonId ?? session.barber.salonId;
-    if (!organizationId || !salonId) return null;
+    const organizationId = session.barber.organizationId;
+    const salonId = session.barber.salonId;
+    if (!organizationId || !salonId || (session.organizationId && session.organizationId !== organizationId)) return null;
+    const salon = await prisma.salon.findFirst({
+      where: { id: salonId, organizationId, isActive: true },
+      select: { id: true, organization: { select: { status: true } } },
+    });
+    if (!salon || salon.organization.status === "SUSPENDED") return null;
     return {
       type: "barber",
       id: session.id,

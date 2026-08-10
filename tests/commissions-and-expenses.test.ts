@@ -68,6 +68,23 @@ describe("عمولة الحلاق", () => {
     expect(result.totalCommission).toBe(0);
   });
 
+  it("لا تحتسب أي عمولة عند تعطيلها للحلاق حتى مع وجود نسب للخدمة والفرع", () => {
+    const result = calculateVisitCommission({
+      lines: [
+        { serviceId: "s1", lineTotal: 60, serviceRate: 40 },
+        { serviceId: "s2", lineTotal: 40 },
+      ],
+      commissionBase: 100,
+      enabled: false,
+      barberRate: 25,
+      defaultRate: 10,
+    });
+
+    expect(result.totalCommission).toBe(0);
+    expect(result.lines.map((line) => line.commissionRate)).toEqual([0, 0]);
+    expect(result.lines.map((line) => line.commissionAmount)).toEqual([0, 0]);
+  });
+
   it("توزّع بالتساوي عند خدمات بقيمة صفر بدل القسمة على صفر", () => {
     const result = calculateVisitCommission({
       lines: [

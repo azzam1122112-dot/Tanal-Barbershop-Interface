@@ -24,6 +24,8 @@ export type SafeBarber = {
   createdAt?: string;
   updatedAt?: string;
   lastLoginAt?: string | null;
+  /** هل حساب العمولة وعرض مستحقاتها مفعّلان لهذا الحلاق؟ */
+  commissionEnabled?: boolean;
   /** نسبة العمولة %، أو null لاستخدام النسبة الافتراضية للفرع. */
   commissionRate?: number | null;
   workScheduleEnabled?: boolean;
@@ -71,6 +73,7 @@ export function toSafeBarber(barber: Barber, includeManagementFields = false): S
     safeBarber.createdAt = barber.createdAt.toISOString();
     safeBarber.updatedAt = barber.updatedAt.toISOString();
     safeBarber.lastLoginAt = barber.lastLoginAt?.toISOString() ?? null;
+    safeBarber.commissionEnabled = barber.commissionEnabled;
     safeBarber.commissionRate = barber.commissionRate == null ? null : Number(barber.commissionRate);
     safeBarber.workScheduleEnabled = barber.workScheduleEnabled;
     safeBarber.workStartMinute = barber.workStartMinute;

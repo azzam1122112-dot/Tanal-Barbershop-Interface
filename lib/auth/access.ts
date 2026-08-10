@@ -1,6 +1,6 @@
 import type { AuthSession } from "./session";
 
-export function canAccessDashboard(session: AuthSession | null) {
+export function canAccessDashboard(session: AuthSession | null): session is Extract<AuthSession, { type: "dashboard" }> {
   return session?.type === "dashboard" && (session.role === "OWNER" || session.role === "ADMIN" || session.role === "SUPERVISOR");
 }
 
@@ -13,11 +13,11 @@ export function canManageOrganization(session: AuthSession | null) {
 }
 
 /**
- * تشغيل برنامج الولاء: صرف مكافآت المدير، تشغيل الحملات، رسائل واتساب، متابعة العملاء.
- * المشرف مسؤول عن هذا داخل فروعه المسندة.
+ * تشغيل برنامج الولاء والحملات والرسائل يغيّر بيانات المؤسسة ويتواصل مع العملاء؛
+ * لذلك يقتصر صراحة على المالك والمدير. المشرف تشغيلي داخل فروعه فقط.
  */
 export function canOperateLoyalty(session: AuthSession | null) {
-  return canAccessDashboard(session);
+  return canManageStaff(session);
 }
 
 /**
@@ -42,6 +42,10 @@ export function canAccessBarberApp(session: AuthSession | null) {
   return session?.type === "barber" && session.role === "BARBER";
 }
 
-export function canAccessPlatform(session: AuthSession | null) {
-  return session?.type === "platform";
+export function canAccessPlatform(session: AuthSession | null): session is Extract<AuthSession, { type: "platform" }> {
+  return session?.type === "platform" && session.mfaVerified;
+}
+
+export function canSetupPlatformMfa(session: AuthSession | null): session is Extract<AuthSession, { type: "platform" }> {
+  return session?.type === "platform" && session.mfaSetupRequired;
 }

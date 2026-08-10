@@ -1,4 +1,5 @@
 import type { PaymentMethod, Prisma, PrismaClient } from "@prisma/client";
+import { getCachedJson, redisKey, setCachedJson } from "@/lib/cache/redis";
 
 type ReportPrisma = PrismaClient | Prisma.TransactionClient;
 
@@ -67,8 +68,21 @@ export function normalizeReportFilters(filters: ReportFilters = {}) {
 
 export async function getDashboardSummary(prisma: ReportPrisma, organizationId?: string, salonIds?: string[] | null, now = new Date()) {
   const range = getTodayRange(now);
+  const cacheKey = organizationId
+    ? redisKey("dashboard", "summary", organizationId, scopeCachePart(salonIds), range.from.toISOString().slice(0, 10))
+    : null;
+  if (cacheKey) {
+    const cached = await getCachedJson<Awaited<ReturnType<typeof buildDashboardSummary>>>(cacheKey);
+    if (cached) return cached;
+  }
   const normalized = normalizeReportFilters({ ...range, organizationId, salonIds });
   const visits = await getVisitsForReport(prisma, normalized);
+  const summary = buildDashboardSummary(visits, range);
+  if (cacheKey) await setCachedJson(cacheKey, summary, dashboardCacheTtl());
+  return summary;
+}
+
+function buildDashboardSummary(visits: VisitForReport[], range: { from: Date; to: Date }) {
   const revenue = buildRevenueSummary(visits, range);
   const barberRows = buildBarberPerformance(visits, range);
   const services = buildServiceReport(visits);
@@ -110,6 +124,27 @@ export async function getDiscountReport(prisma: ReportPrisma, filters: ReportFil
   const normalized = normalizeReportFilters(filters);
   const visits = await getVisitsForReport(prisma, normalized);
   return buildDiscountSummary(visits);
+}
+
+/**
+ * تقرير الصفحة الكامل من لقطة بيانات واحدة. سابقًا كانت الصفحة تستدعي خمس
+ * دوال، وكل واحدة تجلب الزيارات وعلاقاتها نفسها من PostgreSQL؛ أي خمسة أضعاف
+ * القراءة والذاكرة بلا فائدة.
+ */
+export async function getDashboardReportsBundle(prisma: ReportPrisma, filters: ReportFilters = {}) {
+  const normalized = normalizeReportFilters(filters);
+  const [visits, inactiveCustomers] = await Promise.all([
+    getVisitsForReport(prisma, normalized),
+    buildInactiveCustomers(prisma, normalized.organizationId),
+  ]);
+
+  return {
+    revenue: buildRevenueSummary(visits, normalized),
+    barberPerformance: buildBarberPerformance(visits, normalized),
+    services: buildServiceReport(visits),
+    customers: { topCustomers: buildTopCustomers(visits), inactiveCustomers },
+    discounts: buildDiscountSummary(visits),
+  };
 }
 
 async function getVisitsForReport(prisma: ReportPrisma, filters: ReturnType<typeof normalizeReportFilters>) {
@@ -312,4 +347,13 @@ function sum(values: number[]) {
 
 function roundMoney(value: number) {
   return Math.round(value * 100) / 100;
+}
+
+function scopeCachePart(salonIds?: string[] | null) {
+  return salonIds && salonIds.length > 0 ? [...salonIds].sort().join(",") : "all";
+}
+
+function dashboardCacheTtl() {
+  const configured = Number(process.env.DASHBOARD_CACHE_TTL_SECONDS);
+  return Number.isFinite(configured) ? Math.min(60, Math.max(2, Math.trunc(configured))) : 10;
 }

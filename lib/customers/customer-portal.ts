@@ -3,29 +3,50 @@ import type { PrismaClient } from "@prisma/client";
 import { BusinessError } from "@/lib/errors";
 import { getEffectiveSettings } from "@/lib/settings/system-settings";
 import { listBookableSalons, listCustomerAppointments } from "@/lib/appointments/customer-booking";
+import { toCustomerBookingPolicy } from "@/lib/appointments/booking-discipline";
 
 /**
  * بوابة العميل: رابط سرّي يعرض للعميل رصيد نقاطه ومكافأته القادمة وسجل زياراته.
  *
- * الرمز نفسه هو السر (نمط magic link) — لا يكشف إلا بيانات هذا العميل،
- * وقابل للتدوير من لوحة الإدارة إن تسرّب الرابط.
+ * الرمز نفسه هو السر (نمط magic link). لا نخزنه بصورته الأصلية، بل SHA-256 فقط،
+ * وله عمر قصير قابل للضبط (30 يومًا افتراضيًا، 90 كحد أقصى).
  */
 export function generatePortalToken() {
-  return crypto.randomBytes(24).toString("base64url");
+  return crypto.randomBytes(32).toString("base64url");
 }
 
-/** يعيد رمز العميل، ويولّده عند أول طلب. */
+export function hashPortalToken(token: string) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+function portalTokenExpiresAt(now = new Date()) {
+  const configured = Number.parseInt(process.env.PORTAL_TOKEN_TTL_DAYS ?? "30", 10);
+  const days = Number.isFinite(configured) ? Math.min(90, Math.max(1, configured)) : 30;
+  return new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+}
+
+async function issuePortalToken(prisma: PrismaClient, customerId: string) {
+  const portalToken = generatePortalToken();
+  const issuedAt = new Date();
+  await prisma.customer.update({
+    where: { id: customerId },
+    data: {
+      portalTokenHash: hashPortalToken(portalToken),
+      portalTokenIssuedAt: issuedAt,
+      portalTokenExpiresAt: portalTokenExpiresAt(issuedAt),
+    },
+  });
+  return portalToken;
+}
+
+/** يصدر رابطًا جديدًا؛ لا يمكن إعادة عرض الرمز القديم لأن قاعدة البيانات لا تحفظه. */
 export async function ensurePortalToken(prisma: PrismaClient, customerId: string, organizationId: string) {
   const customer = await prisma.customer.findFirst({
     where: { id: customerId, organizationId },
-    select: { id: true, portalToken: true },
+    select: { id: true },
   });
   if (!customer) throw new BusinessError("العميل غير موجود", 404);
-  if (customer.portalToken) return customer.portalToken;
-
-  const portalToken = generatePortalToken();
-  await prisma.customer.update({ where: { id: customer.id }, data: { portalToken } });
-  return portalToken;
+  return issuePortalToken(prisma, customer.id);
 }
 
 /** يبطل الرابط القديم ويصدر رمزًا جديدًا. */
@@ -36,9 +57,7 @@ export async function rotatePortalToken(prisma: PrismaClient, customerId: string
   });
   if (!customer) throw new BusinessError("العميل غير موجود", 404);
 
-  const portalToken = generatePortalToken();
-  await prisma.customer.update({ where: { id: customer.id }, data: { portalToken } });
-  return portalToken;
+  return issuePortalToken(prisma, customer.id);
 }
 
 /**
@@ -52,17 +71,18 @@ export async function resolveCustomerByPortalToken(prisma: PrismaClient, token: 
   if (!token || token.length < 16) return null;
 
   const customer = await prisma.customer.findUnique({
-    where: { portalToken: token },
+    where: { portalTokenHash: hashPortalToken(token) },
     select: {
       id: true,
       name: true,
       phone: true,
       organizationId: true,
+      portalTokenExpiresAt: true,
       organization: { select: { id: true, status: true } },
     },
   });
 
-  if (!customer || !customer.organizationId) return null;
+  if (!customer || !customer.portalTokenExpiresAt || customer.portalTokenExpiresAt <= new Date()) return null;
   if (customer.organization?.status === "SUSPENDED") return null;
 
   return {
@@ -80,7 +100,7 @@ export async function getCustomerPortalView(prisma: PrismaClient, token: string)
   if (!token || token.length < 16) return null;
 
   const customer = await prisma.customer.findUnique({
-    where: { portalToken: token },
+    where: { portalTokenHash: hashPortalToken(token) },
     include: {
       loyaltyAccount: true,
       organization: { select: { id: true, name: true, status: true } },
@@ -94,10 +114,15 @@ export async function getCustomerPortalView(prisma: PrismaClient, token: string)
         where: { redeemedAt: null, revokedAt: null },
         orderBy: { createdAt: "desc" },
       },
+      dataSubjectRequests: {
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        select: { id: true, type: true, status: true, createdAt: true },
+      },
     },
   });
 
-  if (!customer || !customer.organizationId) return null;
+  if (!customer || !customer.portalTokenExpiresAt || customer.portalTokenExpiresAt <= new Date()) return null;
   // مؤسسة موقوفة لا تعرض بوابة عملاء.
   if (customer.organization?.status === "SUSPENDED") return null;
 
@@ -150,6 +175,12 @@ export async function getCustomerPortalView(prisma: PrismaClient, token: string)
         discountAmount: Number(reward.discountAmount),
         expiresAt: reward.expiresAt?.toISOString() ?? null,
       })),
+    dataSubjectRequests: customer.dataSubjectRequests.map((request) => ({
+      id: request.id,
+      type: request.type,
+      status: request.status,
+      createdAt: request.createdAt.toISOString(),
+    })),
     recentVisits: customer.visits.map((visit) => ({
       id: visit.id,
       visitedAt: visit.visitedAt.toISOString(),
@@ -160,6 +191,8 @@ export async function getCustomerPortalView(prisma: PrismaClient, token: string)
     })),
     /** مواعيد العميل من أمس فصاعدًا — القادمة أولًا. */
     appointments,
+    /** سياسة عدم الحضور تُعرض قبل الحجز، والحظر نفسه مفروض مرة أخرى في الخادم. */
+    bookingPolicy: toCustomerBookingPolicy(customer),
     /** الفروع التي فعّلت الحجز الذاتي. فارغة = لا يُعرض قسم الحجز إطلاقًا. */
     bookableSalons,
   };

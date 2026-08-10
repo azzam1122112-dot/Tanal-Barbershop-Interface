@@ -223,6 +223,7 @@ async function createVisit({
   const campaignId = fixedCampaign || percentageCampaign
     ? await createCampaign(fixedCampaign ? "FIXED_AMOUNT" : "PERCENTAGE", fixedCampaign ?? percentageCampaign ?? 0)
     : undefined;
+  await prisma.service.update({ where: { id: serviceId }, data: { defaultPrice: grossAmount } });
   const result = await confirmVisit(prisma, {
       organizationId: "org_default",
       salonId: "salon_default",
@@ -254,6 +255,7 @@ async function createCustomer(name: string) {
 async function createCampaign(discountType: "FIXED_AMOUNT" | "PERCENTAGE", discountValue: number) {
   const campaign = await prisma.campaign.create({
     data: {
+      organizationId: "org_default",
       name: `حملة تصحيح ${discountType} ${Date.now()} ${Math.random()}`,
       discountType,
       discountValue,

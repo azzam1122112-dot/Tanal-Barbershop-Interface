@@ -35,7 +35,8 @@ describe("إعداد النشر", () => {
     const envExample = readFileSync(join(process.cwd(), ".env.example"), "utf8");
 
     expect(seed).toContain("REQUIRE_EXPLICIT_SEED_CREDENTIALS");
-    expect(seed).toContain("is required when REQUIRE_EXPLICIT_SEED_CREDENTIALS=true");
+    expect(seed).toContain('process.env.NODE_ENV === "production"');
+    expect(seed).toContain("must not use the demo value in production");
     expect(envExample).toContain("REQUIRE_EXPLICIT_SEED_CREDENTIALS");
   });
 
@@ -48,8 +49,34 @@ describe("إعداد النشر", () => {
     expect(healthRoute).toContain("Cache-Control");
   });
 
+  it("يوفّر readiness مستقلة تتحقق من PostgreSQL وRedis", () => {
+    const readinessPath = join(process.cwd(), "app", "api", "health", "readiness", "route.ts");
+    expect(existsSync(readinessPath)).toBe(true);
+    const readiness = readFileSync(readinessPath, "utf8");
+    expect(readiness).toContain("SELECT 1");
+    expect(readiness).toContain("pingRedis");
+    expect(readiness).toContain("REDIS_REQUIRED");
+  });
+
   it("لا يبقي أي ارتباط بمزوّد استضافة بعينه", () => {
     expect(existsSync(join(process.cwd(), "render.yaml"))).toBe(false);
     expect(JSON.stringify(packageJson.scripts)).not.toMatch(/render|vercel|heroku|netlify/i);
+  });
+
+  it("يشغّل حذف الحسابات غير النشطة وصيانة الخصوصية يوميًا", () => {
+    const service = readFileSync(join(process.cwd(), "deploy", "systemd", "xmansx-maintenance.service"), "utf8");
+    const timer = readFileSync(join(process.cwd(), "deploy", "systemd", "xmansx-maintenance.timer"), "utf8");
+    expect(service).toContain("npm run maintenance:cleanup");
+    expect(timer).toContain("OnCalendar=");
+    expect(timer).toContain("Persistent=true");
+  });
+
+  it("يحدد دورة حذف آمنة للنسخ الاحتياطية المشفرة", () => {
+    const backup = readFileSync(join(process.cwd(), "deploy", "backup", "xmansx-backup.sh"), "utf8");
+    const envExample = readFileSync(join(process.cwd(), ".env.example"), "utf8");
+    expect(backup).toContain('BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-30}"');
+    expect(backup).toContain("BACKUP_DIR must be an absolute non-root directory");
+    expect(backup).toContain("-name 'xmansx_*.dump.age'");
+    expect(envExample).toContain('BACKUP_RETENTION_DAYS="30"');
   });
 });

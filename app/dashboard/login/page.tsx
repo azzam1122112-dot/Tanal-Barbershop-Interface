@@ -62,17 +62,17 @@ export default function DashboardLoginPage() {
       <section className="relative mx-auto flex min-h-[calc(100vh-6rem)] max-w-md flex-col justify-center">
         <div className="mb-8">
           <BrandLogo className="animate-float mb-6 h-24 w-24 ring-1 ring-salon-gold/30" priority />
-          <p className="text-[11px] font-bold uppercase tracking-eyebrow text-salon-goldlight">XMANSX · لوحة الإدارة</p>
+          <p className="text-[11px] font-bold uppercase tracking-eyebrow text-salon-goldlight">XMANSX · المؤسسة والفروع</p>
           <h1 className="mt-3 text-4xl font-bold leading-tight tracking-tight">
             دخول <span className="text-gold-sheen">الإدارة</span>
           </h1>
-          <p className="mt-3 text-sm leading-7 text-white/60">تابع يومك التشغيلي، وأدِر الفريق والعملاء والتقارير من مكان واحد.</p>
+          <p className="mt-3 text-sm leading-7 text-white/60">دخول المالك ومدير المؤسسة ومدير الفرع؛ يفتح النظام تلقائيًا اللوحة والنطاق المطابقين لصلاحيتك.</p>
         </div>
         <form onSubmit={submit} className="sheen-overlay relative space-y-4 rounded-2xl border border-white/10 bg-white/95 p-6 text-salon-ink shadow-[0_40px_90px_-40px_rgba(0,0,0,0.75)] backdrop-blur">
           <span className="absolute inset-x-0 top-0 h-1 bg-royal-gold" aria-hidden="true" />
           {organizations.length > 0 ? (
             <label className="block text-sm font-semibold">
-              اختر صالونك
+              اختر مؤسستك
               <select
                 value={organizationId}
                 onChange={(event) => setOrganizationId(event.target.value)}

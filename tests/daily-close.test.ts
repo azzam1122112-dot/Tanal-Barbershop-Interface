@@ -103,6 +103,7 @@ describe("daily close and operation alerts", () => {
     rewardRuleId = (await prisma.rewardRule.findFirstOrThrow({ where: { requiredPoints: 500, isActive: true } })).id;
     const campaign = await prisma.campaign.create({
       data: {
+        organizationId: "org_default",
         name: `حملة إغلاق ${Date.now()}`,
         discountType: "FIXED_AMOUNT",
         discountValue: 20,
@@ -115,6 +116,7 @@ describe("daily close and operation alerts", () => {
     campaignId = campaign.id;
     createdCampaignIds.push(campaignId);
 
+    await prisma.service.update({ where: { id: serviceId }, data: { defaultPrice: 100 } });
     const cashVisit = await confirmVisit(prisma, {
       organizationId: "org_default",
       salonId: "salon_default",
@@ -125,6 +127,7 @@ describe("daily close and operation alerts", () => {
       paymentMethod: "CASH",
       idempotencyKey: `daily-cash-${Date.now()}`,
     });
+    await prisma.service.update({ where: { id: serviceId }, data: { defaultPrice: 80 } });
     const cardVisit = await confirmVisit(prisma, {
       organizationId: "org_default",
       salonId: "salon_default",
@@ -135,6 +138,7 @@ describe("daily close and operation alerts", () => {
       paymentMethod: "NETWORK",
       idempotencyKey: `daily-card-${Date.now()}`,
     });
+    await prisma.service.update({ where: { id: serviceId }, data: { defaultPrice: 70 } });
     const campaignVisit = await confirmVisit(prisma, {
       organizationId: "org_default",
       salonId: "salon_default",
@@ -157,6 +161,7 @@ describe("daily close and operation alerts", () => {
       rewardRuleId,
       idempotencyKey: `daily-reward-${Date.now()}`,
     });
+    await prisma.service.update({ where: { id: serviceId }, data: { defaultPrice: 120 } });
     const openCashVisit = await confirmVisit(prisma, {
       organizationId: "org_default",
       salonId: "salon_default",
@@ -167,6 +172,7 @@ describe("daily close and operation alerts", () => {
       paymentMethod: "CASH",
       idempotencyKey: `daily-open-cash-${Date.now()}`,
     });
+    await prisma.service.update({ where: { id: serviceId }, data: { defaultPrice: 70 } });
     const highDiscountVisit = await confirmVisit(prisma, {
       organizationId: "org_default",
       salonId: "salon_default",
@@ -252,6 +258,7 @@ describe("daily close and operation alerts", () => {
   });
 
   it("daily close remains a snapshot and does not block visits while a cash session is open", async () => {
+    await prisma.service.update({ where: { id: serviceId }, data: { defaultPrice: 50 } });
     const visit = await confirmVisit(prisma, {
       organizationId: "org_default",
       salonId: "salon_default",

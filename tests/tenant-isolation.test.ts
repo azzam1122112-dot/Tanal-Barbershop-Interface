@@ -63,7 +63,10 @@ describe("tenant isolation", () => {
   it("blocks an [id] write scoped to the wrong organization", async () => {
     const orgA = await makeOrg("e");
     const orgB = await makeOrg("f");
-    const admin = await prisma.user.findFirstOrThrow({ where: { role: "ADMIN", isActive: true } });
+    const admin = await prisma.user.create({ data: {
+      organizationId: orgA, name: "Tenant test admin", email: `tenant-${Date.now()}@example.test`,
+      phone: `9665${Date.now().toString().slice(-8)}`, passwordHash: "test-only", role: "ADMIN",
+    } });
 
     const a = await createCustomerWithLoyalty({ prisma, organizationId: orgA, name: "عميل هـ", phone: sharedPhone });
     customerIds.push(a.customer.id);

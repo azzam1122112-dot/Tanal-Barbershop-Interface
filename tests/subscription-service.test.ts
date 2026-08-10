@@ -40,6 +40,8 @@ describe("subscription plans", () => {
         maxCustomers: 50,
         sortOrder: -50,
         isActive: true,
+        isSignupDefault: true,
+        trialDays: 23,
       },
     });
     createdPlanIds.push(paidPlan.id, freePlan.id);
@@ -49,6 +51,7 @@ describe("subscription plans", () => {
       slug: unique("org-plan"),
       salonName: "الفرع الرئيسي",
       ownerName: "مالك الاختبار",
+      city: "الرياض",
       email: `${unique("owner")}@example.com`,
       phone: "0501234567",
       password: "StrongPass123!",
@@ -56,6 +59,9 @@ describe("subscription plans", () => {
     createdOrgIds.push(result.organization.id);
 
     expect(result.organization.planId).toBe(freePlan.id);
+    expect(result.organization.city).toBe("الرياض");
+    expect(result.trialDays).toBe(23);
+    expect(result.organization.trialEndsAt!.getTime()).toBeGreaterThan(Date.now() + 22 * 24 * 60 * 60 * 1000);
   });
 
   it("returns current plan usage and active upgrade plans for the dashboard", async () => {

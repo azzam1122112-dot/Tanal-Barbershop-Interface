@@ -9,6 +9,7 @@ import { toSafeBarber } from "@/lib/auth/sanitize";
 import { writeAuditLog } from "@/lib/audit/audit-log";
 import { BusinessError } from "@/lib/errors";
 import { toErrorResponse } from "@/lib/http/error-response";
+import { lockTenantQuota } from "@/lib/db/tenant-lock";
 
 export async function GET() {
   const auth = await requireBarberOversightApi();
@@ -38,50 +39,33 @@ export async function POST(request: Request) {
   }
 
   try {
-    const organization = await prisma.organization.findUnique({
-      where: { id: session.organizationId },
-      include: { plan: true, _count: { select: { barbers: true } } },
-    });
-    if (!organization) {
-      throw new BusinessError("المؤسسة غير موجودة");
-    }
-
-    const maxBarbers = organization.plan?.maxBarbers ?? null;
-    if (maxBarbers !== null && organization._count.barbers >= maxBarbers) {
-      throw new BusinessError(`باقتك تسمح بـ ${maxBarbers} حلاق. رقّ باقتك لإضافة حلاقين أكثر.`);
-    }
-
-    const salon = await prisma.salon.findFirst({
-      where: { id: parsed.data.salonId, organizationId: session.organizationId, isActive: true },
-      select: { id: true },
-    });
-    if (!salon) {
-      throw new BusinessError("الفرع غير موجود");
-    }
-
-    const barber = await prisma.barber.create({
-      data: {
-        organizationId: session.organizationId,
-        salonId: salon.id,
-        name: parsed.data.name,
-        phone: parsed.data.phone,
-        accessPinHash: await hashBarberPin(parsed.data.pin),
-        isActive: true,
-      },
-    });
-
+    const pinHash = await hashBarberPin(parsed.data.pin);
     const meta = await getRequestMeta();
-    await writeAuditLog({
-      prisma,
-      organizationId: session.organizationId,
-      actorType: session.role,
-      actorUserId: session.user.id,
-      action: "barber.created",
-      entityType: "Barber",
-      entityId: barber.id,
-      after: toSafeBarber(barber, true),
-      ...meta,
-    });
+    const barber = await prisma.$transaction(async (tx) => {
+      await lockTenantQuota(tx, session.organizationId, "barbers");
+      const organization = await tx.organization.findUnique({
+        where: { id: session.organizationId },
+        include: { plan: true, _count: { select: { barbers: true } } },
+      });
+      if (!organization) throw new BusinessError("المؤسسة غير موجودة");
+      const maxBarbers = organization.plan?.maxBarbers ?? null;
+      if (maxBarbers !== null && organization._count.barbers >= maxBarbers) {
+        throw new BusinessError(`باقتك تسمح بـ ${maxBarbers} حلاق. رقّ باقتك لإضافة حلاقين أكثر.`);
+      }
+      const salon = await tx.salon.findFirst({
+        where: { id: parsed.data.salonId, organizationId: session.organizationId, isActive: true }, select: { id: true },
+      });
+      if (!salon) throw new BusinessError("الفرع غير موجود");
+      const created = await tx.barber.create({ data: {
+        organizationId: session.organizationId, salonId: salon.id, name: parsed.data.name,
+        phone: parsed.data.phone, accessPinHash: pinHash, isActive: true,
+        commissionEnabled: parsed.data.commissionEnabled, commissionRate: parsed.data.commissionRate,
+      } });
+      await writeAuditLog({ prisma: tx, organizationId: session.organizationId, actorType: session.role,
+        actorUserId: session.user.id, action: "barber.created", entityType: "Barber", entityId: created.id,
+        after: toSafeBarber(created, true), ...meta });
+      return created;
+    }, { isolationLevel: "Serializable" });
 
     return NextResponse.json({ barber: toSafeBarber(barber, true) }, { status: 201 });
   } catch (error) {

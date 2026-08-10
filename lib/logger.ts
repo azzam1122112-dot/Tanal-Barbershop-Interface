@@ -15,9 +15,39 @@ function minLevel(): LogLevel {
 
 function serializeError(error: unknown) {
   if (error instanceof Error) {
-    return { name: error.name, message: error.message, stack: error.stack };
+    return {
+      name: error.name,
+      message: redactString(error.message),
+      ...(process.env.NODE_ENV === "production" ? {} : { stack: redactString(error.stack ?? "") }),
+    };
   }
-  return error;
+  return redactForLog(error);
+}
+
+const SENSITIVE_KEY = /(password|passphrase|secret|token|authorization|cookie|session|otp|pin|api[-_]?key|private[-_]?key)/i;
+
+export function redactForLog(value: unknown, depth = 0): unknown {
+  if (depth > 6) return "[TRUNCATED]";
+  if (typeof value === "string") return redactString(value);
+  if (typeof value !== "object" || value === null) return value;
+  if (value instanceof Date) return value.toISOString();
+  if (value instanceof Error) return serializeError(value);
+  if (Array.isArray(value)) return value.slice(0, 100).map((item) => redactForLog(item, depth + 1));
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).map(([key, item]) => [
+      key,
+      SENSITIVE_KEY.test(key) ? "[REDACTED]" : redactForLog(item, depth + 1),
+    ]),
+  );
+}
+
+function redactString(value: string) {
+  return value
+    .replace(/(bearer\s+)[a-z0-9._~+\/-]+/gi, "$1[REDACTED]")
+    .replace(/([a-z][a-z0-9+.-]*:\/\/)[^\s/@:]+:[^\s/@]+@/gi, "$1[REDACTED]@")
+    .replace(/([\w.+-])[\w.+-]*@([\w-]+\.[\w.-]+)/g, "$1***@$2")
+    .replace(/\b(?:\+?966|0)?5\d{8}\b/g, (phone) => `${phone.slice(0, 3)}***${phone.slice(-3)}`);
 }
 
 /**
@@ -34,7 +64,7 @@ function emit(level: LogLevel, message: string, context?: unknown) {
   };
 
   if (context !== undefined) {
-    payload.context = level === "error" ? serializeError(context) : context;
+    payload.context = level === "error" ? serializeError(context) : redactForLog(context);
   }
 
   const line = JSON.stringify(payload);

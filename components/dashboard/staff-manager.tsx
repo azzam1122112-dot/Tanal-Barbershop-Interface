@@ -81,7 +81,7 @@ export function StaffManager({ initialUsers, salons, currentUserId }: { initialU
     const form = new FormData(formElement);
 
     if (createRole === "SUPERVISOR" && createSalonIds.length === 0) {
-      setToast({ message: "اختر فرعًا واحدًا على الأقل للمشرف", tone: "error" });
+      setToast({ message: "اختر فرعًا واحدًا على الأقل لمدير الفرع", tone: "error" });
       setLoading(false);
       return;
     }
@@ -184,7 +184,7 @@ export function StaffManager({ initialUsers, salons, currentUserId }: { initialU
     // إسناد فروع المشرف: أرسلها عند التحويل لمشرف أو عند تغيّر الفروع.
     if (draft.role === "SUPERVISOR") {
       if (draft.salonIds.length === 0) {
-        setToast({ message: "اختر فرعًا واحدًا على الأقل للمشرف", tone: "error" });
+        setToast({ message: "اختر فرعًا واحدًا على الأقل لمدير الفرع", tone: "error" });
         return;
       }
       const currentSalonIds = (user.assignedSalons ?? []).map((salon) => salon.id);
@@ -246,8 +246,8 @@ export function StaffManager({ initialUsers, salons, currentUserId }: { initialU
       <DashboardToast toast={toast} onClose={() => setToast(null)} />
 
       <section className="grid gap-4 md:grid-cols-3">
-        <SummaryTile label="مدراء نشطون" value={adminCount} tone="ink" />
-        <SummaryTile label="مشرفون نشطون" value={supervisorCount} tone="forest" />
+        <SummaryTile label="مديرو مؤسسة نشطون" value={adminCount} tone="ink" />
+        <SummaryTile label="مديرو فروع نشطون" value={supervisorCount} tone="forest" />
         <SummaryTile label="حسابات معطلة" value={inactiveCount} tone="ruby" />
       </section>
 
@@ -286,14 +286,14 @@ export function StaffManager({ initialUsers, salons, currentUserId }: { initialU
                 onChange={(event) => setCreateRole(event.target.value as "ADMIN" | "SUPERVISOR")}
                 className="dashboard-field"
               >
-                <option value="SUPERVISOR">مشرف</option>
-                <option value="ADMIN">مدير النظام</option>
+                <option value="SUPERVISOR">مدير فرع</option>
+                <option value="ADMIN">مدير المؤسسة</option>
               </select>
             </Field>
             {createRole === "SUPERVISOR" ? (
-              <Field label="فروع الإشراف">
+              <Field label="الفروع المسندة">
                 <BranchPicker salons={salons} selected={createSalonIds} onChange={setCreateSalonIds} />
-                <span className="mt-1 block text-xs font-bold text-salon-charcoal/70">المشرف يتابع ويغلق صناديق هذه الفروع فقط.</span>
+                <span className="mt-1 block text-xs font-bold text-salon-charcoal/70">مدير الفرع يتابع التشغيل والصندوق داخل الفروع المسندة فقط.</span>
               </Field>
             ) : null}
             <Field label="كلمة المرور">
@@ -310,7 +310,7 @@ export function StaffManager({ initialUsers, salons, currentUserId }: { initialU
             <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <p className="text-xs font-bold text-salon-gold">الصلاحيات</p>
-                <h2 className="mt-2 text-2xl font-bold">مدراء النظام والمشرفون</h2>
+                <h2 className="mt-2 text-2xl font-bold">إدارة المؤسسة والفروع</h2>
               </div>
               <div className="grid gap-2 sm:grid-cols-[220px_1fr]">
                 <input
@@ -322,8 +322,8 @@ export function StaffManager({ initialUsers, salons, currentUserId }: { initialU
                 <div className="grid grid-cols-4 rounded-xl border border-salon-line bg-white p-1 text-xs font-bold">
                   {[
                     ["all", "الكل"],
-                    ["ADMIN", "مدير"],
-                    ["SUPERVISOR", "مشرف"],
+                    ["ADMIN", "مدير مؤسسة"],
+                    ["SUPERVISOR", "مدير فرع"],
                     ["inactive", "معطل"],
                   ].map(([value, label]) => (
                     <button
@@ -378,8 +378,8 @@ export function StaffManager({ initialUsers, salons, currentUserId }: { initialU
                             disabled={isCurrentUser}
                             className="dashboard-field py-2.5 disabled:bg-salon-mist"
                           >
-                            <option value="ADMIN">مدير النظام</option>
-                            <option value="SUPERVISOR">مشرف</option>
+                            <option value="ADMIN">مدير المؤسسة</option>
+                            <option value="SUPERVISOR">مدير فرع</option>
                           </select>
                         </Field>
                         <Field label="كلمة مرور جديدة">
@@ -405,7 +405,7 @@ export function StaffManager({ initialUsers, salons, currentUserId }: { initialU
                         </label>
                         {draft.role === "SUPERVISOR" ? (
                           <div className="md:col-span-2">
-                            <span className="mb-2 block text-xs font-bold text-salon-charcoal">فروع الإشراف</span>
+                            <span className="mb-2 block text-xs font-bold text-salon-charcoal">الفروع المسندة</span>
                             <BranchPicker salons={salons} selected={draft.salonIds} onChange={(ids) => updateDraft(user.id, { salonIds: ids })} />
                           </div>
                         ) : null}
@@ -427,7 +427,7 @@ export function StaffManager({ initialUsers, salons, currentUserId }: { initialU
                           <Info label="آخر تحديث" value={user.updatedAt ? dateFormatter.format(new Date(user.updatedAt)) : "-"} />
                           {user.role === "SUPERVISOR" ? (
                             <div className="md:col-span-2">
-                              <dt className="text-xs font-bold text-salon-charcoal/70">فروع الإشراف</dt>
+                              <dt className="text-xs font-bold text-salon-charcoal/70">الفروع المسندة</dt>
                               <dd className="mt-1.5 flex flex-wrap gap-1.5">
                                 {(user.assignedSalons ?? []).length === 0 ? (
                                   <span className="text-salon-ruby">لا توجد فروع مسندة</span>
@@ -448,8 +448,8 @@ export function StaffManager({ initialUsers, salons, currentUserId }: { initialU
                     <p className="text-xs font-bold text-salon-charcoal">صلاحية الوصول</p>
                     <p className="mt-2 text-sm font-bold text-salon-charcoal/75">
                       {user.role === "ADMIN"
-                        ? "مدير كامل الصلاحيات على كل الفروع"
-                        : "مشرف على فروعه: متابعة وإغلاق الصناديق واستلام الكاش"}
+                        ? "مدير المؤسسة: صلاحيات إدارية على جميع الفروع"
+                        : "مدير فرع: متابعة التشغيل وإغلاق الصناديق داخل نطاقه فقط"}
                     </p>
                     <button
                       type="button"
@@ -559,7 +559,7 @@ function SummaryTile({ label, value, tone }: { label: string; value: number; ton
 }
 
 function RoleBadge({ role }: { role: "OWNER" | "ADMIN" | "SUPERVISOR" }) {
-  const label = role === "OWNER" ? "مالك" : role === "ADMIN" ? "مدير النظام" : "مشرف";
+  const label = role === "OWNER" ? "مالك المؤسسة" : role === "ADMIN" ? "مدير المؤسسة" : "مدير فرع";
   const tone = role === "SUPERVISOR" ? "bg-salon-steel/10 text-salon-steel" : "bg-salon-ink text-white";
   return <span className={`rounded-full px-3 py-1 text-xs font-bold ${tone}`}>{label}</span>;
 }

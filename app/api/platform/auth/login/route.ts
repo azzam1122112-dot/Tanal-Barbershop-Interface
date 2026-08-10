@@ -5,6 +5,7 @@ import { verifyAdminPassword } from "@/lib/auth/password";
 import { createStoredSession } from "@/lib/auth/session";
 import { setSessionCookie, getRequestMeta, parseJsonBody } from "@/lib/auth/http";
 import { clearRateLimit, consumeRateLimit } from "@/lib/auth/rate-limit";
+import { createPlatformMfaChallenge } from "@/lib/auth/platform-mfa";
 
 const schema = z.object({
   email: z.string().trim().email().transform((value) => value.toLowerCase()),
@@ -20,7 +21,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: ERROR_MESSAGE }, { status: 401 });
   }
 
-  const rateKey = `platform:${parsed.data.email}`;
+  const rateKey = `platform:${parsed.data.email}:${meta.ipAddress ?? "unknown"}`;
   const rate = await consumeRateLimit(prisma, rateKey);
   if (rate.limited) {
     return NextResponse.json(
@@ -35,11 +36,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: ERROR_MESSAGE }, { status: 401 });
   }
 
-  const { token } = await createStoredSession({ prisma, actorType: "PLATFORM_ADMIN", actorId: admin.id, ...meta });
-  await prisma.platformAdmin.update({ where: { id: admin.id }, data: { lastLoginAt: new Date() } });
   await clearRateLimit(prisma, rateKey);
 
-  const response = NextResponse.json({ redirectTo: "/platform" });
+  if (admin.mfaEnabledAt) {
+    const challengeToken = await createPlatformMfaChallenge(prisma, admin.id, meta);
+    return NextResponse.json({ requiresMfa: true, challengeToken });
+  }
+
+  const { token } = await createStoredSession({
+    prisma,
+    actorType: "PLATFORM_ADMIN",
+    actorId: admin.id,
+    mfaSetupOnly: true,
+    ...meta,
+  });
+
+  const response = NextResponse.json({ redirectTo: "/platform/mfa-setup" });
   setSessionCookie(response, token);
   return response;
 }

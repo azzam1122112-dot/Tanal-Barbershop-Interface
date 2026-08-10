@@ -8,6 +8,7 @@ import { LogoutButton } from "@/components/logout-button";
 import { Icon } from "@/components/icons";
 import { SalonSwitcher } from "@/components/dashboard/salon-switcher";
 import { useModalDismiss } from "@/components/use-modal-dismiss";
+import { getDashboardRoleCopy, type DashboardRole } from "@/lib/auth/role-copy";
 
 /**
  * شريط علوي + درج تنقّل منزلق للجوال والتابلت (تحت مقاس lg).
@@ -17,10 +18,12 @@ export function DashboardMobileBar({
   role,
   salons,
   activeSalonId,
+  organizationName,
 }: {
-  role: "OWNER" | "ADMIN" | "SUPERVISOR" | null;
+  role: DashboardRole | null;
   salons: { id: string; name: string }[];
   activeSalonId: string | null;
+  organizationName: string;
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -30,6 +33,7 @@ export function DashboardMobileBar({
   useEffect(() => {
     setOpen(false);
   }, [pathname]);
+  const roleCopy = getDashboardRoleCopy(role);
 
   return (
     <div className="lg:hidden">
@@ -39,8 +43,8 @@ export function DashboardMobileBar({
         <div className="flex min-w-0 items-center gap-3">
           <BrandLogo className="h-10 w-10 ring-1 ring-salon-gold/30" priority />
           <div className="min-w-0 leading-tight">
-            <p className="text-[10px] font-bold uppercase tracking-eyebrow text-salon-goldlight">منصة XMANSX</p>
-            <p className="truncate text-sm font-bold">لوحة الإدارة</p>
+            <p className="text-[10px] font-bold uppercase tracking-eyebrow text-salon-goldlight">{roleCopy.panelEyebrow}</p>
+            <p className="truncate text-sm font-bold">{roleCopy.panelTitle}</p>
           </div>
         </div>
         <button
@@ -62,8 +66,8 @@ export function DashboardMobileBar({
               <div className="flex min-w-0 items-center gap-3">
                 <BrandLogo className="h-11 w-11 ring-1 ring-salon-gold/30" />
                 <div className="min-w-0">
-                  <p className="text-[10px] font-bold uppercase tracking-eyebrow text-salon-goldlight">منصة XMANSX</p>
-                  <p className="truncate text-sm font-bold">لوحة الإدارة</p>
+                  <p className="text-[10px] font-bold uppercase tracking-eyebrow text-salon-goldlight">{roleCopy.panelEyebrow}</p>
+                  <p className="truncate text-sm font-bold">{roleCopy.panelTitle}</p>
                 </div>
               </div>
               <button
@@ -76,8 +80,13 @@ export function DashboardMobileBar({
               </button>
             </div>
 
+            <div className="mt-4 rounded-xl border border-white/10 bg-black/20 px-3 py-3">
+              <p className="truncate text-sm font-bold">{organizationName}</p>
+              <p className="mt-1 text-xs font-semibold text-white/50">{roleCopy.label}</p>
+            </div>
+
             <div className="mt-4">
-              <SalonSwitcher salons={salons} activeSalonId={activeSalonId} allLabel={role === "SUPERVISOR" ? "كل فروعي" : "كل الفروع"} />
+              <SalonSwitcher salons={salons} activeSalonId={activeSalonId} allLabel={role === "SUPERVISOR" ? "الفروع المسندة" : "كل الفروع"} />
             </div>
 
             <div className="mt-4 min-h-0 flex-1 overflow-y-auto">
@@ -85,7 +94,7 @@ export function DashboardMobileBar({
             </div>
 
             <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-3">
-              <p className="text-[11px] font-bold uppercase tracking-eyebrow text-white/40">{role === "SUPERVISOR" ? "جلسة مشرف" : "جلسة المدير"}</p>
+              <p className="text-[11px] font-bold uppercase tracking-eyebrow text-white/40">{roleCopy.sessionLabel}</p>
               <LogoutButton className="mt-3 w-full border-white/15 bg-white/10 text-white hover:bg-white/15" />
             </div>
           </aside>
