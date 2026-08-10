@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   addRiyadhDays,
+  getRiyadhDayRange,
+  getRiyadhMonthRange,
   getRiyadhMinuteOfDay,
   getRiyadhWeekday,
   isSameRiyadhDay,
@@ -36,6 +38,17 @@ describe("Riyadh operational dates", () => {
     expect(toRiyadhDateKey(lateNight)).toBe("2027-01-01");
     expect(nextDay.toISOString()).toBe("2027-01-01T21:00:00.000Z");
     expect(isSameRiyadhDay(lateNight, new Date("2026-12-31T21:01:00.000Z"))).toBe(true);
+  });
+
+  it("builds day and month ranges on Riyadh midnight boundaries", () => {
+    const instant = new Date("2026-08-10T21:30:00.000Z");
+    const day = getRiyadhDayRange(instant);
+    const month = getRiyadhMonthRange(instant);
+
+    expect(day.from.toISOString()).toBe("2026-08-10T21:00:00.000Z");
+    expect(day.to.toISOString()).toBe("2026-08-11T21:00:00.000Z");
+    expect(month.from.toISOString()).toBe("2026-07-31T21:00:00.000Z");
+    expect(month.to.toISOString()).toBe("2026-08-31T21:00:00.000Z");
   });
 
   it("rejects impossible civil dates", () => {

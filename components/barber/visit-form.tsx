@@ -548,7 +548,7 @@ export function VisitForm({
       </div>
 
       {preview ? (
-        <div className="fixed inset-0 z-40 flex items-end justify-center bg-salon-ink/35 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(3rem,env(safe-area-inset-top))] backdrop-blur-sm sm:items-center sm:pt-4" role="dialog" aria-modal="true" aria-label="معاينة العملية">
+        <div className="fixed inset-0 z-[100] flex items-end justify-center bg-salon-ink/35 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(3rem,env(safe-area-inset-top))] backdrop-blur-sm sm:items-center sm:pt-4" role="dialog" aria-modal="true" aria-label="معاينة العملية">
           <button
             type="button"
             aria-label="إغلاق المعاينة"

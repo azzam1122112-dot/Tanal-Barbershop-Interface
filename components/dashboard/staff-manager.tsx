@@ -5,6 +5,7 @@ import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import type { SafeAdminUser } from "@/lib/auth/sanitize";
 import { InlineEmpty } from "@/components/dashboard/ui";
+import { RIYADH_TIME_ZONE } from "@/lib/datetime/riyadh";
 
 type StaffResponse = {
   user?: SafeAdminUser;
@@ -33,6 +34,7 @@ function sameIdSet(a: string[], b: string[]) {
 type StaffFilter = "all" | "ADMIN" | "SUPERVISOR" | "inactive";
 
 const dateFormatter = new Intl.DateTimeFormat("ar-SA", {
+  timeZone: RIYADH_TIME_ZONE,
   year: "numeric",
   month: "short",
   day: "numeric",
@@ -346,6 +348,7 @@ export function StaffManager({ initialUsers, salons, currentUserId }: { initialU
               const draft = drafts[user.id];
               const isPending = pendingId === user.id;
               const isCurrentUser = user.id === currentUserId;
+              const isOwner = user.role === "OWNER";
 
               return (
                 <article key={user.id} className="grid gap-4 px-5 py-5 xl:grid-cols-[1fr_180px_260px] xl:items-start">
@@ -447,13 +450,15 @@ export function StaffManager({ initialUsers, salons, currentUserId }: { initialU
                   <div className="rounded-xl border border-salon-line bg-salon-pearl px-4 py-3">
                     <p className="text-xs font-bold text-salon-charcoal">صلاحية الوصول</p>
                     <p className="mt-2 text-sm font-bold text-salon-charcoal/75">
-                      {user.role === "ADMIN"
-                        ? "مدير المؤسسة: صلاحيات إدارية على جميع الفروع"
-                        : "مدير فرع: متابعة التشغيل وإغلاق الصناديق داخل نطاقه فقط"}
+                      {user.role === "OWNER"
+                        ? "مالك المؤسسة: الحساب الجذري محمي ولا يُعدّل من إدارة الموظفين"
+                        : user.role === "ADMIN"
+                          ? "مدير المؤسسة: صلاحيات إدارية على جميع الفروع"
+                          : "مدير فرع: متابعة التشغيل وإغلاق الصناديق داخل نطاقه فقط"}
                     </p>
                     <button
                       type="button"
-                      disabled={isPending || isEditing || isCurrentUser}
+                      disabled={isPending || isEditing || isCurrentUser || isOwner}
                       onClick={() => void toggleStatus(user)}
                       className={`mt-3 w-full rounded-lg px-3 py-2 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-55 ${
                         user.isActive ? "bg-green-50 text-green-700 hover:bg-green-100" : "bg-red-50 text-red-700 hover:bg-red-100"
@@ -475,9 +480,15 @@ export function StaffManager({ initialUsers, salons, currentUserId }: { initialU
                       </>
                     ) : (
                       <>
-                        <button type="button" disabled={Boolean(editingId) || isPending} onClick={() => startEdit(user)} className="dashboard-button py-2.5">
-                          تعديل
-                        </button>
+                        {isOwner ? (
+                          <span className="rounded-xl border border-salon-line bg-salon-mist px-4 py-3 text-center text-sm font-bold text-salon-charcoal">
+                            حساب محمي
+                          </span>
+                        ) : (
+                          <button type="button" disabled={Boolean(editingId) || isPending} onClick={() => startEdit(user)} className="dashboard-button py-2.5">
+                            تعديل
+                          </button>
+                        )}
                         {user.id === currentUserId || user.role === "OWNER" ? null : (
                           <button
                             type="button"
@@ -568,7 +579,7 @@ function Info({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <dt className="text-xs font-bold text-salon-charcoal/70">{label}</dt>
-      <dd className="mt-1 break-words text-salon-ink">{value}</dd>
+      <dd className="mt-1 break-words text-salon-ink [overflow-wrap:anywhere]">{value}</dd>
     </div>
   );
 }

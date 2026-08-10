@@ -12,7 +12,7 @@ export default async function ProductsPage() {
   if (!session) redirect("/dashboard/login");
   if (!canAccessDashboard(session)) redirect("/barber");
   // الكتالوج والمخزون من صلاحيات المالك/المدير مثل كتالوج الخدمات.
-  if (!canManageStaff(session)) redirect("/dashboard");
+  if (!canManageStaff(session)) redirect("/dashboard/forbidden");
   if (session.type !== "dashboard") redirect("/dashboard");
 
   const { organizationId, salonIds, activeSalonId } = dashboardScope(session);

@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { BusinessError } from "@/lib/errors";
+import { addRiyadhDays, normalizeRiyadhDay, startOfRiyadhMonth } from "@/lib/datetime/riyadh";
 
 type AttendancePrisma = PrismaClient | Prisma.TransactionClient;
 
@@ -157,17 +158,13 @@ function toAttendanceRow(record: {
 }
 
 function startOfMonth(now = new Date()) {
-  return new Date(now.getFullYear(), now.getMonth(), 1);
+  return startOfRiyadhMonth(now);
 }
 
 function startOfDay(date: Date | string) {
-  const next = new Date(date);
-  next.setHours(0, 0, 0, 0);
-  return next;
+  return normalizeRiyadhDay(date);
 }
 
 function endExclusive(date: Date | string) {
-  const next = startOfDay(date);
-  next.setDate(next.getDate() + 1);
-  return next;
+  return addRiyadhDays(normalizeRiyadhDay(date), 1);
 }

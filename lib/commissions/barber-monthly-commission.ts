@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { roundMoney } from "@/lib/visits/visit-totals";
+import { getRiyadhMonthRange, RIYADH_TIME_ZONE } from "@/lib/datetime/riyadh";
 
 type MonthlyCommissionPrisma = PrismaClient | Prisma.TransactionClient;
 
@@ -19,8 +20,7 @@ export async function getBarberMonthlyCommission(
 
   if (!barber?.commissionEnabled) return null;
 
-  const from = new Date(date.getFullYear(), date.getMonth(), 1);
-  const to = new Date(date.getFullYear(), date.getMonth() + 1, 1);
+  const { from, to } = getRiyadhMonthRange(date);
   const result = await prisma.visit.aggregate({
     where: {
       barberId,
@@ -38,6 +38,7 @@ export async function getBarberMonthlyCommission(
     from: from.toISOString(),
     to: to.toISOString(),
     monthLabel: new Intl.DateTimeFormat("ar-SA-u-ca-gregory", {
+      timeZone: RIYADH_TIME_ZONE,
       month: "long",
       year: "numeric",
     }).format(date),

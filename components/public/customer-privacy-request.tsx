@@ -25,7 +25,8 @@ export function CustomerPrivacyRequest({ token, initialRequests }: { token: stri
     event.preventDefault();
     setLoading(true);
     setMessage("");
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const response = await fetch(`/api/public/portal/${encodeURIComponent(token)}/privacy-requests`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -41,7 +42,7 @@ export function CustomerPrivacyRequest({ token, initialRequests }: { token: stri
     if (response.ok && data.request) {
       setRequests((current) => [data.request!, ...current]);
       setMessage("تم استلام طلبك، وستتم معالجته خلال 30 يومًا.");
-      event.currentTarget.reset();
+      formElement.reset();
     } else {
       setMessage(data.message ?? "تعذر إرسال الطلب");
     }

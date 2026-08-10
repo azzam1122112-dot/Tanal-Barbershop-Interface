@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { RIYADH_TIME_ZONE } from "@/lib/datetime/riyadh";
 
 type Attendance = { id: string; checkInAt: string; isOpen: boolean } | null;
 
-const timeFormatter = new Intl.DateTimeFormat("ar-SA", { hour: "2-digit", minute: "2-digit" });
+const timeFormatter = new Intl.DateTimeFormat("ar-SA", { timeZone: RIYADH_TIME_ZONE, hour: "2-digit", minute: "2-digit" });
 
 /** تسجيل حضور/انصراف الحلاق — منفصل عن جلسة الصندوق عمدًا. */
 export function AttendancePanel({ initialAttendance }: { initialAttendance: Attendance }) {

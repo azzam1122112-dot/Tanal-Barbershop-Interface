@@ -10,7 +10,7 @@ export default async function DashboardCampaignsPage() {
   const session = await getRequestSession();
   if (!session) redirect("/dashboard/login");
   if (!canAccessDashboard(session)) redirect("/barber");
-  if (!canOperateLoyalty(session)) redirect("/dashboard");
+  if (!canOperateLoyalty(session)) redirect("/dashboard/forbidden");
 
   const organizationId = session.type === "dashboard" ? session.organizationId : undefined;
   const campaigns = await prisma.campaign.findMany({ where: { ...(organizationId ? { organizationId } : {}) }, orderBy: [{ createdAt: "desc" }, { name: "asc" }] });

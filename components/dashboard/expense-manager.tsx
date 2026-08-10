@@ -115,7 +115,7 @@ export function ExpenseCreateForm({
 
           <label className="block text-sm font-semibold">
             تاريخ المصروف
-            <input lang="en" name="expenseDate" type="date" required max={today} defaultValue={today} className="dashboard-field mt-2" />
+            <input dir="ltr" lang="en" name="expenseDate" type="date" required max={today} defaultValue={today} className="dashboard-field mt-2" />
           </label>
 
           <label className="block text-sm font-semibold">

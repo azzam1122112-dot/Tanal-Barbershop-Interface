@@ -9,6 +9,7 @@ import { prisma } from "@/lib/db/prisma";
 import { EXPENSE_CATEGORY_LABELS, getExpensesReport } from "@/lib/expenses/expense-service";
 import { formatDate, formatDateTime, formatMoney, formatNumber } from "@/lib/format";
 import { getPresetRange, getRevenueReport } from "@/lib/reports/dashboard-reports";
+import { addRiyadhDays, parseRiyadhDateKey, toRiyadhDateKey } from "@/lib/datetime/riyadh";
 
 const CATEGORIES = Object.entries(EXPENSE_CATEGORY_LABELS) as [ExpenseCategory, string][];
 
@@ -27,8 +28,8 @@ export default async function ExpensesPage({
 
   const preset = params.preset ?? "month";
   const presetRange = getPresetRange(preset);
-  const from = params.from ? startOfDay(params.from) : presetRange.from;
-  const to = params.to ? endExclusive(params.to) : presetRange.to;
+  const from = params.from ? parseRiyadhDateKey(params.from) : presetRange.from;
+  const to = params.to ? addRiyadhDays(parseRiyadhDateKey(params.to), 1) : presetRange.to;
   const category = isExpenseCategory(params.category) ? params.category : null;
   const paymentSource = isPaymentSource(params.paymentSource) ? params.paymentSource : null;
   const baseFilters = { organizationId, salonIds, from, to };
@@ -61,7 +62,7 @@ export default async function ExpensesPage({
   ]);
 
   const operatingNet = revenue.netAmount - revenue.commissionAmount - fullReport.total;
-  const today = dateInputValue(new Date());
+  const today = toRiyadhDateKey(new Date());
 
   return (
     <DashboardShell
@@ -78,8 +79,8 @@ export default async function ExpensesPage({
             <option value="custom">فترة مخصصة</option>
           </select>
         </Field>
-        <Field label="من تاريخ"><input lang="en" name="from" type="date" defaultValue={params.from ?? ""} className="dashboard-field" /></Field>
-        <Field label="إلى تاريخ"><input lang="en" name="to" type="date" defaultValue={params.to ?? ""} className="dashboard-field" /></Field>
+        <Field label="من تاريخ"><input dir="ltr" lang="en" name="from" type="date" defaultValue={params.from ?? ""} className="dashboard-field" /></Field>
+        <Field label="إلى تاريخ"><input dir="ltr" lang="en" name="to" type="date" defaultValue={params.to ?? ""} className="dashboard-field" /></Field>
         <Field label="بند المصروف">
           <select name="category" defaultValue={category ?? ""} className="dashboard-field">
             <option value="">كل البنود</option>
@@ -181,21 +182,4 @@ function isExpenseCategory(value: string | undefined): value is ExpenseCategory 
 
 function isPaymentSource(value: string | undefined): value is ExpensePaymentSource {
   return value === "CASH_DRAWER" || value === "EXTERNAL";
-}
-
-function startOfDay(value: string) {
-  return new Date(`${value}T00:00:00`);
-}
-
-function endExclusive(value: string) {
-  const date = startOfDay(value);
-  date.setDate(date.getDate() + 1);
-  return date;
-}
-
-function dateInputValue(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
 }

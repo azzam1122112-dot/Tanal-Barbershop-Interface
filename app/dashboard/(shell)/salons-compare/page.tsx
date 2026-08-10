@@ -35,8 +35,8 @@ export default async function SalonComparisonPage({
       description="أداء الفروع جنبًا إلى جنب: الدخل، متوسط الفاتورة، العمولات، المصروفات، وما يتبقى للمؤسسة."
     >
       <FilterBar className="md:grid-cols-[160px_160px_1fr_120px]">
-        <Field label="من تاريخ"><input lang="en" name="from" type="date" defaultValue={params.from ?? ""} className="dashboard-field" /></Field>
-        <Field label="إلى تاريخ"><input lang="en" name="to" type="date" defaultValue={params.to ?? ""} className="dashboard-field" /></Field>
+        <Field label="من تاريخ"><input dir="ltr" lang="en" name="from" type="date" defaultValue={params.from ?? ""} className="dashboard-field" /></Field>
+        <Field label="إلى تاريخ"><input dir="ltr" lang="en" name="to" type="date" defaultValue={params.to ?? ""} className="dashboard-field" /></Field>
         <span />
         <button className="dashboard-button">تصفية</button>
       </FilterBar>

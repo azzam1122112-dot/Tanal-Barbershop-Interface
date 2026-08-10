@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { isBusinessError } from "@/lib/errors";
 import { buildReceipt } from "@/lib/invoicing/receipt";
 import { generateReceiptPdf, receiptPdfFilename } from "@/lib/invoicing/receipt-pdf";
+import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
 
@@ -38,6 +39,10 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     if (isBusinessError(error) && error.status === 404) {
       return Response.json({ message: "الإيصال غير موجود" }, { status: 404 });
     }
-    throw error;
+    logger.error("receipt.pdf.failed", error);
+    return Response.json(
+      { message: "تعذر إنشاء ملف الإيصال الآن. حاول مرة أخرى أو استخدم صفحة الطباعة." },
+      { status: 500 },
+    );
   }
 }

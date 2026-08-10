@@ -1,9 +1,6 @@
-import { createRequire } from "node:module";
 import path from "node:path";
 import PDFDocument from "pdfkit";
 import type { ReceiptData } from "@/lib/invoicing/receipt";
-
-const require = createRequire(import.meta.url);
 
 const COLORS = {
   ink: "#15111f",
@@ -65,8 +62,20 @@ export function receiptPdfFilename(receipt: Pick<ReceiptData, "invoiceNumber">) 
 }
 
 function resolveArabicFont(filename: string) {
-  const packageJson = require.resolve("@ibm/plex-sans-arabic/package.json");
-  return path.join(path.dirname(packageJson), "fonts", "complete", "woff", filename);
+  // لا تستخدم require.resolve هنا: محزّم Next.js يحوّله داخل Route Handler إلى
+  // رقم وحدة Webpack، ثم يفشل path.dirname في نسخة الإنتاج قبل إنشاء الملف.
+  // الحزمة dependency تشغيلية ثابتة، لذا يكون مسارها من جذر التطبيق ثابتًا
+  // ويعمل في next dev وnext start على حد سواء.
+  return path.join(
+    process.cwd(),
+    "node_modules",
+    "@ibm",
+    "plex-sans-arabic",
+    "fonts",
+    "complete",
+    "woff",
+    filename,
+  );
 }
 
 function drawHeader(doc: PDFKit.PDFDocument, receipt: ReceiptData, logoPath: string) {

@@ -2,6 +2,7 @@ import { Prisma, type AuditActorType, type ExpenseCategory, type ExpensePaymentS
 import { BusinessError } from "@/lib/errors";
 import { roundMoney } from "@/lib/visits/visit-totals";
 import { recordBarberCashDelta } from "@/lib/cash-custody/cash-custody-service";
+import { addRiyadhDays, normalizeRiyadhDay, startOfRiyadhMonth } from "@/lib/datetime/riyadh";
 
 type ExpensePrisma = PrismaClient | Prisma.TransactionClient;
 
@@ -371,20 +372,15 @@ function toExpenseRow(
 }
 
 function startOfMonth(now = new Date()) {
-  return new Date(now.getFullYear(), now.getMonth(), 1);
+  return startOfRiyadhMonth(now);
 }
 
 function endExclusive(date: Date | string) {
-  const next = new Date(date);
-  next.setHours(0, 0, 0, 0);
-  next.setDate(next.getDate() + 1);
-  return next;
+  return addRiyadhDays(normalizeRiyadhDay(date), 1);
 }
 
 function startOfDay(date: Date | string) {
-  const next = new Date(date);
-  next.setHours(0, 0, 0, 0);
-  return next;
+  return normalizeRiyadhDay(date);
 }
 
 async function runSerializableExpenseTransaction<T>(

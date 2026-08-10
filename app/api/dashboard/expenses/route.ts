@@ -5,6 +5,7 @@ import { assertSalonAllowed, effectiveSalonIds } from "@/lib/auth/salon-scope";
 import { prisma } from "@/lib/db/prisma";
 import { getExpensesReport, recordCashExpense } from "@/lib/expenses/expense-service";
 import { toErrorResponse } from "@/lib/http/error-response";
+import { parseRiyadhDateKey } from "@/lib/datetime/riyadh";
 
 const createExpenseSchema = z.object({
   salonId: z.string().min(1, "الفرع مطلوب"),
@@ -66,7 +67,7 @@ export async function POST(request: Request) {
       note: parsed.data.note,
       payee: parsed.data.payee,
       reference: parsed.data.reference,
-      expenseDate: parsed.data.expenseDate ? new Date(`${parsed.data.expenseDate}T00:00:00`) : undefined,
+      expenseDate: parsed.data.expenseDate ? parseRiyadhDateKey(parsed.data.expenseDate) : undefined,
       recordedByUserId: session.user.id,
       recordedByActorType: session.role,
       auditMeta: await getRequestMeta(),

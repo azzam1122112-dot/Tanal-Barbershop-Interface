@@ -34,7 +34,7 @@ export default async function CustomerPortalPage({ params }: { params: Promise<{
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-salon-mist px-4 py-8">
-      <div className="mx-auto min-w-0 max-w-md space-y-4">
+      <div className="mx-auto min-w-0 max-w-3xl space-y-4">
         <header className="lux-edge rounded-2xl border border-white/10 bg-sidebar-onyx px-6 py-7 text-center text-white shadow-[var(--shadow-lg)]">
           <p className="text-xs font-bold uppercase tracking-eyebrow text-salon-goldlight">{view.brandName}</p>
           <h1 className="mt-3 break-words text-2xl font-bold [overflow-wrap:anywhere]">أهلًا {view.customer.name}</h1>

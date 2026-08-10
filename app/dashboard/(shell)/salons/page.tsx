@@ -11,7 +11,7 @@ export default async function DashboardSalonsPage() {
   const session = await getRequestSession();
   if (!session) redirect("/dashboard/login");
   if (!canAccessDashboard(session)) redirect("/barber");
-  if (!canManageOrganization(session) || session.type !== "dashboard") redirect("/dashboard");
+  if (!canManageOrganization(session) || session.type !== "dashboard") redirect("/dashboard/forbidden");
 
   const [salons, organization] = await Promise.all([
     listSalons(prisma, session.organizationId),

@@ -12,7 +12,7 @@ export default async function DashboardStaffPage() {
 
   if (!session) redirect("/dashboard/login");
   if (!canAccessDashboard(session)) redirect("/barber");
-  if (!canManageStaff(session) || session.type !== "dashboard") redirect("/dashboard");
+  if (!canManageStaff(session) || session.type !== "dashboard") redirect("/dashboard/forbidden");
 
   const [users, salons] = await Promise.all([
     prisma.user.findMany({

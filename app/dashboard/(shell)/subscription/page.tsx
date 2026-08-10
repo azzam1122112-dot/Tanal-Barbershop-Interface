@@ -26,7 +26,7 @@ export default async function DashboardSubscriptionPage() {
   const session = await getRequestSession();
   if (!session) redirect("/dashboard/login");
   if (!canAccessDashboard(session)) redirect("/barber");
-  if (session.type !== "dashboard" || session.role === "SUPERVISOR") redirect("/dashboard");
+  if (session.type !== "dashboard" || session.role === "SUPERVISOR") redirect("/dashboard/forbidden");
 
   const [overview, invoices] = await Promise.all([
     getOrganizationSubscriptionOverview(prisma, session.organizationId),

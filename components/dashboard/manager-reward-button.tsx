@@ -12,7 +12,8 @@ export function ManagerRewardButton({ customerId, customerName }: { customerId: 
     setMessage("");
     setSubmitting(true);
 
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const response = await fetch(`/api/dashboard/customers/${customerId}/manager-rewards`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -27,7 +28,7 @@ export function ManagerRewardButton({ customerId, customerName }: { customerId: 
 
     if (response.ok) {
       setMessage("تم إصدار المكافأة");
-      event.currentTarget.reset();
+      formElement.reset();
       window.setTimeout(() => {
         setOpen(false);
         window.location.reload();
@@ -59,7 +60,7 @@ export function ManagerRewardButton({ customerId, customerName }: { customerId: 
             <div className="mt-4 space-y-3">
               <input name="title" defaultValue="مكافأة من الإدارة" required className="dashboard-field" />
               <input lang="en" name="discountAmount" type="number" min="0.01" step="0.01" required placeholder="قيمة الخصم بالريال" className="dashboard-field" />
-              <input lang="en" name="expiresAt" type="datetime-local" className="dashboard-field" />
+              <input dir="ltr" lang="en" name="expiresAt" type="datetime-local" className="dashboard-field" />
               <textarea name="description" rows={3} placeholder="سبب المكافأة أو ملاحظة للحلاق" className="dashboard-field" />
             </div>
             {message ? <p className="mt-3 rounded-xl border border-salon-line bg-salon-mist px-3 py-2 text-sm font-bold">{message}</p> : null}

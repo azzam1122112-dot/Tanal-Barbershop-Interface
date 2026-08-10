@@ -30,7 +30,8 @@ export function ServiceManager({ initialServices }: { initialServices: ManagedSe
     setToast(null);
 
     try {
-      const form = new FormData(event.currentTarget);
+      const formElement = event.currentTarget;
+      const form = new FormData(formElement);
       const name = String(form.get("name") ?? "").trim();
       const defaultPrice = Number(form.get("defaultPrice"));
       const sortOrder = Number(form.get("sortOrder") || 0);
@@ -49,7 +50,7 @@ export function ServiceManager({ initialServices }: { initialServices: ManagedSe
 
       if (response.ok && data.service) {
         setServices((current) => [...current, data.service!].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name, "ar")));
-        event.currentTarget.reset();
+        formElement.reset();
         setToast({ message: "تم إنشاء الخدمة بنجاح", tone: "success" });
       } else {
         setToast({ message: data.message ?? "تعذر إنشاء الخدمة", tone: "error" });

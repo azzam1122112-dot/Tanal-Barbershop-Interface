@@ -26,7 +26,8 @@ export function RewardRuleManager({ initialRules, readOnly = false }: { initialR
     event.preventDefault();
     setLoading(true);
     setToast(null);
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const response = await fetch("/api/dashboard/loyalty/reward-rules", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -40,7 +41,7 @@ export function RewardRuleManager({ initialRules, readOnly = false }: { initialR
 
     if (response.ok && data.rewardRule) {
       setRules((current) => [...current, data.rewardRule!].sort((a, b) => a.sortOrder - b.sortOrder || a.pointsRequired - b.pointsRequired));
-      event.currentTarget.reset();
+      formElement.reset();
       setToast({ message: "تم إنشاء قاعدة المكافأة", tone: "success" });
     } else {
       setToast({ message: data.message ?? "تعذر إنشاء قاعدة المكافأة", tone: "error" });
