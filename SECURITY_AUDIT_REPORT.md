@@ -186,8 +186,8 @@
 - **File:** `lib/visits/visit-service.ts:100-184,284-337`
 - **Endpoint:** preview/confirm visit
 - **Description:** مبلغ الخدمة قادم من العميل رغم وجود أسعار خدمة، وفي التأكيد تُستخدم `input.grossAmount` بدل إجمالي المعاينة الذي يتضمن المنتجات.
-- **Attack scenario:** موظف يخفض المبلغ أو يسجل منتجات دون إدخالها في الإيراد/النقاط/VAT.
-- **Business impact:** تلاعب مالي وضريبي وعمولات خاطئة.
+- **Attack scenario:** موظف يخفض المبلغ أو يسجل منتجات دون إدخالها في الإيراد والنقاط.
+- **Business impact:** تلاعب مالي وعمولات خاطئة.
 - **Evidence:** الخدمات المختارة لا تحسب السعر النهائي server-side؛ مسار confirm يتجاهل `preview.grossAmount` في عدة حسابات.
 - **Recommended fix:** حساب السعر من DB، وأي override يحتاج صلاحية وسبب وسجل؛ استخدم إجمالي preview الموثوق في confirm.
 

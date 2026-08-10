@@ -37,7 +37,6 @@ export async function getSalonComparisonReport(
       customerId: true,
       netAmount: true,
       discountAmount: true,
-      vatAmount: true,
       commissionAmount: true,
       paymentMethod: true,
     },
@@ -73,7 +72,6 @@ export async function getSalonComparisonReport(
         salonVisits.filter((visit) => visit.paymentMethod === "NETWORK").reduce((total, visit) => total + Number(visit.netAmount), 0),
       ),
       discountAmount: roundMoney(salonVisits.reduce((total, visit) => total + Number(visit.discountAmount), 0)),
-      vatAmount: roundMoney(salonVisits.reduce((total, visit) => total + Number(visit.vatAmount), 0)),
       commissionAmount,
       expensesTotal,
       // ما يتبقى للمؤسسة بعد عمولات الحلاقين والمصروفات النثرية.

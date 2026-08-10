@@ -32,6 +32,8 @@ export async function POST(request: Request) {
       products: parsed.data.products,
       grossAmount: parsed.data.grossAmount,
       paymentMethod: parsed.data.paymentMethod,
+      paymentConfirmed: parsed.data.paymentConfirmed,
+      cashTenderedAmount: parsed.data.cashTenderedAmount,
       rewardRuleId: parsed.data.rewardRuleId,
       managerRewardId: parsed.data.managerRewardId,
       campaignId: parsed.data.campaignId,

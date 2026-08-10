@@ -30,10 +30,12 @@
     "sharp": "^0.35.0"
   },
   "dependencies": {
+    "@ibm/plex-sans-arabic": "^1.1.0",
     "@prisma/client": "^6.0.0",
     "bcryptjs": "^2.4.3",
     "clsx": "^2.1.1",
     "next": "^15.0.0",
+    "pdfkit": "^0.19.1",
     "qrcode-generator": "^2.0.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -45,6 +47,7 @@
     "@eslint/eslintrc": "^3.3.1",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.10.2",
+    "@types/pdfkit": "^0.17.6",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
     "@types/web-push": "^3.6.4",

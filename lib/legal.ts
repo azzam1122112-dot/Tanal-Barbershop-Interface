@@ -1,4 +1,4 @@
-export const LEGAL_VERSION = "2026-08-10";
+export const LEGAL_VERSION = "2026-08-10.2";
 
 export const legalInfo = {
   brandName: "إكس مانس إكس",
@@ -20,7 +20,7 @@ export const legalInfo = {
     "الرياض، المملكة العربية السعودية",
   primaryHostingLocation:
     process.env.PUBLIC_DATA_HOSTING_LOCATION?.trim() ||
-    "غير محدد في إعدادات النشر بعد - يجب ضبط PUBLIC_DATA_HOSTING_LOCATION قبل بدء البيع",
+    "لم يُعلن بعد — يجب نشر موقع الاستضافة الفعلي قبل إدخال بيانات حقيقية",
   privacyEmail: process.env.PUBLIC_PRIVACY_EMAIL?.trim() || "support@xmansx.com",
 } as const;
 

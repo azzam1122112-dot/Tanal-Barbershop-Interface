@@ -1,10 +1,12 @@
 import { BusinessError } from "@/lib/errors";
+import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import type { PaymentMethod, PrismaClient } from "@prisma/client";
 import { computeCampaignDiscount } from "@/lib/campaigns/campaign-eligibility";
 import { calculateVisitTotals } from "@/lib/loyalty/calculations";
 import { getEffectiveSettings } from "@/lib/settings/system-settings";
 import { recordStockMovement } from "@/lib/products/product-service";
+import { recordBarberCashDelta } from "@/lib/cash-custody/cash-custody-service";
 
 type AdminVisitPrisma = PrismaClient | Prisma.TransactionClient;
 
@@ -45,18 +47,19 @@ export async function cancelVisit(prisma: PrismaClient, visitId: string, meta: A
     const redeemedPointsToRestore = Math.abs(
       sumPoints(visit.loyaltyTransactions.filter((transaction) => transaction.type === "REDEEM").map((transaction) => transaction.points)),
     );
-    const balanceBefore = await getBalance(tx, visit.customerId);
+    const customerId = visit.customerId;
+    const balanceBefore = customerId ? await getBalance(tx, customerId) : 0;
     const balanceAfterEarnReversal = balanceBefore - pointsEarnedToReverse;
     const balanceAfterRestore = balanceAfterEarnReversal + redeemedPointsToRestore;
     if (balanceAfterEarnReversal < 0) {
       throw new BusinessError("لا يمكن عكس النقاط لأن رصيد العميل غير كافٍ");
     }
 
-    if (pointsEarnedToReverse > 0) {
+    if (customerId && pointsEarnedToReverse > 0) {
       await tx.loyaltyTransaction.create({
         data: {
           organizationId: visit.organizationId,
-          customerId: visit.customerId,
+          customerId,
           visitId: visit.id,
           type: "REVERSAL",
           points: -pointsEarnedToReverse,
@@ -65,11 +68,11 @@ export async function cancelVisit(prisma: PrismaClient, visitId: string, meta: A
         },
       });
     }
-    if (redeemedPointsToRestore > 0) {
+    if (customerId && redeemedPointsToRestore > 0) {
       await tx.loyaltyTransaction.create({
         data: {
           organizationId: visit.organizationId,
-          customerId: visit.customerId,
+          customerId,
           visitId: visit.id,
           type: "REVERSAL",
           points: redeemedPointsToRestore,
@@ -88,10 +91,9 @@ export async function cancelVisit(prisma: PrismaClient, visitId: string, meta: A
       });
     }
 
-    await tx.loyaltyAccount.update({
-      where: { customerId: visit.customerId },
-      data: { points: balanceAfterRestore },
-    });
+    if (customerId) {
+      await tx.loyaltyAccount.updateMany({ where: { customerId }, data: { points: balanceAfterRestore } });
+    }
 
     // إلغاء الزيارة يعيد المنتجات المباعة للمخزون بحركة مسجّلة لا بتعديل صامت.
     if (visit.organizationId) {
@@ -118,19 +120,36 @@ export async function cancelVisit(prisma: PrismaClient, visitId: string, meta: A
       },
       include: adminVisitInclude,
     });
-    const latestCompletedVisit = await tx.visit.findFirst({
-      where: { customerId: visit.customerId, status: "COMPLETED", id: { not: visit.id } },
-      orderBy: { visitedAt: "desc" },
-    });
-    await tx.customer.update({
-      where: { id: visit.customerId },
-      data: {
-        visitCount: { decrement: 1 },
-        totalPaid: { decrement: Number(visit.netAmount) },
-        lastVisitAt: latestCompletedVisit?.visitedAt ?? null,
-        lastBarberId: latestCompletedVisit?.barberId ?? null,
-      },
-    });
+    if (visit.paymentMethod === "CASH") {
+      await recordBarberCashDelta(tx, {
+        organizationId: visit.organizationId,
+        salonId: visit.salonId,
+        barberId: visit.barberId,
+        cashSessionId: visit.cashSessionId,
+        amount: -Number(visit.netAmount),
+        type: "VISIT_REVERSAL",
+        referenceKey: `VISIT:CANCEL:${visit.id}`,
+        referenceId: visit.id,
+        note: meta.reason,
+        actorType: meta.actorType,
+        actorUserId: meta.actorUserId,
+      });
+    }
+    if (customerId) {
+      const latestCompletedVisit = await tx.visit.findFirst({
+        where: { customerId, status: "COMPLETED", id: { not: visit.id } },
+        orderBy: { visitedAt: "desc" },
+      });
+      await tx.customer.update({
+        where: { id: customerId },
+        data: {
+          visitCount: { decrement: 1 },
+          totalPaid: { decrement: Number(visit.netAmount) },
+          lastVisitAt: latestCompletedVisit?.visitedAt ?? null,
+          lastBarberId: latestCompletedVisit?.barberId ?? null,
+        },
+      });
+    }
 
     await writeVisitAudit(tx, {
       meta,
@@ -162,6 +181,23 @@ export async function updateVisitPaymentMethod(prisma: PrismaClient, visitId: st
       data: { paymentMethod },
       include: adminVisitInclude,
     });
+
+    if (visit.paymentMethod !== paymentMethod) {
+      const delta = paymentMethod === "CASH" ? Number(visit.netAmount) : -Number(visit.netAmount);
+      await recordBarberCashDelta(tx, {
+        organizationId: visit.organizationId,
+        salonId: visit.salonId,
+        barberId: visit.barberId,
+        cashSessionId: visit.cashSessionId,
+        amount: delta,
+        type: "PAYMENT_METHOD_ADJUSTMENT",
+        referenceKey: `VISIT:PAYMENT:${visit.id}:${randomUUID()}`,
+        referenceId: visit.id,
+        note: meta.reason,
+        actorType: meta.actorType,
+        actorUserId: meta.actorUserId,
+      });
+    }
 
     await writeVisitAudit(tx, {
       meta,
@@ -203,24 +239,21 @@ export async function updateVisitAmount(prisma: PrismaClient, visitId: string, g
       discountAmount,
       pointsPerCurrencyUnit: settings ? Number(settings.pointsPerCurrencyUnit) : 1,
       pointsCalculatedAfterDiscount: settings?.pointsCalculatedAfterDiscount ?? true,
-      // نعتمد معدّل الزيارة الأصلي لا معدّل اليوم — تصحيح فاتورة قديمة يبقى بضريبتها.
-      vatEnabled: Number(visit.vatRate) > 0,
-      vatRate: Number(visit.vatRate),
-      vatInclusive: settings?.vatInclusive ?? true,
     });
     const currentEarned = sumPoints(visit.loyaltyTransactions.filter((transaction) => transaction.type === "EARN").map((transaction) => transaction.points));
     const pointsAdjustment = totals.pointsEarned - currentEarned;
-    const balanceBefore = await getBalance(tx, visit.customerId);
+    const customerId = visit.customerId;
+    const balanceBefore = customerId ? await getBalance(tx, customerId) : 0;
     const balanceAfter = balanceBefore + pointsAdjustment;
     if (balanceAfter < 0) {
       throw new BusinessError("لا يمكن تعديل المبلغ لأن رصيد العميل لا يكفي لعكس النقاط");
     }
 
-    if (pointsAdjustment !== 0) {
+    if (customerId && pointsAdjustment !== 0) {
       await tx.loyaltyTransaction.create({
         data: {
           organizationId: visit.organizationId,
-          customerId: visit.customerId,
+          customerId,
           visitId: visit.id,
           type: "ADJUST",
           points: pointsAdjustment,
@@ -229,7 +262,7 @@ export async function updateVisitAmount(prisma: PrismaClient, visitId: string, g
         },
       });
       await tx.loyaltyAccount.update({
-        where: { customerId: visit.customerId },
+        where: { customerId },
         data: { points: balanceAfter },
       });
     }
@@ -239,8 +272,6 @@ export async function updateVisitAmount(prisma: PrismaClient, visitId: string, g
       data: {
         grossAmount: totals.grossAmount,
         discountAmount: totals.discountAmount,
-        subtotalAmount: totals.subtotalAmount,
-        vatAmount: totals.vatAmount,
         netAmount: totals.netAmount,
         pointsEarned: totals.pointsEarned,
       },
@@ -253,9 +284,24 @@ export async function updateVisitAmount(prisma: PrismaClient, visitId: string, g
       });
     }
     const netDifference = totals.netAmount - Number(visit.netAmount);
-    if (netDifference !== 0) {
+    if (visit.paymentMethod === "CASH" && netDifference !== 0) {
+      await recordBarberCashDelta(tx, {
+        organizationId: visit.organizationId,
+        salonId: visit.salonId,
+        barberId: visit.barberId,
+        cashSessionId: visit.cashSessionId,
+        amount: netDifference,
+        type: "VISIT_AMOUNT_ADJUSTMENT",
+        referenceKey: `VISIT:AMOUNT:${visit.id}:${randomUUID()}`,
+        referenceId: visit.id,
+        note: meta.reason,
+        actorType: meta.actorType,
+        actorUserId: meta.actorUserId,
+      });
+    }
+    if (customerId && netDifference !== 0) {
       await tx.customer.update({
-        where: { id: visit.customerId },
+        where: { id: customerId },
         data: { totalPaid: { increment: netDifference } },
       });
     }
@@ -428,7 +474,7 @@ function toAdminVisitResponse<TExtra extends Record<string, unknown>>(visit: Vis
   return {
     visit: {
       ...toAdminVisitSnapshot(visit),
-      customer: { id: visit.customer.id, name: visit.customer.name, phone: visit.customer.phone },
+      customer: visit.customer ? { id: visit.customer.id, name: visit.customer.name, phone: visit.customer.phone } : null,
       barber: { id: visit.barber.id, name: visit.barber.name },
       cancelledAt: visit.cancelledAt?.toISOString() ?? null,
       cancelReason: visit.cancelReason,

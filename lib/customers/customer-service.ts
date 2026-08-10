@@ -2,6 +2,13 @@ import type { Prisma, PrismaClient, WhatsAppConsentSource } from "@prisma/client
 import { BusinessError } from "@/lib/errors";
 import { lockTenantQuota } from "@/lib/db/tenant-lock";
 
+type CustomerWithOperationalSummary = Prisma.CustomerGetPayload<{
+  include: {
+    loyaltyAccount: true;
+    visits: { include: { barber: true; services: true } };
+  };
+}>;
+
 /** يمنع تجاوز حد العملاء في الباقة. `maxCustomers = null` يعني بلا حد. */
 async function assertCustomerQuota(prisma: Prisma.TransactionClient, organizationId: string) {
   const organization = await prisma.organization.findUnique({
@@ -24,7 +31,9 @@ export async function createCustomerWithLoyalty({
   createdByBarberId,
   whatsappTransactionalOptIn = false,
   whatsappMarketingOptIn = false,
+  enrollInLoyalty = true,
   whatsappConsentSource,
+  privacyNotice,
 }: {
   prisma: PrismaClient;
   organizationId: string;
@@ -33,7 +42,10 @@ export async function createCustomerWithLoyalty({
   createdByBarberId?: string | null;
   whatsappTransactionalOptIn?: boolean;
   whatsappMarketingOptIn?: boolean;
+  /** العضوية اختيارية للحلاق؛ التسجيل الذاتي ومسارات الإدارة تبقي القيمة الافتراضية مفعّلة. */
+  enrollInLoyalty?: boolean;
   whatsappConsentSource?: WhatsAppConsentSource;
+  privacyNotice?: { acknowledgedAt: Date; version: string; controllerName: string };
 }) {
   return prisma.$transaction(async (tx) => {
     await lockTenantQuota(tx, organizationId, "customers");
@@ -47,7 +59,7 @@ export async function createCustomerWithLoyalty({
     if (existing) return { customer: existing, created: false };
 
     await assertCustomerQuota(tx, organizationId);
-    const customer = await tx.customer.create({
+    const customer: CustomerWithOperationalSummary = await tx.customer.create({
       data: {
         organizationId,
         name,
@@ -59,7 +71,10 @@ export async function createCustomerWithLoyalty({
         whatsappConsentSource: whatsappTransactionalOptIn || whatsappMarketingOptIn ? whatsappConsentSource : undefined,
         whatsappTransactionalConsentAt: whatsappTransactionalOptIn ? new Date() : undefined,
         whatsappMarketingConsentAt: whatsappMarketingOptIn ? new Date() : undefined,
-        loyaltyAccount: { create: { organizationId } },
+        privacyNoticeAcknowledgedAt: privacyNotice?.acknowledgedAt,
+        privacyNoticeVersion: privacyNotice?.version,
+        privacyNoticeControllerName: privacyNotice?.controllerName,
+        loyaltyAccount: enrollInLoyalty ? { create: { organizationId } } : undefined,
       },
       include: {
         loyaltyAccount: true,

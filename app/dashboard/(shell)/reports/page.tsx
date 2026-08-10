@@ -1,10 +1,12 @@
 import { formatDate, formatMoney, formatNumber } from "@/lib/format";
+import Link from "next/link";
 import { redirect } from "next/navigation";
-import { DashboardShell, SectionPanel, StatCard } from "@/components/dashboard/ui";
+import { DashboardShell, Notice, SectionPanel, StatCard } from "@/components/dashboard/ui";
 import { canAccessDashboard } from "@/lib/auth/access";
 import { dashboardScope } from "@/lib/auth/salon-scope";
 import { getRequestSession } from "@/lib/auth/http";
 import { prisma } from "@/lib/db/prisma";
+import { getExpensesReport } from "@/lib/expenses/expense-service";
 import {
   getDashboardReportsBundle,
   getPresetRange,
@@ -32,11 +34,13 @@ export default async function DashboardReportsPage({
     paymentMethod: params.paymentMethod === "CASH" || params.paymentMethod === "NETWORK" ? params.paymentMethod : undefined,
   };
 
-  const [barbers, reports] = await Promise.all([
+  const [barbers, reports, expenses] = await Promise.all([
     prisma.barber.findMany({ where: { ...orgWhere, ...salonWhere }, orderBy: { name: "asc" } }),
     getDashboardReportsBundle(prisma, filters),
+    getExpensesReport(prisma, { organizationId, salonIds, from: filters.from, to: filters.to }),
   ]);
   const { revenue, barberPerformance, services, customers, discounts } = reports;
+  const revenueIsFiltered = Boolean(filters.barberId || filters.paymentMethod);
 
   return (
     <DashboardShell title="التقارير المالية والتشغيلية" description="قراءة واضحة للدخل، الأداء، الخصومات، العملاء، وحركة الخدمات حسب الفترة والحلاق وطريقة الدفع.">
@@ -62,10 +66,23 @@ export default async function DashboardReportsPage({
           <button className="dashboard-button">تطبيق</button>
         </form>
 
+        {!revenueIsFiltered ? (
+          <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard label="إيراد الفترة" value={formatMoney(revenue.netAmount)} subValue="صافي المبيعات بعد الخصم" />
+            <StatCard label="المصروفات" value={formatMoney(expenses.total)} subValue={`${formatNumber(expenses.count)} حركة`} tone={expenses.total > 0 ? "danger" : "neutral"} />
+            <StatCard label="صافي التشغيل" value={formatMoney(revenue.netAmount - expenses.total)} subValue="الإيراد ناقص المصروفات" tone={revenue.netAmount - expenses.total >= 0 ? "success" : "danger"} />
+            <StatCard label="مصروفات درج الكاش" value={formatMoney(expenses.cashDrawerTotal)} subValue={`خارجي ${formatMoney(expenses.externalTotal)}`} />
+          </div>
+        ) : (
+          <Notice tone="info" title="صافي التشغيل يظهر بدون تصفية الحلاق أو طريقة الدفع" className="mt-6">
+            لأن المصروفات تخص الفرع كله ولا يصح خصمها من إيراد حلاق واحد. <Link href="/dashboard/expenses" className="font-bold underline">افتح تقرير المصروفات الكامل</Link>.
+          </Notice>
+        )}
+
         <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard label="قبل الخصم" value={formatMoney(revenue.grossAmount)} />
           <StatCard label="الخصومات" value={formatMoney(revenue.discountAmount)} />
-          <StatCard label="الصافي" value={formatMoney(revenue.netAmount)} />
+          <StatCard label="صافي المبيعات" value={formatMoney(revenue.netAmount)} />
           <StatCard label="متوسط الفاتورة" value={formatMoney(revenue.averageTicket)} />
           <StatCard label="الكاش" value={formatMoney(revenue.cashAmount)} />
           <StatCard label="الشبكة" value={formatMoney(revenue.networkAmount)} />

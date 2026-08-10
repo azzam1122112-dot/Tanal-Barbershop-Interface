@@ -35,7 +35,7 @@ export default async function CommissionsPage({
   return (
     <DashboardShell
       title="مستحقات العمولات"
-      description="عمولة كل حلاق عن الفترة، محسوبة على المبلغ بعد الخصم وقبل الضريبة كما كانت وقت كل زيارة."
+      description="عمولة كل حلاق عن الفترة، محسوبة على المبلغ بعد الخصم كما كانت وقت كل زيارة."
     >
       <FilterBar className="md:grid-cols-[160px_160px_1fr_120px]">
         <Field label="من تاريخ"><input lang="en" name="from" type="date" defaultValue={params.from ?? ""} className="dashboard-field" /></Field>

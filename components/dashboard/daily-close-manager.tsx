@@ -18,6 +18,7 @@ type CashSessionRow = {
   barber: { id: string; name: string };
   status: "OPEN" | "CLOSED";
   openedAt: string;
+  openingCashAmount: number;
   closedAt: string | null;
   closedBy: { id: string; name: string } | null;
   visitsCount: number;
@@ -25,6 +26,9 @@ type CashSessionRow = {
   discountTotal: number;
   netTotal: number;
   cashTotal: number;
+  expensesTotal: number;
+  collectionsTotal: number;
+  expectedCash: number;
   cardTotal: number;
   pointsEarnedTotal: number;
   pointsRedeemedTotal: number;
@@ -53,8 +57,8 @@ export function DailyCloseManager({ initialSummary }: { initialSummary: SummaryR
     if (
       !(await confirm({
         title: `إغلاق جلسة صندوق ${row.barberName}؟`,
-        description: "سيتم تأكيد استلام الكاش وإغلاق الجلسة.",
-        confirmLabel: "إغلاق واستلام",
+        description: "سيُثبت العد وتُغلق الجلسة فقط. تحصيل الكاش يتم مستقلًا من شاشة عهدة الكاش.",
+        confirmLabel: "إغلاق الجلسة",
       }))
     ) {
       return;
@@ -75,7 +79,7 @@ export function DailyCloseManager({ initialSummary }: { initialSummary: SummaryR
 
     if (response.ok && data.cashSession) {
       setSummary((current) => current.map((item) => (item.barberId === row.barberId ? { ...item, status: "CLOSED", openSession: null } : item)));
-      setToast({ message: "تم إغلاق جلسة الصندوق واستلام الكاش", tone: "success" });
+      setToast({ message: "تم إغلاق جلسة الصندوق دون تسجيل تحصيل", tone: "success" });
     } else {
       setToast({ message: data.message ?? "تعذر إغلاق جلسة الصندوق", tone: "error" });
     }
@@ -97,6 +101,10 @@ export function DailyCloseManager({ initialSummary }: { initialSummary: SummaryR
               <th className="px-3 py-3 text-right">المدة</th>
               <th className="px-3 py-3 text-right">الزيارات</th>
               <th className="px-3 py-3 text-right">الكاش</th>
+              <th className="px-3 py-3 text-right">عهدة البداية</th>
+              <th className="px-3 py-3 text-right">مصروفات الدرج</th>
+              <th className="px-3 py-3 text-right">تحصيلات الإدارة</th>
+              <th className="px-3 py-3 text-right">المتوقع</th>
               <th className="px-3 py-3 text-right">الشبكة</th>
               <th className="px-3 py-3 text-right">الصافي</th>
               <th className="px-3 py-3 text-right">الخصومات</th>
@@ -118,18 +126,23 @@ export function DailyCloseManager({ initialSummary }: { initialSummary: SummaryR
                   <td className="px-3 py-3">{session ? formatDuration(session.openedAt) : "-"}</td>
                   <td className="px-3 py-3">{session?.visitsCount ?? 0}</td>
                   <td className="px-3 py-3">{formatMoney(session?.cashTotal ?? 0)}</td>
+                  <td className="px-3 py-3">{formatMoney(session?.openingCashAmount ?? 0)}</td>
+                  <td className="px-3 py-3 text-salon-ruby">{formatMoney(session?.expensesTotal ?? 0)}</td>
+                  <td className="px-3 py-3 text-salon-steel">{formatMoney(session?.collectionsTotal ?? 0)}</td>
+                  <td className="px-3 py-3 font-bold text-salon-forest">{formatMoney(session?.expectedCash ?? 0)}</td>
                   <td className="px-3 py-3">{formatMoney(session?.cardTotal ?? 0)}</td>
                   <td className="px-3 py-3 font-bold">{formatMoney(session?.netTotal ?? 0)}</td>
                   <td className="px-3 py-3">{formatMoney(session?.discountTotal ?? 0)}</td>
                   <td className="px-3 py-3">
                     {session ? (
                       <form onSubmit={(event) => closeSession(event, row)} className="grid min-w-[280px] gap-2">
+                        <span className="text-xs font-bold text-salon-charcoal/65">الكاش المعدود عند الإغلاق</span>
                         <input lang="en"
                           name="cashReceivedAmount"
                           type="number"
                           min={0}
                           step="0.01"
-                          defaultValue={session.cashTotal}
+                          defaultValue={session.expectedCash}
                           className="dashboard-field py-2"
                         />
                         <input
@@ -138,7 +151,7 @@ export function DailyCloseManager({ initialSummary }: { initialSummary: SummaryR
                           className="dashboard-field py-2"
                         />
                         <button disabled={loadingSessionId === session.id} className="dashboard-button-gold px-3 py-2">
-                          {loadingSessionId === session.id ? "جاري الإغلاق..." : "إغلاق جلسة الصندوق"}
+                          {loadingSessionId === session.id ? "جاري الإغلاق..." : "إغلاق فقط"}
                         </button>
                       </form>
                     ) : (
@@ -148,7 +161,7 @@ export function DailyCloseManager({ initialSummary }: { initialSummary: SummaryR
                 </tr>
               );
             })}
-            {summary.length === 0 ? <tr><td colSpan={10} className="p-4"><InlineEmpty icon="💈" title="لا يوجد حلاقون نشطون" hint="فعّل حلاقًا من صفحة الحلاقين ليظهر هنا صندوقه." /></td></tr> : null}
+            {summary.length === 0 ? <tr><td colSpan={13} className="p-4"><InlineEmpty icon="💈" title="لا يوجد حلاقون نشطون" hint="فعّل حلاقًا من صفحة الحلاقين ليظهر هنا صندوقه." /></td></tr> : null}
           </tbody>
         </table>
         </div>

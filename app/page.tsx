@@ -16,7 +16,7 @@ const DEFAULT_TRIAL_DAYS = 14;
 
 export const metadata: Metadata = {
   title: "منصة تشغيل صالونات الحلاقة الرجالية",
-  description: "نظام عربي واحد لصالون الحلاقة: صندوق يُقفل بفروقات مفسّرة، عمولات تُحسب لحظة الزيارة، إيصالات وسجل مالي، ولاء وحجوزات وتقارير لكل الفروع. تجربة مجانية بدون بطاقة بنكية.",
+  description: "منصة عربية لتشغيل صالونات الحلاقة: صندوق وعمولات وإيصالات زيارة تشغيلية وحجوزات وولاء ومخزون وتقارير للفروع. تجربة مجانية بدون بطاقة بنكية.",
   keywords: [
     "برنامج إدارة صالون حلاقة",
     "نظام صالون رجالي",
@@ -32,12 +32,12 @@ export const metadata: Metadata = {
     locale: "ar_SA",
     siteName: "XMANSX",
     title: "XMANSX · منصة تشغيل صالونات الحلاقة الرجالية",
-    description: "صندوق مضبوط، عمولات دقيقة، إيصالات واضحة، وولاء يُرجع الزبون. تجربة مجانية بدون بطاقة بنكية.",
+    description: "صندوق مضبوط، عمولات دقيقة، إيصالات زيارة واضحة، وولاء وحجوزات وتقارير. تجربة مجانية بدون بطاقة بنكية.",
   },
   twitter: {
     card: "summary_large_image",
     title: "XMANSX · منصة تشغيل صالونات الحلاقة الرجالية",
-    description: "صندوق مضبوط، عمولات دقيقة، إيصالات واضحة، وولاء يُرجع الزبون. تجربة مجانية بدون بطاقة بنكية.",
+    description: "صندوق مضبوط، عمولات دقيقة، إيصالات زيارة واضحة، وولاء وحجوزات وتقارير. تجربة مجانية بدون بطاقة بنكية.",
   },
 };
 
@@ -52,7 +52,7 @@ export const revalidate = 300;
    ———————————————————————————————————————————————— */
 
 const trustBar: { value: string; label: string; ltr?: boolean }[] = [
-  { value: "تجربة مجانية", label: "تجربة كاملة بدون بطاقة بنكية" },
+  { value: "تجربة مجانية", label: "تبدأ فور التسجيل بدون بطاقة بنكية" },
   { value: "0%", label: "عمولة على مبيعاتك — اشتراك فقط", ltr: true },
   { value: "سجل كامل", label: "إيصال واضح لكل زيارة" },
   { value: "4 واجهات", label: "مالك · مدير · حلاق · زبون" },
@@ -82,7 +82,7 @@ const painPairs: { before: string; after: string }[] = [
   },
   {
     before: "كل فرع يشتغل بطريقته ولا تعرف أيّهما يربح فعلًا",
-    after: "فروع تحت مؤسسة واحدة بأرقام قابلة للمقارنة من شاشة واحدة",
+    after: "فروع تحت حساب نشاط واحد بأرقام قابلة للمقارنة من شاشة واحدة",
   },
 ];
 
@@ -175,7 +175,7 @@ const journey: { number: string; icon: IconName; title: string; description: str
     number: "02",
     icon: "visits",
     title: "شغّل يومك",
-    description: "الحلاق يسجّل حضوره، يفتح الصندوق، يستقبل الحجز، يسجّل الخدمة والمبلغ، ويصدر الفاتورة.",
+    description: "الحلاق يسجّل حضوره، يفتح الصندوق، يستقبل الحجز، يسجّل الخدمة والمبلغ، ويصدر إيصال الزيارة.",
   },
   {
     number: "03",
@@ -221,17 +221,12 @@ const audiences: { icon: IconName; label: string; title: string; description: st
 const faqs: { question: string; answer: string }[] = [
   {
     question: "كم تكلفة المنصة؟",
-    answer: "تبدأ بتجربة كاملة بدون بطاقة بنكية ولا التزام، ومدتها هي المعلنة في الصفحة وقت التسجيل. بعدها تختار من الباقات والأسعار المنشورة حسب عدد الفروع والحلاقين. لا نأخذ نسبة من مبيعاتك ولا من حجوزاتك — اشتراك ثابت فقط.",
+    answer: "تبدأ بتجربة الباقة المعلنة بدون بطاقة بنكية ولا التزام مالي، ومدتها هي الظاهرة وقت التسجيل. بعدها تختار من الباقات المنشورة حسب حدود الفروع والحلاقين والعملاء. لا نأخذ نسبة من مبيعاتك أو حجوزاتك — الاشتراك هو المقابل الوحيد.",
   },
   {
     question: "كم يستغرق تشغيلها في صالوني؟",
     answer:
-      "تُنشئ مؤسستك وفرعك من صفحة البدء مباشرة. الوقت الفعلي يذهب إلى إدخال خدماتك وأسعارك وحلاقيك ونِسَب عمولاتهم، وهي خطوة تُدخَل مرة واحدة. واجهة الحلاق لا تحتاج تدريبًا حقيقيًا لأنها شاشة واحدة بخطوات متتابعة.",
-  },
-  {
-    question: "هل تدعم المنصة ZATCA أو الربط مع منصة فاتورة؟",
-    answer:
-      "لا. XMANSX تصدر إيصال زيارة تشغيليًا وسجلًا ماليًا داخليًا فقط، ولا تدّعي التوافق مع ZATCA أو الربط والتكامل معها. يبقى على الصالون استخدام حل فوترة ضريبية معتمد متى كان ملزمًا بذلك.",
+      "تُنشئ حساب نشاطك وفرعك من صفحة البدء مباشرة. الوقت الفعلي يذهب إلى إدخال خدماتك وأسعارك وحلاقيك ونِسَب عمولاتهم، وهي خطوة تُدخَل مرة واحدة. واجهة الحلاق شاشة واحدة بخطوات متتابعة.",
   },
   {
     question: "ماذا يحدث لو انقطع الإنترنت أثناء العمل؟",
@@ -246,7 +241,7 @@ const faqs: { question: string; answer: string }[] = [
   {
     question: "هل تناسب أكثر من فرع؟",
     answer:
-      "نعم، وهذا أحد أسبابها. الفروع تعمل تحت مؤسسة واحدة، فيجمع الزبون نقاطه من أي فرع ويستبدلها في أي فرع، بينما تقارن أنت أداء الفروع من شاشة واحدة. ويمكنك تقييد كل مدير فرع بالفروع المسندة له فلا يرى أرقام غيرها.",
+      "نعم. تعمل الفروع تحت حساب نشاط واحد، فيجمع الزبون نقاطه من أي فرع ويستبدلها في أي فرع، بينما تقارن أنت أداء الفروع من شاشة واحدة. ويمكنك تقييد كل مدير بالفروع المسندة إليه.",
   },
   {
     question: "كيف يعمل واتساب داخل المنصة؟",
@@ -256,7 +251,17 @@ const faqs: { question: string; answer: string }[] = [
   {
     question: "ماذا يحدث لبياناتي إذا انتهى الاشتراك؟",
     answer:
-      "انتهاء الاشتراك يوقف التشغيل — تسجيل الزيارات وفتح الصندوق — ولا يقطع دخولك للوحة. تبقى قادرًا على قراءة تقاريرك وبيانات زبائنك وتجديد اشتراكك متى شئت.",
+      "انتهاء الاشتراك يوقف العمليات الجديدة ويبدأ مهلة عدم نشاط مدتها 60 يومًا. يستطيع المالك خلالها الدخول للقراءة والتصدير أو التجديد. بعد المهلة تُحذف بيانات الحساب من قاعدة البيانات التشغيلية، وقد تبقى نسخة معزولة ضمن النسخ الاحتياطية لمدة لا تتجاوز 30 يومًا إضافية قبل زوالها تلقائيًا.",
+  },
+  {
+    question: "ما الفرق بين إيصال الزيارة وفاتورة الاشتراك؟",
+    answer:
+      "إيصال الزيارة مرجع تشغيلي يصدره الصالون لعملية مسجلة داخل حسابه. أما فاتورة اشتراك XMANSX فتظهر للمالك بعد اعتماد دفع الباقة، وتوثّق قيمة الاشتراك وفترته وحالة السداد.",
+  },
+  {
+    question: "كيف أوقف الاشتراك؟",
+    answer:
+      "لا يوجد خصم بنكي أو تجديد مالي تلقائي. يمكنك إيقاف استمرار الاشتراك من لوحة الحساب، وتبقى الخدمة متاحة حتى نهاية المدة المدفوعة. تخضع طلبات الاسترداد للسياسة المنشورة والحقوق النظامية الواجبة التطبيق.",
   },
 ];
 
@@ -264,7 +269,38 @@ const securityPoints: { icon: IconName; text: string }[] = [
   { icon: "staff", text: "صلاحيات حسب الدور والفرع" },
   { icon: "reports", text: "سجل تدقيق لكل عملية حسّاسة" },
   { icon: "billing", text: "مطابقة مالية قابلة للمراجعة" },
-  { icon: "settings", text: "عزل كامل بين المؤسسات" },
+  { icon: "settings", text: "عزل كامل بين حسابات الأنشطة" },
+];
+
+const preContractFacts: { icon: IconName; title: string; description: string; href: string; linkLabel: string }[] = [
+  {
+    icon: "services",
+    title: "خدمة رقمية بلا شحن",
+    description: "تصل إلى المنصة عبر المتصفح أو كتطبيق ويب. لا توجد أجهزة أو منتجات مادية أو رسوم توصيل.",
+    href: "/digital-service-policy",
+    linkLabel: "سياسة تقديم الخدمة",
+  },
+  {
+    icon: "billing",
+    title: "دفع واضح بلا تجديد مالي تلقائي",
+    description: "تُعتمد الباقة المدفوعة بعد التحقق من التحويل، ثم تظهر فاتورة الاشتراك داخل حساب المالك.",
+    href: "/terms",
+    linkLabel: "شروط الاشتراك",
+  },
+  {
+    icon: "adjustments",
+    title: "إيقاف الاستمرار من حسابك",
+    description: "يمكنك إيقاف استمرار الاشتراك، وتبقى الخدمة حتى نهاية الفترة المدفوعة. الاسترداد وفق السياسة المنشورة.",
+    href: "/refund-policy",
+    linkLabel: "الإلغاء والاسترداد",
+  },
+  {
+    icon: "staff",
+    title: "بيانات زبائنك تحت تحكمك",
+    description: "الصالون جهة التحكم وXMANSX جهة معالجة. تتاح لك نسخة شاملة قبل الحذف بعد مهلة عدم النشاط.",
+    href: "/data-processing-agreement",
+    linkLabel: "اتفاقية معالجة البيانات",
+  },
 ];
 
 /* ———————————————————————————————————————————————— */
@@ -298,7 +334,7 @@ export default async function HomePage() {
     index === 0
       ? {
           ...faq,
-          answer: `تبدأ بـ ${trialDays} يومًا تجربة كاملة بدون بطاقة بنكية ولا التزام. بعدها تختار من الباقات والأسعار المنشورة في هذه الصفحة حسب عدد الفروع والحلاقين. لا نأخذ نسبة من مبيعاتك ولا من حجوزاتك — اشتراك ثابت فقط.`,
+          answer: `تبدأ بـ ${trialDays} يومًا من تجربة الباقة المعلنة بدون بطاقة بنكية ولا التزام مالي. بعدها تختار من الباقات والأسعار المنشورة حسب حدود الفروع والحلاقين والعملاء. لا نأخذ نسبة من مبيعاتك أو حجوزاتك — الاشتراك هو المقابل الوحيد.`,
         }
       : faq,
   );
@@ -378,6 +414,9 @@ export default async function HomePage() {
             <a className="transition-colors hover:text-white" href="#pricing">
               الباقات
             </a>
+            <a className="transition-colors hover:text-white" href="#before-subscription">
+              قبل الاشتراك
+            </a>
             <a className="transition-colors hover:text-white" href="#faq">
               الأسئلة
             </a>
@@ -434,8 +473,8 @@ export default async function HomePage() {
             </Reveal>
 
             <Reveal as="p" delay={140} className="x-lead mt-5 max-w-2xl text-slate-300 sm:mt-6">
-              نظام عربي واحد لصالون الحلاقة الرجالي: صندوق يُقفل بفرق مفسَّر، عمولات تُحسب لحظة الزيارة، إيصال واضح
-              لكل عملية، ونقاط تُرجع الزبون إلى كرسيك.
+              نظام عربي واحد لصالون الحلاقة الرجالي: صندوق يُقفل بفرق مفسَّر، عمولات تُحسب لحظة الزيارة، إيصال زيارة
+              واضح، ونقاط تساعدك على تكرار الزيارة.
             </Reveal>
 
             <Reveal delay={210} className="mt-7 flex flex-col gap-3 sm:mt-8 sm:flex-row">
@@ -460,6 +499,9 @@ export default async function HomePage() {
                   {item}
                 </span>
               ))}
+            </Reveal>
+            <Reveal as="p" delay={330} className="mt-4 max-w-xl text-xs font-semibold leading-6 text-slate-500">
+              التسجيل يفعّل التجربة بعد قبول الشروط وسياسة الخصوصية واتفاقية معالجة البيانات. لا يوجد خصم بنكي تلقائي.
             </Reveal>
           </div>
 
@@ -590,7 +632,7 @@ export default async function HomePage() {
           <SectionHeading
             eyebrow="منظومة واحدة"
             title="وحدات تعمل معًا، لا جزر منفصلة."
-            description="الزيارة الواحدة تحرّك المخزون والنقاط والعمولة والفاتورة والصندوق في اللحظة نفسها — أو لا تُحفظ أصلًا."
+            description="الزيارة الواحدة تحرّك المخزون والنقاط والعمولة وإيصال الزيارة والصندوق في اللحظة نفسها — أو لا تُحفظ أصلًا."
           />
           <div className="mt-10 grid gap-4 sm:mt-14 sm:grid-cols-2 lg:grid-cols-4">
             {platformFeatures.map((feature, index) => (
@@ -652,15 +694,14 @@ export default async function HomePage() {
               <p className="x-eyebrow">مرجع كل عملية</p>
               <h2 className="x-h2 x-balance mt-4 font-bold">كل زيارة لها سجل وإيصال واضح.</h2>
               <p className="x-lead mt-4 text-slate-600">
-                تُحفظ الخدمة والخصم وطريقة الدفع في مسار واحد، فيرجع المالك أو الزبون إلى مرجع مفهوم بلا ادعاء أنه
-                فاتورة ضريبية أو حل ZATCA.
+                تُحفظ الخدمة والخصم وطريقة الدفع في مسار واحد، فيرجع المالك أو الزبون إلى مرجع تشغيلي واضح.
               </p>
               <ul className="mt-7 space-y-3">
                 {[
                   "رقم إيصال تسلسلي لكل فرع ولكل سنة يصدر داخل معاملة الزيارة.",
                   "تفصيل الخدمات والمنتجات والخصم وطريقة الدفع والمبلغ النهائي.",
                   "إمكانية الطباعة أو الحفظ PDF من المتصفح وإرسال المرجع للزبون.",
-                  "الإيصال تشغيلي وليس فاتورة ضريبية، والمنصة لا تدعم ZATCA أو الربط معها.",
+                  "يعرض الإيصال تفاصيل العملية كما سُجّلت داخل الصالون.",
                   "كل تعديل أو إلغاء حساس يبقى ظاهرًا في سجل التدقيق.",
                 ].map((line) => (
                   <li key={line} className="flex items-start gap-3">
@@ -707,7 +748,7 @@ export default async function HomePage() {
                   </span>
                 </div>
                 <p className="mt-4 rounded-lg bg-violet-50 px-3 py-2 text-center text-[10px] font-bold text-violet-800">
-                  إيصال تشغيلي قابل للطباعة · ليس فاتورة ضريبية
+                  إيصال زيارة قابل للطباعة
                 </p>
               </div>
             </div>
@@ -811,8 +852,8 @@ export default async function HomePage() {
           {publicPlans.length > 0 ? (
             <div className="mt-10 grid items-stretch gap-5 sm:mt-14 lg:grid-cols-3">
               {publicPlans.map((plan) => {
-                const annualPrice = plan.priceYearly ?? plan.priceMonthly * 10;
-                const annualSaving = Math.max(0, plan.priceMonthly * 12 - annualPrice);
+                const annualPrice = plan.priceYearly;
+                const annualSaving = annualPrice == null ? 0 : Math.max(0, plan.priceMonthly * 12 - annualPrice);
 
                 return (
                   <article
@@ -825,7 +866,7 @@ export default async function HomePage() {
                   >
                     {plan.isFeatured ? (
                       <span className="absolute left-5 top-5 rounded-full bg-violet-500 px-3 py-1 text-[11px] font-bold text-white">
-                        الأكثر طلبًا
+                        موصى بها
                       </span>
                     ) : null}
 
@@ -842,18 +883,25 @@ export default async function HomePage() {
                         <strong className="text-3xl font-black">{formatMoney(plan.priceMonthly)}</strong>
                         <span className={`pb-1 text-xs ${plan.isFeatured ? "text-slate-400" : "text-slate-500"}`}>/ شهريًا</span>
                       </div>
-                      <p className={`mt-2 text-xs ${plan.isFeatured ? "text-violet-200" : "text-violet-700"}`}>
-                        سنويًا: {formatMoney(annualPrice)}
-                        {annualSaving > 0 ? ` · وفّر ${formatMoney(annualSaving)}` : ""}
-                      </p>
+                      {annualPrice == null ? (
+                        <p className={`mt-2 text-xs ${plan.isFeatured ? "text-violet-200" : "text-violet-700"}`}>الدفع الشهري متاح</p>
+                      ) : (
+                        <p className={`mt-2 text-xs ${plan.isFeatured ? "text-violet-200" : "text-violet-700"}`}>
+                          سنويًا: {formatMoney(annualPrice)}
+                          {annualSaving > 0 ? ` · وفّر ${formatMoney(annualSaving)}` : ""}
+                        </p>
+                      )}
                     </div>
 
-                    <div className={`mt-5 grid grid-cols-2 gap-2 text-xs font-bold ${plan.isFeatured ? "text-slate-200" : "text-slate-700"}`}>
+                    <div className={`mt-5 grid grid-cols-3 gap-2 text-xs font-bold ${plan.isFeatured ? "text-slate-200" : "text-slate-700"}`}>
                       <span className={`rounded-xl p-3 ${plan.isFeatured ? "bg-white/5" : "bg-slate-50"}`}>
                         {plan.maxSalons} {plan.maxSalons === 1 ? "فرع" : "فروع"}
                       </span>
                       <span className={`rounded-xl p-3 ${plan.isFeatured ? "bg-white/5" : "bg-slate-50"}`}>
                         {plan.maxBarbers == null ? "حلاقون بلا حد" : `${plan.maxBarbers} حلاقين`}
+                      </span>
+                      <span className={`rounded-xl p-3 ${plan.isFeatured ? "bg-white/5" : "bg-slate-50"}`}>
+                        {plan.maxCustomers == null ? "عملاء بلا حد" : `${plan.maxCustomers} عميل`}
                       </span>
                     </div>
 
@@ -889,7 +937,60 @@ export default async function HomePage() {
           )}
 
           <p className="mt-7 text-center text-xs text-slate-500">
-            الأسعار بالريال السعودي · لا نسبة على المبيعات · يمكنك طلب الإلغاء من لوحة اشتراكك
+            الأسعار بالريال السعودي · لا نسبة على المبيعات · أوقف استمرار الاشتراك من لوحة حسابك متى شئت
+          </p>
+        </div>
+      </section>
+
+      {/* ===== الإفصاح قبل الاشتراك ===== */}
+      <section id="before-subscription" className="scroll-mt-24 bg-white py-16 sm:py-24 lg:py-28">
+        <div className="x-shell">
+          <SectionHeading
+            eyebrow="قبل أن تنشئ حسابك"
+            title="العقد والخدمة والبيانات — بلغة مباشرة."
+            description="هذه المعلومات جزء من قرار الاشتراك: ماذا تشتري، وكيف تُفعّل الخدمة، وكيف توقفها، وما الذي يحدث لبيانات نشاطك."
+          />
+
+          <div className="mt-10 grid gap-4 sm:mt-14 md:grid-cols-2 xl:grid-cols-4">
+            {preContractFacts.map((fact, index) => (
+              <Reveal key={fact.title} delay={index * 55} className="flex h-full flex-col rounded-3xl border border-salon-line bg-salon-pearl p-6">
+                <span className="grid h-11 w-11 place-items-center rounded-2xl bg-violet-100 text-violet-700">
+                  <Icon name={fact.icon} className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <h3 className="mt-5 text-lg font-bold">{fact.title}</h3>
+                <p className="x-body mt-3 flex-1 text-slate-600">{fact.description}</p>
+                <Link href={fact.href} className="mt-5 inline-flex min-h-10 items-center text-sm font-bold text-violet-800 hover:text-violet-950">
+                  {fact.linkLabel} <span className="mr-1" aria-hidden="true">←</span>
+                </Link>
+              </Reveal>
+            ))}
+          </div>
+
+          <div className="mt-6 overflow-hidden rounded-3xl border border-violet-200 bg-gradient-to-l from-violet-50 via-white to-salon-pearl">
+            <div className="grid gap-7 p-6 sm:p-8 lg:grid-cols-[1.2fr_.8fr] lg:items-center lg:p-10">
+              <div>
+                <p className="text-xs font-bold text-violet-700">مقدم الخدمة</p>
+                <h3 className="mt-2 text-2xl font-bold">{legalInfo.brandName} يقدمها ممارس عمل حر موثّق.</h3>
+                <p className="x-body mt-3 max-w-2xl text-slate-600">
+                  مقدم الخدمة {legalInfo.providerName}، بموجب وثيقة عمل حر رقم <span dir="ltr">{legalInfo.freelanceDocumentNumber}</span>
+                  {" "}في نشاط {legalInfo.freelanceActivity}. XMANSX اسم المنصة وليس شركة أو مؤسسة مستقلة.
+                </p>
+                <div className="mt-5 flex flex-wrap gap-3">
+                  <Link href="/provider" className="x-button-primary min-h-11 px-5 text-sm">بيانات مقدم الخدمة</Link>
+                  <Link href="/contact" className="inline-flex min-h-11 items-center rounded-xl border border-violet-200 bg-white px-5 text-sm font-bold text-violet-900 hover:border-violet-400">التواصل والشكاوى</Link>
+                </div>
+              </div>
+              <dl className="grid gap-3 rounded-2xl border border-white bg-white/85 p-5 text-sm shadow-sm">
+                <div className="flex items-center justify-between gap-4"><dt className="text-slate-500">العنوان</dt><dd className="font-bold">{legalInfo.businessAddress}</dd></div>
+                <div className="flex items-center justify-between gap-4"><dt className="text-slate-500">البريد</dt><dd><a dir="ltr" className="font-bold text-violet-800 hover:underline" href={`mailto:${legalInfo.supportEmail}`}>{legalInfo.supportEmail}</a></dd></div>
+                <div className="flex items-center justify-between gap-4"><dt className="text-slate-500">الجوال</dt><dd><a dir="ltr" className="font-bold text-violet-800 hover:underline" href={`tel:${legalInfo.supportPhone}`}>{legalInfo.supportPhone}</a></dd></div>
+                <div className="flex items-center justify-between gap-4"><dt className="text-slate-500">استلام الشكاوى</dt><dd className="font-bold">خلال يومي عمل</dd></div>
+              </dl>
+            </div>
+          </div>
+
+          <p className="mx-auto mt-6 max-w-4xl text-center text-xs font-semibold leading-6 text-slate-500">
+            بإنشاء الحساب تقبل النسخة المعروضة من شروط الاشتراك وسياسة الخصوصية وسياسة الإلغاء والاسترداد وسياسة تقديم الخدمة الرقمية واتفاقية معالجة البيانات.
           </p>
         </div>
       </section>
@@ -952,7 +1053,7 @@ export default async function HomePage() {
               اسأل قبل أن تبدأ
             </a>
           </div>
-          <p className="mt-4 text-xs text-slate-500">بدون بطاقة بنكية · بدون التزام · إلغاء في أي وقت</p>
+          <p className="mt-4 text-xs text-slate-500">بدون بطاقة بنكية · لا تجديد مالي تلقائي · أوقف الاستمرار من حسابك</p>
           </div>
         </div>
       </section>
@@ -990,13 +1091,8 @@ export default async function HomePage() {
                   </Link>
                 </li>
                 <li>
-                  <Link className="inline-flex min-h-8 items-center transition-colors hover:text-white" href="/join">
-                    انضمام الزبون للولاء
-                  </Link>
-                </li>
-                <li>
                   <Link className="inline-flex min-h-8 items-center transition-colors hover:text-white" href="/signup">
-                    إنشاء مؤسسة جديدة
+                    إنشاء حساب نشاط
                   </Link>
                 </li>
               </ul>
@@ -1008,6 +1104,7 @@ export default async function HomePage() {
                 <li><Link className="inline-flex min-h-8 items-center transition-colors hover:text-white" href="/terms">الشروط والأحكام</Link></li>
                 <li><Link className="inline-flex min-h-8 items-center transition-colors hover:text-white" href="/privacy">سياسة الخصوصية</Link></li>
                 <li><Link className="inline-flex min-h-8 items-center transition-colors hover:text-white" href="/refund-policy">الإلغاء والاسترداد</Link></li>
+                <li><Link className="inline-flex min-h-8 items-center transition-colors hover:text-white" href="/digital-service-policy">تقديم الخدمة الرقمية</Link></li>
                 <li><Link className="inline-flex min-h-8 items-center transition-colors hover:text-white" href="/data-processing-agreement">معالجة البيانات</Link></li>
                 <li><Link className="inline-flex min-h-8 items-center transition-colors hover:text-white" href="/provider">مقدم الخدمة</Link></li>
               </ul>
@@ -1034,6 +1131,11 @@ export default async function HomePage() {
                 <li>
                   <a className="inline-flex min-h-8 items-center transition-colors hover:text-white" href="#pricing">
                     الباقات والأسعار
+                  </a>
+                </li>
+                <li>
+                  <a className="inline-flex min-h-8 items-center transition-colors hover:text-white" href="#before-subscription">
+                    قبل الاشتراك
                   </a>
                 </li>
                 <li>

@@ -27,6 +27,7 @@ export async function POST(request: Request) {
     name: parsed.data.name,
     phone: parsed.data.phone,
     createdByBarberId: session.barber.id,
+    enrollInLoyalty: parsed.data.enrollInLoyalty,
     whatsappTransactionalOptIn: parsed.data.whatsappTransactionalOptIn,
     whatsappMarketingOptIn: parsed.data.whatsappMarketingOptIn,
     whatsappConsentSource: "IN_PERSON",
@@ -48,7 +49,11 @@ export async function POST(request: Request) {
     {
       created: result.created,
       customer: toCustomerSummary(result.customer),
-      message: result.created ? "تم إنشاء العميل" : "العميل موجود مسبقًا",
+      message: result.created
+        ? parsed.data.enrollInLoyalty
+          ? "تم إنشاء العميل وتفعيل الولاء"
+          : "تم إنشاء العميل بدون عضوية ولاء"
+        : "العميل موجود مسبقًا",
     },
     { status: result.created ? 201 : 200 },
   );

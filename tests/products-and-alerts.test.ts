@@ -30,15 +30,9 @@ describe("بيع المنتجات مع الزيارة", () => {
     expect(result.totalCommission).toBe(25);
   });
 
-  it("يحتسب الضريبة على مجموع الخدمات والمنتجات معًا", () => {
-    const totals = calculateVisitTotals({
-      grossAmount: 115,
-      vatEnabled: true,
-      vatRate: 15,
-      vatInclusive: true,
-    });
-    expect(totals.subtotalAmount).toBe(100);
-    expect(totals.vatAmount).toBe(15);
+  it("يطبق الخصم على مجموع الخدمات والمنتجات", () => {
+    const totals = calculateVisitTotals({ grossAmount: 115, discountAmount: 15 });
+    expect(totals.netAmount).toBe(100);
   });
 });
 

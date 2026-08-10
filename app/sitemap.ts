@@ -13,7 +13,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
   return [
     { url: absoluteUrl("/"), changeFrequency: "monthly", priority: 1 },
     { url: absoluteUrl("/signup"), changeFrequency: "yearly", priority: 0.8 },
-    { url: absoluteUrl("/join"), changeFrequency: "yearly", priority: 0.5 },
     { url: absoluteUrl("/terms"), changeFrequency: "yearly", priority: 0.5 },
     { url: absoluteUrl("/privacy"), changeFrequency: "yearly", priority: 0.6 },
     { url: absoluteUrl("/refund-policy"), changeFrequency: "yearly", priority: 0.5 },

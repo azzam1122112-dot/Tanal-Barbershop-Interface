@@ -5,11 +5,12 @@ import { Icon } from "@/components/icons";
 import { LoyaltyJoinForm } from "@/components/public/loyalty-join-form";
 import { prisma } from "@/lib/db/prisma";
 import { getEffectiveSettings } from "@/lib/settings/system-settings";
-import { resolveRequestOrganization } from "@/lib/tenant/request-org";
+import { getKnownLoginOrgSlug } from "@/lib/tenant/request-org";
 
 export const metadata: Metadata = {
   title: "انضم لبرنامج الولاء",
   description: "عضويتك المجانية لمتابعة النقاط والمكافآت مع كل زيارة.",
+  robots: { index: false, follow: false },
 };
 
 /**
@@ -22,18 +23,24 @@ export default async function LoyaltyJoinPage({
   searchParams: Promise<{ org?: string }>;
 }) {
   const params = await searchParams;
-  const organization = params.org
-    ? await prisma.organization.findUnique({ where: { slug: params.org } })
-    : await resolveRequestOrganization();
+  const organizationSlug = params.org ?? await getKnownLoginOrgSlug();
+  const organization = organizationSlug
+    ? await prisma.organization.findUnique({ where: { slug: organizationSlug } })
+    : null;
 
   if (!organization || organization.status === "SUSPENDED") notFound();
 
-  const [settings, rewardRules] = await Promise.all([
+  const [settings, rewardRules, owner] = await Promise.all([
     getEffectiveSettings(prisma, { organizationId: organization.id }),
     prisma.rewardRule.findMany({
       where: { organizationId: organization.id, isActive: true },
       orderBy: { requiredPoints: "asc" },
       take: 3,
+    }),
+    prisma.user.findFirst({
+      where: { organizationId: organization.id, role: "OWNER", isActive: true },
+      select: { email: true, phone: true },
+      orderBy: { createdAt: "asc" },
     }),
   ]);
 
@@ -144,12 +151,17 @@ export default async function LoyaltyJoinPage({
           </section>
 
           <aside className="loyalty-form-shell mx-auto w-full max-w-lg lg:mx-0" aria-label="نموذج الانضمام">
-            <LoyaltyJoinForm organizationSlug={params.org} />
+            <LoyaltyJoinForm
+              organizationSlug={organization.slug}
+              brandName={brandName}
+              controllerEmail={owner?.email ?? null}
+              controllerPhone={owner?.phone ?? null}
+            />
           </aside>
         </div>
 
         <footer className="flex flex-col gap-2 border-t border-white/[0.07] pt-5 text-[11px] font-medium text-white/35 sm:flex-row sm:items-center sm:justify-between">
-          <p>بياناتك محمية ولا تُستخدم دون موافقتك.</p>
+          <p>يعالج الصالون بيانات العضوية وفق إشعار الخصوصية المعروض قبل التسجيل.</p>
           <p dir="ltr">POWERED BY <span className="font-bold text-white/55">XMANSX</span></p>
         </footer>
       </div>

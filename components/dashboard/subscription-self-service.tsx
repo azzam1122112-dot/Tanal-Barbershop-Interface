@@ -92,8 +92,8 @@ export function SubscriptionSelfService({
       description:
         action === "CANCEL"
           ? currentPeriodEnd
-            ? `ستبقى المنصة فعّالة حتى ${formatDate(currentPeriodEnd)} ثم يتوقف التشغيل، ولن تُحذف بياناتك.`
-            : "سيتوقف الاشتراك الحالي، ولن تُحذف بياناتك."
+            ? `ستبقى المنصة فعّالة حتى ${formatDate(currentPeriodEnd)} ثم يتوقف التشغيل وتبدأ مهلة عدم نشاط مدتها 60 يومًا. صدّر بياناتك أو جدّد قبل نهايتها لتجنب الحذف النهائي.`
+            : "سيتوقف الاشتراك الحالي، ثم تبدأ مهلة عدم نشاط مدتها 60 يومًا قبل الحذف النهائي."
           : `سيستمر اشتراكك الحالي حتى ${formatDate(currentPeriodEnd)}.`,
       confirmLabel: action === "CANCEL" ? "إلغاء التجديد" : "استئناف الاشتراك",
       tone: action === "CANCEL" ? "danger" : "default",
@@ -183,7 +183,7 @@ export function SubscriptionSelfService({
 
       <section className="dashboard-panel overflow-hidden">
         <div className="flex flex-col gap-3 border-b border-salon-line px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div><h2 className="text-xl font-bold">إدارة التجديد</h2><p className="mt-1 text-sm font-semibold text-salon-charcoal">الإلغاء لا يحذف بياناتك ولا يسقط المدة المدفوعة.</p></div>
+          <div><h2 className="text-xl font-bold">إدارة التجديد</h2><p className="mt-1 text-sm font-semibold text-salon-charcoal">الإلغاء لا يحذف البيانات فورًا ولا يسقط المدة المدفوعة؛ تبدأ مهلة الحذف البالغة 60 يومًا بعد توقف الخدمة.</p></div>
           {status === "ACTIVE" ? <button type="button" disabled={loading} onClick={() => void changeRenewal("CANCEL")} className="dashboard-danger-button">إلغاء التجديد</button> : status === "CANCELED" && currentPeriodEnd ? <button type="button" disabled={loading} onClick={() => void changeRenewal("RESUME")} className="dashboard-button">استئناف الاشتراك</button> : null}
         </div>
       </section>

@@ -60,8 +60,7 @@ export async function getCommissionReport(prisma: ReportPrisma, filters: Commiss
     };
 
     row.visitsCount += 1;
-    // الوعاء هو المبلغ قبل الضريبة؛ للزيارات القديمة بلا ضريبة يساوي الصافي.
-    row.commissionBase += Number(visit.subtotalAmount) || Number(visit.netAmount);
+    row.commissionBase += Number(visit.netAmount);
     row.commissionAmount += Number(visit.commissionAmount);
     row.netAmount += Number(visit.netAmount);
     for (const line of visit.services) {

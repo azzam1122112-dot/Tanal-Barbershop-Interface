@@ -41,6 +41,8 @@ p.html
 slots.json
 app/my/*/h.txt
 app/my/*/m.json
+output/
+tmp/
 
 # tests
 coverage/

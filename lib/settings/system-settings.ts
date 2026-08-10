@@ -10,7 +10,7 @@ type SettingsPrisma = PrismaClient | Prisma.TransactionClient;
  *
  * **استخدمها دائمًا بدل `systemSettings.findFirst({})`** — الاستعلام بلا قيد
  * قد يعيد إعدادات مؤسسة أخرى في بيئة متعددة المستأجرين، فتُحتسب النقاط
- * أو إعدادات الحساب بمعدّل خاطئ.
+ * أو إعدادات الحساب بقيم خاطئة.
  */
 export async function getEffectiveSettings(
   prisma: SettingsPrisma,
@@ -45,10 +45,6 @@ export function toSafeSystemSettings(settings: SystemSettings) {
     allowMultipleDiscounts: settings.allowMultipleDiscounts,
     whatsappDefaultCountryCode: settings.whatsappDefaultCountryCode,
     whatsappEnabled: settings.whatsappEnabled,
-    vatEnabled: settings.vatEnabled,
-    vatRate: Number(settings.vatRate),
-    vatInclusive: settings.vatInclusive,
-    vatNumber: settings.vatNumber,
     legalName: settings.legalName,
     defaultCommissionRate: Number(settings.defaultCommissionRate),
     bookingEnabled: settings.bookingEnabled,
@@ -68,10 +64,6 @@ export type SystemSettingsUpdate = Partial<{
   currency: string;
   pointsPerCurrencyUnit: number;
   whatsappEnabled: boolean;
-  vatEnabled: boolean;
-  vatRate: number;
-  vatInclusive: boolean;
-  vatNumber: string | null;
   legalName: string | null;
   defaultCommissionRate: number;
   bookingEnabled: boolean;
@@ -88,18 +80,6 @@ export async function updateSystemSettings(prisma: PrismaClient, data: SystemSet
   const before = await getEffectiveSettings(prisma, { organizationId: meta.organizationId, salonId: meta.salonId });
   if (!before) throw new BusinessError("إعدادات النظام غير موجودة");
 
-  // حقول الضريبة للحساب الداخلي فقط؛ لا تنتج المنصة فاتورة ZATCA.
-  const nextVatEnabled = data.vatEnabled ?? before.vatEnabled;
-  if (nextVatEnabled) {
-    const vatNumber = (data.vatNumber ?? before.vatNumber ?? "").trim();
-    const legalName = (data.legalName ?? before.legalName ?? before.salonName ?? "").trim();
-    if (!/^\d{15}$/.test(vatNumber)) {
-      throw new BusinessError("الرقم الضريبي يجب أن يتكوّن من 15 رقمًا عند حفظ إعدادات الضريبة الداخلية");
-    }
-    if (!legalName) {
-      throw new BusinessError("أدخل الاسم النظامي للمنشأة لتفعيل الضريبة");
-    }
-  }
   // نافذة الحجز تُرفض عند الحفظ لا تُقصَّ بصمت: المالك يستحق سبب الرفض،
   // وإلا حفظ إغلاقًا قبل الفتح ثم بحث عن سبب اختفاء الفترات من صفحة عميله.
   const nextBookingEnabled = data.bookingEnabled ?? before.bookingEnabled;

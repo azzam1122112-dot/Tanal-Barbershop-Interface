@@ -1,6 +1,6 @@
 import qrcode from "qrcode-generator";
 
-/** QR عام لروابط داخلية مثل ملصق الولاء. لا يحمل أي دلالة ضريبية. */
+/** QR عام لروابط داخلية مثل ملصق الولاء. */
 export function buildQrSvg(data: string, options: { cellSize?: number; margin?: number } = {}) {
   const qr = qrcode(0, "M");
   qr.addData(data);

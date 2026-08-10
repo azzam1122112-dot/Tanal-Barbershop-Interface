@@ -5,6 +5,7 @@ import { ensurePortalToken } from "@/lib/customers/customer-portal";
 import { assertSubscriptionActive } from "@/lib/plans/subscription-guard";
 import { normalizeSaudiPhone } from "@/lib/phone/saudi-phone";
 import { consumeRateLimit } from "@/lib/auth/rate-limit";
+import { LEGAL_VERSION } from "@/lib/legal";
 
 export type LoyaltySignupResult =
   | { outcome: "CREATED"; portalPath: string; customerId: string }
@@ -28,6 +29,8 @@ export async function selfRegisterForLoyalty(
     rateLimitKey: string;
     whatsappTransactionalOptIn?: boolean;
     whatsappMarketingOptIn?: boolean;
+    privacyNoticeAcknowledged: true;
+    privacyNoticeControllerName: string;
   },
 ): Promise<LoyaltySignupResult> {
   const name = input.name.trim();
@@ -58,6 +61,11 @@ export async function selfRegisterForLoyalty(
     whatsappTransactionalOptIn: input.whatsappTransactionalOptIn ?? false,
     whatsappMarketingOptIn: input.whatsappMarketingOptIn ?? false,
     whatsappConsentSource: "WEBSITE",
+    privacyNotice: {
+      acknowledgedAt: new Date(),
+      version: LEGAL_VERSION,
+      controllerName: input.privacyNoticeControllerName,
+    },
   });
 
   const token = await ensurePortalToken(prisma, customer.id, input.organizationId);
@@ -75,6 +83,9 @@ export async function selfRegisterForLoyalty(
         whatsappTransactionalOptIn: input.whatsappTransactionalOptIn ?? false,
         whatsappMarketingOptIn: input.whatsappMarketingOptIn ?? false,
         whatsappConsentSource: "WEBSITE",
+        privacyNoticeAcknowledged: true,
+        privacyNoticeVersion: LEGAL_VERSION,
+        privacyNoticeControllerName: input.privacyNoticeControllerName,
       },
     },
   });

@@ -10,6 +10,7 @@ type CustomerSummary = {
   id: string;
   name: string;
   phone: string;
+  loyaltyEnabled: boolean;
   pointsBalance: number;
   visitsCount: number;
   lastVisitAt: string | null;
@@ -22,6 +23,7 @@ export function CustomerSearch() {
   const [customer, setCustomer] = useState<CustomerSummary | null>(null);
   const [notFoundPhone, setNotFoundPhone] = useState("");
   const [newName, setNewName] = useState("");
+  const [enrollInLoyalty, setEnrollInLoyalty] = useState(false);
   const [transactionalConsent, setTransactionalConsent] = useState(false);
   const [marketingConsent, setMarketingConsent] = useState(false);
   const [message, setMessage] = useState("");
@@ -87,6 +89,7 @@ export function CustomerSearch() {
       body: JSON.stringify({
         name: newName,
         phone: notFoundPhone,
+        enrollInLoyalty,
         whatsappTransactionalOptIn: transactionalConsent,
         whatsappMarketingOptIn: marketingConsent,
       }),
@@ -106,6 +109,7 @@ export function CustomerSearch() {
     setCustomer(null);
     setNotFoundPhone("");
     setNewName("");
+    setEnrollInLoyalty(false);
     setTransactionalConsent(false);
     setMarketingConsent(false);
     setMessage("");
@@ -166,15 +170,22 @@ export function CustomerSearch() {
 
             {customer ? (
               <div className="p-4">
-                <p className="text-xs font-bold text-salon-forest">تم العثور على العميل</p>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-bold text-salon-forest">تم العثور على العميل</p>
+                  <span className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${customer.loyaltyEnabled ? "border-violet-200 bg-violet-50 text-violet-700" : "border-salon-line bg-salon-mist text-salon-charcoal"}`}>
+                    {customer.loyaltyEnabled ? "مشترك في الولاء" : "عميل عادي"}
+                  </span>
+                </div>
                 <div className="mt-2 flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <h2 className="break-words text-3xl font-bold text-salon-ink">{customer.name}</h2>
                     <p className="mt-1 font-semibold text-salon-charcoal/75">{customer.phone}</p>
                   </div>
-                  <div className="rounded-2xl border border-salon-gold/40 bg-salon-gold/10 px-4 py-3 text-center">
-                    <p className="text-xs font-bold text-salon-charcoal/65">النقاط</p>
-                    <p className="text-2xl font-black text-salon-forest">{customer.pointsBalance}</p>
+                  <div className={`rounded-2xl border px-4 py-3 text-center ${customer.loyaltyEnabled ? "border-salon-gold/40 bg-salon-gold/10" : "border-salon-line bg-salon-mist"}`}>
+                    <p className="text-xs font-bold text-salon-charcoal/65">{customer.loyaltyEnabled ? "النقاط" : "الولاء"}</p>
+                    <p className={`${customer.loyaltyEnabled ? "text-2xl" : "mt-1 text-xs"} font-black text-salon-forest`}>
+                      {customer.loyaltyEnabled ? customer.pointsBalance : "غير مشترك"}
+                    </p>
                   </div>
                 </div>
                 <dl className="mt-4 grid grid-cols-2 gap-2 text-sm">
@@ -198,8 +209,10 @@ export function CustomerSearch() {
               <form onSubmit={createCustomer} className="space-y-3 p-4">
                 <div>
                   <p className="text-xs font-bold text-salon-forest">عميل جديد</p>
-                  <h2 className="mt-1 text-2xl font-bold">إضافة العميل والمتابعة</h2>
-                  <p className="mt-1 text-sm font-semibold text-salon-charcoal/70">الرقم جاهز، أضف الاسم فقط وسيتم فتح تسجيل الزيارة.</p>
+                  <h2 className="mt-1 text-2xl font-bold">تسجيل العملية لعميل جديد</h2>
+                  <p className="mt-1 text-sm font-semibold leading-6 text-salon-charcoal/70">
+                    أضف الاسم ثم تابع للعملية. عضوية الولاء اختيارية ولا تمنع تسجيل الزيارة.
+                  </p>
                 </div>
                 <input value={notFoundPhone} readOnly className="barber-field h-12 bg-salon-mist" />
                 <input
@@ -209,6 +222,20 @@ export function CustomerSearch() {
                   placeholder="اسم العميل"
                   className="barber-field h-14 text-lg"
                 />
+                <label className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-3.5 transition ${enrollInLoyalty ? "border-violet-300 bg-violet-50" : "border-salon-line bg-salon-mist"}`}>
+                  <input
+                    type="checkbox"
+                    checked={enrollInLoyalty}
+                    onChange={(event) => setEnrollInLoyalty(event.target.checked)}
+                    className="mt-1 h-5 w-5 accent-violet-600"
+                  />
+                  <span>
+                    <strong className="block text-sm font-bold text-salon-ink">إضافة العميل إلى برنامج الولاء</strong>
+                    <small className="mt-1 block text-[11px] font-semibold leading-5 text-salon-charcoal/65">
+                      فعّلها فقط إذا رغب العميل؛ وإلا ستُسجّل العملية بلا نقاط.
+                    </small>
+                  </span>
+                </label>
                 <div className="space-y-2 rounded-2xl border border-violet-200 bg-violet-50/70 p-3">
                   <p className="text-xs font-bold text-violet-900">اسأل العميل وحدد موافقته</p>
                   <label className="flex cursor-pointer items-center gap-3 rounded-xl bg-white px-3 py-2.5 text-sm font-bold">
@@ -222,7 +249,7 @@ export function CustomerSearch() {
                   <p className="text-[11px] leading-5 text-slate-500">لا تفعّل أي خيار دون موافقة العميل الصريحة.</p>
                 </div>
                 <button disabled={loading} aria-busy={loading} className="barber-gold-button h-14 w-full text-lg">
-                  {loading ? "جاري الحفظ..." : "حفظ وفتح تسجيل الزيارة"}
+                  {loading ? "جاري الحفظ..." : enrollInLoyalty ? "حفظ مع الولاء وفتح العملية" : "حفظ كعميل عادي وفتح العملية"}
                 </button>
               </form>
             ) : null}

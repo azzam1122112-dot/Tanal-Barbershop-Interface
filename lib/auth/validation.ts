@@ -145,6 +145,7 @@ export const updateStaffSchema = z.object({
 export const customerCreateSchema = z.object({
   name: z.string().trim().min(2, "اسم العميل مطلوب"),
   phone: phoneSchema,
+  enrollInLoyalty: z.boolean().optional().default(true),
   whatsappTransactionalOptIn: z.boolean().optional().default(false),
   whatsappMarketingOptIn: z.boolean().optional().default(false),
 });
@@ -172,7 +173,7 @@ export const visitPaymentMethodSchema = z.enum(["CASH", "NETWORK"], {
 });
 
 export const visitRequestSchema = z.object({
-  customerId: z.string().trim().min(1, "العميل مطلوب"),
+  customerId: z.string().trim().min(1).optional().nullable(),
   serviceIds: z.array(z.string().trim().min(1)).min(1, "اختر خدمة واحدة على الأقل"),
   // المنتجات اختيارية؛ أسعارها من الكتالوج ولا تُقبل من العميل.
   products: z
@@ -193,6 +194,8 @@ export const visitRequestSchema = z.object({
 
 export const visitConfirmRequestSchema = visitRequestSchema.extend({
   idempotencyKey: z.string().trim().min(8, "مفتاح منع التكرار مطلوب").max(120),
+  paymentConfirmed: z.literal(true, { errorMap: () => ({ message: "أكد استلام الدفع" }) }),
+  cashTenderedAmount: z.coerce.number().nonnegative().optional().nullable(),
 });
 
 export const rewardRuleCreateSchema = z.object({
@@ -386,22 +389,10 @@ export const systemSettingsUpdateSchema = z.object({
   currency: z.string().trim().min(2).max(8).optional(),
   pointsPerCurrencyUnit: z.coerce.number().positive("قيمة النقاط يجب أن تكون أكبر من صفر").optional(),
   whatsappEnabled: z.boolean().optional(),
-  // ضريبة القيمة المضافة — اختيارية، يفعّلها المالك.
-  vatEnabled: z.boolean().optional(),
-  vatRate: z.coerce.number().min(0, "نسبة الضريبة لا تقل عن صفر").max(100, "نسبة الضريبة لا تتجاوز 100").optional(),
-  vatInclusive: z.boolean().optional(),
   defaultCommissionRate: z.coerce
     .number()
     .min(0, "نسبة العمولة لا تقل عن صفر")
     .max(100, "نسبة العمولة لا تتجاوز 100")
-    .optional(),
-  vatNumber: z
-    .string()
-    .trim()
-    .regex(/^\d{15}$/, "الرقم الضريبي يجب أن يتكوّن من 15 رقمًا")
-    .or(z.literal(""))
-    .transform((value) => (value === "" ? null : value))
-    .nullable()
     .optional(),
   legalName: z
     .string()

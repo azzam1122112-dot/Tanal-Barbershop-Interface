@@ -33,6 +33,8 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/dashboard/appointments", label: "المواعيد", description: "جدول اليوم", icon: "visits", roles: BRANCH_OPERATIONS },
       { href: "/dashboard/visits", label: "الزيارات", description: "الخدمات والتحصيل", icon: "scissors", roles: BRANCH_OPERATIONS },
+      { href: "/dashboard/expenses", label: "المصروفات", description: "البنود وصافي التشغيل", icon: "cash", roles: BRANCH_OPERATIONS },
+      { href: "/dashboard/cash-custody", label: "عهدة الكاش", description: "التحصيل وخزائن الفروع", icon: "billing", roles: BRANCH_OPERATIONS },
       { href: "/dashboard/daily-close", label: "الصندوق", description: "الجلسات والإغلاق", icon: "cash", roles: BRANCH_OPERATIONS },
       { href: "/dashboard/post-close-adjustments", label: "تصحيحات الإغلاق", description: "الفروقات والمراجعة", icon: "adjustments", roles: BRANCH_OPERATIONS },
       { href: "/dashboard/attendance", label: "الحضور", description: "حالة الفريق", icon: "staff", roles: BRANCH_OPERATIONS },

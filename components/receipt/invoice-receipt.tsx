@@ -1,6 +1,7 @@
 import { formatDateTime, formatMoney, formatNumber } from "@/lib/format";
 import type { ReceiptData } from "@/lib/invoicing/receipt";
 import { PrintButton } from "./print-button";
+import { ShareReceiptPdfButton } from "./share-pdf-button";
 
 /**
  * مستند الإيصال/الفاتورة. مصمّم بعرض إيصال حراري (80mm) فيطبع كما هو
@@ -8,11 +9,10 @@ import { PrintButton } from "./print-button";
  */
 export function InvoiceReceipt({ receipt, backHref }: { receipt: ReceiptData; backHref?: string }) {
   const { totals, seller } = receipt;
-  const hasVat = totals.vatRate > 0;
 
   return (
     <div className="receipt-page min-h-screen bg-salon-mist px-4 py-6 print:bg-white print:p-0">
-      <div className="receipt-actions mx-auto mb-4 flex max-w-[380px] items-center justify-between gap-3 print:hidden">
+      <div className="receipt-actions mx-auto mb-4 flex max-w-[520px] flex-wrap items-center justify-between gap-3 print:hidden">
         {backHref ? (
           <a href={backHref} className="dashboard-button-soft px-4 py-2 text-sm">
             رجوع
@@ -20,7 +20,10 @@ export function InvoiceReceipt({ receipt, backHref }: { receipt: ReceiptData; ba
         ) : (
           <span />
         )}
-        <PrintButton />
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <ShareReceiptPdfButton visitId={receipt.visitId} />
+          <PrintButton />
+        </div>
       </div>
 
       <article className="receipt-sheet mx-auto max-w-[380px] bg-white px-6 py-7 text-salon-ink shadow-sm print:max-w-none print:shadow-none">
@@ -32,7 +35,6 @@ export function InvoiceReceipt({ receipt, backHref }: { receipt: ReceiptData; ba
           <p className="mt-3 inline-block rounded-md border border-salon-line px-3 py-1 text-xs font-bold">
             {receipt.documentTitle}
           </p>
-          <p className="mt-2 text-[10px] font-semibold text-salon-charcoal">إيصال تشغيلي - ليس فاتورة ضريبية ولا مستند ZATCA</p>
         </header>
 
         {receipt.status === "CANCELLED" ? (
@@ -42,7 +44,7 @@ export function InvoiceReceipt({ receipt, backHref }: { receipt: ReceiptData; ba
         ) : null}
 
         <dl className="mt-5 space-y-1.5 border-y border-dashed border-salon-line py-4 text-xs font-semibold">
-          <Row label="رقم الفاتورة" value={receipt.invoiceNumber ?? "-"} ltr />
+          <Row label="رقم الإيصال" value={receipt.invoiceNumber ?? "-"} ltr />
           <Row label="التاريخ" value={formatDateTime(receipt.visitedAt)} />
           <Row label="الحلاق" value={receipt.barber.name} />
           <Row label="العميل" value={receipt.customer.name} />
@@ -70,17 +72,17 @@ export function InvoiceReceipt({ receipt, backHref }: { receipt: ReceiptData; ba
         <dl className="mt-4 space-y-1.5 border-t border-salon-line pt-4 text-xs font-semibold">
           <Row label="الإجمالي" value={formatMoney(totals.grossAmount)} />
           {totals.discountAmount > 0 ? <Row label="الخصم" value={`- ${formatMoney(totals.discountAmount)}`} /> : null}
-          {hasVat ? (
-            <>
-              <Row label="الإجمالي قبل الضريبة" value={formatMoney(totals.subtotalAmount)} />
-              <Row label={`ضريبة القيمة المضافة (${totals.vatRate}%)`} value={formatMoney(totals.vatAmount)} />
-            </>
-          ) : null}
           <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-salon-line pt-3">
-            <dt className="text-sm font-bold">{hasVat ? "الإجمالي شامل الضريبة" : "المبلغ المستحق"}</dt>
+            <dt className="text-sm font-bold">المبلغ المستحق</dt>
             <dd className="text-base font-bold tabular-nums">{formatMoney(totals.netAmount)}</dd>
           </div>
           <Row label="طريقة الدفع" value={receipt.paymentMethod === "CASH" ? "كاش" : "شبكة"} />
+          {receipt.paymentMethod === "CASH" && receipt.cashTenderedAmount != null ? (
+            <>
+              <Row label="المبلغ المستلم" value={formatMoney(receipt.cashTenderedAmount)} />
+              <Row label="الباقي للعميل" value={formatMoney(receipt.cashChangeAmount ?? 0)} />
+            </>
+          ) : null}
         </dl>
 
         {receipt.loyalty.earnedPoints > 0 || receipt.loyalty.redeemedPoints > 0 ? (

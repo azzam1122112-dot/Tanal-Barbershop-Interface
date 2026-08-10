@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getRequestMeta, parseJsonBody } from "@/lib/auth/http";
 import { prisma } from "@/lib/db/prisma";
-import { resolveRequestOrganization } from "@/lib/tenant/request-org";
+import { getKnownLoginOrgSlug } from "@/lib/tenant/request-org";
 import { selfRegisterForLoyalty } from "@/lib/customers/loyalty-signup";
 import { saudiPhoneInputSchema } from "@/lib/phone/saudi-phone";
 import { toErrorResponse } from "@/lib/http/error-response";
@@ -14,6 +14,7 @@ const joinSchema = z.object({
   organizationSlug: z.string().trim().min(1).max(60).optional(),
   whatsappTransactionalOptIn: z.boolean().optional().default(false),
   whatsappMarketingOptIn: z.boolean().optional().default(false),
+  privacyNoticeAcknowledged: z.literal(true, { message: "يجب تأكيد الاطلاع على إشعار الخصوصية" }),
 });
 
 export async function POST(request: Request) {
@@ -22,9 +23,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: parsed.error.issues[0]?.message ?? "بيانات غير صحيحة" }, { status: 400 });
   }
 
-  const organization = parsed.data.organizationSlug
-    ? await prisma.organization.findUnique({ where: { slug: parsed.data.organizationSlug } })
-    : await resolveRequestOrganization();
+  const organizationSlug = parsed.data.organizationSlug ?? await getKnownLoginOrgSlug();
+  const organization = organizationSlug
+    ? await prisma.organization.findUnique({ where: { slug: organizationSlug } })
+    : null;
 
   if (!organization || organization.status === "SUSPENDED") {
     return NextResponse.json({ message: "الصالون غير متاح للتسجيل حاليًا" }, { status: 404 });
@@ -40,6 +42,8 @@ export async function POST(request: Request) {
       rateLimitKey: meta.ipAddress ?? "unknown",
       whatsappTransactionalOptIn: parsed.data.whatsappTransactionalOptIn,
       whatsappMarketingOptIn: parsed.data.whatsappMarketingOptIn,
+      privacyNoticeAcknowledged: true,
+      privacyNoticeControllerName: organization.name,
     });
 
     if (result.outcome === "ALREADY_REGISTERED") {

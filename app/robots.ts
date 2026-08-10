@@ -15,8 +15,8 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: "*",
-        allow: ["/", "/join", "/signup", "/terms", "/privacy", "/refund-policy", "/digital-service-policy", "/data-processing-agreement", "/provider", "/contact"],
-        disallow: ["/api/", "/dashboard", "/barber", "/platform", "/my/", "/receipt/"],
+        allow: ["/", "/signup", "/terms", "/privacy", "/refund-policy", "/digital-service-policy", "/data-processing-agreement", "/provider", "/contact"],
+        disallow: ["/api/", "/dashboard", "/barber", "/platform", "/join", "/my/", "/receipt/"],
       },
     ],
     sitemap: absoluteUrl("/sitemap.xml"),
