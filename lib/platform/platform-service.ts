@@ -3,6 +3,7 @@ import type { OrganizationStatus, Prisma, PrismaClient, SubscriptionStatus } fro
 import { BusinessError } from "@/lib/errors";
 import { hashAdminPassword } from "@/lib/auth/password";
 import { hashBarberPin } from "@/lib/auth/barber-pin";
+import { startOfRiyadhMonth } from "@/lib/datetime/riyadh";
 
 const PAGE_SIZE = 20;
 
@@ -110,7 +111,7 @@ export async function getPlatformOverview(prisma: PrismaClient) {
   const now = new Date();
   const soon = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
   const renewalWindow = new Date(now.getTime() + 14 * DAY_MS);
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthStart = startOfRiyadhMonth(now);
 
   const [
     totalOrgs,

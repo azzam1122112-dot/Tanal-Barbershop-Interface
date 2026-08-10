@@ -197,7 +197,7 @@ export function AppointmentsManager({
         <div className="grid grid-cols-2 gap-3">
           <label className="block text-sm font-semibold">
             الوقت
-            <input lang="en" name="time" type="time" required className="dashboard-field mt-2" />
+            <input dir="ltr" lang="en" name="time" type="time" required className="dashboard-field mt-2" />
           </label>
           <label className="block text-sm font-semibold">
             المدة (دقيقة)

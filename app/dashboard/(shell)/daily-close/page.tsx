@@ -9,6 +9,7 @@ import { getRequestSession } from "@/lib/auth/http";
 import { getCashSessionHistory, getCashSessionSummary } from "@/lib/cash-sessions/cash-session-service";
 import { prisma } from "@/lib/db/prisma";
 import { getPostCloseAdjustmentReport } from "@/lib/post-close-adjustments/post-close-adjustment-report";
+import { addRiyadhDays, parseRiyadhDateKey, toRiyadhDateKey } from "@/lib/datetime/riyadh";
 
 export default async function DashboardDailyClosePage({
   searchParams,
@@ -20,9 +21,9 @@ export default async function DashboardDailyClosePage({
   if (!canAccessDashboard(session)) redirect("/barber");
 
   const params = await searchParams;
-  const selectedDate = params.date ? new Date(params.date) : new Date();
-  const last7From = new Date(selectedDate);
-  last7From.setDate(last7From.getDate() - 6);
+  const selectedDateKey = params.date ?? toRiyadhDateKey(new Date());
+  const selectedDate = parseRiyadhDateKey(selectedDateKey);
+  const last7From = addRiyadhDays(selectedDate, -6);
   const { organizationId, orgWhere, salonWhere, salonIds } = dashboardScope(session);
   const [summary, history, barbers, adjustmentReport] = await Promise.all([
     getCashSessionSummary(prisma, organizationId, salonIds),
@@ -32,11 +33,11 @@ export default async function DashboardDailyClosePage({
   ]);
 
   return (
-    <DashboardShell title="جلسات الصندوق" description="يفتح الحلاق جلسة تشغيلية ويغلقها المدير لتثبيت العد. التحصيل ونقل العهدة مستقلان تمامًا في شاشة عهدة الكاش.">
+    <DashboardShell title="جلسات الصندوق" description="يفتح الحلاق الجلسة ويمكنه إنهاؤها عند التوقف، وتبقى كل جلسة مغلقة ظاهرة للإدارة للتدقيق. التحصيل ونقل العهدة مستقلان في شاشة عهدة الكاش.">
         <form className="dashboard-panel mt-6 flex flex-col gap-3 p-4 sm:flex-row sm:items-end">
           <label className="text-sm font-bold text-salon-charcoal">
             تاريخ سجل الجلسات
-            <input lang="en" name="date" type="date" defaultValue={toDateInput(selectedDate)} className="dashboard-field mt-2" />
+            <input dir="ltr" lang="en" name="date" type="date" defaultValue={selectedDateKey} className="dashboard-field mt-2" />
           </label>
           <button className="dashboard-button">عرض السجل</button>
         </form>
@@ -55,8 +56,8 @@ export default async function DashboardDailyClosePage({
         <section className="mt-8">
           <h2 className="text-2xl font-bold">سجل جلسات الصندوق المغلقة</h2>
           <FilterBar className="mt-4 md:grid-cols-[150px_150px_1fr_120px]">
-            <input lang="en" name="from" type="date" defaultValue={params.from ?? toDateInput(selectedDate)} className="dashboard-field" />
-            <input lang="en" name="to" type="date" defaultValue={params.to ?? toDateInput(selectedDate)} className="dashboard-field" />
+            <input dir="ltr" lang="en" name="from" type="date" defaultValue={params.from ?? selectedDateKey} className="dashboard-field" />
+            <input dir="ltr" lang="en" name="to" type="date" defaultValue={params.to ?? selectedDateKey} className="dashboard-field" />
             <select name="barberId" defaultValue={params.barberId ?? ""} className="dashboard-field">
               <option value="">كل الحلاقين</option>
               {barbers.map((barber) => <option key={barber.id} value={barber.id}>{barber.name}</option>)}
@@ -98,7 +99,7 @@ export default async function DashboardDailyClosePage({
                     <td className="px-3 py-3">{formatMoney(close.cashDifference)}</td>
                     <td className="px-3 py-3">{formatMoney(close.cardTotal)}</td>
                     <td className="px-3 py-3 font-bold">{formatMoney(close.netTotal)}</td>
-                    <td className="px-3 py-3">{close.closedBy?.name ?? "-"}</td>
+                    <td className="px-3 py-3">{close.closedBy?.name ?? (close.notes?.includes("أغلقها الحلاق") ? `${close.barber.name} (الحلاق)` : "-")}</td>
                   </tr>
                 ))}
                 {history.length === 0 ? <tr><td colSpan={13} className="px-4 py-8"><EmptyState title="لا توجد جلسات مغلقة" description="لا يوجد سجل مطابق للفترة أو الحلاق المحدد." /></td></tr> : null}
@@ -108,8 +109,4 @@ export default async function DashboardDailyClosePage({
         </section>
     </DashboardShell>
   );
-}
-
-function toDateInput(date: Date) {
-  return date.toISOString().slice(0, 10);
 }

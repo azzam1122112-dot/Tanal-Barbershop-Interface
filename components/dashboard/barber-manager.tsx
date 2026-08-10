@@ -6,6 +6,7 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
 import type { SafeBarber } from "@/lib/auth/sanitize";
 import { buildBarberLoginMessage, toWhatsAppPhone } from "@/lib/barbers/login-share";
 import { InlineEmpty } from "@/components/dashboard/ui";
+import { RIYADH_TIME_ZONE } from "@/lib/datetime/riyadh";
 
 type BarberResponse = {
   barber?: SafeBarber;
@@ -33,6 +34,7 @@ type BarberDraft = {
 type BarberFilter = "all" | "active" | "inactive";
 
 const dateFormatter = new Intl.DateTimeFormat("ar-SA", {
+  timeZone: RIYADH_TIME_ZONE,
   year: "numeric",
   month: "short",
   day: "numeric",
@@ -589,6 +591,7 @@ export function BarberManager({
                                 <span className="mb-2 block text-xs font-bold text-salon-charcoal">بداية الدوام</span>
                                 <input
                                   type="time"
+                                  dir="ltr"
                                   lang="en"
                                   value={draft.workStartTime}
                                   onChange={(event) => updateDraft(barber.id, { workStartTime: event.target.value })}
@@ -599,6 +602,7 @@ export function BarberManager({
                                 <span className="mb-2 block text-xs font-bold text-salon-charcoal">نهاية الدوام</span>
                                 <input
                                   type="time"
+                                  dir="ltr"
                                   lang="en"
                                   value={draft.workEndTime}
                                   onChange={(event) => updateDraft(barber.id, { workEndTime: event.target.value })}

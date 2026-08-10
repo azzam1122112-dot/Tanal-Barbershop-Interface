@@ -4,6 +4,14 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   compress: true,
+  // مولّد الإيصال يقرأ الخطين من القرص وقت التشغيل. تضمينهما صراحةً يحافظ
+  // عليهما أيضًا عند نشر ناتج file tracing أو حزمة standalone مصغّرة.
+  outputFileTracingIncludes: {
+    "/*": [
+      "./node_modules/@ibm/plex-sans-arabic/fonts/complete/woff/IBMPlexSansArabic-Regular.woff",
+      "./node_modules/@ibm/plex-sans-arabic/fonts/complete/woff/IBMPlexSansArabic-Bold.woff",
+    ],
+  },
   async headers() {
     const securityHeaders = [
       { key: "X-Content-Type-Options", value: "nosniff" },

@@ -1,5 +1,6 @@
 import type { PaymentMethod } from "@prisma/client";
 import { getPresetRange, type ReportFilters } from "./dashboard-reports";
+import { addRiyadhDays, parseRiyadhDateKey } from "@/lib/datetime/riyadh";
 
 export function getReportFiltersFromUrl(url: URL): ReportFilters {
   const preset = url.searchParams.get("preset");
@@ -9,8 +10,8 @@ export function getReportFiltersFromUrl(url: URL): ReportFilters {
   const paymentMethod = url.searchParams.get("paymentMethod");
 
   return {
-    from: fromParam ? startOfDay(new Date(fromParam)) : presetRange.from,
-    to: toParam ? endExclusive(new Date(toParam)) : presetRange.to,
+    from: fromParam ? parseRiyadhDateKey(fromParam) : presetRange.from,
+    to: toParam ? addRiyadhDays(parseRiyadhDateKey(toParam), 1) : presetRange.to,
     barberId: url.searchParams.get("barberId"),
     paymentMethod: isPaymentMethod(paymentMethod) ? paymentMethod : undefined,
   };
@@ -18,16 +19,4 @@ export function getReportFiltersFromUrl(url: URL): ReportFilters {
 
 function isPaymentMethod(value: string | null): value is PaymentMethod {
   return value === "CASH" || value === "NETWORK";
-}
-
-function startOfDay(date: Date) {
-  const next = new Date(date);
-  next.setHours(0, 0, 0, 0);
-  return next;
-}
-
-function endExclusive(date: Date) {
-  const next = startOfDay(date);
-  next.setDate(next.getDate() + 1);
-  return next;
 }

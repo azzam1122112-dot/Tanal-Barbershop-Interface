@@ -1,5 +1,6 @@
 import type { PaymentMethod, Prisma, PrismaClient } from "@prisma/client";
 import { getCachedJson, redisKey, setCachedJson } from "@/lib/cache/redis";
+import { addRiyadhDays, getRiyadhDayRange, normalizeRiyadhDay, startOfRiyadhMonth, toRiyadhDateKey } from "@/lib/datetime/riyadh";
 
 type ReportPrisma = PrismaClient | Prisma.TransactionClient;
 
@@ -24,37 +25,28 @@ type VisitForReport = Prisma.VisitGetPayload<{
 }>;
 
 export function getTodayRange(now = new Date()) {
-  const start = new Date(now);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 1);
-  return { from: start, to: end };
+  const { from, to } = getRiyadhDayRange(now);
+  return { from, to };
 }
 
 export function getPresetRange(preset: string | null | undefined, now = new Date()) {
   const today = getTodayRange(now);
   if (preset === "yesterday") {
-    const from = new Date(today.from);
-    from.setDate(from.getDate() - 1);
-    const to = new Date(today.from);
-    return { from, to };
+    return { from: addRiyadhDays(today.from, -1), to: today.from };
   }
   if (preset === "last7") {
-    const from = new Date(today.from);
-    from.setDate(from.getDate() - 6);
-    return { from, to: today.to };
+    return { from: addRiyadhDays(today.from, -6), to: today.to };
   }
   if (preset === "month") {
-    const from = new Date(today.from.getFullYear(), today.from.getMonth(), 1);
-    return { from, to: today.to };
+    return { from: startOfRiyadhMonth(now), to: today.to };
   }
   return today;
 }
 
 export function normalizeReportFilters(filters: ReportFilters = {}) {
   const fallback = getTodayRange();
-  const from = filters.from ? new Date(filters.from) : fallback.from;
-  const to = filters.to ? new Date(filters.to) : fallback.to;
+  const from = filters.from ? normalizeReportBoundary(filters.from, false) : fallback.from;
+  const to = filters.to ? normalizeReportBoundary(filters.to, true) : fallback.to;
 
   return {
     organizationId: filters.organizationId || undefined,
@@ -69,7 +61,7 @@ export function normalizeReportFilters(filters: ReportFilters = {}) {
 export async function getDashboardSummary(prisma: ReportPrisma, organizationId?: string, salonIds?: string[] | null, now = new Date()) {
   const range = getTodayRange(now);
   const cacheKey = organizationId
-    ? redisKey("dashboard", "summary", organizationId, scopeCachePart(salonIds), range.from.toISOString().slice(0, 10))
+    ? redisKey("dashboard", "summary", organizationId, scopeCachePart(salonIds), toRiyadhDateKey(range.from))
     : null;
   if (cacheKey) {
     const cached = await getCachedJson<Awaited<ReturnType<typeof buildDashboardSummary>>>(cacheKey);
@@ -80,6 +72,12 @@ export async function getDashboardSummary(prisma: ReportPrisma, organizationId?:
   const summary = buildDashboardSummary(visits, range);
   if (cacheKey) await setCachedJson(cacheKey, summary, dashboardCacheTtl());
   return summary;
+}
+
+function normalizeReportBoundary(value: Date | string, isEnd: boolean) {
+  if (value instanceof Date) return value;
+  const day = normalizeRiyadhDay(value);
+  return isEnd ? addRiyadhDays(day, 1) : day;
 }
 
 function buildDashboardSummary(visits: VisitForReport[], range: { from: Date; to: Date }) {
@@ -287,9 +285,7 @@ function buildTopCustomers(visits: VisitForReport[]) {
 }
 
 async function buildInactiveCustomers(prisma: ReportPrisma, organizationId?: string) {
-  const cutoff = new Date();
-  cutoff.setHours(0, 0, 0, 0);
-  cutoff.setDate(cutoff.getDate() - 30);
+  const cutoff = addRiyadhDays(normalizeRiyadhDay(new Date()), -30);
   const customers = await prisma.customer.findMany({
     where: {
       ...(organizationId ? { organizationId } : {}),

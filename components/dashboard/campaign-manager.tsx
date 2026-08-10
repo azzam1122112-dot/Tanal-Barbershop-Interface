@@ -34,7 +34,8 @@ export function CampaignManager({ initialCampaigns }: { initialCampaigns: Campai
     event.preventDefault();
     setLoading(true);
     setToast(null);
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const response = await fetch("/api/dashboard/campaigns", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -55,7 +56,7 @@ export function CampaignManager({ initialCampaigns }: { initialCampaigns: Campai
 
     if (response.ok && data.campaign) {
       setCampaigns((current) => [data.campaign!, ...current]);
-      event.currentTarget.reset();
+      formElement.reset();
       setToast({ message: "تم إنشاء الحملة بنجاح", tone: "success" });
     } else {
       setToast({ message: data.message ?? "تعذر إنشاء الحملة", tone: "error" });
@@ -107,11 +108,11 @@ export function CampaignManager({ initialCampaigns }: { initialCampaigns: Campai
         <div className="grid grid-cols-2 gap-2">
           <label className="text-sm font-bold text-salon-charcoal">
             البداية
-            <input lang="en" name="startAt" required type="datetime-local" className="dashboard-field mt-1" />
+            <input dir="ltr" lang="en" name="startAt" required type="datetime-local" className="dashboard-field mt-1" />
           </label>
           <label className="text-sm font-bold text-salon-charcoal">
             النهاية
-            <input lang="en" name="endAt" required type="datetime-local" className="dashboard-field mt-1" />
+            <input dir="ltr" lang="en" name="endAt" required type="datetime-local" className="dashboard-field mt-1" />
           </label>
         </div>
         <input lang="en" name="maxUsesPerCustomer" required type="number" min={1} defaultValue={1} placeholder="الاستخدام لكل عميل" className="dashboard-field" />

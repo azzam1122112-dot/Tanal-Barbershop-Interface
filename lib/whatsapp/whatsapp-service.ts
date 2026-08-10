@@ -17,6 +17,7 @@ import { normalizeSaudiPhone, toSaudiWhatsAppPhone } from "@/lib/phone/saudi-pho
 import { writeAuditLog } from "@/lib/audit/audit-log";
 import { getActiveManagerRewards } from "@/lib/manager-rewards/manager-reward-service";
 import { getEffectiveSettings } from "@/lib/settings/system-settings";
+import { getRiyadhDayRange, toRiyadhDateKey } from "@/lib/datetime/riyadh";
 import {
   assertWhatsAppConsentForCategory,
   categoryForTemplate,
@@ -687,7 +688,7 @@ function sanitizeMessageValue(value: unknown) {
 }
 
 function formatDate(date: Date) {
-  return date.toISOString().slice(0, 10);
+  return toRiyadhDateKey(date);
 }
 
 function formatCampaignDiscount(campaign: Campaign) {
@@ -696,15 +697,11 @@ function formatCampaignDiscount(campaign: Campaign) {
 }
 
 function startOfDay(date: Date) {
-  const next = new Date(date);
-  next.setHours(0, 0, 0, 0);
-  return next;
+  return getRiyadhDayRange(date).from;
 }
 
 function endExclusive(date: Date) {
-  const next = startOfDay(date);
-  next.setDate(next.getDate() + 1);
-  return next;
+  return getRiyadhDayRange(date).to;
 }
 
 const messageLogInclude = {

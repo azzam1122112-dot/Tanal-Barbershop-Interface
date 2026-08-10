@@ -93,6 +93,7 @@ export function PortalInstall() {
           {copied ? "تم النسخ ✓" : "نسخ الرابط"}
         </button>
       </div>
+      <span className="sr-only" aria-live="polite">{copied ? "تم نسخ رابط الصفحة" : ""}</span>
 
       {showHelp ? (
         <div className="mt-4 space-y-3 rounded-2xl bg-white px-4 py-4 text-xs font-semibold leading-6 text-salon-charcoal">

@@ -49,7 +49,7 @@ export default async function AppointmentsPage({
       <form className="dashboard-panel mt-6 flex flex-col gap-3 p-4 sm:flex-row sm:items-end">
         <label className="text-sm font-bold text-salon-charcoal">
           يوم المواعيد
-          <input lang="en" name="date" type="date" defaultValue={selectedDate} className="dashboard-field mt-2" />
+          <input dir="ltr" lang="en" name="date" type="date" defaultValue={selectedDate} className="dashboard-field mt-2" />
         </label>
         <button className="dashboard-button">عرض</button>
       </form>

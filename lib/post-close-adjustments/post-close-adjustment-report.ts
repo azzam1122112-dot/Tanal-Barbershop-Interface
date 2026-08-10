@@ -1,4 +1,5 @@
 import type { AuditLog, PaymentMethod, PrismaClient } from "@prisma/client";
+import { addRiyadhDays, normalizeRiyadhDay, startOfRiyadhDay } from "@/lib/datetime/riyadh";
 
 type AdjustmentType = "VISIT_CANCELLED" | "VISIT_PAYMENT_METHOD_UPDATED" | "VISIT_AMOUNT_UPDATED";
 
@@ -162,27 +163,12 @@ function summarizeAdjustments(adjustments: SummaryAdjustment[]) {
 }
 
 function normalizeRange(filters: ReportFilters) {
-  const fallbackFrom = new Date();
-  fallbackFrom.setHours(0, 0, 0, 0);
-  fallbackFrom.setDate(fallbackFrom.getDate() - 6);
-  const fallbackTo = new Date();
-  fallbackTo.setHours(0, 0, 0, 0);
-  fallbackTo.setDate(fallbackTo.getDate() + 1);
-  const from = filters.from ? startOfDay(new Date(filters.from)) : fallbackFrom;
-  const to = filters.to ? endExclusive(new Date(filters.to)) : fallbackTo;
+  const today = startOfRiyadhDay(new Date());
+  const fallbackFrom = addRiyadhDays(today, -6);
+  const fallbackTo = addRiyadhDays(today, 1);
+  const from = filters.from ? normalizeRiyadhDay(filters.from) : fallbackFrom;
+  const to = filters.to ? addRiyadhDays(normalizeRiyadhDay(filters.to), 1) : fallbackTo;
   return { from, to };
-}
-
-function startOfDay(date: Date) {
-  const next = new Date(date);
-  next.setHours(0, 0, 0, 0);
-  return next;
-}
-
-function endExclusive(date: Date) {
-  const next = startOfDay(date);
-  next.setDate(next.getDate() + 1);
-  return next;
 }
 
 function sanitizeValues(values: AuditJson) {

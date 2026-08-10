@@ -201,7 +201,7 @@ function PwaBar({
   return (
     <div
       role="status"
-      className="fixed inset-x-0 bottom-0 z-50 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3"
+      className="fixed inset-x-0 bottom-0 z-30 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3"
     >
       <div
         className={`mx-auto flex max-w-md items-center gap-3 rounded-2xl border px-4 py-3 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.6)] ${toneClass}`}

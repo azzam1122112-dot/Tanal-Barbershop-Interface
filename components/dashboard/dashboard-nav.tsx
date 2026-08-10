@@ -45,7 +45,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/dashboard/barbers", label: "الحلاقون", description: "الفريق والعمولات", icon: "barbers", roles: BRANCH_OPERATIONS },
       { href: "/dashboard/commissions", label: "المستحقات", description: "عمولات الحلاقين", icon: "billing", roles: BRANCH_OPERATIONS },
-      { href: "/dashboard/customers", label: "العملاء", description: "السجل والعلاقة", icon: "customers", roles: BRANCH_OPERATIONS },
+      { href: "/dashboard/customers", label: "العملاء", description: "السجل والعلاقة", icon: "customers", roles: ALL_MANAGEMENT },
       { href: "/dashboard/privacy-requests", label: "طلبات الخصوصية", description: "وصول وتصحيح وحذف", icon: "customers", roles: ALL_MANAGEMENT },
     ],
   },
@@ -54,9 +54,9 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/dashboard/services", label: "الخدمات", description: "الأسعار والمدد", icon: "services", roles: ALL_MANAGEMENT },
       { href: "/dashboard/products", label: "المنتجات", description: "المبيعات والمخزون", icon: "services", roles: ALL_MANAGEMENT },
-      { href: "/dashboard/loyalty", label: "الولاء", description: "النقاط والمكافآت", icon: "loyalty", roles: BRANCH_OPERATIONS },
-      { href: "/dashboard/campaigns", label: "الحملات", description: "العروض والاستهداف", icon: "campaigns", roles: BRANCH_OPERATIONS },
-      { href: "/dashboard/whatsapp", label: "واتساب", description: "التواصل والموافقات", icon: "whatsapp", roles: BRANCH_OPERATIONS },
+      { href: "/dashboard/loyalty", label: "الولاء", description: "النقاط والمكافآت", icon: "loyalty", roles: ALL_MANAGEMENT },
+      { href: "/dashboard/campaigns", label: "الحملات", description: "العروض والاستهداف", icon: "campaigns", roles: ALL_MANAGEMENT },
+      { href: "/dashboard/whatsapp", label: "واتساب", description: "التواصل والموافقات", icon: "whatsapp", roles: ALL_MANAGEMENT },
     ],
   },
   {
