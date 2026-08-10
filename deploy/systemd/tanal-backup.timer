@@ -2,10 +2,10 @@
 Description=Nightly XMANSX PostgreSQL backup
 
 [Timer]
-OnCalendar=*-*-* 01:17:00 UTC
-RandomizedDelaySec=900
+OnCalendar=*-*-* 02:30:00
+RandomizedDelaySec=15m
 Persistent=true
-Unit=xmansx-backup.service
+Unit=tanal-backup.service
 
 [Install]
 WantedBy=timers.target

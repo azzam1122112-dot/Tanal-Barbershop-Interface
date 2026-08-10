@@ -260,7 +260,7 @@
 ### XM-H-11 — Proxy/IP trust allows rate-limit bypass
 
 - **Severity/CVSS:** High / 7.5
-- **File:** `lib/auth/rate-limit.ts`; request metadata helper؛ `deploy/nginx/xmansx.conf`
+- **File:** `lib/auth/rate-limit.ts`; request metadata helper؛ `deploy/nginx/tanal.conf`
 - **Endpoint:** login/signup/public forms
 - **Description:** التطبيق يثق بأول `X-Forwarded-For`، وNginx يستخدم `$proxy_add_x_forwarded_for`؛ يمكن للعميل إدخال قيمة أولى مزورة إن وصل إلى proxy.
 - **Attack scenario:** تغيير header لكل محاولة لتجاوز حد التسجيل/الدخول.

@@ -1,0 +1,17 @@
+[Unit]
+Description=XMANSX encrypted PostgreSQL backup
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=tanal
+Group=tanal
+EnvironmentFile=/etc/tanal/tanal.env
+Environment=BACKUP_DIR=/var/backups/tanal/postgresql
+ExecStart=/srv/tanal/app/deploy/backup/tanal-backup.sh
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/backups/tanal

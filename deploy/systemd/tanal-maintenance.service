@@ -5,14 +5,15 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=xmansx
-Group=xmansx
-WorkingDirectory=/srv/xmansx/current
-EnvironmentFile=/etc/xmansx/xmansx.env
+User=tanal
+Group=tanal
+WorkingDirectory=/srv/tanal/app
+EnvironmentFile=/etc/tanal/tanal.env
 Environment=NODE_ENV=production
-ExecStart=/usr/bin/npm run maintenance:cleanup
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/local/bin/npm run maintenance:cleanup
 PrivateTmp=true
 NoNewPrivileges=true
-ProtectSystem=strict
+ProtectSystem=full
 ProtectHome=true
-ReadWritePaths=/srv/xmansx/current/.next /var/tmp
+ReadWritePaths=/srv/tanal

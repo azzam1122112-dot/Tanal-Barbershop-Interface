@@ -5,7 +5,7 @@ Description=Run XMANSX privacy retention cleanup daily
 OnCalendar=*-*-* 02:10:00 Asia/Riyadh
 RandomizedDelaySec=600
 Persistent=true
-Unit=xmansx-maintenance.service
+Unit=tanal-maintenance.service
 
 [Install]
 WantedBy=timers.target

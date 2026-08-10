@@ -207,6 +207,30 @@ npm run start:prod
 `GET /api/health/readiness` لموازن الحمل؛ فهو يتحقق من PostgreSQL وRedis ويعيد `503`
 عند عدم الجاهزية. لا توجّه حركة جديدة إلى نسخة تفشل في هذا المسار.
 
+### نشر إصدار على خادم الإنتاج القائم
+
+خادم الإنتاج الحالي يشغّل `tanal.service` من `/srv/tanal/app`، وأسراره في
+`/etc/tanal/tanal.env` خارج مجلد التطبيق. المجلد **ليس مستودع git**؛ الإصدار
+يُسلَّم كأرشيف ويُبدَّل مجلده بالكامل، ويُقرأ إصداره الحالي من `.release-sha`.
+
+```bash
+# من جهاز التطوير
+git archive --format=tar.gz -o /tmp/tanal-<sha>.tar.gz <sha>
+scp /tmp/tanal-<sha>.tar.gz root@<host>:/tmp/
+
+# على الخادم
+/srv/tanal/app/deploy/release.sh /tmp/tanal-<sha>.tar.gz <sha>
+```
+
+`deploy/release.sh` يأخذ نسخة احتياطية من قاعدة البيانات، ثم يبني الإصدار الجديد
+في مجلد مستقل **والتطبيق الحالي ما زال يخدم الطلبات**، فيقتصر التوقف على لحظة
+التبديل وإعادة التشغيل. وإن فشل فحص الصحة بعده يرجع تلقائيًا للإصدار السابق.
+
+> **لا تضبط `NODE_ENV=production` قبل `npm ci`.** عندها يتخطّى npm حزم التطوير
+> فيسقط TypeScript وTailwind ويفشل البناء. والأهم أن `ExecStartPre` في وحدة
+> systemd يشغّل `prisma migrate deploy` وحزمة `prisma` نفسها devDependency —
+> أي أن تقليم حزم التطوير بعد البناء يمنع الخدمة من الإقلاع أصلًا.
+
 ### طبقة الإنتاج المقترحة
 
 توجد ملفات جاهزة تحت `deploy/` لـ systemd وNginx وRedis. ثبّت شهادة Cloudflare
@@ -248,6 +272,18 @@ npm run maintenance:cleanup
 ```
 
 أو عبر طلب `POST /api/maintenance/cleanup` مع ترويسة `x-maintenance-token` تحمل قيمة `MAINTENANCE_TOKEN`.
+
+الوحدتان الجاهزتان لذلك `deploy/systemd/tanal-maintenance.{service,timer}`:
+
+```bash
+install -m 0644 deploy/systemd/tanal-maintenance.{service,timer} /etc/systemd/system/
+systemctl daemon-reload && systemctl enable --now tanal-maintenance.timer
+```
+
+> **حالة الإنتاج (11 أغسطس 2026): هذه الوحدة غير مثبّتة على `tanal-prod`،** ولا
+> يوجد أي جدول cron بديل لها. أي أن الجلسات المنتهية وعدادات المحاولات وسجلات
+> التدقيق **لا تُحذف أبدًا** حاليًا، فمدة الاحتفاظ المعلنة في سياسة الخصوصية غير
+> مطبَّقة فعليًا. تثبيتها عملية حذف بيانات، فراجع `RETENTION_*` قبل أول تشغيل.
 
 ### النسخ الاحتياطي
 
