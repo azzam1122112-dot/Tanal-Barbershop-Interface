@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { CashCustodyManager } from "@/components/dashboard/cash-custody-manager";
 import { DashboardShell, Notice } from "@/components/dashboard/ui";
-import { canAccessDashboard } from "@/lib/auth/access";
+import { canAccessDashboard, canWithdrawBranchSafe } from "@/lib/auth/access";
 import { getRequestSession } from "@/lib/auth/http";
 import { effectiveSalonIds } from "@/lib/auth/salon-scope";
 import { getCashCustodyDashboard } from "@/lib/cash-custody/cash-custody-service";
@@ -26,7 +26,7 @@ export default async function CashCustodyPage() {
       <Notice title="التحصيل نقل عهدة فقط" tone="gold" className="mt-6">
         الإيراد يُثبت مرة واحدة عند دفع الزيارة. هذه الشاشة تنقل حيازة النقد بين الحلاق وخزنة الفرع، وكل خطأ يُعكس بحركة موثقة بدل حذف السجل.
       </Notice>
-      <CashCustodyManager initialData={data} />
+      <CashCustodyManager initialData={data} canWithdrawSafe={canWithdrawBranchSafe(session)} />
     </DashboardShell>
   );
 }

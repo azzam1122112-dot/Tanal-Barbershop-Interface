@@ -25,28 +25,44 @@ const actionToType: Record<string, AdjustmentType> = {
   "visit.amount_updated": "VISIT_AMOUNT_UPDATED",
 };
 
+/** سقف صفوف العرض. يُطبَّق على السجلات **المطابقة** لا على سجل التدقيق كله. */
+const ADJUSTMENT_ROWS_LIMIT = 500;
+
 export async function getPostCloseAdjustmentReport(prisma: PrismaClient, filters: ReportFilters = {}) {
   const range = normalizeRange(filters);
+  const scopedSalonIds = filters.salonIds && filters.salonIds.length > 0 ? filters.salonIds : null;
+
+  /**
+   * التصفية داخل القاعدة لا بعد الجلب.
+   *
+   * كان الاستعلام يسحب أحدث ٥٠٠ سجل تعديل زيارة **على مستوى المؤسسة** ثم يصفّي
+   * بالتصحيح-بعد-الإغلاق وبالفرع في الذاكرة. مشرف فرعٍ هادئ في مؤسسة نشطة كان
+   * يرى تقريرًا فارغًا لأن الخمسمئة استُهلكت في فروع أخرى — وهذه شاشة رقابية،
+   * والفراغ فيها يُقرأ «لا مخالفات».
+   *
+   * سجلات ما قبل إضافة `salonId` تحمل `null`، فتُقبل هنا ويصفّيها ربط الزيارة
+   * أدناه — فلا ينكسر التاريخ ولا يتسرّب فرع خارج النطاق.
+   */
   const logs = await prisma.auditLog.findMany({
     where: {
       ...(filters.organizationId ? { organizationId: filters.organizationId } : {}),
       entityType: "Visit",
-      action: { in: Object.keys(actionToType) },
+      action: { in: filters.adjustmentType ? typeToActions(filters.adjustmentType) : Object.keys(actionToType) },
       createdAt: { gte: range.from, lt: range.to },
+      after: { path: ["postCloseAdjustment"], equals: true },
+      ...(scopedSalonIds ? { OR: [{ salonId: { in: scopedSalonIds } }, { salonId: null }] } : {}),
     },
     include: { actorUser: true },
     orderBy: { createdAt: "desc" },
-    take: 500,
+    take: ADJUSTMENT_ROWS_LIMIT,
   });
-  const postCloseLogs = logs.filter((log) => {
-    const after = asObject(log.after);
-    return after.postCloseAdjustment === true && (!filters.adjustmentType || actionToType[log.action] === filters.adjustmentType);
-  });
+  const postCloseLogs = logs;
   const visitIds = [...new Set(postCloseLogs.map((log) => log.entityId).filter((id): id is string => Boolean(id)))];
   const visits = await prisma.visit.findMany({
     where: {
       id: { in: visitIds },
-      ...(filters.salonIds && filters.salonIds.length > 0 ? { salonId: { in: filters.salonIds } } : {}),
+      ...(filters.organizationId ? { organizationId: filters.organizationId } : {}),
+      ...(scopedSalonIds ? { salonId: { in: scopedSalonIds } } : {}),
       ...(filters.barberId ? { barberId: filters.barberId } : {}),
     },
     include: { customer: true, barber: true },
@@ -82,7 +98,16 @@ export async function getPostCloseAdjustmentReport(prisma: PrismaClient, filters
   return {
     summary: summarizeAdjustments(adjustments),
     adjustments,
+    // القصّ يُعلَن ولا يُخفى: شاشة رقابية تعرض جزءًا صامتة تُقرأ كأنها تعرض الكل.
+    truncated: logs.length >= ADJUSTMENT_ROWS_LIMIT,
+    rowsLimit: ADJUSTMENT_ROWS_LIMIT,
   };
+}
+
+function typeToActions(type: AdjustmentType) {
+  return Object.entries(actionToType)
+    .filter(([, value]) => value === type)
+    .map(([action]) => action);
 }
 
 function calculateFinancialImpact(type: AdjustmentType, before: AuditJson, after: AuditJson) {

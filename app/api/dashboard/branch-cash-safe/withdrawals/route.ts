@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { parseJsonBody, requireDashboardApi } from "@/lib/auth/http";
+import { parseJsonBody, requireBranchSafeWithdrawalApi } from "@/lib/auth/http";
 import { assertSalonAllowed } from "@/lib/auth/salon-scope";
 import { withdrawBranchSafe } from "@/lib/cash-custody/cash-custody-service";
 import { prisma } from "@/lib/db/prisma";
@@ -15,10 +15,13 @@ const schema = z.object({
 });
 
 export async function POST(request: Request) {
-  const auth = await requireDashboardApi();
+  const auth = await requireBranchSafeWithdrawalApi();
   if (auth.response) return auth.response;
   const session = auth.session;
   if (!session || session.type !== "dashboard") return NextResponse.json({ message: "غير مصرح" }, { status: 401 });
+  if (session.role !== "OWNER" && session.role !== "ADMIN") {
+    return NextResponse.json({ message: "صلاحية غير كافية" }, { status: 403 });
+  }
   const parsed = schema.safeParse(await parseJsonBody(request));
   if (!parsed.success) return NextResponse.json({ message: parsed.error.issues[0]?.message ?? "بيانات السحب غير صحيحة" }, { status: 400 });
   try {

@@ -10,6 +10,7 @@ type Settings = {
   whatsappEnabled: boolean;
   legalName: string | null;
   defaultCommissionRate: number;
+  barberExpenseLimit: number;
   bookingEnabled: boolean;
   bookingOpenMinute: number;
   bookingCloseMinute: number;
@@ -91,6 +92,7 @@ export function SettingsForm({ initialSettings }: { initialSettings: Settings })
         pointsPerCurrencyUnit: form.get("pointsPerCurrencyUnit"),
         whatsappEnabled: form.get("whatsappEnabled") === "on",
         defaultCommissionRate: form.get("defaultCommissionRate"),
+        barberExpenseLimit: form.get("barberExpenseLimit"),
         legalName: form.get("legalName"),
         bookingEnabled,
         ...(bookingEnabled
@@ -163,6 +165,21 @@ export function SettingsForm({ initialSettings }: { initialSettings: Settings })
             />
             <span className="mt-1.5 block text-xs font-medium text-salon-charcoal/70">
               تُستخدم لمن لم تُحدَّد له نسبة خاصة. صفر = بلا عمولة.
+            </span>
+          </label>
+          <label className="text-sm font-bold text-salon-charcoal">
+            سقف مصروف الحلاق من الدرج
+            <input lang="en"
+              name="barberExpenseLimit"
+              defaultValue={settings.barberExpenseLimit}
+              type="number"
+              step="10"
+              min="0"
+              max="100000"
+              className="dashboard-field mt-2 h-12"
+            />
+            <span className="mt-1.5 block text-xs font-medium text-salon-charcoal/70">
+              أكبر مبلغ يسجّله الحلاق بنفسه؛ ما فوقه يسجّله مدير الفرع. صفر = بلا سقف.
             </span>
           </label>
           <label className="flex items-center gap-3 rounded-xl border border-salon-line bg-white px-3 py-3 text-sm font-bold text-salon-charcoal">

@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
+import { organizationContribution } from "@/lib/finance/contribution";
 import { roundMoney } from "@/lib/visits/visit-totals";
 import { addRiyadhDays, normalizeRiyadhDay, startOfRiyadhMonth } from "@/lib/datetime/riyadh";
 
@@ -40,14 +41,18 @@ export async function getSalonComparisonReport(
       discountAmount: true,
       commissionAmount: true,
       paymentMethod: true,
+      productLines: { select: { unitCost: true, quantity: true } },
     },
   });
 
+  // `expenseDate` لا `createdAt`: مصروف ٣٠ يوليو يُدخَل ٢ أغسطس ينتمي ليوليو.
+  // كان هذا الاستعلام وحده يفلتر على وقت الإدخال، فيختلف مجموع الفرع هنا عن
+  // تقرير المصروفات لنفس الفترة بلا سبب ظاهر للمالك.
   const expenses = await prisma.cashExpense.groupBy({
     by: ["salonId"],
     where: {
       organizationId: filters.organizationId,
-      createdAt: { gte: from, lt: to },
+      expenseDate: { gte: from, lt: to },
       ...(filters.salonIds && filters.salonIds.length > 0 ? { salonId: { in: filters.salonIds } } : {}),
     },
     _sum: { amount: true },
@@ -59,6 +64,17 @@ export async function getSalonComparisonReport(
     const netAmount = roundMoney(salonVisits.reduce((total, visit) => total + Number(visit.netAmount), 0));
     const commissionAmount = roundMoney(salonVisits.reduce((total, visit) => total + Number(visit.commissionAmount), 0));
     const expensesTotal = roundMoney(expensesBySalon.get(salon.id) ?? 0);
+    const productCost = roundMoney(
+      salonVisits.reduce(
+        (total, visit) =>
+          total +
+          visit.productLines.reduce(
+            (lineTotal, line) => lineTotal + (line.unitCost == null ? 0 : Number(line.unitCost) * line.quantity),
+            0,
+          ),
+        0,
+      ),
+    );
 
     return {
       salonId: salon.id,
@@ -75,8 +91,14 @@ export async function getSalonComparisonReport(
       discountAmount: roundMoney(salonVisits.reduce((total, visit) => total + Number(visit.discountAmount), 0)),
       commissionAmount,
       expensesTotal,
-      // ما يتبقى للمؤسسة بعد عمولات الحلاقين والمصروفات النثرية.
-      contribution: roundMoney(netAmount - commissionAmount - expensesTotal),
+      productCost,
+      // ما يتبقى للمؤسسة بعد تكلفة المنتجات وعمولات الحلاقين والمصروفات النثرية.
+      contribution: organizationContribution({
+        netSales: netAmount,
+        productCost,
+        commissionAccrued: commissionAmount,
+        expensesTotal,
+      }),
       averageTicket: salonVisits.length > 0 ? roundMoney(netAmount / salonVisits.length) : 0,
       dailyAverage: roundMoney(netAmount / periodDays),
       activeBarbers: new Set(salonVisits.map((visit) => visit.barberId)).size,
@@ -104,6 +126,7 @@ export async function getSalonComparisonReport(
       netAmount: totalNet,
       commissionAmount: roundMoney(rows.reduce((total, row) => total + row.commissionAmount, 0)),
       expensesTotal: roundMoney(rows.reduce((total, row) => total + row.expensesTotal, 0)),
+      productCost: roundMoney(rows.reduce((total, row) => total + row.productCost, 0)),
       contribution: roundMoney(rows.reduce((total, row) => total + row.contribution, 0)),
     },
     best: ranked[0] ?? null,

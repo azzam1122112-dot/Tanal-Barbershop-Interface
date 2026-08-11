@@ -38,6 +38,36 @@ export function canTransferBarbers(session: AuthSession | null) {
   return canAccessDashboard(session);
 }
 
+/**
+ * صرف عمولات الحلاقين وعكسها: مالك/مدير مؤسسة فقط.
+ * قرار مالي يُخرج نقدًا من الخزنة أو يُسقط دَينًا على المؤسسة، فلا يُترك لمشرف
+ * فرع كما لا تُترك له إدارة الموظفين والإعدادات.
+ */
+export function canPayCommissions(session: AuthSession | null) {
+  return canManageStaff(session);
+}
+
+/**
+ * قراءة البيان المالي الشهري وربحية الفروع: مالك/مدير مؤسسة فقط.
+ * المشرف فرعي النطاق ويرى مصروفات فروعه وأداءها، أما ربح المؤسسة بعد العمولات
+ * فقرار ملكية لا معلومة تشغيلية.
+ */
+export function canViewFinancials(session: AuthSession | null) {
+  return canManageStaff(session);
+}
+
+/**
+ * إخراج نقد من خزنة الفرع (تسليم للمالك أو إيداع بنكي): مالك/مدير مؤسسة فقط.
+ *
+ * القاعدة الجامعة: **كل ما يُخرج نقدًا من الخزنة بيد واحدة يحتاج نفس الصلاحية.**
+ * كان صرف خمسين ريالًا عمولة محجوبًا عن المشرف بينما سحب رصيد الخزنة كاملًا
+ * متاحًا له — تدرّج مخاطر معكوس. التحصيل من الحلاق يبقى للمشرف لأنه **يُدخل**
+ * النقد إلى الخزنة لا يُخرجه.
+ */
+export function canWithdrawBranchSafe(session: AuthSession | null) {
+  return canManageStaff(session);
+}
+
 export function canAccessBarberApp(session: AuthSession | null) {
   return session?.type === "barber" && session.role === "BARBER";
 }

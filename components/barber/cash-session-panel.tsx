@@ -46,7 +46,6 @@ const EXPENSE_CATEGORIES = [
   { value: "SUPPLIES", label: "مستلزمات" },
   { value: "MAINTENANCE", label: "صيانة" },
   { value: "UTILITIES", label: "فواتير وخدمات" },
-  { value: "STAFF_ADVANCE", label: "سلفة موظف" },
   { value: "OTHER", label: "أخرى" },
 ] as const;
 
@@ -56,6 +55,7 @@ export function CashSessionPanel({
   custodyBalance = 0,
   custodyInitialized = false,
   collections = [],
+  expenseLimit = 0,
 }: {
   initialSession: CashSession;
   initialExpenses?: Expense[];
@@ -64,6 +64,8 @@ export function CashSessionPanel({
   /** هل عدّ المدير العهدة عدًّا فعليًا مرة واحدة على الأقل؟ */
   custodyInitialized?: boolean;
   collections?: BarberCollection[];
+  /** سقف ما يسجّله الحلاق بنفسه من الدرج. صفر = بلا سقف. */
+  expenseLimit?: number;
 }) {
   const [cashSession, setCashSession] = useState(initialSession);
   const [loading, setLoading] = useState(false);
@@ -362,10 +364,16 @@ export function CashSessionPanel({
                   min={0.5}
                   step="0.5"
                   inputMode="decimal"
+                  max={expenseLimit > 0 ? expenseLimit : undefined}
                   required
                   placeholder="المبلغ المصروف"
                   className="barber-field h-12"
                 />
+                {expenseLimit > 0 ? (
+                  <p className="-mt-1 px-1 text-xs font-semibold text-salon-charcoal/70">
+                    أقصى مبلغ تسجّله بنفسك {formatMoney(expenseLimit)}. ما فوقه يسجّله مدير الفرع.
+                  </p>
+                ) : null}
                 <select name="category" defaultValue="SUPPLIES" required className="barber-field h-12">
                   {EXPENSE_CATEGORIES.map((category) => (
                     <option key={category.value} value={category.value}>

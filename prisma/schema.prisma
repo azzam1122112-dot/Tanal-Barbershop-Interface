@@ -54,6 +54,11 @@ enum CashCustodyMovementType {
   COUNT_ADJUSTMENT
   SAFE_OWNER_PICKUP
   SAFE_BANK_DEPOSIT
+  // صرف عمولة: من خزنة الفرع نقدًا، أو خصمًا مما بيد الحلاق من عهدة.
+  SAFE_COMMISSION_PAYOUT
+  CUSTODY_COMMISSION_PAYOUT
+  CUSTODY_COMMISSION_PAYOUT_REVERSAL
+  SAFE_COMMISSION_PAYOUT_REVERSAL
 }
 
 enum CashCollectionScheduleMode {
@@ -142,7 +147,6 @@ enum ExpenseCategory {
   SUPPLIES
   MAINTENANCE
   UTILITIES
-  STAFF_ADVANCE
   REFUND
   OTHER
 }
@@ -150,6 +154,20 @@ enum ExpenseCategory {
 enum ExpensePaymentSource {
   CASH_DRAWER
   EXTERNAL
+}
+
+/**
+ * طريقة صرف العمولة — كل قيمة أثرها مختلف على دفاتر النقد.
+ */
+enum CommissionPayoutMethod {
+  // حوالة أو محفظة: لا أثر على أي دفتر نقدي داخل النظام.
+  BANK_TRANSFER
+  // نقدًا من خزنة الفرع: تنقص الخزنة بحركة موثقة.
+  CASH_FROM_SAFE
+  // يبقي الحلاق ما يعادلها مما بيده: تنقص عهدته بدل أن يسلّمها ويستلمها.
+  BARBER_CUSTODY_DEDUCTION
+  // تسوية افتتاحية لمرة واحدة: اعتماد ما قبل التشغيل مدفوعًا بلا حركة نقد.
+  OPENING_SETTLEMENT
 }
 
 enum AppointmentStatus {
@@ -323,6 +341,7 @@ model Organization {
   branchCashSafes         BranchCashSafe[]
   cashCustodyMovements    CashCustodyMovement[]
   cashCollections         CashCollection[]
+  commissionPayouts       CommissionPayout[]
   cashCollectionPolicies  CashCollectionPolicy[]
   appointments            Appointment[]
   products                Product[]
@@ -361,6 +380,7 @@ model Salon {
   branchCashSafe       BranchCashSafe?
   cashCustodyMovements CashCustodyMovement[]
   cashCollections      CashCollection[]
+  commissionPayouts    CommissionPayout[]
   cashCollectionPolicy CashCollectionPolicy?
   appointments         Appointment[]
   products             Product[]
@@ -415,6 +435,8 @@ model User {
   salonAssignments           StaffSalon[]
   collectedCash              CashCollection[]     @relation("CashCollectionCollectedBy")
   reversedCashCollections    CashCollection[]     @relation("CashCollectionReversedBy")
+  paidCommissions            CommissionPayout[]   @relation("CommissionPayoutPaidBy")
+  reversedCommissionPayouts  CommissionPayout[]   @relation("CommissionPayoutReversedBy")
 
   @@unique([organizationId, email])
   @@unique([organizationId, phone])
@@ -457,6 +479,7 @@ model Barber {
   cashBalance          BarberCashBalance?
   cashCustodyMovements CashCustodyMovement[]
   cashCollections      CashCollection[]
+  commissionPayouts    CommissionPayout[]
 
   @@unique([organizationId, phone])
   @@index([salonId, isActive])
@@ -891,6 +914,10 @@ model SystemSettings {
   legalName                     String?
   // نسبة العمولة الافتراضية للفرع %. تُستخدم إن لم تُحدَّد للحلاق أو الخدمة.
   defaultCommissionRate         Decimal      @default(0) @db.Decimal(5, 2)
+  // أقصى مصروف يسجّله الحلاق بنفسه من درج الكاش. ما فوقه يلزمه مدير الفرع.
+  // بلا سقف يستطيع الحلاق تخفيض «الكاش المتوقع» بمصروف كبير وقت الإغلاق فيختفي
+  // العجز، والتدقيق يكشفه بعد وقوعه لا قبله.
+  barberExpenseLimit            Decimal      @default(200) @db.Decimal(10, 2)
   // الحجز الذاتي من بوابة العميل — معطّل افتراضيًا حتى يفعّله المالك صراحةً.
   // تعطيله يعيد سلوك النظام السابق حرفيًا: الحجز من الموظفين فقط.
   bookingEnabled                Boolean      @default(false)
@@ -1163,6 +1190,52 @@ model CashCollectionPolicy {
   @@index([organizationId])
 }
 
+/**
+ * صرف عمولة حلاق.
+ * **دفتر رصيد جارٍ لا تسوية شهر:** المتبقي = مجموع العمولات المستحقة من الزيارات
+ * المكتملة ناقص مجموع ما صُرف غير المعكوس. الفترة هنا وصفية للإيصال فقط، لأن
+ * التسوية بالفترة تنكسر عند إلغاء زيارة قديمة أو تسجيل زيارة متأخرة.
+ * **ليس مصروفًا:** العمولة تُطرح من ربح المؤسسة مرة واحدة وقت الاستحقاق. لو
+ * سُجّل الصرف مصروفًا لطُرح مرتين. لذلك الكيان مستقل عن `CashExpense`.
+ */
+model CommissionPayout {
+  id                 String                 @id @default(cuid())
+  organizationId     String
+  // الفرع الذي خرج منه المال — يخص دفتر الخزنة لا احتساب الاستحقاق.
+  salonId            String
+  barberId           String
+  periodFrom         DateTime
+  periodTo           DateTime
+  amount             Decimal                @db.Decimal(12, 2)
+  method             CommissionPayoutMethod
+  reference          String?
+  note               String?
+  // لقطات تجعل الإيصال يشرح نفسه بعد سنة بلا إعادة حساب التاريخ كله.
+  accruedSnapshot    Decimal                @db.Decimal(12, 2)
+  paidBeforeSnapshot Decimal                @db.Decimal(12, 2)
+  outstandingAfter   Decimal                @db.Decimal(12, 2)
+  paidByUserId       String
+  paidAt             DateTime               @default(now())
+  reversedAt         DateTime?
+  reversedByUserId   String?
+  reversalReason     String?
+  idempotencyKey     String
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  salon        Salon        @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  barber       Barber       @relation(fields: [barberId], references: [id])
+  paidBy       User         @relation("CommissionPayoutPaidBy", fields: [paidByUserId], references: [id])
+  reversedBy   User?        @relation("CommissionPayoutReversedBy", fields: [reversedByUserId], references: [id])
+
+  @@unique([organizationId, idempotencyKey])
+  @@index([barberId, paidAt])
+  @@index([organizationId, paidAt])
+  @@index([salonId, paidAt])
+  @@index([reversedAt])
+}
+
 // موعد حجز. الصالون walk-in أصلًا، فالموعد اختياري ولا يمنع تسجيل زيارة بدونه.
 model Appointment {
   id              String            @id @default(cuid())
@@ -1232,6 +1305,9 @@ model VisitProduct {
   productId        String
   productName      String
   unitPrice        Decimal @db.Decimal(10, 2)
+  // تكلفة الوحدة **لحظة البيع**، كنسبة العمولة تمامًا: تعديل تكلفة المنتج لاحقًا
+  // لا يجوز أن يعيد كتابة أرباح شهور مضت. `null` = لم تُسجَّل تكلفة للمنتج.
+  unitCost         Decimal? @db.Decimal(10, 2)
   quantity         Int     @default(1)
   lineTotal        Decimal @db.Decimal(10, 2)
   commissionRate   Decimal @default(0) @db.Decimal(5, 2)

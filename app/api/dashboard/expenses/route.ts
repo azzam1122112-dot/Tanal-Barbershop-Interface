@@ -12,7 +12,7 @@ const createExpenseSchema = z.object({
   cashSessionId: z.string().min(1).optional().nullable(),
   barberId: z.string().min(1).optional().nullable(),
   amount: z.coerce.number().positive("قيمة المصروف يجب أن تكون أكبر من صفر"),
-  category: z.enum(["SUPPLIES", "MAINTENANCE", "UTILITIES", "STAFF_ADVANCE", "REFUND", "OTHER"]),
+  category: z.enum(["SUPPLIES", "MAINTENANCE", "UTILITIES", "REFUND", "OTHER"]),
   paymentSource: z.enum(["CASH_DRAWER", "EXTERNAL"]).default("EXTERNAL"),
   note: z.string().trim().min(2, "اكتب سبب المصروف"),
   payee: z.string().trim().max(120).optional().nullable(),
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
   if (!session || session.type !== "dashboard") return NextResponse.json({ message: "غير مصرح" }, { status: 401 });
 
   const url = new URL(request.url);
-  const category = z.enum(["SUPPLIES", "MAINTENANCE", "UTILITIES", "STAFF_ADVANCE", "REFUND", "OTHER"]).safeParse(
+  const category = z.enum(["SUPPLIES", "MAINTENANCE", "UTILITIES", "REFUND", "OTHER"]).safeParse(
     url.searchParams.get("category"),
   );
   const paymentSource = z.enum(["CASH_DRAWER", "EXTERNAL"]).safeParse(url.searchParams.get("paymentSource"));

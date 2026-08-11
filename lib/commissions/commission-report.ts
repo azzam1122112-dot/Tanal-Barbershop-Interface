@@ -93,6 +93,9 @@ export async function getCommissionReport(prisma: ReportPrisma, filters: Commiss
     rows,
     totals: {
       barbersCount: rows.length,
+      // من له مستحق فعلي > 0. `barbersCount` يعدّ كل من عمل في الفترة، بمن فيهم
+      // من عمولته معطّلة — عرضه تحت «حلاقون بمستحقات» يقرأ كخطأ في ضبط النسب.
+      earningBarbersCount: rows.filter((row) => row.commissionAmount > 0).length,
       visitsCount: rows.reduce((total, row) => total + row.visitsCount, 0),
       commissionBase: roundMoney(rows.reduce((total, row) => total + row.commissionBase, 0)),
       commissionAmount: roundMoney(rows.reduce((total, row) => total + row.commissionAmount, 0)),

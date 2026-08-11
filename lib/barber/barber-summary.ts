@@ -7,23 +7,34 @@ type BarberSummaryPrisma = PrismaClient | Prisma.TransactionClient;
 
 export async function getBarberTodaySummary(prisma: BarberSummaryPrisma, barberId: string, date = new Date()) {
   const { from, to } = getRiyadhDayRange(date);
+  const todayWhere = {
+    barberId,
+    status: "COMPLETED" as const,
+    visitedAt: { gte: from, lt: to },
+  };
 
-  const visits = await prisma.visit.findMany({
-    where: {
-      barberId,
-      status: "COMPLETED",
-      visitedAt: { gte: from, lt: to },
-    },
-    include: {
-      customer: true,
-      services: true,
-    },
-    orderBy: { visitedAt: "desc" },
-    take: 8,
-  });
+  /**
+   * **المجاميع بالتجميع والقائمة وحدها محدودة.**
+   * كانت الأرقام تُجمع من نفس الاستعلام المحدود بثماني زيارات، فحلاق بتسع زيارات
+   * فأكثر يقرأ «صافي اليوم» ناقصًا بينما بطاقة جلسة الصندوق على الشاشة نفسها
+   * تعرض الرقم الكامل — رقمان متناقضان أمام من يعدّ درجه بيده.
+   */
+  const [totalsRow, cashRow, latestVisitRows] = await Promise.all([
+    prisma.visit.aggregate({ where: todayWhere, _count: { _all: true }, _sum: { netAmount: true } }),
+    prisma.visit.groupBy({ by: ["paymentMethod"], where: todayWhere, _sum: { netAmount: true } }),
+    prisma.visit.findMany({
+      where: todayWhere,
+      include: { customer: true, services: true },
+      orderBy: { visitedAt: "desc" },
+      take: LATEST_VISITS_LIMIT,
+    }),
+  ]);
 
-  const cashTotal = sum(visits.filter((visit) => visit.paymentMethod === "CASH").map((visit) => Number(visit.netAmount)));
-  const networkTotal = sum(visits.filter((visit) => visit.paymentMethod === "NETWORK").map((visit) => Number(visit.netAmount)));
+  const netByMethod = new Map(cashRow.map((row) => [row.paymentMethod, Number(row._sum.netAmount ?? 0)]));
+  const visitsCount = totalsRow._count._all;
+  const netTotal = round(Number(totalsRow._sum.netAmount ?? 0));
+  const cashTotal = round(netByMethod.get("CASH") ?? 0);
+  const networkTotal = round(netByMethod.get("NETWORK") ?? 0);
   const [openCashSession, custody] = await Promise.all([
     getOpenCashSession(prisma, barberId),
     prisma.barberCashBalance.findUnique({ where: { barberId }, select: { balance: true, isInitialized: true } }),
@@ -47,10 +58,10 @@ export async function getBarberTodaySummary(prisma: BarberSummaryPrisma, barberI
   });
 
   return {
-    visitsCount: visits.length,
+    visitsCount,
     cashTotal,
     networkTotal,
-    netTotal: sum(visits.map((visit) => Number(visit.netAmount))),
+    netTotal,
     custodyBalance: Number(custody?.balance ?? 0),
     custodyInitialized: custody?.isInitialized ?? false,
     collections: collections.map((collection) => ({
@@ -60,7 +71,7 @@ export async function getBarberTodaySummary(prisma: BarberSummaryPrisma, barberI
       collectedAt: collection.collectedAt.toISOString(),
       collectedByName: collection.collectedBy?.name ?? null,
     })),
-    latestVisits: visits.slice(0, 5).map((visit) => ({
+    latestVisits: latestVisitRows.map((visit) => ({
       id: visit.id,
       customer: visit.customer
         ? { id: visit.customer.id, name: visit.customer.name, phone: visit.customer.phone }
@@ -86,6 +97,9 @@ export async function getBarberTodaySummary(prisma: BarberSummaryPrisma, barberI
   };
 }
 
-function sum(values: number[]) {
-  return Math.round(values.reduce((total, value) => total + value, 0) * 100) / 100;
+/** آخر العمليات المعروضة في شاشة الحلاق — عرض فقط، لا يحدّ أي مجموع. */
+const LATEST_VISITS_LIMIT = 5;
+
+function round(value: number) {
+  return Math.round(value * 100) / 100;
 }

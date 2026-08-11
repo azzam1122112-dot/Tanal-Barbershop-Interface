@@ -60,12 +60,62 @@ export function startOfRiyadhMonth(value: Date = new Date()) {
 
 /** نطاق الشهر الميلادي بحسب الرياض، مستقل عن منطقة خادم Node. */
 export function getRiyadhMonthRange(value: Date = new Date()) {
+  const from = startOfRiyadhMonth(value);
+  return { from, to: addRiyadhMonths(from, 1) };
+}
+
+/** بداية الشهر بعد عدد من الأشهر المدنية — يتخطى اختلاف أطوال الشهور. */
+export function addRiyadhMonths(value: Date, months: number) {
   const { year, month } = getRiyadhDateParts(value);
-  const from = riyadhDateTime(year, month, 1, 0);
-  const nextMonthCivil = createUtcDate(year, month, 1, 0);
-  nextMonthCivil.setUTCMonth(nextMonthCivil.getUTCMonth() + 1);
-  const to = riyadhDateTime(nextMonthCivil.getUTCFullYear(), nextMonthCivil.getUTCMonth() + 1, 1, 0);
-  return { from, to };
+  const civil = createUtcDate(year, month, 1, 0);
+  civil.setUTCMonth(civil.getUTCMonth() + months);
+  return riyadhDateTime(civil.getUTCFullYear(), civil.getUTCMonth() + 1, 1, 0);
+}
+
+/**
+ * مفتاح الشهر التشغيلي `YYYY-MM` بحسب تقويم الرياض.
+ * هو وحدة التجميع المالي: كل تقرير شهري يُفهرس به، وهو نفسه ما تحمله الروابط.
+ */
+export function toRiyadhMonthKey(value: Date) {
+  const { year, month } = getRiyadhDateParts(value);
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+export function parseRiyadhMonthKey(value: string) {
+  const match = /^(\d{4})-(\d{2})$/.exec(value.trim());
+  if (!match) throw new Error("Invalid month key");
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (month < 1 || month > 12) throw new Error("Invalid month key");
+  return riyadhDateTime(year, month, 1, 0);
+}
+
+export function isRiyadhMonthKey(value: string | null | undefined): value is string {
+  if (!value) return false;
+  try {
+    parseRiyadhMonthKey(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** نطاق يشمل الشهرين وما بينهما: البداية مشمولة والنهاية غير مشمولة. */
+export function getRiyadhMonthSpan(fromKey: string, toKey: string) {
+  const first = parseRiyadhMonthKey(fromKey);
+  const last = parseRiyadhMonthKey(toKey);
+  const [start, end] = first <= last ? [first, last] : [last, first];
+  return { from: start, to: addRiyadhMonths(end, 1) };
+}
+
+/** قائمة مفاتيح الأشهر بين شهرين شاملةً الطرفين، مرتّبة تصاعديًا. */
+export function riyadhMonthKeysBetween(fromKey: string, toKey: string) {
+  const { from, to } = getRiyadhMonthSpan(fromKey, toKey);
+  const keys: string[] = [];
+  for (let cursor = from; cursor < to; cursor = addRiyadhMonths(cursor, 1)) {
+    keys.push(toRiyadhMonthKey(cursor));
+  }
+  return keys;
 }
 
 /** يعيد منتصف ليل الرياض بعد عدد من الأيام المدنية من تاريخ القيمة. */

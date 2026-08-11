@@ -1,6 +1,6 @@
 import { formatDateTime, formatMoney, formatNumber } from "@/lib/format";
 import { redirect } from "next/navigation";
-import { DashboardShell, EmptyState, Field, FilterBar, StatCard, TablePanel } from "@/components/dashboard/ui";
+import { DashboardShell, EmptyState, Field, FilterBar, Notice, StatCard, TablePanel } from "@/components/dashboard/ui";
 import { canAccessDashboard } from "@/lib/auth/access";
 import { dashboardScope } from "@/lib/auth/salon-scope";
 import { getRequestSession } from "@/lib/auth/http";
@@ -47,6 +47,13 @@ export default async function PostCloseAdjustmentsPage({
           </select></Field>
           <button className="dashboard-button">تصفية</button>
         </FilterBar>
+
+        {report.truncated ? (
+          <Notice tone="warning" className="mt-6" title={`العرض مقصور على أحدث ${formatNumber(report.rowsLimit)} تصحيح`}>
+            توجد تصحيحات أقدم خارج هذه القائمة. ضيّق المدة الزمنية أو نوع التصحيح لقراءة الفترة كاملة —
+            المؤشرات أدناه تخص المعروض فقط.
+          </Notice>
+        ) : null}
 
         <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <StatCard label="عدد التصحيحات" value={formatNumber(report.summary.count)} />

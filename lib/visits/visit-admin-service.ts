@@ -3,7 +3,9 @@ import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import type { PaymentMethod, PrismaClient } from "@prisma/client";
 import { computeCampaignDiscount } from "@/lib/campaigns/campaign-eligibility";
+import { calculateVisitCommission } from "@/lib/commissions/commission";
 import { calculateVisitTotals } from "@/lib/loyalty/calculations";
+import { roundMoney } from "@/lib/visits/visit-totals";
 import { getEffectiveSettings } from "@/lib/settings/system-settings";
 import { recordStockMovement } from "@/lib/products/product-service";
 import { recordBarberCashDelta } from "@/lib/cash-custody/cash-custody-service";
@@ -155,6 +157,7 @@ export async function cancelVisit(prisma: PrismaClient, visitId: string, meta: A
       meta,
       action: "visit.cancelled",
       visitId: visit.id,
+      salonId: visit.salonId,
       before: toAdminVisitSnapshot(visit),
       after: {
         oldStatus: visit.status,
@@ -203,6 +206,7 @@ export async function updateVisitPaymentMethod(prisma: PrismaClient, visitId: st
       meta,
       action: "visit.payment_method_updated",
       visitId: visit.id,
+      salonId: visit.salonId,
       before: {
         paymentMethod: visit.paymentMethod,
         grossAmount: Number(visit.grossAmount),
@@ -267,6 +271,8 @@ export async function updateVisitAmount(prisma: PrismaClient, visitId: string, g
       });
     }
 
+    const commission = recalculateVisitCommission(visit, totals.netAmount);
+
     const updated = await tx.visit.update({
       where: { id: visit.id },
       data: {
@@ -274,9 +280,18 @@ export async function updateVisitAmount(prisma: PrismaClient, visitId: string, g
         discountAmount: totals.discountAmount,
         netAmount: totals.netAmount,
         pointsEarned: totals.pointsEarned,
+        commissionAmount: commission.totalCommission,
       },
       include: adminVisitInclude,
     });
+    // سطور الزيارة تحمل حصة كل خدمة/منتج من المستحق؛ تركها قديمة يجعل مجموع
+    // السطور مخالفًا لمستحق الزيارة، وتقرير الخدمات يقرأ مبيعات لم تُحصَّل.
+    for (const line of commission.serviceLines) {
+      await tx.visitService.update({ where: { id: line.id }, data: { commissionAmount: line.commissionAmount } });
+    }
+    for (const line of commission.productLines) {
+      await tx.visitProduct.update({ where: { id: line.id }, data: { commissionAmount: line.commissionAmount } });
+    }
     if (visit.discountType === "CAMPAIGN" && visit.campaignRedemption) {
       await tx.campaignRedemption.update({
         where: { visitId: visit.id },
@@ -310,6 +325,7 @@ export async function updateVisitAmount(prisma: PrismaClient, visitId: string, g
       meta,
       action: "visit.amount_updated",
       visitId: visit.id,
+      salonId: visit.salonId,
       before: {
         grossAmount: Number(visit.grossAmount),
         discountAmount: Number(visit.discountAmount),
@@ -325,14 +341,67 @@ export async function updateVisitAmount(prisma: PrismaClient, visitId: string, g
         paymentMethod: visit.paymentMethod,
         pointsEarned: totals.pointsEarned,
         pointsAdjustment,
+        commissionAmount: commission.totalCommission,
+        commissionAdjustment: roundMoney(commission.totalCommission - Number(visit.commissionAmount)),
         reason: meta.reason,
         postCloseAdjustment,
       },
       postCloseAdjustment,
     });
 
-    return toAdminVisitResponse(updated, { postCloseAdjustment, pointsAdjustment });
+    return toAdminVisitResponse(updated, {
+      postCloseAdjustment,
+      pointsAdjustment,
+      commissionAdjustment: roundMoney(commission.totalCommission - Number(visit.commissionAmount)),
+    });
   });
+}
+
+/**
+ * يعيد توزيع مستحق العمولة بعد تعديل مبلغ الزيارة.
+ *
+ * **النِّسب المخزَّنة لا الحالية.** كل سطر يحمل نسبته كما كانت لحظة البيع، فنعيد
+ * الحساب بها لا بنسب اليوم — وإلا لغيّر تعديلُ مبلغٍ واحد قاعدةَ «تغيير النسب لا
+ * يمسّ المستحقات التاريخية». الوعاء وحده هو ما تغيّر: المبلغ بعد الخصم.
+ *
+ * تركُ `commissionAmount` على قيمته القديمة كان يجعل الحلاق مستحقًا عمولة على مال
+ * لم يُحصَّل، ويُظهر «نسبة فعلية» تتجاوز 100% في تقرير المستحقات، ويُبخِّس المتبقي
+ * للمؤسسة في البيان الشهري.
+ *
+ * زيارة بلا سطور (بيانات قديمة) تُقاس بالتناسب على نسبتها الفعلية السابقة، فلا
+ * تُطبَّق عليها نسب حالية لم تكن سارية يومها.
+ */
+function recalculateVisitCommission(visit: VisitForAdmin, netAmount: number) {
+  const lines = [
+    ...visit.services.map((line) => ({
+      id: line.id,
+      kind: "SERVICE" as const,
+      serviceId: line.serviceId,
+      lineTotal: Number(line.lineTotal),
+      serviceRate: Number(line.commissionRate),
+    })),
+    ...visit.productLines.map((line) => ({
+      id: line.id,
+      kind: "PRODUCT" as const,
+      serviceId: line.productId,
+      lineTotal: Number(line.lineTotal),
+      serviceRate: Number(line.commissionRate),
+    })),
+  ];
+
+  if (lines.length === 0) {
+    const previousNet = Number(visit.netAmount);
+    const previousCommission = Number(visit.commissionAmount);
+    const effectiveRate = previousNet > 0 ? previousCommission / previousNet : 0;
+    return { totalCommission: roundMoney(netAmount * effectiveRate), serviceLines: [], productLines: [] };
+  }
+
+  const result = calculateVisitCommission({ lines, commissionBase: netAmount });
+  return {
+    totalCommission: result.totalCommission,
+    serviceLines: result.lines.filter((line) => line.kind === "SERVICE"),
+    productLines: result.lines.filter((line) => line.kind === "PRODUCT"),
+  };
 }
 
 async function calculateUpdatedDiscount(tx: AdminVisitPrisma, visit: VisitForAdmin, grossAmount: number) {
@@ -420,6 +489,8 @@ async function writeVisitAudit(
     meta: AdminMeta;
     action: string;
     visitId: string;
+    /** فرع الزيارة — يجعل سجل التدقيق قابلًا للتصفية بالفرع في القاعدة نفسها. */
+    salonId: string;
     before: unknown;
     after: unknown;
     postCloseAdjustment: boolean;
@@ -428,6 +499,7 @@ async function writeVisitAudit(
   await tx.auditLog.create({
     data: {
       organizationId: input.meta.organizationId,
+      salonId: input.salonId,
       actorType: input.meta.actorType,
       actorUserId: input.meta.actorUserId,
       action: input.action,
@@ -442,6 +514,9 @@ async function writeVisitAudit(
   if (input.postCloseAdjustment) {
     await tx.auditLog.create({
       data: {
+        // كان هذا السجل بلا مؤسسة ولا فرع — سطر تدقيق غير منسوب لمستأجر.
+        organizationId: input.meta.organizationId,
+        salonId: input.salonId,
         actorType: input.meta.actorType,
         actorUserId: input.meta.actorUserId,
         action: "visit.post_close_adjustment",

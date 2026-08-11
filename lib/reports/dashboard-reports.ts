@@ -19,6 +19,7 @@ type VisitForReport = Prisma.VisitGetPayload<{
     customer: { include: { loyaltyAccount: true } };
     barber: true;
     services: true;
+    productLines: true;
     loyaltyTransactions: true;
     campaignRedemption: { include: { campaign: true } };
   };
@@ -159,6 +160,7 @@ async function getVisitsForReport(prisma: ReportPrisma, filters: ReturnType<type
       customer: { include: { loyaltyAccount: true } },
       barber: true,
       services: true,
+      productLines: true,
       loyaltyTransactions: true,
       campaignRedemption: { include: { campaign: true } },
     },
@@ -171,6 +173,8 @@ function buildRevenueSummary(visits: VisitForReport[], range: { from: Date; to: 
   const discountAmount = sum(visits.map((visit) => Number(visit.discountAmount)));
   const netAmount = sum(visits.map((visit) => Number(visit.netAmount)));
   const commissionAmount = sum(visits.map((visit) => Number(visit.commissionAmount)));
+  // تكلفة ما بيع من مخزون، من لقطة السطر لا من كتالوج اليوم.
+  const productCost = sumProductCost(visits);
   const cashAmount = sum(visits.filter((visit) => visit.paymentMethod === "CASH").map((visit) => Number(visit.netAmount)));
   const networkAmount = sum(visits.filter((visit) => visit.paymentMethod === "NETWORK").map((visit) => Number(visit.netAmount)));
   const pointsEarned = sum(visits.flatMap((visit) => visit.loyaltyTransactions.filter((transaction) => transaction.type === "EARN").map((transaction) => transaction.points)));
@@ -194,6 +198,7 @@ function buildRevenueSummary(visits: VisitForReport[], range: { from: Date; to: 
     discountAmount,
     netAmount,
     commissionAmount,
+    productCost,
     cashAmount,
     networkAmount,
     visitsCount: visits.length,
@@ -344,6 +349,15 @@ function buildDiscountSummary(visits: VisitForReport[]) {
 
 function sum(values: number[]) {
   return roundMoney(values.reduce((total, value) => total + value, 0));
+}
+
+/** سطر بلا تكلفة مسجّلة يُحتسب صفرًا — تقدير متحفّظ لا تخمين بسعر اليوم. */
+function sumProductCost(visits: VisitForReport[]) {
+  return sum(
+    visits.flatMap((visit) =>
+      visit.productLines.map((line) => (line.unitCost == null ? 0 : Number(line.unitCost) * line.quantity)),
+    ),
+  );
 }
 
 function roundMoney(value: number) {

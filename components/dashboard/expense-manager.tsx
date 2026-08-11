@@ -17,7 +17,6 @@ const CATEGORIES = [
   ["SUPPLIES", "مستلزمات"],
   ["MAINTENANCE", "صيانة"],
   ["UTILITIES", "فواتير وخدمات"],
-  ["STAFF_ADVANCE", "سلفة موظف"],
   ["OTHER", "أخرى"],
 ] as const;
 

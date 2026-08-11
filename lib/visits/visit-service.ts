@@ -21,6 +21,8 @@ type ResolvedProductLine = {
   productId: string;
   productName: string;
   unitPrice: number;
+  /** تكلفة الوحدة لحظة البيع — لقطة مجمَّدة، لا قراءة من الكتالوج وقت التقرير. */
+  unitCost: number | null;
   quantity: number;
   lineTotal: number;
   commissionRate: number | null;
@@ -63,6 +65,9 @@ async function resolveProductLines(prisma: VisitPrisma, input: VisitInput): Prom
       productId: product.id,
       productName: product.name,
       unitPrice,
+      // تكلفة الوحدة تُلتقط الآن ولا تُقرأ من الكتالوج وقت التقرير: تعديل التكلفة
+      // لاحقًا يجب ألا يعيد كتابة مجمل ربح شهر مضى، كما لا تفعل نسبة العمولة.
+      unitCost: numberOrNull(product.costPrice),
       quantity,
       lineTotal: roundMoney(unitPrice * quantity),
       commissionRate: numberOrNull(product.commissionRate),
@@ -388,6 +393,7 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
           serviceId: product.productId,
           serviceName: product.productName,
           unitPrice: product.unitPrice,
+          unitCost: product.unitCost,
           quantity: product.quantity,
           lineTotal: product.lineTotal,
           kind: "PRODUCT" as const,
@@ -446,6 +452,7 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
             productId: line.serviceId,
             productName: line.serviceName,
             unitPrice: line.unitPrice,
+            unitCost: line.unitCost,
             quantity: line.quantity,
             lineTotal: line.lineTotal,
             commissionRate: line.commissionRate,

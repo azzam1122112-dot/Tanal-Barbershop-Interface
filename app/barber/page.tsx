@@ -9,6 +9,7 @@ import { CashSessionPanel } from "@/components/barber/cash-session-panel";
 import { getBarberTodaySummary } from "@/lib/barber/barber-summary";
 import { getSubscriptionState } from "@/lib/plans/subscription-guard";
 import { getSessionExpenses } from "@/lib/expenses/expense-service";
+import { getEffectiveSettings } from "@/lib/settings/system-settings";
 import { getOpenAttendance } from "@/lib/attendance/attendance-service";
 import { listAppointments } from "@/lib/appointments/appointment-service";
 import { AttendancePanel } from "@/components/barber/attendance-panel";
@@ -16,6 +17,7 @@ import { BarberNotificationCenter } from "@/components/barber/notification-cente
 import { BarberAppointmentsPanel } from "@/components/barber/appointments-panel";
 import { prisma } from "@/lib/db/prisma";
 import { getBarberMonthlyCommission } from "@/lib/commissions/barber-monthly-commission";
+import { getBarberCommissionBalance } from "@/lib/commissions/commission-payout";
 import Link from "next/link";
 import { RIYADH_TIME_ZONE } from "@/lib/datetime/riyadh";
 
@@ -24,9 +26,13 @@ export default async function BarberHomePage() {
 
   if (!session) redirect("/barber/login");
   if (!canAccessBarberApp(session)) redirect("/dashboard");
-  const [summary, monthlyCommission, organization, salon] = await Promise.all([
+  const [summary, monthlyCommission, commissionBalance, organization, salon] = await Promise.all([
     getBarberTodaySummary(prisma, session.barber.id),
     getBarberMonthlyCommission(prisma, session.barber.id),
+    getBarberCommissionBalance(prisma, {
+      organizationId: session.organizationId,
+      barberId: session.barber.id,
+    }),
     session.organizationId
       ? prisma.organization.findUnique({ where: { id: session.organizationId }, select: { name: true } })
       : null,
@@ -37,6 +43,11 @@ export default async function BarberHomePage() {
   // اسم المؤسسة والفرع قد يتطابقان (مؤسسة بفرع واحد) — تكرارهما يبدو خطأ لا معلومة.
   const workplace = [...new Set([organization?.name, salon?.name].filter(Boolean))].join(" · ");
   const subscription = await getSubscriptionState(prisma, session.organizationId);
+  const settings = await getEffectiveSettings(prisma, {
+    organizationId: session.organizationId,
+    salonId: session.salonId,
+  });
+  const barberExpenseLimit = settings ? Number(settings.barberExpenseLimit) : 0;
   const [sessionExpenses, openAttendance, todayAppointments] = await Promise.all([
     summary.cashSession ? getSessionExpenses(prisma, summary.cashSession.id) : Promise.resolve([]),
     getOpenAttendance(prisma, session.barber.id),
@@ -151,6 +162,7 @@ export default async function BarberHomePage() {
                 custodyBalance={summary.custodyBalance}
                 custodyInitialized={summary.custodyInitialized}
                 collections={summary.collections}
+                expenseLimit={barberExpenseLimit}
               />
             )}
 
@@ -165,18 +177,47 @@ export default async function BarberHomePage() {
                     </div>
                     <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-bold">مفعّلة</span>
                   </div>
-                  <p className="mt-5 text-4xl font-black tabular-nums text-white">{formatMoney(monthlyCommission.commissionAmount)}</p>
-                  <p className="mt-1 text-xs font-semibold text-white/65">المبلغ المسجل من الزيارات المكتملة خلال الشهر</p>
-                  <div className="mt-4 grid grid-cols-2 gap-2 border-t border-white/15 pt-4 text-center">
-                    <div className="rounded-2xl bg-white/10 px-3 py-2.5">
-                      <p className="text-lg font-black tabular-nums">{monthlyCommission.visitsCount}</p>
-                      <p className="text-[11px] font-bold text-white/65">زيارة مكتملة</p>
+                  {/* الرقم البطولي هو المتبقي له لا ما اكتسبه: بعد أول صرف يصير
+                      المكتسب الخام رقمًا مضلّلًا يظن الحلاق أنه ما زال يستحقه. */}
+                  <p className="lux-number mt-5 text-4xl text-white">{formatMoney(commissionBalance.outstanding)}</p>
+                  <p className="mt-1 text-xs font-semibold text-white/65">
+                    المتبقي لك بعد ما استلمته · عمولة {monthlyCommission.monthLabel} {formatMoney(monthlyCommission.commissionAmount)}
+                  </p>
+                  <div className="mt-4 grid grid-cols-3 gap-2 border-t border-white/15 pt-4 text-center">
+                    <div className="rounded-xl bg-white/10 px-2 py-2.5">
+                      <p className="lux-number text-base">{formatMoney(commissionBalance.accrued)}</p>
+                      <p className="text-[11px] font-bold text-white/65">مستحق تراكمي</p>
                     </div>
-                    <div className="rounded-2xl bg-white/10 px-3 py-2.5">
-                      <p className="text-lg font-black tabular-nums">{monthlyCommission.effectiveRate}%</p>
+                    <div className="rounded-xl bg-white/10 px-2 py-2.5">
+                      <p className="lux-number text-base">{formatMoney(commissionBalance.paid)}</p>
+                      <p className="text-[11px] font-bold text-white/65">استلمته</p>
+                    </div>
+                    <div className="rounded-xl bg-white/10 px-2 py-2.5">
+                      <p className="lux-number text-base">{monthlyCommission.effectiveRate}%</p>
                       <p className="text-[11px] font-bold text-white/65">النسبة الفعلية</p>
                     </div>
                   </div>
+                  {commissionBalance.payouts.length > 0 ? (
+                    <ul className="mt-3 space-y-1.5">
+                      {commissionBalance.payouts.slice(0, 3).map((payout) => (
+                        <li
+                          key={payout.id}
+                          className="flex items-baseline justify-between gap-3 rounded-xl bg-white/10 px-3 py-2 text-xs font-semibold text-white/85"
+                        >
+                          <span className="min-w-0 truncate">
+                            {new Date(payout.paidAt).toLocaleDateString("ar-SA", { timeZone: RIYADH_TIME_ZONE })} ·{" "}
+                            {payout.methodLabel}
+                            {payout.paidByName ? ` · ${payout.paidByName}` : ""}
+                          </span>
+                          <span className="lux-number shrink-0 text-salon-goldlight">{formatMoney(payout.amount)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-3 rounded-xl border border-dashed border-white/20 px-3 py-2.5 text-center text-[11px] font-semibold text-white/60">
+                      لم تستلم أي صرف عمولة بعد. كل صرف توثّقه الإدارة سيظهر هنا بمبلغه وطريقته.
+                    </p>
+                  )}
                 </div>
               </section>
             ) : null}

@@ -12,8 +12,10 @@ import {
   canManageOrganization,
   canManageStaff,
   canOperateLoyalty,
+  canPayCommissions,
   canSetLoyaltyPolicy,
   canTransferBarbers,
+  canWithdrawBranchSafe,
 } from "./access";
 import { getAuthSession } from "./session";
 
@@ -75,6 +77,37 @@ export async function requireAdminApi() {
 
   if (!canManageStaff(session)) {
     return { session, response: NextResponse.json({ message: "صلاحية المدير مطلوبة" }, { status: 403 }) };
+  }
+
+  return { session, response: null };
+}
+
+/** صرف عمولات الحلاقين وعكسها — مالك/مدير مؤسسة فقط. */
+export async function requireCommissionPayoutApi() {
+  const session = await getRequestSession();
+
+  if (!canAccessDashboard(session)) {
+    return { session: null, response: NextResponse.json({ message: "غير مصرح" }, { status: 401 }) };
+  }
+  if (!canPayCommissions(session)) {
+    return { session, response: NextResponse.json({ message: "صرف العمولات من صلاحيات المالك أو مدير المؤسسة" }, { status: 403 }) };
+  }
+
+  return { session, response: null };
+}
+
+/** سحب نقد من خزنة الفرع — مالك/مدير مؤسسة فقط، كصرف العمولات تمامًا. */
+export async function requireBranchSafeWithdrawalApi() {
+  const session = await getRequestSession();
+
+  if (!canAccessDashboard(session)) {
+    return { session: null, response: NextResponse.json({ message: "غير مصرح" }, { status: 401 }) };
+  }
+  if (!canWithdrawBranchSafe(session)) {
+    return {
+      session,
+      response: NextResponse.json({ message: "سحب النقد من خزنة الفرع من صلاحيات المالك أو مدير المؤسسة" }, { status: 403 }),
+    };
   }
 
   return { session, response: null };
