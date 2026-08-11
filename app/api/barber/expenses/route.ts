@@ -9,7 +9,7 @@ import { BusinessError } from "@/lib/errors";
 
 const barberExpenseSchema = z.object({
   amount: z.coerce.number().positive("قيمة المصروف يجب أن تكون أكبر من صفر"),
-  category: z.enum(["SUPPLIES", "MAINTENANCE", "UTILITIES", "STAFF_ADVANCE", "REFUND", "OTHER"]),
+  category: z.enum(["SUPPLIES", "MAINTENANCE", "UTILITIES", "REFUND", "OTHER"]),
   paymentSource: z.enum(["CASH_DRAWER", "EXTERNAL"]).default("CASH_DRAWER"),
   note: z.string().trim().min(2, "اكتب سبب المصروف"),
   payee: z.string().trim().max(120).optional().nullable(),

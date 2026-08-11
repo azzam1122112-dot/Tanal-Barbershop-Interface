@@ -7,6 +7,7 @@ import { dashboardScope } from "@/lib/auth/salon-scope";
 import { getRequestSession } from "@/lib/auth/http";
 import { prisma } from "@/lib/db/prisma";
 import { EXPENSE_CATEGORY_LABELS, getExpensesReport } from "@/lib/expenses/expense-service";
+import { organizationContribution } from "@/lib/finance/contribution";
 import { formatDate, formatDateTime, formatMoney, formatNumber } from "@/lib/format";
 import { getPresetRange, getRevenueReport } from "@/lib/reports/dashboard-reports";
 import { addRiyadhDays, parseRiyadhDateKey, toRiyadhDateKey } from "@/lib/datetime/riyadh";
@@ -61,7 +62,12 @@ export default async function ExpensesPage({
     filteredReportPromise,
   ]);
 
-  const operatingNet = revenue.netAmount - revenue.commissionAmount - fullReport.total;
+  const operatingNet = organizationContribution({
+    netSales: revenue.netAmount,
+    productCost: revenue.productCost,
+    commissionAccrued: revenue.commissionAmount,
+    expensesTotal: fullReport.total,
+  });
   const today = toRiyadhDateKey(new Date());
 
   return (

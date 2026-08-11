@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { formatMoney, formatNumber } from "@/lib/format";
 import { DashboardShell, EmptyState, Field, FilterBar, Notice, StatCard, TablePanel } from "@/components/dashboard/ui";
-import { canAccessDashboard } from "@/lib/auth/access";
+import { canAccessDashboard, canViewFinancials } from "@/lib/auth/access";
 import { dashboardScope } from "@/lib/auth/salon-scope";
 import { getRequestSession } from "@/lib/auth/http";
 import { prisma } from "@/lib/db/prisma";
@@ -16,6 +16,9 @@ export default async function SalonComparisonPage({
   if (!session) redirect("/dashboard/login");
   if (!canAccessDashboard(session)) redirect("/barber");
   if (session.type !== "dashboard") redirect("/dashboard");
+  // الصفحة تعرض «المتبقي للمؤسسة» لكل فرع — نفس رقم البيان المالي، فتلزمها نفس
+  // البوابة. إخفاؤها من التنقّل وحده لم يكن صلاحية: الرابط المباشر كان يفتحها.
+  if (!canViewFinancials(session)) redirect("/dashboard/forbidden");
 
   const params = await searchParams;
   const { organizationId, salonIds } = dashboardScope(session);

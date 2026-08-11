@@ -2,6 +2,7 @@ import { Prisma, type AuditActorType, type ExpenseCategory, type ExpensePaymentS
 import { BusinessError } from "@/lib/errors";
 import { roundMoney } from "@/lib/visits/visit-totals";
 import { recordBarberCashDelta } from "@/lib/cash-custody/cash-custody-service";
+import { getEffectiveSettings } from "@/lib/settings/system-settings";
 import { addRiyadhDays, normalizeRiyadhDay, startOfRiyadhMonth } from "@/lib/datetime/riyadh";
 
 type ExpensePrisma = PrismaClient | Prisma.TransactionClient;
@@ -10,7 +11,6 @@ export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
   SUPPLIES: "مستلزمات",
   MAINTENANCE: "صيانة",
   UTILITIES: "فواتير وخدمات",
-  STAFF_ADVANCE: "سلفة موظف",
   REFUND: "إرجاع مبلغ لعميل",
   OTHER: "أخرى",
 };
@@ -105,6 +105,28 @@ export async function recordCashExpense(prisma: PrismaClient, input: RecordExpen
 
     if (paymentSource === "CASH_DRAWER" && !cashSessionId) {
       throw new BusinessError("حدد جلسة صندوق مفتوحة للمصروف المدفوع من الدرج");
+    }
+
+    /**
+     * سقف ما يسجّله الحلاق بنفسه من الدرج.
+     *
+     * مصروف الدرج يُنقص «الكاش المتوقع»، فبلا سقف يستطيع الحلاق تغطية عجز وقت
+     * الإغلاق بمصروف كبير: التدقيق يكشفه **بعد** وقوعه لا قبله. النثريات اليومية
+     * تمر كما هي، وما فوق السقف يصبح قرار مدير الفرع من شاشة المصروفات.
+     * القيد على المسجِّل لا على البند: المدير يسجّل أي مبلغ باسمه.
+     */
+    if (input.recordedByBarberId) {
+      const settings = await getEffectiveSettings(tx, {
+        organizationId: input.organizationId,
+        salonId: input.salonId,
+      });
+      const limit = settings ? Number(settings.barberExpenseLimit) : 0;
+      if (limit > 0 && roundMoney(input.amount) > limit) {
+        throw new BusinessError(
+          `أقصى مصروف تسجّله بنفسك ${limit} ريال. راجع مدير الفرع لتسجيل هذا المبلغ.`,
+          409,
+        );
+      }
     }
 
     const expense = await tx.cashExpense.create({

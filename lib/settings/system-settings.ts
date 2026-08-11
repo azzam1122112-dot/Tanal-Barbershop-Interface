@@ -47,6 +47,7 @@ export function toSafeSystemSettings(settings: SystemSettings) {
     whatsappEnabled: settings.whatsappEnabled,
     legalName: settings.legalName,
     defaultCommissionRate: Number(settings.defaultCommissionRate),
+    barberExpenseLimit: Number(settings.barberExpenseLimit),
     bookingEnabled: settings.bookingEnabled,
     bookingOpenMinute: settings.bookingOpenMinute,
     bookingCloseMinute: settings.bookingCloseMinute,
@@ -66,6 +67,7 @@ export type SystemSettingsUpdate = Partial<{
   whatsappEnabled: boolean;
   legalName: string | null;
   defaultCommissionRate: number;
+  barberExpenseLimit: number;
   bookingEnabled: boolean;
   bookingOpenMinute: number;
   bookingCloseMinute: number;
@@ -82,6 +84,10 @@ export async function updateSystemSettings(prisma: PrismaClient, data: SystemSet
 
   // نافذة الحجز تُرفض عند الحفظ لا تُقصَّ بصمت: المالك يستحق سبب الرفض،
   // وإلا حفظ إغلاقًا قبل الفتح ثم بحث عن سبب اختفاء الفترات من صفحة عميله.
+  if (data.barberExpenseLimit != null && (data.barberExpenseLimit < 0 || data.barberExpenseLimit > 100000)) {
+    throw new BusinessError("سقف مصروف الحلاق يجب أن يكون بين صفر و100000 ريال");
+  }
+
   const nextBookingEnabled = data.bookingEnabled ?? before.bookingEnabled;
   if (nextBookingEnabled) {
     const openMinute = data.bookingOpenMinute ?? before.bookingOpenMinute;

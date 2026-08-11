@@ -24,6 +24,7 @@ const navGroups: NavGroup[] = [
     title: "القيادة",
     items: [
       { href: "/dashboard", label: "مركز المتابعة", description: "المهم الآن", icon: "home", roles: BRANCH_OPERATIONS },
+      { href: "/dashboard/finance", label: "البيان المالي", description: "الدخل والربح شهريًا", icon: "billing", roles: ALL_MANAGEMENT },
       { href: "/dashboard/reports", label: "التقارير", description: "الأداء والاتجاهات", icon: "reports", roles: BRANCH_OPERATIONS },
       { href: "/dashboard/salons-compare", label: "مقارنة الفروع", description: "قرار المالك", icon: "reports", roles: ALL_MANAGEMENT },
     ],

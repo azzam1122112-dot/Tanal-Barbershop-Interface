@@ -50,8 +50,7 @@ describe("تسميات عربية مكتملة", () => {
   });
 
   it("لكل تصنيف مصروف تسمية", () => {
-    expect(Object.keys(EXPENSE_CATEGORY_LABELS)).toHaveLength(6);
-    expect(EXPENSE_CATEGORY_LABELS.STAFF_ADVANCE).toBe("سلفة موظف");
+    expect(Object.keys(EXPENSE_CATEGORY_LABELS)).toHaveLength(5);
   });
 });
 

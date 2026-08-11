@@ -394,6 +394,12 @@ export const systemSettingsUpdateSchema = z.object({
     .min(0, "نسبة العمولة لا تقل عن صفر")
     .max(100, "نسبة العمولة لا تتجاوز 100")
     .optional(),
+  // سقف ما يسجّله الحلاق بنفسه من درج الكاش. صفر = بلا سقف (ثقة كاملة).
+  barberExpenseLimit: z.coerce
+    .number()
+    .min(0, "سقف مصروف الحلاق لا يقل عن صفر")
+    .max(100000, "سقف مصروف الحلاق لا يتجاوز 100000")
+    .optional(),
   legalName: z
     .string()
     .trim()

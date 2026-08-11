@@ -29,6 +29,10 @@ export const CUSTODY_MOVEMENT_LABELS: Record<CashCustodyMovementType, string> = 
   COUNT_ADJUSTMENT: "تسوية فرق العد",
   SAFE_OWNER_PICKUP: "تسليم للمالك",
   SAFE_BANK_DEPOSIT: "إيداع بنكي",
+  SAFE_COMMISSION_PAYOUT: "صرف عمولة من الخزنة",
+  SAFE_COMMISSION_PAYOUT_REVERSAL: "عكس صرف عمولة من الخزنة",
+  CUSTODY_COMMISSION_PAYOUT: "صرف عمولة خصمًا من العهدة",
+  CUSTODY_COMMISSION_PAYOUT_REVERSAL: "عكس صرف عمولة من العهدة",
 };
 
 export type CollectionDueStatus = "UNINITIALIZED" | "CLEAR" | "DUE" | "OVERDUE" | "DISABLED";
@@ -379,7 +383,8 @@ export async function withdrawBranchSafe(
     amount: number;
     note: string;
     actorUserId: string;
-    actorType: Extract<AuditActorType, "OWNER" | "ADMIN" | "SUPERVISOR">;
+    // إخراج نقد من الخزنة — مالك/مدير مؤسسة فقط. النوع يمنع تمرير مشرف بالخطأ.
+    actorType: Extract<AuditActorType, "OWNER" | "ADMIN">;
     idempotencyKey: string;
   },
 ) {

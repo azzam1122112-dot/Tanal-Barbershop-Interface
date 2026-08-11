@@ -1,11 +1,13 @@
 import { redirect } from "next/navigation";
 import { formatMoney, formatNumber } from "@/lib/format";
 import { DashboardShell, EmptyState, Field, FilterBar, Notice, StatCard, TablePanel } from "@/components/dashboard/ui";
-import { canAccessDashboard } from "@/lib/auth/access";
+import { canAccessDashboard, canPayCommissions } from "@/lib/auth/access";
 import { dashboardScope } from "@/lib/auth/salon-scope";
 import { getRequestSession } from "@/lib/auth/http";
 import { prisma } from "@/lib/db/prisma";
 import { getCommissionReport } from "@/lib/commissions/commission-report";
+import { getCommissionLedger, listCommissionPayouts } from "@/lib/commissions/commission-payout";
+import { CommissionPayoutManager } from "@/components/dashboard/commission-payout-manager";
 
 export default async function CommissionsPage({
   searchParams,
@@ -19,7 +21,8 @@ export default async function CommissionsPage({
   const params = await searchParams;
   const { organizationId, orgWhere, salonWhere, salonIds } = dashboardScope(session);
 
-  const [report, barbers] = await Promise.all([
+  const canPay = canPayCommissions(session);
+  const [report, barbers, ledger, payouts] = await Promise.all([
     getCommissionReport(prisma, {
       organizationId,
       salonIds,
@@ -28,14 +31,24 @@ export default async function CommissionsPage({
       barberId: params.barberId,
     }),
     prisma.barber.findMany({ where: { ...orgWhere, ...salonWhere }, orderBy: { name: "asc" } }),
+    // الدفتر تراكمي عبر كل الفترات والفروع عمدًا: الصرف يتم من الرصيد الجاري لا
+    // من مستحق الفترة المعروضة، وإلا صُرف مرتين عن نفس الزيارة بتغيير التاريخ.
+    // ولأنه يتجاوز حدود الفرع فهو محجوب عن المشرف: يرى مستحق فروعه في الجدول
+    // أعلاه، أما دَين المؤسسة تجاه الحلاق فبيد من يملك صرفه.
+    organizationId && canPay
+      ? getCommissionLedger(prisma, { organizationId, salonIds, barberId: params.barberId })
+      : Promise.resolve([]),
+    organizationId && canPay
+      ? listCommissionPayouts(prisma, { organizationId, salonIds, barberId: params.barberId })
+      : Promise.resolve([]),
   ]);
 
   const hasRates = report.rows.some((row) => row.commissionAmount > 0);
 
   return (
     <DashboardShell
-      title="مستحقات العمولات"
-      description="عمولة كل حلاق عن الفترة، محسوبة على المبلغ بعد الخصم كما كانت وقت كل زيارة."
+      title="مستحقات العمولات وصرفها"
+      description="عمولة كل حلاق عن الفترة محسوبة كما كانت وقت كل زيارة، ودفتر جارٍ لما صُرف وما تبقى."
     >
       <FilterBar className="md:grid-cols-[160px_160px_1fr_120px]">
         <Field label="من تاريخ"><input dir="ltr" lang="en" name="from" type="date" defaultValue={params.from ?? ""} className="dashboard-field" /></Field>
@@ -62,7 +75,15 @@ export default async function CommissionsPage({
         <StatCard label="إجمالي المستحقات" value={formatMoney(report.totals.commissionAmount)} />
         <StatCard label="وعاء العمولة" value={formatMoney(report.totals.commissionBase)} />
         <StatCard label="عدد الزيارات" value={formatNumber(report.totals.visitsCount)} />
-        <StatCard label="حلاقون بمستحقات" value={formatNumber(report.totals.barbersCount)} />
+        <StatCard
+          label="حلاقون بمستحقات"
+          value={formatNumber(report.totals.earningBarbersCount)}
+          subValue={
+            report.totals.barbersCount > report.totals.earningBarbersCount
+              ? `${formatNumber(report.totals.barbersCount - report.totals.earningBarbersCount)} بلا نسبة عمولة`
+              : undefined
+          }
+        />
       </div>
 
       <TablePanel>
@@ -103,6 +124,31 @@ export default async function CommissionsPage({
           </div>
         ) : null}
       </TablePanel>
+
+      {canPay ? (
+        <>
+          <div className="mt-8">
+            <h2 className="lux-section-title">الصرف والمتبقي</h2>
+            <p className="dashboard-muted mt-1 max-w-2xl text-sm leading-6">
+              الأرقام هنا تراكمية منذ أول زيارة وعبر كل الفروع، ولا تتأثر بفلتر الفترة أعلاه. الصرف
+              حركة نقد لا مصروف جديد: ربح المؤسسة خُصمت منه العمولة مرة واحدة وقت الزيارة.
+            </p>
+          </div>
+
+          <CommissionPayoutManager
+            ledger={ledger}
+            payouts={payouts}
+            canPay
+            periodFrom={report.from}
+            periodTo={report.to}
+          />
+        </>
+      ) : (
+        <Notice tone="info" className="mt-8" title="الصرف والمتبقي من صلاحيات المالك أو مدير المؤسسة">
+          الجدول أعلاه يعرض مستحق فروعك عن الفترة المختارة. أما دفتر الصرف فتراكمي عبر كل الفروع —
+          يشمل عمل الحلاق قبل نقله إلى فرعك — فيبقى مع من يملك قرار الصرف.
+        </Notice>
+      )}
     </DashboardShell>
   );
 }

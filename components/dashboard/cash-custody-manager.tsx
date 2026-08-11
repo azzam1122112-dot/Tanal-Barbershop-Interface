@@ -26,7 +26,14 @@ const DAYS = [
   { value: 3, label: "الأربعاء" }, { value: 4, label: "الخميس" }, { value: 5, label: "الجمعة" }, { value: 6, label: "السبت" },
 ];
 
-export function CashCustodyManager({ initialData }: { initialData: DashboardData }) {
+export function CashCustodyManager({
+  initialData,
+  canWithdrawSafe,
+}: {
+  initialData: DashboardData;
+  /** سحب نقد من الخزنة مالك/مدير فقط — الخادم يرفضه، والنموذج لا يُعرض أصلًا. */
+  canWithdrawSafe: boolean;
+}) {
   const [data, setData] = useState(initialData);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [busy, setBusy] = useState(false);
@@ -128,9 +135,11 @@ export function CashCustodyManager({ initialData }: { initialData: DashboardData
       ) : null}
 
       {activeSettingsSalon ? (
-        <div className="grid gap-6 xl:grid-cols-2">
+        <div className={`grid gap-6 ${canWithdrawSafe ? "xl:grid-cols-2" : ""}`}>
           <PolicyForm key={`${activeSettingsSalon.id}:${activeSettingsSalon.policy.mode}:${activeSettingsSalon.policy.intervalDays}:${activeSettingsSalon.policy.weekdays.join("-")}:${activeSettingsSalon.policy.thresholdAmount}`} salons={data.salons} activeSalon={activeSettingsSalon} onSalonChange={setSettingsSalonId} busy={busy} onSubmit={(body) => submitJson("/api/dashboard/cash-collection-policy", "PUT", body, "تم حفظ جدول التحصيل")} />
-          <SafeWithdrawalForm salons={data.salons} defaultSalonId={activeSettingsSalon.id} busy={busy} onSubmit={(body) => submitJson("/api/dashboard/branch-cash-safe/withdrawals", "POST", body, "تم تسجيل حركة خزنة الفرع")} />
+          {canWithdrawSafe ? (
+            <SafeWithdrawalForm salons={data.salons} defaultSalonId={activeSettingsSalon.id} busy={busy} onSubmit={(body) => submitJson("/api/dashboard/branch-cash-safe/withdrawals", "POST", body, "تم تسجيل حركة خزنة الفرع")} />
+          ) : null}
         </div>
       ) : null}
 

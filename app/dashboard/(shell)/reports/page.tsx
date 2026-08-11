@@ -8,6 +8,7 @@ import { getRequestSession } from "@/lib/auth/http";
 import { addRiyadhDays, parseRiyadhDateKey } from "@/lib/datetime/riyadh";
 import { prisma } from "@/lib/db/prisma";
 import { getExpensesReport } from "@/lib/expenses/expense-service";
+import { organizationContribution } from "@/lib/finance/contribution";
 import {
   getDashboardReportsBundle,
   getPresetRange,
@@ -42,6 +43,14 @@ export default async function DashboardReportsPage({
   ]);
   const { revenue, barberPerformance, services, customers, discounts } = reports;
   const revenueIsFiltered = Boolean(filters.barberId || filters.paymentMethod);
+  // نفس معادلة البيان المالي وشاشة المصروفات ومقارنة الفروع — كانت هذه الشاشة
+  // وحدها تعرض «صافي التشغيل» بلا خصم العمولات، فيقرأ المالك رقمين متناقضين.
+  const operatingNet = organizationContribution({
+    netSales: revenue.netAmount,
+    productCost: revenue.productCost,
+    commissionAccrued: revenue.commissionAmount,
+    expensesTotal: expenses.total,
+  });
 
   return (
     <DashboardShell title="التقارير المالية والتشغيلية" description="قراءة واضحة للدخل، الأداء، الخصومات، العملاء، وحركة الخدمات حسب الفترة والحلاق وطريقة الدفع.">
@@ -70,13 +79,19 @@ export default async function DashboardReportsPage({
         {!revenueIsFiltered ? (
           <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard label="إيراد الفترة" value={formatMoney(revenue.netAmount)} subValue="صافي المبيعات بعد الخصم" />
-            <StatCard label="المصروفات" value={formatMoney(expenses.total)} subValue={`${formatNumber(expenses.count)} حركة`} tone={expenses.total > 0 ? "danger" : "neutral"} />
-            <StatCard label="صافي التشغيل" value={formatMoney(revenue.netAmount - expenses.total)} subValue="الإيراد ناقص المصروفات" tone={revenue.netAmount - expenses.total >= 0 ? "success" : "danger"} />
-            <StatCard label="مصروفات درج الكاش" value={formatMoney(expenses.cashDrawerTotal)} subValue={`خارجي ${formatMoney(expenses.externalTotal)}`} />
+            <StatCard label="عمولات مستحقة" value={formatMoney(revenue.commissionAmount)} subValue="عن زيارات الفترة" />
+            <StatCard label="المصروفات" value={formatMoney(expenses.total)} subValue={`${formatNumber(expenses.count)} حركة · من الدرج ${formatMoney(expenses.cashDrawerTotal)}`} tone={expenses.total > 0 ? "danger" : "neutral"} />
+            <StatCard
+              label="المتبقي للمؤسسة"
+              value={formatMoney(operatingNet)}
+              subValue="بعد العمولات والمصروفات"
+              tone={operatingNet >= 0 ? "success" : "danger"}
+              hint="صافي المبيعات − عمولات الحلاقين المستحقة − المصروفات"
+            />
           </div>
         ) : (
-          <Notice tone="info" title="صافي التشغيل يظهر بدون تصفية الحلاق أو طريقة الدفع" className="mt-6">
-            لأن المصروفات تخص الفرع كله ولا يصح خصمها من إيراد حلاق واحد. <Link href="/dashboard/expenses" className="font-bold underline">افتح تقرير المصروفات الكامل</Link>.
+          <Notice tone="info" title="المتبقي للمؤسسة يظهر بدون تصفية الحلاق أو طريقة الدفع" className="mt-6">
+            لأن المصروفات تخص الفرع كله ولا يصح خصمها من إيراد حلاق واحد. <Link href="/dashboard/expenses" className="font-bold underline">افتح تقرير المصروفات الكامل</Link> أو <Link href="/dashboard/finance" className="font-bold underline">البيان المالي الشهري</Link>.
           </Notice>
         )}
 
