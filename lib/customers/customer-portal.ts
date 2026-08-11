@@ -148,6 +148,8 @@ export async function getCustomerPortalView(prisma: PrismaClient, token: string)
     brandName: settings?.legalName?.trim() || settings?.salonName || customer.organization?.name || "",
     customer: { name: customer.name, phone: customer.phone },
     points,
+    /** معدّل الكسب — يشرح للعميل معنى الرقم بدل أن يراه رصيدًا مجرّدًا. */
+    pointsPerRiyal: settings ? Number(settings.pointsPerCurrencyUnit) : 1,
     lifetimeEarned: customer.loyaltyAccount?.lifetimeEarned ?? 0,
     visitCount: customer.visitCount,
     lastVisitAt: customer.lastVisitAt?.toISOString() ?? null,
