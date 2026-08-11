@@ -269,7 +269,7 @@ export function PortalBooking({
           : "barber-card"
       }`}>
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-base font-bold">حجوزاتك القادمة</h2>
+          <h2 className="lux-section-title">حجوزاتك القادمة</h2>
           <span className="rounded-full bg-salon-mist px-2.5 py-1 text-xs font-black tabular-nums text-salon-charcoal">
             {upcoming.length}
           </span>
@@ -336,14 +336,14 @@ export function PortalBooking({
 
       {salons.length === 0 && !bookingPolicy.blocked ? (
         <section className="barber-card px-5 py-5">
-          <h2 className="text-base font-bold">احجز موعدك</h2>
+          <h2 className="lux-section-title">احجز موعدك</h2>
           <p className="mt-2 text-sm font-semibold leading-6 text-salon-charcoal">
-            الحجز الإلكتروني غير مفعّل حاليًا لهذا الفرع. تواصل مع الصالون لحجز موعدك.
+            الحجز الإلكتروني غير متاح حاليًا. تواصل مع الصالون مباشرة لحجز موعدك، أو احجز عند زيارتك القادمة.
           </p>
         </section>
       ) : salons.length === 0 || bookingPolicy.blocked ? null : (
         <section className="barber-card px-5 py-5">
-          <h2 className="text-base font-bold">احجز موعدك</h2>
+          <h2 className="lux-section-title">احجز موعدك</h2>
 
           {salons.length > 1 ? (
             <label className="mt-4 block">

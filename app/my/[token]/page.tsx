@@ -32,69 +32,105 @@ export default async function CustomerPortalPage({ params }: { params: Promise<{
   const view = await getCustomerPortalView(prisma, token);
   if (!view) notFound();
 
+  // اسم القاعدة كثيرًا ما يكون «خصم ٢٥ ريال»، فإلحاق المبلغ به ينتج تكرارًا
+  // مثل «خصم ٢٥ ريال — خصم ٢٥ ريال». نعرض المبلغ فقط حين لا يذكره الاسم.
+  const nextRewardMentionsAmount = view.nextReward
+    ? view.nextReward.name.includes(String(view.nextReward.discountAmount))
+    : false;
+
   return (
-    <main className="min-h-screen overflow-x-hidden bg-salon-mist px-4 py-8">
+    <main className="min-h-screen overflow-x-hidden bg-salon-mist px-4 pt-8 pb-[calc(2rem+env(safe-area-inset-bottom))]">
       <div className="mx-auto min-w-0 max-w-3xl space-y-4">
-        <header className="lux-edge rounded-2xl border border-white/10 bg-sidebar-onyx px-6 py-7 text-center text-white shadow-[var(--shadow-lg)]">
-          <p className="text-xs font-bold uppercase tracking-eyebrow text-salon-goldlight">{view.brandName}</p>
-          <h1 className="mt-3 break-words text-2xl font-bold [overflow-wrap:anywhere]">أهلًا {view.customer.name}</h1>
-          <p className="mt-6 text-6xl font-black tabular-nums text-salon-goldlight">{formatNumber(view.points)}</p>
-          <p className="mt-1 text-sm font-bold text-white/70">نقطة في رصيدك</p>
-          <div className="mt-6 grid grid-cols-2 gap-3 text-sm">
-            <div className="rounded-2xl bg-white/[0.08] px-3 py-3">
-              <p className="text-xs font-semibold text-white/60">عدد زياراتك</p>
-              <p className="mt-1 text-xl font-black tabular-nums">{formatNumber(view.visitCount)}</p>
+        <header className="lux-edge rounded-2xl border border-white/10 bg-sidebar-onyx px-6 py-8 text-center text-white shadow-[var(--shadow-lg)]">
+          <p className="lux-eyebrow text-salon-goldlight">{view.brandName}</p>
+          <h1 className="mt-3 text-2xl font-bold [overflow-wrap:anywhere]">أهلًا {view.customer.name}</h1>
+
+          <p className="mt-7 text-6xl leading-none text-salon-goldlight lux-number">{formatNumber(view.points)}</p>
+          <p className="mt-2 text-sm font-bold text-white/70">نقطة في رصيدك</p>
+          {/* الرقم وحده بلا معنى؛ هذا السطر يخبر العميل كيف يكبر رصيده. */}
+          <p className="mt-1 text-xs font-semibold text-white/45">
+            تكسب {view.pointsPerRiyal === 1 ? "نقطة" : `${formatNumber(view.pointsPerRiyal)} نقاط`} على كل ريال
+          </p>
+
+          <div className="mt-7 grid grid-cols-3 gap-2.5 text-center">
+            <div className="rounded-xl bg-white/[0.08] px-2 py-3">
+              <p className="text-[11px] font-semibold text-white/55">زياراتك</p>
+              <p className="mt-1 text-lg lux-number">{formatNumber(view.visitCount)}</p>
             </div>
-            <div className="rounded-2xl bg-white/[0.08] px-3 py-3">
-              <p className="text-xs font-semibold text-white/60">آخر زيارة</p>
-              <p className="mt-1 text-sm font-bold">{view.lastVisitAt ? formatDate(view.lastVisitAt) : "-"}</p>
+            <div className="rounded-xl bg-white/[0.08] px-2 py-3">
+              <p className="text-[11px] font-semibold text-white/55">مجموع نقاطك</p>
+              <p className="mt-1 text-lg lux-number">{formatNumber(view.lifetimeEarned)}</p>
+            </div>
+            <div className="rounded-xl bg-white/[0.08] px-2 py-3">
+              <p className="text-[11px] font-semibold text-white/55">آخر زيارة</p>
+              <p className="mt-1 text-sm font-bold">{view.lastVisitAt ? formatDate(view.lastVisitAt) : "—"}</p>
             </div>
           </div>
         </header>
 
         {view.nextReward ? (
           <section className="barber-card px-5 py-5">
-            <h2 className="text-base font-bold">مكافأتك القادمة</h2>
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 className="lux-section-title">مكافأتك القادمة</h2>
+              <span className="text-sm text-salon-forest lux-number">{view.nextReward.progress}%</span>
+            </div>
             <p className="mt-1.5 text-sm font-semibold text-salon-charcoal">
-              {view.nextReward.name} — خصم {formatMoney(view.nextReward.discountAmount)}
+              {view.nextReward.name}
+              {nextRewardMentionsAmount ? "" : ` — خصم ${formatMoney(view.nextReward.discountAmount)}`}
             </p>
-            <div className="mt-4 h-3 overflow-hidden rounded-full bg-salon-mist">
+            <div
+              className="mt-4 h-3 overflow-hidden rounded-full bg-salon-mist"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={view.nextReward.progress}
+              aria-label="تقدّمك نحو المكافأة القادمة"
+            >
               <div
                 className="h-full rounded-full bg-gradient-to-l from-salon-gold to-salon-forest transition-[width]"
                 style={{ width: `${view.nextReward.progress}%` }}
               />
             </div>
-            <p className="mt-2 text-sm font-bold text-salon-forest">
-              باقٍ {formatNumber(view.nextReward.pointsRemaining)} نقطة فقط
+            {/* «فقط» تُقال حين يكون الباقي قريبًا؛ مع ٣٥٥ نقطة متبقية تبدو سخرية. */}
+            <p className="mt-2.5 text-sm font-bold text-salon-forest">
+              تبقّى {formatNumber(view.nextReward.pointsRemaining)} نقطة للوصول إليها
             </p>
           </section>
         ) : view.unlockedRewards.length === 0 && view.managerRewards.length === 0 ? (
           <section className="barber-card px-5 py-5">
-            <h2 className="text-base font-bold">مكافآتك</h2>
+            <h2 className="lux-section-title">مكافآتك</h2>
+            {/* لا تذكر «قواعد المكافآت» — إعداد داخلي للصالون لا يعني العميل شيئًا. */}
             <p className="mt-2 text-sm font-semibold leading-6 text-salon-charcoal">
-              ستظهر مكافآتك هنا فور إضافة قواعد المكافآت وبدء جمع النقاط.
+              كل زيارة تضيف نقاطًا إلى رصيدك. اسأل الحلاق عن مكافآت الصالون في زيارتك القادمة.
             </p>
           </section>
         ) : null}
 
         {view.unlockedRewards.length > 0 ? (
-          <section className="rounded-2xl border border-salon-gold/35 bg-salon-gold/[0.09] px-5 py-5 shadow-[var(--shadow-sm)]">
-            <h2 className="text-base font-bold">مكافآت جاهزة للاستبدال</h2>
-            <ul className="mt-3 space-y-2">
+          <section className="lux-edge rounded-2xl border border-salon-gold/35 bg-salon-gold/[0.09] px-5 py-5 shadow-[var(--shadow-sm)]">
+            <h2 className="lux-section-title">مكافآت جاهزة للاستبدال</h2>
+            <p className="mt-1 text-xs font-semibold text-salon-charcoal">
+              اذكرها للحلاق عند الدفع ليُطبّق الخصم.
+            </p>
+            <ul className="mt-3.5 space-y-2">
               {view.unlockedRewards.map((reward) => (
-                <li key={reward.id} className="flex items-baseline justify-between gap-3 text-sm font-bold">
-                  <span>{reward.name}</span>
-                  <span className="tabular-nums text-salon-forest">خصم {formatMoney(reward.discountAmount)}</span>
+                <li
+                  key={reward.id}
+                  className="flex items-baseline justify-between gap-3 rounded-xl bg-white/70 px-3.5 py-2.5 text-sm font-bold"
+                >
+                  <span className="min-w-0 [overflow-wrap:anywhere]">{reward.name}</span>
+                  <span className="shrink-0 text-salon-forest lux-number">
+                    خصم {formatMoney(reward.discountAmount)}
+                  </span>
                 </li>
               ))}
             </ul>
-            <p className="mt-3 text-xs font-semibold text-salon-charcoal">اذكرها للحلاق عند زيارتك القادمة.</p>
           </section>
         ) : null}
 
         {view.managerRewards.length > 0 ? (
           <section className="barber-card px-5 py-5">
-            <h2 className="text-base font-bold">هدايا خاصة لك</h2>
+            <h2 className="lux-section-title">هدايا خاصة لك</h2>
             <ul className="mt-3 space-y-3">
               {view.managerRewards.map((reward) => (
                 <li key={reward.id} className="rounded-2xl bg-salon-pearl px-4 py-3">
@@ -125,21 +161,27 @@ export default async function CustomerPortalPage({ params }: { params: Promise<{
         />
 
         <section className="barber-card px-5 py-5">
-          <h2 className="text-base font-bold">آخر زياراتك</h2>
+          <h2 className="lux-section-title">آخر زياراتك</h2>
           {view.recentVisits.length === 0 ? (
             <p className="mt-3 text-sm font-semibold text-salon-charcoal">لا توجد زيارات مسجّلة بعد.</p>
           ) : (
             <ul className="mt-3 divide-y divide-salon-line/70">
               {view.recentVisits.map((visit) => (
-                <li key={visit.id} className="py-3">
+                <li key={visit.id} className="py-3.5">
                   <div className="flex items-baseline justify-between gap-3">
                     <span className="text-sm font-bold">{formatDate(visit.visitedAt)}</span>
-                    <span className="text-sm font-black tabular-nums">{formatMoney(visit.netAmount)}</span>
+                    <span className="text-sm lux-number">{formatMoney(visit.netAmount)}</span>
                   </div>
-                  <p className="mt-1 text-xs font-semibold text-salon-charcoal">
+                  <p className="mt-1 text-xs font-semibold text-salon-charcoal [overflow-wrap:anywhere]">
                     {visit.services.join("، ") || "زيارة"}
-                    {visit.pointsEarned > 0 ? ` · +${formatNumber(visit.pointsEarned)} نقطة` : ""}
+                    {/* الفرع كان يُجلب ولا يُعرض — يهم العميل في صالون متعدد الفروع. */}
+                    {visit.salonName ? ` · ${visit.salonName}` : ""}
                   </p>
+                  {visit.pointsEarned > 0 ? (
+                    <p className="mt-1.5 inline-flex rounded-full bg-salon-mist px-2.5 py-1 text-[11px] font-bold text-salon-forest">
+                      +{formatNumber(visit.pointsEarned)} نقطة
+                    </p>
+                  ) : null}
                 </li>
               ))}
             </ul>
