@@ -5,7 +5,11 @@ umask 077
 : "${DATABASE_URL:?DATABASE_URL is required}"
 : "${BACKUP_AGE_RECIPIENT:?BACKUP_AGE_RECIPIENT is required}"
 
-BACKUP_DIR="${BACKUP_DIR:-/var/backups/xmansx/postgresql}"
+# ‏Prisma يطلب ‎?schema=public‎ في الرابط، وpg_dump يرفض معاملات الاستعلام
+# بـ ‎invalid URI query parameter‎. تُقصّ للنسخ الاحتياطي وحده.
+PGDUMP_URL="${DATABASE_URL%%\?*}"
+
+BACKUP_DIR="${BACKUP_DIR:-/var/backups/tanal/postgresql}"
 BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-30}"
 
 if [[ "$BACKUP_DIR" != /* || "$BACKUP_DIR" == "/" ]]; then
@@ -25,7 +29,7 @@ TMP_DUMP="$(mktemp --tmpdir="$BACKUP_DIR" ".${BASENAME}.XXXXXX")"
 cleanup() { rm -f -- "$TMP_DUMP"; }
 trap cleanup EXIT
 
-pg_dump "$DATABASE_URL" --format=custom --compress=9 --no-owner --no-acl --file="$TMP_DUMP"
+pg_dump "$PGDUMP_URL" --format=custom --compress=9 --no-owner --no-acl --file="$TMP_DUMP"
 pg_restore --list "$TMP_DUMP" >/dev/null
 age --recipient "$BACKUP_AGE_RECIPIENT" --output "$BACKUP_DIR/$BASENAME.age" "$TMP_DUMP"
 sha256sum "$BACKUP_DIR/$BASENAME.age" >"$BACKUP_DIR/$BASENAME.age.sha256"
