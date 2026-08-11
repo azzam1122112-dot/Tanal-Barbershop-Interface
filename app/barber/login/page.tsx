@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { BrandLogo } from "@/components/brand-logo";
+import { useHydrated } from "@/components/use-hydrated";
 
 // دعوة التثبيت انتقلت إلى `components/barber/pwa.tsx` المركّب في تخطيط `/barber`:
 // شريط سفلي يمكن تجاهله بدل نافذة تعترض شاشة الدخول قبل أن يكتب الحلاق رقمه.
@@ -9,6 +10,9 @@ import { BrandLogo } from "@/components/brand-logo";
 export default function BarberLoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  // الزر معطّل حتى الترطيب: ضغطة مبكرة كانت تُرسل النموذج بـ GET فينتهي رمز
+  // الدخول في شريط العنوان وسجلات الخادم.
+  const hydrated = useHydrated();
   const [phone, setPhone] = useState("");
   // لا معرّف مؤسسة. القائمة تظهر فقط إذا كان الجوال ورمز الدخول صحيحين في أكثر من صالون.
   const [organizations, setOrganizations] = useState<{ id: string; name: string }[]>([]);
@@ -132,11 +136,11 @@ export default function BarberLoginPage() {
             {error ? <p className="rounded-xl border border-red-100 bg-red-50 px-3 py-3 text-sm font-semibold text-red-700">{error}</p> : null}
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !hydrated}
               aria-busy={loading}
               className="barber-gold-button sheen-overlay h-14 w-full text-lg"
             >
-              {loading ? "جاري الدخول..." : "دخول"}
+              {loading ? "جاري الدخول..." : hydrated ? "دخول" : "جاري التحضير..."}
             </button>
           </form>
         </div>

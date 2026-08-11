@@ -95,8 +95,16 @@ export default async function DashboardDailyClosePage({
                     <td className="px-3 py-3">{formatMoney(close.expectedCash)}</td>
                     <td className="px-3 py-3 text-salon-ruby">{formatMoney(close.expensesTotal)}</td>
                     <td className="px-3 py-3 text-salon-steel">{formatMoney(close.collectionsTotal)}</td>
-                    <td className="px-3 py-3">{formatMoney(close.cashReceivedAmount)}</td>
-                    <td className="px-3 py-3">{formatMoney(close.cashDifference)}</td>
+                    {/* جلسة أنهاها الحلاق بنفسه لا مبلغ مستلمًا لها: الكاش ما زال في
+                        عهدته حتى يسجّل المدير التحصيل. الشرطة أصدق من رقم مفترض. */}
+                    <td className="px-3 py-3">
+                      {close.cashReceivedAmount == null
+                        ? <span className="text-salon-charcoal/55">لم يُستلم بعد</span>
+                        : formatMoney(close.cashReceivedAmount)}
+                    </td>
+                    <td className="px-3 py-3">
+                      {close.cashDifference == null ? "-" : formatMoney(close.cashDifference)}
+                    </td>
                     <td className="px-3 py-3">{formatMoney(close.cardTotal)}</td>
                     <td className="px-3 py-3 font-bold">{formatMoney(close.netTotal)}</td>
                     <td className="px-3 py-3">{close.closedBy?.name ?? (close.notes?.includes("أغلقها الحلاق") ? `${close.barber.name} (الحلاق)` : "-")}</td>

@@ -21,6 +21,8 @@ type Settings = {
 };
 
 const WEEKDAYS = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+const MINUTES_IN_DAY = 24 * 60;
+const ALL_DAY = "00:00";
 
 /** دقائق من منتصف الليل → `HH:MM` لحقل الوقت، والعكس. */
 function minutesToTimeValue(minutes: number) {
@@ -28,11 +30,37 @@ function minutesToTimeValue(minutes: number) {
   const minute = minutes % 60;
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
-function timeValueToMinutes(value: FormDataEntryValue | null, fallback: number) {
-  if (typeof value !== "string") return fallback;
+function timeValueToMinutes(value: string, fallback: number) {
   const match = /^(\d{1,2}):(\d{2})$/.exec(value);
   if (!match) return fallback;
   return Number(match[1]) * 60 + Number(match[2]);
+}
+
+/**
+ * `24:00` قيمة مرفوضة في `input[type=time]`، فمنتصف الليل يُكتب `00:00` ويُقرأ
+ * في **خانة النهاية وحدها** على أنه نهاية اليوم (1440). بدونها لا يمكن التعبير
+ * عن فرع يغلق منتصف الليل ولا عن فرع يعمل 24 ساعة.
+ */
+function closeMinutesToTimeValue(minutes: number) {
+  return minutes >= MINUTES_IN_DAY ? ALL_DAY : minutesToTimeValue(minutes);
+}
+function timeValueToCloseMinutes(value: string, fallback: number) {
+  const minutes = timeValueToMinutes(value, fallback);
+  return minutes === 0 ? MINUTES_IN_DAY : minutes;
+}
+function formatWindowLabel(openMinute: number, closeMinute: number) {
+  const label = (minutes: number) => {
+    const wrapped = minutes % MINUTES_IN_DAY;
+    const hour24 = Math.floor(wrapped / 60);
+    const suffix = hour24 < 12 ? "ص" : "م";
+    const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+    return `${hour12}:${String(wrapped % 60).padStart(2, "0")} ${suffix}`;
+  };
+  const span = closeMinute - openMinute;
+  const hours = Math.floor(span / 60);
+  const minutes = span % 60;
+  const duration = span >= MINUTES_IN_DAY ? "24 ساعة" : `${hours} ساعة${minutes > 0 ? ` و${minutes} دقيقة` : ""}`;
+  return `${label(openMinute)} – ${label(closeMinute)} · ${duration}`;
 }
 
 export function SettingsForm({ initialSettings }: { initialSettings: Settings }) {
@@ -41,6 +69,13 @@ export function SettingsForm({ initialSettings }: { initialSettings: Settings })
   const [loading, setLoading] = useState(false);
   const [bookingEnabled, setBookingEnabled] = useState(initialSettings.bookingEnabled);
   const [closedWeekdays, setClosedWeekdays] = useState<number[]>(initialSettings.bookingClosedWeekdays);
+  const [openTime, setOpenTime] = useState(minutesToTimeValue(initialSettings.bookingOpenMinute));
+  const [closeTime, setCloseTime] = useState(closeMinutesToTimeValue(initialSettings.bookingCloseMinute));
+
+  const openMinute = timeValueToMinutes(openTime, settings.bookingOpenMinute);
+  const closeMinute = timeValueToCloseMinutes(closeTime, settings.bookingCloseMinute);
+  const isAllDay = openMinute === 0 && closeMinute === MINUTES_IN_DAY;
+  const windowTooShort = closeMinute - openMinute < 5;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -60,8 +95,8 @@ export function SettingsForm({ initialSettings }: { initialSettings: Settings })
         bookingEnabled,
         ...(bookingEnabled
           ? {
-              bookingOpenMinute: timeValueToMinutes(form.get("bookingOpenTime"), settings.bookingOpenMinute),
-              bookingCloseMinute: timeValueToMinutes(form.get("bookingCloseTime"), settings.bookingCloseMinute),
+              bookingOpenMinute: openMinute,
+              bookingCloseMinute: closeMinute,
               bookingSlotMinutes: form.get("bookingSlotMinutes"),
               bookingClosedWeekdays: closedWeekdays,
               bookingLeadMinutes: form.get("bookingLeadMinutes"),
@@ -76,6 +111,8 @@ export function SettingsForm({ initialSettings }: { initialSettings: Settings })
       setSettings(data.settings);
       setBookingEnabled(data.settings.bookingEnabled);
       setClosedWeekdays(data.settings.bookingClosedWeekdays);
+      setOpenTime(minutesToTimeValue(data.settings.bookingOpenMinute));
+      setCloseTime(closeMinutesToTimeValue(data.settings.bookingCloseMinute));
       setToast({ message: "تم تحديث الإعدادات", tone: "success" });
     } else {
       setToast({ message: data.message ?? "تعذر تحديث الإعدادات", tone: "error" });
@@ -171,7 +208,8 @@ export function SettingsForm({ initialSettings }: { initialSettings: Settings })
                 type="time"
                 dir="ltr"
                 lang="en"
-                defaultValue={minutesToTimeValue(settings.bookingOpenMinute)}
+                value={openTime}
+                onChange={(event) => setOpenTime(event.target.value)}
                 className="dashboard-field mt-2 h-12"
               />
             </label>
@@ -182,10 +220,40 @@ export function SettingsForm({ initialSettings }: { initialSettings: Settings })
                 type="time"
                 dir="ltr"
                 lang="en"
-                defaultValue={minutesToTimeValue(settings.bookingCloseMinute)}
+                value={closeTime}
+                onChange={(event) => setCloseTime(event.target.value)}
                 className="dashboard-field mt-2 h-12"
               />
+              <span className="mt-1.5 block text-xs font-medium text-salon-charcoal/70">
+                12:00 ص في خانة النهاية = منتصف الليل (نهاية اليوم).
+              </span>
             </label>
+
+            <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-salon-line bg-salon-pearl px-4 py-3">
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-salon-charcoal">
+                  {windowTooShort
+                    ? "نافذة الاستقبال غير صالحة — النهاية يجب أن تكون بعد البداية."
+                    : `نافذة الاستقبال: ${formatWindowLabel(openMinute, closeMinute)}`}
+                </p>
+                <p className="mt-1 text-xs font-medium text-salon-charcoal/70">
+                  {isAllDay
+                    ? "الفرع يستقبل الحجز طوال اليوم. أيام الإغلاق الأسبوعية تبقى سارية."
+                    : "خارج هذه النافذة لا يظهر للعميل أي وقت، ولو كان دوام الحلاق أوسع."}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpenTime(ALL_DAY);
+                  setCloseTime(ALL_DAY);
+                }}
+                disabled={isAllDay}
+                className="dashboard-button-soft h-10 shrink-0 px-4 text-xs disabled:opacity-55"
+              >
+                {isAllDay ? "مفعّل: 24 ساعة" : "اجعله 24 ساعة"}
+              </button>
+            </div>
             <label className="text-sm font-bold text-salon-charcoal">
               مدة الفترة (دقيقة)
               <input

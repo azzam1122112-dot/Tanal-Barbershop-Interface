@@ -88,6 +88,8 @@ describe("cash sessions", () => {
     const closed = await closeCashSession(prisma, { barberId, closedByUserId: adminUserId });
     expect(closed.status).toBe("CLOSED");
     expect(closed.expectedCash).toBe(210);
+    // إغلاق بيد مدير = استلام فعلي، فيُسجَّل المبلغ المستلم افتراضًا بالمتوقع.
+    expect(closed.cashReceivedAmount).toBe(210);
     await expect(createVisit("closed-session")).rejects.toThrow("لا توجد جلسة صندوق مفتوحة");
 
     const newOpen = await openCashSession(prisma, { barberId });
@@ -111,6 +113,9 @@ describe("cash sessions", () => {
 
     expect(closed.status).toBe("CLOSED");
     expect(closed.closedBy).toBeNull();
+    // الحلاق أنهى جلسته والكاش ما زال في يده: لا مبلغ «مستلم» بلا مستلم.
+    expect(closed.cashReceivedAmount).toBeNull();
+    expect(closed.cashDifference).toBeNull();
     await expect(createVisit("barber-closed-session")).rejects.toThrow("لا توجد جلسة صندوق مفتوحة");
 
     const audit = await prisma.auditLog.findFirstOrThrow({

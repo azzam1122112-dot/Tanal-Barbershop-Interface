@@ -59,7 +59,10 @@ export default async function BarberHomePage() {
               <BrandLogo className="h-12 w-12 border border-salon-line shadow-sm" priority />
               <div className="min-w-0">
                 <p className="truncate text-xs font-bold text-salon-forest">{workplace || "منصة XMANSX"}</p>
-                <h1 className="mt-1 truncate text-2xl font-bold text-salon-ink">مرحبًا {session.barber.name}</h1>
+                {/* الاسم يلتف على سطرين بدل أن يُقصّ: «مرحبًا حلاق تجر…» ليست تحية. */}
+                <h1 className="mt-1 text-xl font-bold leading-tight text-salon-ink sm:text-2xl">
+                  مرحبًا {session.barber.name}
+                </h1>
               </div>
             </div>
             <LogoutButton className="border-salon-line bg-white text-salon-charcoal shadow-sm hover:border-salon-forest/40" />
@@ -96,7 +99,9 @@ export default async function BarberHomePage() {
 
             {subscription.blockReason ? null : <BarberNotificationCenter />}
 
-            {summary.cashSession && !subscription.blockReason ? (
+            {/* بلا جلسة صندوق تبقى البطاقة ظاهرة معطّلة بسببها: إخفاؤها كان
+                يقرأ كعطل في التطبيق لا كقاعدة تشغيلية. */}
+            {subscription.blockReason ? null : summary.cashSession ? (
               <>
                 <section className="barber-card lux-edge overflow-hidden p-5">
                   <p className="lux-eyebrow">نقطة البيع</p>
@@ -110,7 +115,24 @@ export default async function BarberHomePage() {
                 </section>
                 <CustomerSearch />
               </>
-            ) : null}
+            ) : (
+              <section className="barber-card overflow-hidden p-5">
+                <p className="lux-eyebrow">نقطة البيع</p>
+                <h2 className="mt-2 text-2xl font-bold text-salon-ink">افتح جلسة الصندوق لتبدأ</h2>
+                <p className="mt-2 text-sm font-semibold leading-6 text-salon-charcoal/70">
+                  تسجيل الزيارات والبحث عن العملاء يحتاجان جلسة صندوق مفتوحة، حتى يبقى كل مبلغ مربوطًا
+                  بدرج معروف. افتحها من بطاقة «جلسة الصندوق» في هذه الصفحة.
+                </p>
+                <button
+                  type="button"
+                  disabled
+                  className="barber-gold-button mt-5 flex h-16 w-full items-center justify-center text-xl"
+                >
+                  + عملية جديدة
+                </button>
+                <p className="mt-2 text-center text-xs font-bold text-salon-ruby">متوقّف حتى تفتح جلسة صندوق</p>
+              </section>
+            )}
 
             {!subscription.blockReason ? (
               <BarberAppointmentsPanel
@@ -126,7 +148,9 @@ export default async function BarberHomePage() {
               <CashSessionPanel
                 initialSession={summary.cashSession}
                 initialExpenses={sessionExpenses}
-                initialCustodyBalance={summary.custodyInitialized ? summary.custodyBalance : 0}
+                custodyBalance={summary.custodyBalance}
+                custodyInitialized={summary.custodyInitialized}
+                collections={summary.collections}
               />
             )}
 

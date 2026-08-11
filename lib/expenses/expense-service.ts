@@ -176,24 +176,36 @@ export async function recordCashExpense(prisma: PrismaClient, input: RecordExpen
   });
 }
 
-/** حذف مصروف — متاح قبل إغلاق الجلسة فقط حتى لا تتغيّر أرقام إغلاق محفوظة. */
+/**
+ * حذف مصروف — متاح قبل إغلاق الجلسة فقط حتى لا تتغيّر أرقام إغلاق محفوظة.
+ *
+ * الحلاق يحذف **مصروف نفسه على جلسته المفتوحة** لا غير: خطأ في مبلغ نثري
+ * يُصحَّح في ثانيته بدل أن يُغلق يومًا بأرقام يعرف صاحبها أنها خاطئة.
+ */
 export async function deleteCashExpense(
   prisma: PrismaClient,
   expenseId: string,
-  scope: { organizationId: string; salonIds?: string[] | null; actorUserId: string; actorType: "OWNER" | "ADMIN" | "SUPERVISOR" },
+  scope:
+    | { organizationId: string; salonIds?: string[] | null; actorUserId: string; actorType: "OWNER" | "ADMIN" | "SUPERVISOR" }
+    | { organizationId: string; actorBarberId: string; actorType: "BARBER" },
 ) {
+  const byBarber = scope.actorType === "BARBER";
   return runSerializableExpenseTransaction(prisma, async (tx) => {
     const expense = await tx.cashExpense.findFirst({
       where: {
         id: expenseId,
         organizationId: scope.organizationId,
-        ...(scope.salonIds && scope.salonIds.length > 0 ? { salonId: { in: scope.salonIds } } : {}),
+        ...(byBarber ? { barberId: scope.actorBarberId } : {}),
+        ...(!byBarber && scope.salonIds && scope.salonIds.length > 0 ? { salonId: { in: scope.salonIds } } : {}),
       },
       include: { cashSession: { select: { status: true } } },
     });
     if (!expense) throw new BusinessError("المصروف غير موجود", 404);
     if (expense.cashSession && expense.cashSession.status === "CLOSED") {
       throw new BusinessError("لا يمكن حذف مصروف على جلسة صندوق مغلقة", 409);
+    }
+    if (byBarber && !expense.cashSessionId) {
+      throw new BusinessError("هذا المصروف ليس ضمن جلسة صندوق — راجع مدير الفرع", 409);
     }
 
     if (expense.paymentSource === "CASH_DRAWER" && expense.barberId) {
@@ -208,7 +220,7 @@ export async function deleteCashExpense(
         referenceId: expense.id,
         note: `عكس مصروف محذوف: ${expense.note}`,
         actorType: scope.actorType,
-        actorUserId: scope.actorUserId,
+        ...(byBarber ? { actorBarberId: scope.actorBarberId } : { actorUserId: scope.actorUserId }),
       });
     }
 
@@ -218,7 +230,7 @@ export async function deleteCashExpense(
         organizationId: scope.organizationId,
         salonId: expense.salonId,
         actorType: scope.actorType,
-        actorUserId: scope.actorUserId,
+        ...(byBarber ? { actorBarberId: scope.actorBarberId } : { actorUserId: scope.actorUserId }),
         action: "cash_expense.deleted",
         entityType: "CashExpense",
         entityId: expense.id,

@@ -3,10 +3,13 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { BrandLogo } from "@/components/brand-logo";
+import { useHydrated } from "@/components/use-hydrated";
 
 export default function DashboardLoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  // معطّل حتى الترطيب: ضغطة مبكرة تُرسل النموذج بـ GET فتظهر كلمة المرور في العنوان.
+  const hydrated = useHydrated();
   // لا يُطلب معرّف مؤسسة. هذه القائمة تظهر فقط في الحالة النادرة: بريد وكلمة
   // مرور صحيحان في أكثر من صالون — فيختار صاحبها بالاسم لا بمعرّف يحفظه.
   const [organizations, setOrganizations] = useState<{ id: string; name: string }[]>([]);
@@ -113,11 +116,11 @@ export default function DashboardLoginPage() {
           {error ? <p className="rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{error}</p> : null}
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !hydrated}
             aria-busy={loading}
             className="dashboard-button-gold sheen-overlay w-full py-3.5 text-base"
           >
-            {loading ? "جاري الدخول..." : "دخول"}
+            {loading ? "جاري الدخول..." : hydrated ? "دخول" : "جاري التحضير..."}
           </button>
           <p className="text-center text-xs font-medium text-salon-charcoal/70">
             ليس لديك حساب؟ <Link href="/signup" className="font-bold text-salon-gold hover:underline">أنشئ مؤسستك</Link>

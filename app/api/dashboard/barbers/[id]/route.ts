@@ -7,6 +7,8 @@ import { isSalonAllowed } from "@/lib/auth/salon-scope";
 import { toSafeBarber } from "@/lib/auth/sanitize";
 import { writeAuditLog } from "@/lib/audit/audit-log";
 import { assertValidBarberWorkSchedule } from "@/lib/barbers/work-schedule";
+import { bookingConfigFromSettings } from "@/lib/appointments/booking-slots";
+import { getEffectiveSettings } from "@/lib/settings/system-settings";
 import { toErrorResponse } from "@/lib/http/error-response";
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -26,12 +28,6 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const before = await prisma.barber.findFirst({ where: { id, organizationId: session.organizationId } });
   if (!before) {
     return NextResponse.json({ message: "الحلاق غير موجود" }, { status: 404 });
-  }
-
-  try {
-    assertValidBarberWorkSchedule(before, parsed.data);
-  } catch (error) {
-    return toErrorResponse(error, "تعذر تحديث دوام الحلاق");
   }
 
   // المشرف: نقل بين فروعه المسندة فقط — لا تعديل اسم/جوال/تفعيل.
@@ -75,6 +71,29 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
         { status: 409 },
       );
     }
+  }
+
+  // الدوام يُقاس على نافذة حجز الفرع الذي سيصير إليه الحلاق بعد التعديل.
+  const scheduleTouched =
+    parsed.data.workScheduleEnabled !== undefined ||
+    parsed.data.workStartMinute !== undefined ||
+    parsed.data.workEndMinute !== undefined ||
+    parsed.data.workClosedWeekdays !== undefined;
+
+  try {
+    const targetSalonId = parsed.data.salonId ?? before.salonId;
+    const booking =
+      scheduleTouched && targetSalonId
+        ? bookingConfigFromSettings(
+            await getEffectiveSettings(prisma, {
+              organizationId: session.organizationId,
+              salonId: targetSalonId,
+            }),
+          )
+        : null;
+    assertValidBarberWorkSchedule(before, parsed.data, booking);
+  } catch (error) {
+    return toErrorResponse(error, "تعذر تحديث دوام الحلاق");
   }
 
   const isTransfer = Boolean(parsed.data.salonId && parsed.data.salonId !== before.salonId);

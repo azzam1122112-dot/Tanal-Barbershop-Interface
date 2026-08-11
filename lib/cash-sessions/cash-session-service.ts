@@ -126,7 +126,9 @@ export async function closeCashSession(prisma: PrismaClient, input: CashSessionC
       sumSessionCollections(tx, session.id),
     ]);
     const expectedCash = roundMoney(Number(session.openingCashAmount) + totals.cashTotal - expensesTotal - collectionsTotal);
-    const cashReceivedAmount = input.cashReceivedAmount ?? expectedCash;
+    // «استُلم» تعني أن إنسانًا استلم. الحلاق حين يغلق جلسته يبقى الكاش في يده،
+    // فلا نكتب مبلغًا مستلمًا بلا مستلم — التسليم الحقيقي حركة تحصيل مستقلة.
+    const cashReceivedAmount = input.cashReceivedAmount ?? (input.closedByUserId ? expectedCash : null);
     const close = await tx.cashSession.update({
       where: { id: session.id },
       data: {
@@ -164,7 +166,7 @@ export async function closeCashSession(prisma: PrismaClient, input: CashSessionC
           expensesTotal,
           collectionsTotal,
           expectedCash,
-          cashDifference: roundMoney(cashReceivedAmount - expectedCash),
+          cashDifference: cashReceivedAmount == null ? null : roundMoney(cashReceivedAmount - expectedCash),
         },
         ipAddress: input.auditMeta?.ipAddress,
         userAgent: input.auditMeta?.userAgent,
@@ -325,7 +327,8 @@ function toStoredCashSessionRow(session: Prisma.CashSessionGetPayload<{ include:
   const collectionsTotal = Number(session.collectionsTotal);
   const openingCashAmount = Number(session.openingCashAmount);
   const expectedCash = roundMoney(openingCashAmount + totals.cashTotal - expensesTotal - collectionsTotal);
-  const cashReceivedAmount = session.cashReceivedAmount != null ? Number(session.cashReceivedAmount) : expectedCash;
+  // لا نفترض استلامًا لم يحدث: جلسة أغلقها الحلاق نفسه تبقى بلا مبلغ مستلم.
+  const cashReceivedAmount = session.cashReceivedAmount != null ? Number(session.cashReceivedAmount) : null;
   return {
     id: session.id,
     barber: { id: session.barber.id, name: session.barber.name },
@@ -339,7 +342,7 @@ function toStoredCashSessionRow(session: Prisma.CashSessionGetPayload<{ include:
     collectionsTotal,
     expectedCash,
     cashReceivedAmount,
-    cashDifference: roundMoney(cashReceivedAmount - expectedCash),
+    cashDifference: cashReceivedAmount == null ? null : roundMoney(cashReceivedAmount - expectedCash),
     notes: session.notes,
   };
 }
