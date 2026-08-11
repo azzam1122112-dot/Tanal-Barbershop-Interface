@@ -2,10 +2,13 @@
 
 import { FormEvent, useState } from "react";
 import { BrandLogo } from "@/components/brand-logo";
+import { useHydrated } from "@/components/use-hydrated";
 
 export default function PlatformLoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  // معطّل حتى الترطيب: ضغطة مبكرة تُرسل النموذج بـ GET فتظهر كلمة المرور في العنوان.
+  const hydrated = useHydrated();
   const [challengeToken, setChallengeToken] = useState("");
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -75,8 +78,8 @@ export default function PlatformLoginPage() {
             </>
           )}
           {error ? <p className="rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{error}</p> : null}
-          <button type="submit" disabled={loading} aria-busy={loading} className="dashboard-button-gold w-full py-3.5 text-base">
-            {loading ? "جاري التحقق..." : challengeToken ? "تحقق ودخول" : "دخول آمن"}
+          <button type="submit" disabled={loading || !hydrated} aria-busy={loading} className="dashboard-button-gold w-full py-3.5 text-base">
+            {loading ? "جاري التحقق..." : !hydrated ? "جاري التحضير..." : challengeToken ? "تحقق ودخول" : "دخول آمن"}
           </button>
         </form>
       </section>

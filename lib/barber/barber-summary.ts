@@ -32,6 +32,20 @@ export async function getBarberTodaySummary(prisma: BarberSummaryPrisma, barberI
     ? await Promise.all([calculateCashSessionSnapshot(prisma, openCashSession.id), sumSessionCollections(prisma, openCashSession.id)])
     : [null, 0];
 
+  // ما سلّمه الحلاق فعلًا للإدارة: يعيش خارج الجلسة، فيبقى ظاهرًا بعد إغلاقها.
+  const collections = await prisma.cashCollection.findMany({
+    where: { barberId, reversedAt: null },
+    orderBy: { collectedAt: "desc" },
+    take: 5,
+    select: {
+      id: true,
+      collectedAmount: true,
+      remainingAfter: true,
+      collectedAt: true,
+      collectedBy: { select: { name: true } },
+    },
+  });
+
   return {
     visitsCount: visits.length,
     cashTotal,
@@ -39,6 +53,13 @@ export async function getBarberTodaySummary(prisma: BarberSummaryPrisma, barberI
     netTotal: sum(visits.map((visit) => Number(visit.netAmount))),
     custodyBalance: Number(custody?.balance ?? 0),
     custodyInitialized: custody?.isInitialized ?? false,
+    collections: collections.map((collection) => ({
+      id: collection.id,
+      amount: Number(collection.collectedAmount),
+      remainingAfter: Number(collection.remainingAfter),
+      collectedAt: collection.collectedAt.toISOString(),
+      collectedByName: collection.collectedBy?.name ?? null,
+    })),
     latestVisits: visits.slice(0, 5).map((visit) => ({
       id: visit.id,
       customer: visit.customer

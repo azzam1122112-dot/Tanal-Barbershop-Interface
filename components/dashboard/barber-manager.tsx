@@ -140,7 +140,7 @@ export function BarberManager({
         commissionRate: barber.commissionRate == null ? "" : String(barber.commissionRate),
         workScheduleEnabled: Boolean(barber.workScheduleEnabled),
         workStartTime: minutesToTimeValue(barber.workStartMinute ?? 16 * 60),
-        workEndTime: minutesToTimeValue(barber.workEndMinute ?? 23 * 60),
+        workEndTime: closeMinutesToTimeValue(barber.workEndMinute ?? 23 * 60),
         workClosedWeekdays: barber.workClosedWeekdays ?? [],
       },
     }));
@@ -223,7 +223,7 @@ export function BarberManager({
     }
     if (draft.workScheduleEnabled) {
       const startMinute = timeValueToMinutes(draft.workStartTime, barber.workStartMinute ?? 16 * 60);
-      const endMinute = timeValueToMinutes(draft.workEndTime, barber.workEndMinute ?? 23 * 60);
+      const endMinute = timeValueToCloseMinutes(draft.workEndTime, barber.workEndMinute ?? 23 * 60);
       if (startMinute !== barber.workStartMinute) updateBody.workStartMinute = startMinute;
       if (endMinute !== barber.workEndMinute) updateBody.workEndMinute = endMinute;
       if (!sameNumberSet(draft.workClosedWeekdays, barber.workClosedWeekdays ?? [])) {
@@ -608,6 +608,9 @@ export function BarberManager({
                                   onChange={(event) => updateDraft(barber.id, { workEndTime: event.target.value })}
                                   className="dashboard-field py-2.5"
                                 />
+                                <span className="mt-1.5 block text-[11px] font-semibold text-salon-charcoal/70">
+                                  12:00 ص = منتصف الليل (نهاية اليوم).
+                                </span>
                               </label>
                               <fieldset className="md:col-span-2">
                                 <legend className="mb-2 text-xs font-bold text-salon-charcoal">أيام إجازة الحلاق</legend>
@@ -824,6 +827,20 @@ function timeValueToMinutes(value: string, fallback: number) {
   const match = /^(\d{2}):(\d{2})$/.exec(value);
   if (!match) return fallback;
   return Number(match[1]) * 60 + Number(match[2]);
+}
+
+/**
+ * `24:00` مرفوضة في `input[type=time]`، فمنتصف الليل يُكتب `00:00` ويُقرأ في
+ * **خانة النهاية وحدها** نهايةَ اليوم — وإلا تعذّر على حلاق في فرع 24 ساعة أن
+ * ينهي دوامه منتصف الليل. نفس القاعدة في إعدادات نافذة حجز الفرع.
+ */
+function closeMinutesToTimeValue(minutes: number) {
+  return minutes >= 24 * 60 ? "00:00" : minutesToTimeValue(minutes);
+}
+
+function timeValueToCloseMinutes(value: string, fallback: number) {
+  const minutes = timeValueToMinutes(value, fallback);
+  return minutes === 0 ? 24 * 60 : minutes;
 }
 
 function sameNumberSet(left: number[], right: number[]) {

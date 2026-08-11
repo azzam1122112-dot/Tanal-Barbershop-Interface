@@ -279,6 +279,13 @@ export function VisitForm({
   const parsedCashTendered = Number(cashTenderedAmount);
   const cashChange = Number.isFinite(parsedCashTendered) ? Math.max(0, Math.round((parsedCashTendered - displayNetAmount) * 100) / 100) : 0;
   const paymentReady = paymentMethod === "NETWORK" ? networkAccepted : Number.isFinite(parsedCashTendered) && parsedCashTendered >= displayNetAmount;
+  // مبالغ جاهزة للضغط: المبلغ بالضبط ثم أقرب ورقة نقدية أعلى منه — أسرع من
+  // كتابة رقم بيد واحدة والمقص في الأخرى.
+  const tenderOptions = [...new Set(
+    [displayNetAmount, 10, 50, 100, 500]
+      .map((step, index) => (index === 0 ? step : Math.ceil(displayNetAmount / step) * step))
+      .filter((value) => Number.isFinite(value) && value >= displayNetAmount && value > 0),
+  )].slice(0, 4);
   const selectedServicesTotal = services
     .filter((service) => selectedServices.includes(service.id))
     .reduce((total, service) => total + service.defaultPrice, 0);
@@ -556,7 +563,12 @@ export function VisitForm({
             onClick={closePreview}
           />
           <div className="barber-card relative mx-auto flex max-h-[92vh] w-full max-w-md flex-col overflow-hidden shadow-[0_28px_70px_-24px_rgba(16,25,22,0.45)]">
-            <div className="barber-card-head">
+            {/* الترويسة تحمل قرار الدفع نفسه: حقل الاستلام وحاسبة الباقي كانا أسفل
+                منطقة تمرير النافذة، فيضغط الحلاق «إتمام» على جوال ولا يرى سبب
+                التعطيل ولا الباقي الذي يجب أن يعيده. القرار الآن فوق الطية دائمًا. */}
+            {/* الترويسة والتذييل ثابتان والوسط وحده يتمرّر: بلا `shrink-0` كان
+                flex يضغط الترويسة فيقصّ حقل الاستلام نفسه الذي رفعناه إليها. */}
+            <div className="barber-card-head lux-edge shrink-0">
               <div className="flex items-center justify-between gap-3">
                 <div className="h-1.5 w-12 rounded-full bg-salon-line" />
                 <button
@@ -567,13 +579,83 @@ export function VisitForm({
                   تعديل
                 </button>
               </div>
-              <p className="mt-4 text-sm font-bold text-salon-charcoal/65">المطلوب تحصيله</p>
-              <p className="mt-1 text-5xl font-black text-salon-forest">{displayNetAmount} ريال</p>
-              <p className="mt-2 text-sm font-semibold text-salon-charcoal/70">
-                {preview.loyaltyEnabled ? `النقاط المتوقعة: ${displayExpectedPoints}` : "عملية عادية بلا نقاط ولاء"}
+              <p className="lux-eyebrow mt-4">المطلوب تحصيله</p>
+              <p className="lux-number mt-1 text-5xl text-salon-forest">{displayNetAmount} ريال</p>
+              <p className="mt-1.5 text-sm font-semibold text-salon-charcoal/70">
+                {preview.customer?.name ?? "عميل زائر"}
+                {preview.loyaltyEnabled ? ` · النقاط المتوقعة ${displayExpectedPoints}` : " · بلا نقاط ولاء"}
               </p>
+
+              {paymentMethod === "CASH" ? (
+                <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50/80 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-sm font-bold text-emerald-950">المبلغ المستلم من العميل</span>
+                    <span className="text-[0.7rem] font-bold text-emerald-800/75">اضغط مبلغًا جاهزًا أو اكتبه</span>
+                  </div>
+                  <div className="mt-2 grid grid-cols-4 gap-1.5">
+                    {tenderOptions.map((value) => {
+                      const active = Number(cashTenderedAmount) === value;
+                      return (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => setCashTenderedAmount(String(value))}
+                          className={`h-11 rounded-xl border text-sm font-bold tabular-nums transition active:scale-[0.97] ${
+                            active
+                              ? "border-salon-forest bg-salon-forest text-white shadow-sm"
+                              : "border-emerald-200 bg-white text-emerald-950"
+                          }`}
+                        >
+                          {value === displayNetAmount ? "بالضبط" : value}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <input
+                    lang="en"
+                    dir="ltr"
+                    type="number"
+                    min={displayNetAmount}
+                    step="0.01"
+                    inputMode="decimal"
+                    aria-label="المبلغ المستلم من العميل"
+                    value={cashTenderedAmount}
+                    onChange={(event) => setCashTenderedAmount(event.target.value)}
+                    className="barber-field mt-2 h-12 bg-white text-center text-xl"
+                  />
+                  <div
+                    className={`mt-2 flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-bold transition-colors ${
+                      cashChange > 0 ? "bg-salon-gold/20 text-salon-ink" : "bg-white text-emerald-950"
+                    }`}
+                  >
+                    <span>{cashChange > 0 ? "الباقي للعميل" : "بلا باقٍ"}</span>
+                    <span className="lux-number text-xl">{cashChange.toFixed(2)} ريال</span>
+                  </div>
+                </div>
+              ) : (
+                <label
+                  className={`mt-4 flex cursor-pointer items-center gap-3 rounded-2xl border p-4 text-sm font-bold transition ${
+                    networkAccepted
+                      ? "border-salon-forest bg-salon-forest text-white shadow-sm"
+                      : "border-sky-200 bg-sky-50 text-sky-950"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={networkAccepted}
+                    onChange={(event) => setNetworkAccepted(event.target.checked)}
+                    className="h-6 w-6 shrink-0 accent-sky-700"
+                  />
+                  <span className="min-w-0">
+                    <span className="block">أؤكد أن جهاز الشبكة وافق وتم تحصيل المبلغ</span>
+                    <span className={`mt-0.5 block text-xs font-semibold ${networkAccepted ? "text-white/75" : "text-sky-900/70"}`}>
+                      {networkAccepted ? "جاهز للإتمام" : "مطلوب قبل إتمام العملية"}
+                    </span>
+                  </span>
+                </label>
+              )}
             </div>
-            <div className="min-h-0 overflow-y-auto p-4">
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
               <div className="rounded-2xl border border-salon-line bg-salon-pearl p-3">
                 <p className="text-sm font-bold">الخصومات المتاحة</p>
                 <p className="mt-1 text-xs font-semibold text-salon-charcoal/70">
@@ -628,38 +710,8 @@ export function VisitForm({
                 <SummaryCell label="مكافأة الإدارة" value={selectedManagerReward ? selectedManagerReward.title : "-"} />
               </dl>
               <p className="mt-3 rounded-2xl bg-salon-mist px-3 py-3 text-sm font-semibold text-salon-charcoal">{preview.services.map((service) => service.name).join("، ")}</p>
-              {paymentMethod === "CASH" ? (
-                <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3">
-                  <label className="text-sm font-bold text-emerald-950">
-                    المبلغ المستلم من العميل
-                    <input
-                      lang="en"
-                      type="number"
-                      min={displayNetAmount}
-                      step="0.01"
-                      value={cashTenderedAmount}
-                      onChange={(event) => setCashTenderedAmount(event.target.value)}
-                      className="barber-field mt-2 bg-white text-center text-xl"
-                    />
-                  </label>
-                  <div className="mt-2 flex items-center justify-between rounded-xl bg-white px-3 py-2 text-sm font-bold text-emerald-950">
-                    <span>الباقي للعميل</span>
-                    <span className="text-lg font-black tabular-nums">{cashChange.toFixed(2)} ريال</span>
-                  </div>
-                </div>
-              ) : (
-                <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm font-bold text-sky-950">
-                  <input
-                    type="checkbox"
-                    checked={networkAccepted}
-                    onChange={(event) => setNetworkAccepted(event.target.checked)}
-                    className="mt-0.5 h-5 w-5 accent-sky-700"
-                  />
-                  <span>أؤكد أن جهاز الشبكة وافق على العملية وتم تحصيل المبلغ.</span>
-                </label>
-              )}
             </div>
-            <div className="border-t border-salon-line bg-white p-4">
+            <div className="shrink-0 border-t border-salon-line bg-white p-4">
               <button
                 type="button"
                 onClick={confirmVisit}
@@ -669,6 +721,14 @@ export function VisitForm({
               >
                 {loadingConfirm ? "جاري إتمام العملية..." : paymentMethod === "CASH" ? "تم استلام الكاش — إتمام العملية" : "تم قبول الشبكة — إتمام العملية"}
               </button>
+              {/* زر معطّل بلا سبب يقرأ كعطل. السبب يُكتب تحته دائمًا. */}
+              {!paymentReady && !loadingConfirm ? (
+                <p role="status" className="mt-2 text-center text-xs font-bold text-salon-ruby">
+                  {paymentMethod === "CASH"
+                    ? `اكتب المبلغ المستلم أولًا (${displayNetAmount} ريال فأكثر)`
+                    : "علّم إقرار قبول جهاز الشبكة أعلاه أولًا"}
+                </p>
+              ) : null}
             </div>
           </div>
         </div>
