@@ -1,0 +1,6 @@
+# ملفات تُنفَّذ أو تُقرأ على خادم لينكس. بلا هذا السطر يطبّق `git archive`
+# تحويل CRLF على جهاز ويندوز (‎core.autocrlf=true‎)، فيصل سطر الشيبانغ إلى
+# الخادم بـ ‎\r‎ ويفشل السكربت بخطأ ‎syntax error near unexpected token‎ مبهم،
+# وتُرفض وحدات systemd. أرشيف النشر لا يمر بـ checkout فلا يصلحه شيء لاحقًا.
+*.sh text eol=lf
+deploy/** text eol=lf
