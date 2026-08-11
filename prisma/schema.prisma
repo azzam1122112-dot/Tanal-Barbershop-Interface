@@ -598,22 +598,23 @@ model Customer {
 }
 
 model Service {
-  id              String         @id @default(cuid())
-  organizationId  String
-  salonId         String
-  name            String
-  defaultPrice    Decimal        @db.Decimal(10, 2)
-  isActive        Boolean        @default(true)
-  sortOrder       Int            @default(0)
+  id                  String               @id @default(cuid())
+  organizationId      String
+  salonId             String
+  name                String
+  defaultPrice        Decimal              @db.Decimal(10, 2)
+  isActive            Boolean              @default(true)
+  sortOrder           Int                  @default(0)
   // مدة الخدمة بالدقائق — تُستخدم لحساب نهاية الموعد.
-  durationMinutes Int            @default(30)
+  durationMinutes     Int                  @default(30)
   // نسبة عمولة خاصة بهذه الخدمة %. null = استخدم نسبة الحلاق ثم الفرع.
-  commissionRate  Decimal?       @db.Decimal(5, 2)
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  salon           Salon          @relation(fields: [salonId], references: [id], onDelete: Cascade)
-  visitServices   VisitService[]
+  commissionRate      Decimal?             @db.Decimal(5, 2)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  organization        Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  salon               Salon                @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  visitServices       VisitService[]
+  appointmentServices AppointmentService[]
 
   @@unique([salonId, name])
   @@index([salonId, isActive, sortOrder])
@@ -935,6 +936,9 @@ model SystemSettings {
   bookingHorizonDays            Int          @default(14)
   // أقصى عدد مواعيد قائمة للعميل الواحد — يمنع حجز مقاعد وهمية.
   bookingMaxActivePerCustomer   Int          @default(2)
+  // كم دقيقة يُطلب من العميل الحضور قبل موعده. إرشاد يُعرض له، لا قيد يُفحص:
+  // لا يزحزح بداية الموعد ولا يدخل حساب التداخل. صفر = لا يُعرض الإرشاد.
+  bookingArriveEarlyMinutes     Int          @default(10)
   createdAt                     DateTime     @default(now())
   updatedAt                     DateTime     @updatedAt
   organization                  Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -1257,11 +1261,12 @@ model Appointment {
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  salon        Salon        @relation(fields: [salonId], references: [id], onDelete: Cascade)
-  barber       Barber?      @relation(fields: [barberId], references: [id], onDelete: SetNull)
-  customer     Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  visit        Visit?       @relation(fields: [visitId], references: [id], onDelete: SetNull)
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  salon        Salon                @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  barber       Barber?              @relation(fields: [barberId], references: [id], onDelete: SetNull)
+  customer     Customer?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  visit        Visit?               @relation(fields: [visitId], references: [id], onDelete: SetNull)
+  services     AppointmentService[]
 
   @@index([salonId, startAt])
   @@index([organizationId, startAt])
@@ -1269,6 +1274,32 @@ model Appointment {
   @@index([barberId, startAt])
   @@index([status, startAt])
   @@index([customerId])
+}
+
+/**
+ * الخدمات المطلوبة في الموعد — مصدر مدّته.
+ * جدول سطور على نمط `VisitService`: لا يكرّر `organizationId`، والعزل بينه وبين
+ * المستأجرين محفّز في القاعدة يقارن مؤسسة الموعد بمؤسسة الخدمة.
+ * المدة **لقطة وقت الحجز** كنسبة العمولة و`VisitProduct.unitCost` تمامًا: تعديل
+ * مدة خدمة في الكتالوج لا يجوز أن يزحزح موعدًا محجوزًا سبق أن أُبلغ به العميل.
+ */
+model AppointmentService {
+  id              String  @id @default(cuid())
+  appointmentId   String
+  serviceId       String
+  serviceName     String
+  durationMinutes Int
+  // سعر إرشادي يُعرض للعميل وقت الحجز. المبلغ المُحصَّل يُحسم في الزيارة وحدها.
+  estimatedPrice  Decimal @db.Decimal(10, 2)
+  sortOrder       Int     @default(0)
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  service     Service     @relation(fields: [serviceId], references: [id])
+
+  // خدمة واحدة لا تتكرر في الموعد: التكرار يعني مدة مضاعفة بلا قصد ظاهر.
+  @@unique([appointmentId, serviceId])
+  @@index([appointmentId])
+  @@index([serviceId])
 }
 
 // منتج للبيع (شمع، شامبو...). المخزون رقم صحيح بسيط — لا دفعات ولا صلاحيات.
@@ -1300,18 +1331,18 @@ model Product {
 
 // سطر منتج مباع ضمن زيارة — نسخة من الاسم والسعر وقت البيع.
 model VisitProduct {
-  id               String  @id @default(cuid())
+  id               String   @id @default(cuid())
   visitId          String
   productId        String
   productName      String
-  unitPrice        Decimal @db.Decimal(10, 2)
+  unitPrice        Decimal  @db.Decimal(10, 2)
   // تكلفة الوحدة **لحظة البيع**، كنسبة العمولة تمامًا: تعديل تكلفة المنتج لاحقًا
   // لا يجوز أن يعيد كتابة أرباح شهور مضت. `null` = لم تُسجَّل تكلفة للمنتج.
   unitCost         Decimal? @db.Decimal(10, 2)
-  quantity         Int     @default(1)
-  lineTotal        Decimal @db.Decimal(10, 2)
-  commissionRate   Decimal @default(0) @db.Decimal(5, 2)
-  commissionAmount Decimal @default(0) @db.Decimal(10, 2)
+  quantity         Int      @default(1)
+  lineTotal        Decimal  @db.Decimal(10, 2)
+  commissionRate   Decimal  @default(0) @db.Decimal(5, 2)
+  commissionAmount Decimal  @default(0) @db.Decimal(10, 2)
 
   visit   Visit   @relation(fields: [visitId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id])

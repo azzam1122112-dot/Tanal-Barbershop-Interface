@@ -9,11 +9,18 @@ import {
   type BookingDay,
 } from "@/lib/appointments/booking-slots";
 import { APPOINTMENT_STATUS_LABELS } from "@/lib/appointments/appointment-service";
+import {
+  appointmentServicesInclude,
+  toAppointmentServiceRows,
+} from "@/lib/appointments/appointment-duration";
 
 const ACTIVE_STATUSES: AppointmentStatus[] = ["BOOKED", "ARRIVED"];
 const appointmentInclude = {
   barber: { select: { id: true, name: true } },
   salon: { select: { id: true, name: true } },
+  // الشاشة تعرض خدمات كل موعد، والصفّ العائد من التأجيل يستبدل الصفّ القديم
+  // في القائمة — إسقاطها هنا يترك الشاشة بلا خدمات بعد أول تأجيل.
+  services: appointmentServicesInclude,
 } satisfies Prisma.AppointmentInclude;
 
 type BarberAppointmentScope = {
@@ -150,6 +157,7 @@ function toBarberAppointmentRow(
     statusLabel: APPOINTMENT_STATUS_LABELS[appointment.status],
     customerName: appointment.customerName,
     customerPhone: appointment.customerPhone,
+    services: toAppointmentServiceRows(appointment.services),
     notes: appointment.notes,
   };
 }

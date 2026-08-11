@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PrismaClient } from "@prisma/client";
 import { selfRegisterForLoyalty } from "../lib/customers/loyalty-signup";
-import { getCustomerPortalView } from "../lib/customers/customer-portal";
+import { getPortalIdentity, getPortalVisits } from "../lib/customers/portal-view";
 
 const prisma = new PrismaClient();
 const ORG = "org_default";
@@ -96,19 +96,19 @@ describe("التسجيل الذاتي في برنامج الولاء", () => {
     createdCustomerIds.push(result.customerId);
 
     const token = result.portalPath.replace("/my/", "");
-    const view = await getCustomerPortalView(prisma, token);
+    const identity = await getPortalIdentity(token);
 
-    expect(view).not.toBeNull();
-    expect(view?.customer.name).toBe("عميل البوابة");
-    expect(view?.points).toBe(0);
-    expect(view?.recentVisits).toHaveLength(0);
+    expect(identity).not.toBeNull();
+    expect(identity?.customer.name).toBe("عميل البوابة");
+    expect(identity?.points).toBe(0);
+    expect((await getPortalVisits(identity!)).recentVisits).toHaveLength(0);
   });
 
   it("يرفض رمزًا غير صحيح", async () => {
-    expect(await getCustomerPortalView(prisma, "invalid-token-value-123")).toBeNull();
-    expect(await getCustomerPortalView(prisma, "")).toBeNull();
+    expect(await getPortalIdentity("invalid-token-value-123")).toBeNull();
+    expect(await getPortalIdentity("")).toBeNull();
     // رمز قصير يُرفض قبل الوصول لقاعدة البيانات.
-    expect(await getCustomerPortalView(prisma, "short")).toBeNull();
+    expect(await getPortalIdentity("short")).toBeNull();
   });
 
   it("يرفض اسمًا فارغًا", async () => {

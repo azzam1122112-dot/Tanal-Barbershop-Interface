@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { parseDateKeyParts, RIYADH_TIME_ZONE } from "@/lib/datetime/riyadh";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { formatAppointmentSpan, formatDurationLabel } from "@/lib/appointments/duration-format";
+import { arriveByLabel } from "@/components/public/next-appointment-card";
 
 /**
  * حجز موعد من بوابة العميل.
@@ -20,6 +22,13 @@ type BookableBarber = {
   inheritsSalonSchedule: boolean;
 };
 
+type BookableService = {
+  id: string;
+  name: string;
+  durationMinutes: number;
+  price: number;
+};
+
 type BookableSalon = {
   id: string;
   name: string;
@@ -27,6 +36,16 @@ type BookableSalon = {
   horizonDays: number;
   closedWeekdays: number[];
   barbers: BookableBarber[];
+  services: BookableService[];
+};
+
+type BookingWindow = {
+  openMinute: number;
+  closeMinute: number;
+  /** فرع لا يغلق: الموعد يعبر منتصف الليل ولا تُقصّ آخر ساعة من اليوم. */
+  continuous: boolean;
+  /** آخر دقيقة يجوز أن يبدأ عندها موعد بهذه المدة. */
+  lastStartMinute: number;
 };
 
 type BookingSlotStatus = "AVAILABLE" | "BOOKED" | "TOO_SOON" | "OFF_DUTY";
@@ -47,6 +66,7 @@ type AppointmentRow = {
   statusLabel: string;
   salonName: string;
   barberName: string | null;
+  services: { serviceId: string; serviceName: string }[];
   canCancel: boolean;
 };
 
@@ -86,6 +106,29 @@ function formatSlotTime(minuteOfDay: number) {
   return `${hour12}:${String(minute).padStart(2, "0")} ${suffix}`;
 }
 
+/**
+ * سطر يشرح حدّ الشبكة: لماذا لا تظهر أوقات متأخرة، ومتى لا يوجد حدّ أصلًا.
+ *
+ * لا يُعرض إن كانت المدة المحجوزة هي الفترة الافتراضية — عندها الشبكة كاملة
+ * ولا شيء اختفى ليُشرح، وسطرٌ بلا سبب ضجيج.
+ */
+function buildWindowNotice(
+  window: BookingWindow | null,
+  durationMinutes: number,
+  slotMinutes: number,
+) {
+  if (!window || durationMinutes <= 0) return "";
+  if (window.continuous) {
+    return durationMinutes > slotMinutes
+      ? `الفرع يستقبل على مدار الساعة، والموعد قد يمتدّ بعد منتصف الليل — مدة خدماتك ${formatDurationLabel(durationMinutes)}.`
+      : "";
+  }
+  if (durationMinutes <= slotMinutes) return "";
+  return `خدماتك تحتاج ${formatDurationLabel(durationMinutes)} متواصلة، فآخر موعد يبدأ ${formatSlotTime(
+    window.lastStartMinute,
+  )} ليكتمل قبل إغلاق الفرع ${formatSlotTime(window.closeMinute)}.`;
+}
+
 function formatLeadDuration(minutes: number) {
   const hours = Math.floor(minutes / 60);
   const remainder = minutes % 60;
@@ -106,28 +149,137 @@ function formatAppointment(startAt: string) {
   }).format(date);
 }
 
+/**
+ * إيصال الحجز — ما يحتاجه العميل ليعرف أن الأمر تمّ وماذا يفعل بعده.
+ *
+ * يحمل ما كان السطر النصّي يُسقطه: الحلاق والفرع والخدمات ووقت الحضور المطلوب.
+ */
+function BookingConfirmation({
+  appointment,
+  arriveEarlyMinutes,
+  onBookAnother,
+}: {
+  appointment: AppointmentRow;
+  arriveEarlyMinutes: number;
+  onBookAnother: () => void;
+}) {
+  const arrive = arriveByLabel(appointment.startAt, arriveEarlyMinutes);
+
+  return (
+    <section
+      className="overflow-hidden rounded-2xl border border-salon-forest/30 bg-white shadow-[var(--shadow-md)]"
+      role="status"
+      aria-live="polite"
+    >
+      <div className="flex items-center gap-3 border-b border-salon-forest/15 bg-salon-forest/[0.08] px-5 py-4">
+        <span
+          aria-hidden="true"
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-salon-forest text-lg font-black text-white"
+        >
+          ✓
+        </span>
+        <div className="min-w-0">
+          <h2 className="text-base font-bold text-salon-ink">تم تأكيد حجزك</h2>
+          <p className="mt-0.5 text-xs font-semibold text-salon-charcoal/70">
+            موعدك محفوظ باسمك — لا حاجة لتأكيد آخر.
+          </p>
+        </div>
+      </div>
+
+      <div className="px-5 py-4">
+        <p className="text-base font-bold text-salon-ink">{formatAppointment(appointment.startAt)}</p>
+        <p className="mt-1 text-lg font-black text-salon-forest" dir="ltr">
+          {formatAppointmentSpan(appointment.startAt, appointment.durationMinutes)}
+        </p>
+        <p className="mt-0.5 text-xs font-bold text-salon-charcoal/65">
+          {formatDurationLabel(appointment.durationMinutes)}
+          {appointment.barberName ? ` · مع ${appointment.barberName}` : ""}
+          {appointment.salonName ? ` · ${appointment.salonName}` : ""}
+        </p>
+
+        {appointment.services.length > 0 ? (
+          <ul className="mt-3 flex flex-wrap gap-1.5">
+            {appointment.services.map((service) => (
+              <li
+                key={service.serviceId}
+                className="rounded-xl bg-salon-forest/[0.07] px-2.5 py-1 text-[11px] font-bold text-salon-forest"
+              >
+                {service.serviceName}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+
+        {arrive ? (
+          <p className="mt-4 flex items-start gap-2.5 rounded-xl border border-salon-gold/35 bg-salon-gold/10 px-3.5 py-3 text-xs font-bold leading-5 text-salon-ink">
+            <span aria-hidden="true" className="shrink-0">
+              ⏰
+            </span>
+            <span>
+              احضر قبل موعدك بـ{arrive.minutes} دقائق —{" "}
+              <span className="text-salon-forest" dir="ltr">
+                {arrive.clock}
+              </span>
+              <span className="mt-0.5 block font-semibold text-salon-charcoal/70">
+                التأخّر قد يعني تقليص الخدمة أو تأجيلها.
+              </span>
+            </span>
+          </p>
+        ) : null}
+
+        <p className="mt-3 text-xs font-semibold leading-5 text-salon-charcoal/70">
+          إن تعذّر حضورك ألغِ الموعد من هذه الصفحة — عدم الحضور لموعدين يُعلّق الحجز الإلكتروني.
+        </p>
+
+        <button
+          type="button"
+          onClick={onBookAnother}
+          className="mt-4 flex min-h-12 w-full items-center justify-center rounded-2xl border border-salon-line bg-salon-pearl text-sm font-black text-salon-ink transition hover:border-salon-forest/40"
+        >
+          حجز موعد آخر
+        </button>
+      </div>
+    </section>
+  );
+}
+
 export function PortalBooking({
   token,
   salons,
   initialAppointments,
   bookingPolicy,
+  arriveEarlyMinutes,
 }: {
   token: string;
   salons: BookableSalon[];
   initialAppointments: AppointmentRow[];
   bookingPolicy: BookingPolicy;
+  arriveEarlyMinutes: number;
 }) {
   const [appointments, setAppointments] = useState(initialAppointments);
   const [salonId, setSalonId] = useState(salons[0]?.id ?? "");
   const [barberId, setBarberId] = useState<string>("");
+  const [serviceIds, setServiceIds] = useState<string[]>([]);
   const [days, setDays] = useState<BookingDay[]>([]);
   const [activeDate, setActiveDate] = useState<string>("");
   const [selected, setSelected] = useState<string>("");
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [leadMinutes, setLeadMinutes] = useState(120);
+  // المدة التي حُسبت بها الشبكة المعروضة — من الخادم لا من حساب الواجهة.
+  const [durationMinutes, setDurationMinutes] = useState(0);
+  const [bookingWindow, setBookingWindow] = useState<BookingWindow | null>(null);
+  const [estimatedTotal, setEstimatedTotal] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>("");
-  const [confirmation, setConfirmation] = useState<string>("");
+  /**
+   * الحجز الناجح يحلّ محلّ النموذج بدل سطر نصّي أسفله.
+   *
+   * كان التأكيد فقرة خضراء تظهر في اللحظة التي **تنكمش فيها الشاشة**: تفريغ
+   * الاختيار يُخفي سطر المدى والملخّص، وإعادة تحميل الشبكة تطوي عشرات الخانات
+   * إلى سطر «جاري جلب الأوقات…» — فتقفز الصفحة مئات البكسلات تحت عين من يبحث
+   * عن تأكيده. اللوح الكامل يشغل مكان النموذج فلا يتحرك شيء، ولا يُفوَّت.
+   */
+  const [justBooked, setJustBooked] = useState<AppointmentRow | null>(null);
   const { confirm, confirmDialog } = useConfirm();
 
   const salon = salons.find((item) => item.id === salonId) ?? null;
@@ -138,10 +290,16 @@ export function PortalBooking({
     setError("");
     try {
       const query = new URLSearchParams({ salonId });
+      // الشبكة تُحسب بمدة الخدمات المختارة: خانةٌ حُسبت بنصف ساعة تعرض وقتًا
+      // يُرفض عند الضغط لأن الحجز الفعلي يمتد ساعة ونصفًا.
+      for (const serviceId of serviceIds) query.append("serviceId", serviceId);
       const response = await fetch(`/api/public/portal/${token}/slots?${query.toString()}`);
       const data = (await response.json().catch(() => ({}))) as {
         days?: BookingDay[];
         leadMinutes?: number;
+        durationMinutes?: number;
+        window?: BookingWindow;
+        estimatedTotal?: number;
         message?: string;
       };
       if (!response.ok) {
@@ -152,6 +310,9 @@ export function PortalBooking({
       const nextDays = data.days ?? [];
       setDays(nextDays);
       setLeadMinutes(data.leadMinutes ?? 120);
+      setDurationMinutes(data.durationMinutes ?? 0);
+      setBookingWindow(data.window ?? null);
+      setEstimatedTotal(data.estimatedTotal ?? 0);
       // نثبّت أول يوم فيه فترة فعلية — القفز ليوم فارغ يبدو كعطل.
       const firstOpen = nextDays.find(
         (day) => !day.closed && day.slots.some((slot) => slot.status === "AVAILABLE"),
@@ -163,17 +324,18 @@ export function PortalBooking({
     } finally {
       setLoadingSlots(false);
     }
-  }, [salonId, token]);
+  }, [salonId, token, serviceIds]);
 
   useEffect(() => {
     setSelected("");
     void loadSlots();
   }, [loadSlots]);
 
-  // تبديل الفرع يُبطل اختيار حلاق من فرع آخر.
+  // تبديل الفرع يُبطل اختيار حلاق أو خدمة من فرع آخر — كلاهما يُرفض عند الحفظ.
   useEffect(() => {
     const nextSalon = salons.find((item) => item.id === salonId);
     setBarberId(nextSalon?.barbers.length === 1 ? nextSalon.barbers[0].id : "");
+    setServiceIds([]);
   }, [salonId, salons]);
 
   useEffect(() => {
@@ -184,13 +346,12 @@ export function PortalBooking({
     if (!selected || !salonId || !barberId) return;
     setSubmitting(true);
     setError("");
-    setConfirmation("");
 
     try {
       const response = await fetch(`/api/public/portal/${token}/appointments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ salonId, barberId, startAt: selected }),
+        body: JSON.stringify({ salonId, barberId, startAt: selected, serviceIds }),
       });
       const data = (await response.json().catch(() => ({}))) as {
         appointment?: AppointmentRow;
@@ -205,9 +366,9 @@ export function PortalBooking({
       }
 
       setAppointments((current) => [...current, data.appointment!].sort((a, b) => a.startAt.localeCompare(b.startAt)));
-      setConfirmation(`تم حجز موعدك: ${formatAppointment(data.appointment.startAt)}`);
+      setJustBooked(data.appointment);
       setSelected("");
-      void loadSlots();
+      setServiceIds([]);
     } catch {
       setError("تعذر الاتصال. تحقق من اتصالك وحاول مجددًا.");
     } finally {
@@ -225,7 +386,7 @@ export function PortalBooking({
     }))) return;
 
     setError("");
-    setConfirmation("");
+    // إلغاء موعد آخر لا يمحو تأكيد حجزٍ نجح للتوّ.
     try {
       const response = await fetch(`/api/public/portal/${token}/appointments/${id}/cancel`, { method: "POST" });
       const data = (await response.json().catch(() => ({}))) as {
@@ -239,7 +400,7 @@ export function PortalBooking({
       setAppointments((current) =>
         current.map((item) => (item.id === id ? data.appointment! : item)),
       );
-      setConfirmation("تم إلغاء الموعد.");
+      if (justBooked?.id === id) setJustBooked(null);
       void loadSlots();
     } catch {
       setError("تعذر الاتصال. تحقق من اتصالك وحاول مجددًا.");
@@ -249,8 +410,10 @@ export function PortalBooking({
   const upcoming = appointments.filter(
     (item) => item.status === "BOOKED" || item.status === "ARRIVED",
   );
+  const arriveEarly = arriveEarlyMinutes > 0;
   const activeDay = days.find((day) => day.date === activeDate) ?? null;
   const activeBarber = salon?.barbers.find((barber) => barber.id === barberId) ?? null;
+  const windowNotice = buildWindowNotice(bookingWindow, durationMinutes, salon?.slotMinutes ?? 0);
   const visibleSlots = activeDay && barberId
     ? activeDay.slots
         .map((slot) => ({
@@ -282,8 +445,24 @@ export function PortalBooking({
                 <p className="mt-1 text-xs font-semibold text-salon-charcoal">
                   {appointment.salonName}
                   {appointment.barberName ? ` · ${appointment.barberName}` : ""}
+                  {` · ${formatDurationLabel(appointment.durationMinutes)}`}
                   {` · ${appointment.statusLabel}`}
                 </p>
+                {appointment.services.length > 0 ? (
+                  <p className="mt-1 text-xs font-bold text-salon-forest">
+                    {appointment.services.map((service) => service.serviceName).join(" + ")}
+                  </p>
+                ) : null}
+                {/* الإرشاد على البطاقة نفسها: من يفتح مواعيده قبل خروجه بحاجة إليه
+                    هنا لا في شاشة تأكيد رآها قبل أسبوع. */}
+                {appointment.canCancel && arriveEarly ? (
+                  <p className="mt-2 rounded-xl bg-salon-mist px-3 py-2 text-[11px] font-bold text-salon-ink">
+                    احضر قبل موعدك بـ{arriveEarlyMinutes} دقائق —{" "}
+                    <span className="text-salon-forest" dir="ltr">
+                      {arriveByLabel(appointment.startAt, arriveEarlyMinutes)?.clock}
+                    </span>
+                  </p>
+                ) : null}
                 {appointment.canCancel ? (
                   <button
                     type="button"
@@ -325,14 +504,9 @@ export function PortalBooking({
             </div>
           </div>
         </section>
-      ) : salons.length > 0 ? (
-        <section className="rounded-2xl border border-salon-line bg-white px-5 py-4">
-          <h2 className="text-sm font-bold text-salon-ink">سياسة الحضور</h2>
-          <p className="mt-1 text-xs font-semibold leading-5 text-salon-charcoal/70">
-            إذا تعذر حضورك، ألغِ الموعد من هذه الصفحة. عدم الحضور لموعدين يؤدي إلى تعليق الحجز الإلكتروني.
-          </p>
-        </section>
       ) : null}
+      {/* لا تُعرض سياسة الحضور لمن لا مخالفة عليه: تحذير استباقي قبل أن يُخطئ
+          أحد. صاحب المخالفة يراها أعلاه، والباقي يجدها في إيصال حجزه. */}
 
       {salons.length === 0 && !bookingPolicy.blocked ? (
         <section className="barber-card px-5 py-5">
@@ -341,7 +515,16 @@ export function PortalBooking({
             الحجز الإلكتروني غير متاح حاليًا. تواصل مع الصالون مباشرة لحجز موعدك، أو احجز عند زيارتك القادمة.
           </p>
         </section>
-      ) : salons.length === 0 || bookingPolicy.blocked ? null : (
+      ) : salons.length === 0 || bookingPolicy.blocked ? null : justBooked ? (
+        <BookingConfirmation
+          appointment={justBooked}
+          arriveEarlyMinutes={arriveEarlyMinutes}
+          onBookAnother={() => {
+            setJustBooked(null);
+            void loadSlots();
+          }}
+        />
+      ) : (
         <section className="barber-card px-5 py-5">
           <h2 className="lux-section-title">احجز موعدك</h2>
 
@@ -360,6 +543,62 @@ export function PortalBooking({
                 ))}
               </select>
             </label>
+          ) : null}
+
+          {/* الخدمات قبل الوقت: الشبكة بلا معنى قبل معرفة كم تستغرق الزيارة. */}
+          {salon && salon.services.length > 0 ? (
+            <div className="mt-5">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <span className="block text-xs font-black text-salon-charcoal">الخدمات المطلوبة</span>
+                <span className="text-[0.65rem] font-bold text-salon-charcoal/60">اختياري</span>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {salon.services.map((service) => {
+                  const active = serviceIds.includes(service.id);
+                  return (
+                    <button
+                      key={service.id}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() =>
+                        setServiceIds((current) =>
+                          current.includes(service.id)
+                            ? current.filter((id) => id !== service.id)
+                            : [...current, service.id],
+                        )
+                      }
+                      className={`flex min-h-12 items-center justify-between gap-2 rounded-2xl border px-3 py-2.5 text-right transition ${
+                        active
+                          ? "border-salon-forest bg-salon-forest text-white shadow-sm"
+                          : "border-salon-line bg-white text-salon-ink hover:border-salon-forest/40"
+                      }`}
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-bold">{service.name}</span>
+                        <span className={`block text-[0.65rem] font-semibold ${active ? "text-white/75" : "text-salon-charcoal/60"}`}>
+                          {formatDurationLabel(service.durationMinutes)}
+                        </span>
+                      </span>
+                      <span className={`shrink-0 text-xs font-black tabular-nums ${active ? "text-white" : "text-salon-forest"}`}>
+                        {service.price} ر.س
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              {serviceIds.length > 0 ? (
+                <p className="mt-2 rounded-xl bg-salon-mist px-3 py-2 text-[0.7rem] font-bold text-salon-charcoal">
+                  المدة المحجوزة {formatDurationLabel(durationMinutes)} · التقدير {estimatedTotal} ر.س
+                  <span className="mt-0.5 block font-semibold text-salon-charcoal/65">
+                    المبلغ النهائي يُحدَّد في الصالون.
+                  </span>
+                </p>
+              ) : (
+                <p className="mt-2 text-[0.7rem] font-semibold text-salon-charcoal/60">
+                  بلا اختيار تُحجز {formatDurationLabel(salon.slotMinutes)} فقط — حدّد خدماتك ليُحجز وقتك كاملًا.
+                </p>
+              )}
+            </div>
           ) : null}
 
           <div className="mt-4 flex items-start gap-3 rounded-2xl border border-salon-gold/30 bg-salon-gold/10 px-4 py-3">
@@ -514,15 +753,26 @@ export function PortalBooking({
                 })}
               </div>
             )}
+
+            {/* الشبكة تتقلّص كلما طالت الخدمات، والاختفاء بلا سبب يُقرأ كعطل:
+                خدمة واحدة تمتدّ إلى 10:30 م وثلاث تتوقف عند 9:30 م. */}
+            {windowNotice ? (
+              <p className="mt-2 rounded-xl border border-salon-line bg-salon-pearl px-3 py-2.5 text-[0.7rem] font-semibold leading-5 text-salon-charcoal/75">
+                {windowNotice}
+              </p>
+            ) : null}
           </div>
+
+          {/* المدى لا الخانة: من يرى «5:30» وحدها يظن أنه ينصرف في السادسة. */}
+          {selected && durationMinutes > 0 ? (
+            <p className="mt-4 rounded-2xl border border-salon-forest/25 bg-salon-forest/[0.07] px-4 py-3 text-sm font-bold text-salon-forest">
+              <span dir="ltr">{formatAppointmentSpan(selected, durationMinutes)}</span>
+              {` · ${formatDurationLabel(durationMinutes)}`}
+            </p>
+          ) : null}
 
           {error ? (
             <p className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{error}</p>
-          ) : null}
-          {confirmation ? (
-            <p className="mt-4 rounded-2xl bg-salon-forest/10 px-4 py-3 text-sm font-bold text-salon-forest">
-              {confirmation}
-            </p>
           ) : null}
 
           <button

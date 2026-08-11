@@ -23,7 +23,7 @@ export default async function AppointmentsPage({
   const { organizationId, orgWhere, salonWhere, salonIds, activeSalonId } = dashboardScope(session);
   const scopedSalonIds = session.scopedSalonIds;
 
-  const [appointments, barbers, salons] = await Promise.all([
+  const [appointments, barbers, salons, services] = await Promise.all([
     organizationId
       ? listAppointments(prisma, { organizationId, salonIds, date: selectedDate })
       : Promise.resolve([]),
@@ -39,6 +39,12 @@ export default async function AppointmentsPage({
           select: { id: true, name: true },
         })
       : Promise.resolve([]),
+    // مدة كل خدمة تُعرض للمدير ليقرأ المدة المشتقّة قبل الحفظ لا بعده.
+    prisma.service.findMany({
+      where: { isActive: true, ...orgWhere, ...salonWhere },
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      select: { id: true, name: true, salonId: true, durationMinutes: true },
+    }),
   ]);
 
   return (
@@ -63,6 +69,7 @@ export default async function AppointmentsPage({
           initialAppointments={appointments}
           barbers={barbers}
           salons={salons}
+          services={services}
           defaultSalonId={activeSalonId ?? salons[0]?.id ?? null}
           date={selectedDate}
         />

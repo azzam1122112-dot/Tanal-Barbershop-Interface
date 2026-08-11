@@ -11,6 +11,11 @@ import {
   startOfRiyadhDay,
   toRiyadhDateKey,
 } from "@/lib/datetime/riyadh";
+import {
+  MAX_APPOINTMENT_MINUTES,
+  dayOverlapWindow,
+  overlapWindowStart,
+} from "@/lib/appointments/overlap-window";
 
 /**
  * حساب الفترات المتاحة للحجز الذاتي من بوابة العميل.
@@ -194,7 +199,8 @@ export async function listAvailableSlots(
     where: {
       salonId: input.salonId,
       status: { in: ACTIVE_STATUSES },
-      startAt: { gte: firstDay, lt: rangeEnd },
+      // موسّعة للخلف: موعد بدأ قبل المدى وامتدّ إليه يشغل وقتًا فيه.
+      startAt: { gte: overlapWindowStart(firstDay), lt: rangeEnd },
       ...(input.excludeAppointmentId ? { id: { not: input.excludeAppointmentId } } : {}),
       // موعد بلا حلاق محدَّد لا يحجز حلاقًا بعينه، فلا يُسقط فترة من الشبكة.
       barberId: { in: barberIds },
@@ -222,11 +228,12 @@ export async function listAvailableSlots(
       for (const barber of barbers) {
         const schedule = schedules.get(barber.id);
         if (!schedule?.enabled || schedule.closedWeekdays.includes(weekday)) continue;
-        for (
-          let minute = schedule.openMinute;
-          minute + durationMinutes <= schedule.closeMinute;
-          minute += config.slotMinutes
-        ) {
+        // الحدّ الأعلى يفرّق بين فرع يغلق (لا يمتدّ الموعد بعد الإغلاق) وفرع
+        // يعمل 24 ساعة (يجوز أن يعبر منتصف الليل إلى دوام اليوم التالي).
+        const lastStart = lastStartMinute(schedule, durationMinutes);
+        for (let minute = schedule.openMinute; minute <= lastStart; minute += config.slotMinutes) {
+          // ما يعبر إلى يوم مغلق لا يُولَّد أصلًا: فترة تُعرض ثم تُرفض ضجيج.
+          if (spillsIntoClosedDay(schedule, weekday, minute, durationMinutes)) continue;
           candidateMinutes.add(minute);
         }
       }
@@ -270,6 +277,23 @@ export async function listAvailableSlots(
   }
 
   return days;
+}
+
+/**
+ * حدود نافذة الحجز لمدة بعينها — لتشرح الواجهة **لماذا** اختفت الأوقات المتأخرة.
+ *
+ * الشبكة تتقلّص كلما طالت الخدمات المختارة، وبلا هذا الشرح يقرأ العميل الاختفاء
+ * كعطل: خدمة واحدة تمتدّ إلى 10:30 م وثلاث تتوقف عند 9:30 م بلا سبب ظاهر.
+ */
+export function bookingWindowLimits(config: BookingConfig, durationMinutes: number) {
+  const continuous = config.openMinute <= 0 && config.closeMinute >= MINUTES_IN_DAY;
+  return {
+    openMinute: config.openMinute,
+    closeMinute: config.closeMinute,
+    /** فرع لا يغلق: منتصف الليل لا يقطع الموعد. */
+    continuous,
+    lastStartMinute: continuous ? MINUTES_IN_DAY - 1 : config.closeMinute - durationMinutes,
+  };
 }
 
 /**
@@ -360,8 +384,8 @@ export async function resolveBookableSlot(
       status: { in: ACTIVE_STATUSES },
       barberId: { in: onDutyBarbers.map((barber) => barber.id) },
       ...(input.excludeAppointmentId ? { id: { not: input.excludeAppointmentId } } : {}),
-      // نافذة يوم كامل حول الموعد: المدد أعمدة لا تعبير SQL، فالتداخل يُفحص حسابيًا.
-      startAt: { gte: startOfRiyadhDay(startAt), lt: addRiyadhDays(startAt, 1) },
+      // المدد أعمدة لا تعبير SQL، فالتداخل يُفحص حسابيًا على نافذة موسّعة للخلف.
+      startAt: dayOverlapWindow(startAt),
     },
     select: { barberId: true, startAt: true, durationMinutes: true },
   });
@@ -383,8 +407,36 @@ export async function resolveBookableSlot(
   return { barberId: free.id, startAt, durationMinutes };
 }
 
+type DutySchedule = {
+  enabled: boolean;
+  openMinute: number;
+  closeMinute: number;
+  closedWeekdays: number[];
+};
+
+/**
+ * هل يغطي الدوام اليوم كاملًا؟ الفرع الذي لا يغلق لا «نهاية دوام» له، فمنتصف
+ * الليل عنده لحظة عابرة لا حاجزًا.
+ */
+function isContinuousSchedule(schedule: DutySchedule) {
+  return schedule.openMinute <= 0 && schedule.closeMinute >= MINUTES_IN_DAY;
+}
+
+/**
+ * آخر دقيقة يجوز أن يبدأ عندها موعد.
+ *
+ * في فرع محدود الساعات: نهاية الدوام ناقص المدة، فلا يمتدّ الموعد بعد الإغلاق.
+ * في فرع يعمل 24 ساعة: أي دقيقة في اليوم، لأن ما بعد منتصف الليل دوامٌ أيضًا —
+ * وإلا لبقيت آخر ساعة قبل منتصف الليل ثقبًا لا يُحجز في فرع لا يغلق أصلًا.
+ */
+function lastStartMinute(schedule: DutySchedule, durationMinutes: number) {
+  return isContinuousSchedule(schedule)
+    ? MINUTES_IN_DAY - 1
+    : schedule.closeMinute - durationMinutes;
+}
+
 function isBarberOnDuty(
-  schedule: { enabled: boolean; openMinute: number; closeMinute: number; closedWeekdays: number[] },
+  schedule: DutySchedule,
   weekday: number,
   minuteOfDay: number,
   durationMinutes: number,
@@ -393,14 +445,28 @@ function isBarberOnDuty(
   return (
     schedule.enabled &&
     !schedule.closedWeekdays.includes(weekday) &&
+    // الامتداد إلى الغد لا يجوز إن كان الغد يوم إغلاق أسبوعي أو إجازة الحلاق.
+    !spillsIntoClosedDay(schedule, weekday, minuteOfDay, durationMinutes) &&
     minuteOfDay >= schedule.openMinute &&
-    minuteOfDay + durationMinutes <= schedule.closeMinute &&
+    minuteOfDay <= lastStartMinute(schedule, durationMinutes) &&
     (minuteOfDay - schedule.openMinute) % intervalMinutes === 0
   );
 }
 
+/** موعد يعبر منتصف الليل إلى يوم مغلق = موعد بلا حلاق في نصفه الثاني. */
+function spillsIntoClosedDay(
+  schedule: DutySchedule,
+  weekday: number,
+  minuteOfDay: number,
+  durationMinutes: number,
+) {
+  if (minuteOfDay + durationMinutes <= MINUTES_IN_DAY) return false;
+  return schedule.closedWeekdays.includes((weekday + 1) % 7);
+}
+
 function validDurationMinutes(value: number) {
-  if (!Number.isInteger(value) || value < 5 || value > 8 * 60) {
+  // السقف نفسه الذي تُوسَّع به نافذة البحث — لا يُرفع أحدهما دون الآخر.
+  if (!Number.isInteger(value) || value < 5 || value > MAX_APPOINTMENT_MINUTES) {
     throw new BusinessError("مدة الحجز غير صحيحة");
   }
   return value;

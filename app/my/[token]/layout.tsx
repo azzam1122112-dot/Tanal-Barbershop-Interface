@@ -1,0 +1,63 @@
+import type { Metadata } from "next";
+import type { ReactNode } from "react";
+import { notFound } from "next/navigation";
+import { getPortalIdentity } from "@/lib/customers/portal-view";
+import { PortalTabs } from "@/components/public/portal-tabs";
+
+/**
+ * هيكل بوابة العميل — تخطيط لا مكوّن صفحة.
+ *
+ * الرمز يُحلّ هنا مرة واحدة، وكل تبويب صفحة خادم مستقلة تجلب ما تعرضه وحده.
+ * التخطيط المشترك لا يُعاد بناؤه عند التنقّل بين التبويبات، فالترويسة تبقى
+ * ثابتة ولا تُعاد قراءة العميل مع كل قفزة — نفس مبدأ هيكل اللوحة.
+ *
+ * البيان يُحقن عبر `metadata` لا كوسم `<link>` في الجسم: الوسم اليدوي **يُضاف**
+ * إلى بيان الجذر فيصير في الصفحة بيانان، والمتصفح يأخذ الأول — فيُثبَّت الموقع
+ * كاملًا بدل بطاقة العميل. `metadata.manifest` يستبدل بيان الجذر لهذا المسار.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ token: string }>;
+}): Promise<Metadata> {
+  const { token } = await params;
+  return {
+    title: "بطاقتي",
+    // الرابط سرّي — لا نريده في نتائج البحث.
+    robots: { index: false, follow: false },
+    manifest: `/my/${token}/pwa.webmanifest`,
+  };
+}
+
+export default async function PortalLayout({
+  children,
+  params,
+}: {
+  children: ReactNode;
+  params: Promise<{ token: string }>;
+}) {
+  const { token } = await params;
+  // بوابة واحدة للرمز: تبويب لا يجد صاحبه لا يُرسم أصلًا.
+  const identity = await getPortalIdentity(token);
+  if (!identity) notFound();
+
+  return (
+    <div className="min-h-screen overflow-x-hidden bg-salon-mist">
+      {/* حشوة سفلية تتجاوز شريط التبويب ومنطقة الأمان معًا. */}
+      <main className="mx-auto min-w-0 max-w-3xl px-4 pt-6 pb-[calc(6rem+env(safe-area-inset-bottom))]">
+        <header className="mb-4 flex items-baseline justify-between gap-3">
+          <div className="min-w-0">
+            <p className="lux-eyebrow text-salon-charcoal/55">{identity.brandName}</p>
+            <h1 className="mt-0.5 truncate text-xl font-bold text-salon-ink">
+              أهلًا {identity.customer.name}
+            </h1>
+          </div>
+        </header>
+
+        {children}
+      </main>
+
+      <PortalTabs token={token} />
+    </div>
+  );
+}

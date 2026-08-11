@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db/prisma";
 import { bookCustomerAppointment, listCustomerAppointments } from "@/lib/appointments/customer-booking";
 import { resolveCustomerByPortalToken } from "@/lib/customers/customer-portal";
 import { toErrorResponse } from "@/lib/http/error-response";
+import { MAX_APPOINTMENT_SERVICES } from "@/lib/appointments/appointment-duration";
 
 /** حجز موعد من بوابة العميل. */
 
@@ -13,6 +14,8 @@ const bookSchema = z.object({
   salonId: z.string().trim().min(1, "الفرع مطلوب"),
   barberId: z.string().trim().min(1).nullish(),
   startAt: z.string().trim().min(1, "اختر وقتًا"),
+  // معرّفات فقط — المدة تُشتقّ في الخادم من الكتالوج ولا تُقبل من الطلب.
+  serviceIds: z.array(z.string().trim().min(1)).max(MAX_APPOINTMENT_SERVICES).default([]),
   notes: z.string().trim().max(200).nullish(),
 });
 
@@ -75,6 +78,7 @@ export async function POST(request: Request, context: { params: Promise<{ token:
       salonId: parsed.data.salonId,
       barberId: parsed.data.barberId ?? null,
       startAt: parsed.data.startAt,
+      serviceIds: parsed.data.serviceIds,
       notes: parsed.data.notes ?? null,
       ipAddress: meta.ipAddress,
     });

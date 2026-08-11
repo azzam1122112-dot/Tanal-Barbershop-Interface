@@ -432,4 +432,10 @@ export const systemSettingsUpdateSchema = z.object({
     .max(90, "مدى الحجز لا يتجاوز 90 يومًا")
     .optional(),
   bookingMaxActivePerCustomer: z.coerce.number().int().min(1).max(20).optional(),
+  bookingArriveEarlyMinutes: z.coerce
+    .number()
+    .int()
+    .min(0, "لا يمكن أن يكون الحضور المبكر بالسالب")
+    .max(60, "الحضور المبكر لا يتجاوز 60 دقيقة")
+    .optional(),
 });
