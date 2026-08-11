@@ -56,6 +56,7 @@ export function toSafeSystemSettings(settings: SystemSettings) {
     bookingLeadMinutes: settings.bookingLeadMinutes,
     bookingHorizonDays: settings.bookingHorizonDays,
     bookingMaxActivePerCustomer: settings.bookingMaxActivePerCustomer,
+    bookingArriveEarlyMinutes: settings.bookingArriveEarlyMinutes,
     updatedAt: settings.updatedAt.toISOString(),
   };
 }
@@ -76,6 +77,7 @@ export type SystemSettingsUpdate = Partial<{
   bookingLeadMinutes: number;
   bookingHorizonDays: number;
   bookingMaxActivePerCustomer: number;
+  bookingArriveEarlyMinutes: number;
 }>;
 
 export async function updateSystemSettings(prisma: PrismaClient, data: SystemSettingsUpdate, meta: SettingsMeta) {

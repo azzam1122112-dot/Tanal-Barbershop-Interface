@@ -6,6 +6,8 @@ import { prisma } from "@/lib/db/prisma";
 import { createAppointment, listAppointments } from "@/lib/appointments/appointment-service";
 import { saudiPhoneInputSchema } from "@/lib/phone/saudi-phone";
 import { toErrorResponse } from "@/lib/http/error-response";
+import { MAX_APPOINTMENT_SERVICES } from "@/lib/appointments/appointment-duration";
+import { MAX_APPOINTMENT_MINUTES } from "@/lib/appointments/overlap-window";
 
 const createSchema = z.object({
   salonId: z.string().min(1, "الفرع مطلوب"),
@@ -13,7 +15,9 @@ const createSchema = z.object({
   customerName: z.string().trim().min(2, "اسم العميل مطلوب"),
   customerPhone: saudiPhoneInputSchema,
   startAt: z.string().min(1, "وقت الموعد مطلوب"),
-  durationMinutes: z.coerce.number().int().min(5).max(480).optional(),
+  // تجاوز يدوي اختياري. بلا قيمة تُشتقّ المدة من الخدمات المختارة.
+  durationMinutes: z.coerce.number().int().min(5).max(MAX_APPOINTMENT_MINUTES).optional(),
+  serviceIds: z.array(z.string().trim().min(1)).max(MAX_APPOINTMENT_SERVICES).default([]),
   notes: z.string().trim().max(300).optional().nullable(),
 });
 
@@ -55,6 +59,7 @@ export async function POST(request: Request) {
       customerPhone: parsed.data.customerPhone,
       startAt: parsed.data.startAt,
       durationMinutes: parsed.data.durationMinutes,
+      serviceIds: parsed.data.serviceIds,
       notes: parsed.data.notes,
       actorUserId: session.user.id,
       actorType: session.role,

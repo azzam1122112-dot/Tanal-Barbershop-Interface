@@ -4,6 +4,7 @@ import { assertSubscriptionActive } from "@/lib/plans/subscription-guard";
 import { getEffectiveSettings } from "@/lib/settings/system-settings";
 import {
   bookingConfigFromSettings,
+  bookingWindowLimits,
   listAvailableSlots,
   parseLocalDateKey,
   resolveBookableSlot,
@@ -13,7 +14,15 @@ import {
 import { sendBarberAppointmentPush } from "@/lib/push/barber-push";
 import { effectiveBarberSchedule } from "@/lib/barbers/work-schedule";
 import { assertCustomerBookingAllowed } from "@/lib/appointments/booking-discipline";
-import { addRiyadhDays, startOfRiyadhDay } from "@/lib/datetime/riyadh";
+import { dayOverlapWindow } from "@/lib/appointments/overlap-window";
+import {
+  appointmentServiceRows,
+  appointmentServicesInclude,
+  resolveAppointmentServices,
+  toAppointmentServiceRows,
+  type AppointmentServiceRow,
+} from "@/lib/appointments/appointment-duration";
+import { onlyActiveServices } from "@/lib/services/service-summary";
 
 /**
  * الحجز الذاتي من بوابة العميل.
@@ -40,6 +49,14 @@ export type BookableBarber = {
   inheritsSalonSchedule: boolean;
 };
 
+/** خدمة معروضة للاختيار وقت الحجز — بمدتها وسعرها الإرشادي. */
+export type BookableService = {
+  id: string;
+  name: string;
+  durationMinutes: number;
+  price: number;
+};
+
 export type BookableSalon = {
   id: string;
   name: string;
@@ -47,6 +64,7 @@ export type BookableSalon = {
   horizonDays: number;
   closedWeekdays: number[];
   barbers: BookableBarber[];
+  services: BookableService[];
 };
 
 export type CustomerAppointmentRow = {
@@ -58,6 +76,7 @@ export type CustomerAppointmentRow = {
   statusLabel: string;
   salonName: string;
   barberName: string | null;
+  services: AppointmentServiceRow[];
   /** يُلغى من البوابة فقط ما لم يبدأ بعد وما زال محجوزًا. */
   canCancel: boolean;
 };
@@ -93,12 +112,26 @@ export async function listBookableSalons(
     });
     if (barbers.length === 0) continue;
 
+    const services = await prisma.service.findMany({
+      where: { organizationId, salonId: salon.id, isActive: true },
+      select: { id: true, name: true, durationMinutes: true, defaultPrice: true, sortOrder: true },
+    });
+
     bookable.push({
       id: salon.id,
       name: salon.name,
       slotMinutes: config.slotMinutes,
       horizonDays: config.horizonDays,
       closedWeekdays: config.closedWeekdays,
+      // الترتيب نفسه المعتمد في بقية الشاشات، فلا تختلف قائمة الخدمات بين مكان وآخر.
+      services: onlyActiveServices(services.map((service) => ({ ...service, isActive: true }))).map(
+        (service) => ({
+          id: service.id,
+          name: service.name,
+          durationMinutes: service.durationMinutes,
+          price: Number(service.defaultPrice),
+        }),
+      ),
       barbers: barbers.map((barber) => {
         const schedule = effectiveBarberSchedule(config, barber);
         return {
@@ -150,8 +183,22 @@ async function assertBarberInSalon(
 
 export async function getCustomerBookingSlots(
   prisma: BookingPrisma,
-  input: { organizationId: string; salonId: string; barberId?: string | null; days?: number },
-): Promise<{ days: BookingDay[]; slotMinutes: number; leadMinutes: number }> {
+  input: {
+    organizationId: string;
+    salonId: string;
+    barberId?: string | null;
+    serviceIds?: string[];
+    days?: number;
+  },
+): Promise<{
+  days: BookingDay[];
+  slotMinutes: number;
+  leadMinutes: number;
+  durationMinutes: number;
+  serviceMinutes: number;
+  estimatedTotal: number;
+  window: ReturnType<typeof bookingWindowLimits>;
+}> {
   await assertSalonInOrganization(prisma, input.organizationId, input.salonId);
   if (input.barberId) {
     await assertBarberInSalon(prisma, input.organizationId, input.salonId, input.barberId);
@@ -160,15 +207,35 @@ export async function getCustomerBookingSlots(
   const config = await getSalonBookingConfig(prisma, input.organizationId, input.salonId);
   if (!config.enabled) throw new BusinessError("الحجز الذاتي غير مفعّل في هذا الفرع", 409);
 
+  // نفس دالة الاشتقاق التي يستدعيها الحجز: شبكةٌ حُسبت بمدة تخالف المحجوزة
+  // تعرض على العميل وقتًا يُرفض عند الضغط.
+  const resolved = await resolveAppointmentServices(prisma, {
+    organizationId: input.organizationId,
+    salonId: input.salonId,
+    serviceIds: input.serviceIds ?? [],
+    slotMinutes: config.slotMinutes,
+  });
+  const durationMinutes = resolved?.bookedMinutes ?? config.slotMinutes;
+
   const days = await listAvailableSlots(prisma, {
     organizationId: input.organizationId,
     salonId: input.salonId,
     barberId: input.barberId ?? null,
     config,
+    durationMinutes,
     days: input.days,
   });
 
-  return { days, slotMinutes: config.slotMinutes, leadMinutes: config.leadMinutes };
+  return {
+    days,
+    slotMinutes: config.slotMinutes,
+    leadMinutes: config.leadMinutes,
+    durationMinutes,
+    serviceMinutes: resolved?.serviceMinutes ?? 0,
+    estimatedTotal: resolved?.estimatedTotal ?? 0,
+    // حدود النافذة تُرسل مع الشبكة لتشرح الواجهة سبب اختفاء الأوقات المتأخرة.
+    window: bookingWindowLimits(config, durationMinutes),
+  };
 }
 
 export async function bookCustomerAppointment(
@@ -179,6 +246,7 @@ export async function bookCustomerAppointment(
     salonId: string;
     barberId?: string | null;
     startAt: string;
+    serviceIds?: string[];
     notes?: string | null;
     ipAddress?: string | null;
   },
@@ -222,6 +290,14 @@ export async function bookCustomerAppointment(
     );
   }
 
+  // المدة من الكتالوج لا من الطلب: رقمٌ يرسله العميل يسرق جدول الحلاق.
+  const resolved = await resolveAppointmentServices(prisma, {
+    organizationId: input.organizationId,
+    salonId: input.salonId,
+    serviceIds: input.serviceIds ?? [],
+    slotMinutes: config.slotMinutes,
+  });
+
   const startAt = new Date(input.startAt);
   const slot = await resolveBookableSlot(prisma, {
     organizationId: input.organizationId,
@@ -229,6 +305,7 @@ export async function bookCustomerAppointment(
     barberId: input.barberId ?? null,
     startAt,
     config,
+    durationMinutes: resolved?.bookedMinutes,
   });
 
   // معاملة واحدة: إعادة فحص التداخل ثم الإنشاء، فطلبان متزامنان على نفس
@@ -237,14 +314,12 @@ export async function bookCustomerAppointment(
   const appointment = await prisma.$transaction(
     async (tx) => {
       const endAt = new Date(slot.startAt.getTime() + slot.durationMinutes * 60_000);
-      const dayStart = startOfRiyadhDay(slot.startAt);
-      const dayEnd = addRiyadhDays(dayStart, 1);
 
       const sameDay = await tx.appointment.findMany({
         where: {
           barberId: slot.barberId,
           status: { in: ["BOOKED", "ARRIVED"] },
-          startAt: { gte: dayStart, lt: dayEnd },
+          startAt: dayOverlapWindow(slot.startAt),
         },
         select: { startAt: true, durationMinutes: true },
       });
@@ -268,10 +343,13 @@ export async function bookCustomerAppointment(
           durationMinutes: slot.durationMinutes,
           notes: input.notes?.trim() || null,
           source: "CUSTOMER",
+          // السطور داخل معاملة الموعد: لا موعد بمدة تسعين دقيقة بلا ما يفسّرها.
+          services: appointmentServiceRows(resolved),
         },
         include: {
           barber: { select: { name: true } },
           salon: { select: { name: true } },
+          services: appointmentServicesInclude,
         },
       });
 
@@ -289,6 +367,8 @@ export async function bookCustomerAppointment(
             startAt: slot.startAt.toISOString(),
             barberId: slot.barberId,
             customerId: customer.id,
+            durationMinutes: slot.durationMinutes,
+            serviceIds: resolved?.lines.map((line) => line.serviceId) ?? [],
           },
         },
       });
@@ -346,6 +426,7 @@ export async function cancelCustomerAppointment(
     include: {
       barber: { select: { name: true } },
       salon: { select: { name: true } },
+      services: appointmentServicesInclude,
     },
   });
 
@@ -384,6 +465,7 @@ export async function listCustomerAppointments(
     include: {
       barber: { select: { name: true } },
       salon: { select: { name: true } },
+      services: appointmentServicesInclude,
     },
     orderBy: { startAt: "asc" },
     take: 10,
@@ -408,6 +490,7 @@ function toCustomerAppointmentRow(
     status: string;
     barber: { name: string } | null;
     salon: { name: string } | null;
+    services: Parameters<typeof toAppointmentServiceRows>[0];
   },
   now: Date,
 ): CustomerAppointmentRow {
@@ -421,6 +504,7 @@ function toCustomerAppointmentRow(
     statusLabel: STATUS_LABELS[appointment.status] ?? appointment.status,
     salonName: appointment.salon?.name ?? "",
     barberName: appointment.barber?.name ?? null,
+    services: toAppointmentServiceRows(appointment.services),
     canCancel: appointment.status === "BOOKED" && appointment.startAt.getTime() > now.getTime(),
   };
 }

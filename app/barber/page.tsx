@@ -12,6 +12,7 @@ import { getSessionExpenses } from "@/lib/expenses/expense-service";
 import { getEffectiveSettings } from "@/lib/settings/system-settings";
 import { getOpenAttendance } from "@/lib/attendance/attendance-service";
 import { listAppointments } from "@/lib/appointments/appointment-service";
+import { BARBER_APPOINTMENTS_DAYS } from "@/lib/appointments/barber-window";
 import { AttendancePanel } from "@/components/barber/attendance-panel";
 import { BarberNotificationCenter } from "@/components/barber/notification-center";
 import { BarberAppointmentsPanel } from "@/components/barber/appointments-panel";
@@ -48,16 +49,19 @@ export default async function BarberHomePage() {
     salonId: session.salonId,
   });
   const barberExpenseLimit = settings ? Number(settings.barberExpenseLimit) : 0;
-  const [sessionExpenses, openAttendance, todayAppointments] = await Promise.all([
+  const [sessionExpenses, openAttendance, nextDaysAppointments] = await Promise.all([
     summary.cashSession ? getSessionExpenses(prisma, summary.cashSession.id) : Promise.resolve([]),
     getOpenAttendance(prisma, session.barber.id),
+    // ثلاثة أيام لا يوم واحد: تنبيه حجز الغد كان يصل الحلاق ولا يجد له أثرًا في
+    // شاشته، فيظنه عطلًا. المدى نفسه في `/api/barber/appointments` للتحديث الدوري.
     listAppointments(prisma, {
       organizationId: session.organizationId,
       salonIds: [session.salonId],
       barberId: session.barber.id,
+      days: BARBER_APPOINTMENTS_DAYS,
     }),
   ]);
-  const upcomingAppointments = todayAppointments.filter(
+  const upcomingAppointments = nextDaysAppointments.filter(
     (appointment) => appointment.status === "BOOKED" || appointment.status === "ARRIVED",
   );
 

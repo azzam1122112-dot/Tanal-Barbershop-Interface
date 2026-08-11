@@ -7,7 +7,9 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
 import { buildAppointmentWhatsAppMessage } from "@/lib/appointments/barber-contact";
 import { toSaudiWhatsAppPhone } from "@/lib/phone/saudi-phone";
 import { BarberRescheduleDialog } from "@/components/barber/reschedule-dialog";
-import { isSameRiyadhDay, RIYADH_TIME_ZONE } from "@/lib/datetime/riyadh";
+import { RIYADH_TIME_ZONE } from "@/lib/datetime/riyadh";
+import { barberDayBuckets, barberDayOffset } from "@/lib/appointments/barber-window";
+import { formatAppointmentSpan, formatDurationLabel } from "@/lib/appointments/duration-format";
 
 type AppointmentStatus = "BOOKED" | "ARRIVED" | "CANCELLED" | "NO_SHOW";
 
@@ -19,13 +21,15 @@ export type BarberAppointment = {
   statusLabel: string;
   customerName: string;
   customerPhone: string;
+  services: { serviceId: string; serviceName: string; durationMinutes: number }[];
   notes: string | null;
 };
 
-const timeFormatter = new Intl.DateTimeFormat("ar-SA", {
+const shortDateFormatter = new Intl.DateTimeFormat("ar-SA-u-ca-gregory", {
   timeZone: RIYADH_TIME_ZONE,
-  hour: "2-digit",
-  minute: "2-digit",
+  weekday: "long",
+  day: "numeric",
+  month: "short",
 });
 const messageDateFormatter = new Intl.DateTimeFormat("ar-SA", {
   timeZone: RIYADH_TIME_ZONE,
@@ -82,7 +86,8 @@ export function BarberAppointmentsPanel({
 
   function onRescheduled(changed: BarberAppointment) {
     setAppointments((current) => {
-      if (!isToday(changed.startAt)) return current.filter((item) => item.id !== changed.id);
+      // خارج نافذة الأيام الثلاثة يختفي من الشاشة؛ داخلها ينتقل ليومه الجديد.
+      if (barberDayOffset(changed.startAt) < 0) return current.filter((item) => item.id !== changed.id);
       return current.map((item) => (item.id === changed.id ? changed : item));
     });
     setRescheduleShare(changed);
@@ -153,6 +158,21 @@ export function BarberAppointmentsPanel({
     }
   }
 
+  // التجميع بمفتاح يوم الرياض لا بفارق ٢٤ ساعة: موعد ١١ مساءً وآخر ١ صباحًا
+  // يومان مختلفان عند الحلاق مهما قرب الفارق بينهما.
+  //
+  // والموعد الذي بدأ أمس وما زال جاريًا (١١:٣٠ مساءً بمدة ساعة ونصف) يُضم إلى
+  // «اليوم»: الخادم يرسله لأنه يتقاطع مع المدى، وبلا هذا الضم يسقط من كل
+  // المجموعات فيختفي من الشاشة والحلاق يخدم صاحبه.
+  const dayGroups = barberDayBuckets().map((bucket) => ({
+    ...bucket,
+    dateLabel: shortDateFormatter.format(parseDateKey(bucket.key)),
+    items: appointments.filter((appointment) => {
+      const offset = barberDayOffset(appointment.startAt);
+      return offset === bucket.offset || (offset < 0 && bucket.offset === 0);
+    }),
+  }));
+
   return (
     <section id="appointments" className="barber-card scroll-mt-24 overflow-hidden">
       {confirmDialog}
@@ -166,14 +186,39 @@ export function BarberAppointmentsPanel({
       <DashboardToast toast={toast} onClose={() => setToast(null)} />
 
       <div className="barber-card-head flex items-center justify-between gap-3">
-        <div>
-          <h2 className="font-bold text-salon-ink">مواعيدك اليوم</h2>
-          <p className="mt-1 text-xs font-semibold text-salon-charcoal/60">تتحدّث تلقائيًا كل 10 ثوانٍ</p>
+        <div className="min-w-0">
+          <h2 className="font-bold text-salon-ink">حجوزاتك القادمة</h2>
+          <p className="mt-1 text-xs font-semibold text-salon-charcoal/60">
+            اليوم وغدًا وبعد غد · تتحدّث تلقائيًا كل 10 ثوانٍ
+          </p>
         </div>
-        <span className="rounded-full bg-salon-forest px-3 py-1 text-xs font-black text-white">
+        <span className="shrink-0 rounded-full bg-salon-forest px-3 py-1 text-xs font-black text-white">
           {appointments.length}
         </span>
       </div>
+
+      {/* شريط عدّادات الأيام: يرى الحلاق حِمل غدٍ قبل أن يمرّر إليه. */}
+      {appointments.length > 0 ? (
+        <div className="grid grid-cols-3 gap-2 border-b border-salon-line/70 bg-salon-pearl px-4 py-3">
+          {dayGroups.map((group) => (
+            <div
+              key={group.key}
+              className={`rounded-xl border px-2 py-2 text-center ${
+                group.items.length > 0 ? "border-salon-forest/30 bg-white" : "border-salon-line/70 bg-white/60"
+              }`}
+            >
+              <p className="text-[11px] font-bold text-salon-charcoal/70">{group.label}</p>
+              <p
+                className={`mt-0.5 text-lg font-black tabular-nums ${
+                  group.items.length > 0 ? "text-salon-forest" : "text-salon-charcoal/35"
+                }`}
+              >
+                {group.items.length}
+              </p>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       {rescheduleShare ? (
         <div className="border-b border-violet-200 bg-violet-50 px-4 py-4">
@@ -213,10 +258,25 @@ export function BarberAppointmentsPanel({
           <p className="mt-1 text-xs font-semibold text-salon-charcoal/60">ستظهر الحجوزات الجديدة هنا تلقائيًا خلال ثوانٍ.</p>
         </div>
       ) : (
-        <div className="divide-y divide-salon-line/70">
-          {appointments.map((appointment) => {
+        <div>
+          {dayGroups
+            .filter((group) => group.items.length > 0)
+            .map((group) => (
+              <div key={group.key}>
+                {/* عنوان اليوم لاصق: عند التمرير يبقى الحلاق عارفًا أي يوم يقرأ. */}
+                <div className="sticky top-0 z-[1] flex items-center justify-between gap-2 border-y border-salon-line/70 bg-salon-mist/95 px-4 py-2 backdrop-blur-sm">
+                  <span className="text-xs font-black text-salon-ink">{group.label}</span>
+                  <span className="text-[11px] font-bold text-salon-charcoal/60">
+                    {group.dateLabel} · {group.items.length} حجز
+                  </span>
+                </div>
+                <div className="divide-y divide-salon-line/70">
+                  {group.items.map((appointment) => {
             const busy = pendingId === appointment.id;
             const arrived = appointment.status === "ARRIVED";
+            // الحضور وعدمه لموعد اليوم فقط: ضغطة على «لم يحضر» لموعد الغد
+            // تُعلّق حجز العميل الإلكتروني. الخادم يرفضها أيضًا.
+            const isTodayAppointment = group.offset === 0;
             const canContact = appointment.status === "BOOKED" || appointment.status === "ARRIVED";
             const whatsappMessage = buildAppointmentWhatsAppMessage({
               customerName: appointment.customerName,
@@ -232,6 +292,11 @@ export function BarberAppointmentsPanel({
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="font-bold text-salon-ink">{appointment.customerName}</h3>
+                      {barberDayOffset(appointment.startAt) < 0 ? (
+                        <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-black text-amber-800 ring-1 ring-amber-200">
+                          بدأ أمس · جارٍ
+                        </span>
+                      ) : null}
                       {arrived ? (
                         <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-black text-emerald-700 ring-1 ring-emerald-200">
                           حضر
@@ -241,15 +306,32 @@ export function BarberAppointmentsPanel({
                     <p className="mt-1 text-xs font-semibold text-salon-charcoal/65" dir="ltr">
                       {appointment.customerPhone}
                     </p>
+                    {appointment.services.length > 0 ? (
+                      <ul className="mt-2 flex flex-wrap gap-1.5">
+                        {appointment.services.map((service) => (
+                          <li
+                            key={service.serviceId}
+                            className="rounded-xl bg-salon-forest/8 px-2.5 py-1 text-[11px] font-bold text-salon-forest ring-1 ring-salon-forest/15"
+                          >
+                            {service.serviceName}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
                     {appointment.notes ? (
                       <p className="mt-2 rounded-xl bg-salon-mist px-3 py-2 text-xs font-semibold leading-5 text-salon-charcoal/75">
                         {appointment.notes}
                       </p>
                     ) : null}
                   </div>
+                  {/* المدى لا البداية: الحلاق يحتاج أن يعرف متى يتحرّر كرسيه. */}
                   <div className="shrink-0 rounded-xl bg-salon-mist px-3 py-2 text-center">
-                    <p className="text-sm font-black text-salon-forest">{timeFormatter.format(new Date(appointment.startAt))}</p>
-                    <p className="mt-0.5 text-[10px] font-bold text-salon-charcoal/55">{appointment.durationMinutes} دقيقة</p>
+                    <p className="text-sm font-black text-salon-forest" dir="ltr">
+                      {formatAppointmentSpan(appointment.startAt, appointment.durationMinutes)}
+                    </p>
+                    <p className="mt-0.5 text-[10px] font-bold text-salon-charcoal/55">
+                      {formatDurationLabel(appointment.durationMinutes)}
+                    </p>
                   </div>
                 </div>
 
@@ -289,7 +371,7 @@ export function BarberAppointmentsPanel({
                 <div className="mt-4 grid grid-cols-3 gap-2">
                   <button
                     type="button"
-                    disabled={busy || arrived}
+                    disabled={busy || arrived || !isTodayAppointment}
                     aria-busy={busy}
                     onClick={() => void changeStatus(appointment, "ARRIVED")}
                     className={`min-h-11 rounded-xl px-2 text-xs font-black transition active:scale-[0.98] disabled:cursor-not-allowed ${
@@ -302,7 +384,7 @@ export function BarberAppointmentsPanel({
                   </button>
                   <button
                     type="button"
-                    disabled={busy}
+                    disabled={busy || !isTodayAppointment}
                     aria-busy={busy}
                     onClick={() => void changeStatus(appointment, "NO_SHOW")}
                     className="min-h-11 rounded-xl border border-amber-200 bg-amber-50 px-2 text-xs font-black text-amber-800 transition active:scale-[0.98] disabled:opacity-55"
@@ -319,9 +401,17 @@ export function BarberAppointmentsPanel({
                     إلغاء الحجز
                   </button>
                 </div>
+                {!isTodayAppointment ? (
+                  <p className="mt-2 text-center text-[11px] font-bold text-salon-charcoal/55">
+                    تسجيل الحضور يُفعَّل يوم الموعد. يمكنك الآن التواصل أو تغيير الموعد أو إلغاؤه.
+                  </p>
+                ) : null}
               </article>
             );
-          })}
+                  })}
+                </div>
+              </div>
+            ))}
         </div>
       )}
     </section>
@@ -338,6 +428,11 @@ function buildWhatsAppUrl(appointment: BarberAppointment, barberName: string, sa
   return `https://wa.me/${toSaudiWhatsAppPhone(appointment.customerPhone)}?text=${encodeURIComponent(message)}`;
 }
 
-function isToday(startAt: string) {
-  return isSameRiyadhDay(new Date(startAt), new Date());
+/** `2026-08-12` → منتصف نهار ذلك اليوم، لعرض اسمه بلا انزياح منطقة زمنية. */
+function parseDateKey(key: string) {
+  const [year, month, day] = key.split("-").map(Number);
+  const date = new Date(0);
+  date.setUTCFullYear(year, month - 1, day);
+  date.setUTCHours(12, 0, 0, 0);
+  return date;
 }

@@ -6,6 +6,7 @@ import { resolveCustomerByPortalToken } from "@/lib/customers/customer-portal";
 import { toErrorResponse } from "@/lib/http/error-response";
 import { getRequestMeta } from "@/lib/auth/http";
 import { consumeRateLimit } from "@/lib/auth/rate-limit";
+import { MAX_APPOINTMENT_SERVICES } from "@/lib/appointments/appointment-duration";
 
 /**
  * الفترات المتاحة لعميل البوابة.
@@ -17,6 +18,8 @@ import { consumeRateLimit } from "@/lib/auth/rate-limit";
 const querySchema = z.object({
   salonId: z.string().trim().min(1, "الفرع مطلوب"),
   barberId: z.string().trim().min(1).optional(),
+  // معرّفات فقط — المدة والسعر يُقرآن من الكتالوج في الخادم.
+  serviceIds: z.array(z.string().trim().min(1)).max(MAX_APPOINTMENT_SERVICES).default([]),
 });
 
 export async function GET(request: Request, context: { params: Promise<{ token: string }> }) {
@@ -39,6 +42,7 @@ export async function GET(request: Request, context: { params: Promise<{ token: 
   const parsed = querySchema.safeParse({
     salonId: url.searchParams.get("salonId") ?? "",
     barberId: url.searchParams.get("barberId") ?? undefined,
+    serviceIds: url.searchParams.getAll("serviceId"),
   });
   if (!parsed.success) {
     return NextResponse.json({ message: parsed.error.issues[0]?.message ?? "بيانات غير صحيحة" }, { status: 400 });
@@ -49,6 +53,7 @@ export async function GET(request: Request, context: { params: Promise<{ token: 
       organizationId: customer.organizationId,
       salonId: parsed.data.salonId,
       barberId: parsed.data.barberId ?? null,
+      serviceIds: parsed.data.serviceIds,
     });
     return NextResponse.json(result);
   } catch (error) {

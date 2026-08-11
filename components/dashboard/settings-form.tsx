@@ -19,6 +19,7 @@ type Settings = {
   bookingLeadMinutes: number;
   bookingHorizonDays: number;
   bookingMaxActivePerCustomer: number;
+  bookingArriveEarlyMinutes: number;
 };
 
 const WEEKDAYS = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
@@ -104,6 +105,7 @@ export function SettingsForm({ initialSettings }: { initialSettings: Settings })
               bookingLeadMinutes: form.get("bookingLeadMinutes"),
               bookingHorizonDays: form.get("bookingHorizonDays"),
               bookingMaxActivePerCustomer: form.get("bookingMaxActivePerCustomer"),
+              bookingArriveEarlyMinutes: form.get("bookingArriveEarlyMinutes"),
             }
           : {}),
       }),
@@ -328,6 +330,21 @@ export function SettingsForm({ initialSettings }: { initialSettings: Settings })
               />
               <span className="mt-1.5 block text-xs font-medium text-salon-charcoal/70">
                 يمنع حجز مقاعد لا يحضرها.
+              </span>
+            </label>
+            <label className="text-sm font-bold text-salon-charcoal">
+              الحضور قبل الموعد (دقيقة)
+              <input
+                lang="en"
+                name="bookingArriveEarlyMinutes"
+                type="number"
+                min="0"
+                max="60"
+                defaultValue={settings.bookingArriveEarlyMinutes}
+                className="dashboard-field mt-2 h-12"
+              />
+              <span className="mt-1.5 block text-xs font-medium text-salon-charcoal/70">
+                إرشاد يُعرض للعميل في تأكيد الحجز وبطاقة موعده. لا يزحزح وقت الموعد. صفر = لا يُعرض.
               </span>
             </label>
 

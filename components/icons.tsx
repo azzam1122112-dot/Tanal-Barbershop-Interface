@@ -20,6 +20,7 @@ export type IconName =
   | "scissors"
   | "menu"
   | "bell"
+  | "calendar"
   | "close"
   | "check";
 
@@ -107,6 +108,12 @@ const PATHS: Record<IconName, ReactElement> = {
     <>
       <path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 8.5h18C21 16 18 16 18 9Z" />
       <path d="M10 21h4" />
+    </>
+  ),
+  calendar: (
+    <>
+      <rect x="3.5" y="5" width="17" height="15" rx="2" />
+      <path d="M3.5 10h17M8 3.5V6M16 3.5V6" />
     </>
   ),
   close: <path d="M6 6l12 12M18 6 6 18" />,

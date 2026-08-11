@@ -5,6 +5,7 @@ import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { InlineEmpty } from "@/components/dashboard/ui";
 import { parseRiyadhDateKey, RIYADH_TIME_ZONE } from "@/lib/datetime/riyadh";
+import { formatDurationLabel } from "@/lib/appointments/duration-format";
 
 type Appointment = {
   id: string;
@@ -18,12 +19,14 @@ type Appointment = {
   customerId: string | null;
   barber: { id: string; name: string } | null;
   salon: { id: string; name: string } | null;
+  services: { serviceId: string; serviceName: string; durationMinutes: number }[];
   notes: string | null;
   visitId: string | null;
 };
 
 type BarberOption = { id: string; name: string; salonId: string | null };
 type SalonOption = { id: string; name: string };
+type ServiceOption = { id: string; name: string; salonId: string; durationMinutes: number };
 
 const timeFormatter = new Intl.DateTimeFormat("ar-SA", {
   timeZone: RIYADH_TIME_ZONE,
@@ -35,12 +38,14 @@ export function AppointmentsManager({
   initialAppointments,
   barbers,
   salons,
+  services,
   defaultSalonId,
   date,
 }: {
   initialAppointments: Appointment[];
   barbers: BarberOption[];
   salons: SalonOption[];
+  services: ServiceOption[];
   defaultSalonId: string | null;
   date: string;
 }) {
@@ -49,11 +54,32 @@ export function AppointmentsManager({
   const [loading, setLoading] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [salonId, setSalonId] = useState(defaultSalonId ?? salons[0]?.id ?? "");
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
   const { confirm, confirmDialog } = useConfirm();
 
   // الحلاقون المعروضون يتبعون الفرع المختار حتى لا يُحجز حلاق من فرع آخر.
   const salonBarbers = barbers.filter((barber) => !salonId || barber.salonId === salonId);
+  const salonServices = services.filter((service) => service.salonId === salonId);
   const active = appointments.filter((item) => item.status === "BOOKED" || item.status === "ARRIVED");
+
+  // المدة المشتقّة تُعرض قبل الحفظ: الخادم يحسبها من الكتالوج، وهذه معاينتها.
+  const derivedMinutes = salonServices
+    .filter((service) => selectedServiceIds.includes(service.id))
+    .reduce((total, service) => total + service.durationMinutes, 0);
+
+  function toggleService(serviceId: string) {
+    setSelectedServiceIds((current) =>
+      current.includes(serviceId)
+        ? current.filter((id) => id !== serviceId)
+        : [...current, serviceId],
+    );
+  }
+
+  function changeSalon(nextSalonId: string) {
+    setSalonId(nextSalonId);
+    // خدمات الفرع السابق لا تُقبل في الفرع الجديد — إبقاؤها يعني رفضًا عند الحفظ.
+    setSelectedServiceIds([]);
+  }
 
   async function createAppointment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -76,7 +102,9 @@ export function AppointmentsManager({
         customerPhone: form.get("customerPhone"),
         // وقت الإدخال هو وقت الفرع في الرياض مهما كانت منطقة جهاز المدير.
         startAt: startAt.toISOString(),
-        durationMinutes: Number(form.get("durationMinutes")) || 30,
+        serviceIds: selectedServiceIds,
+        // فارغ = اترك الخادم يشتقّها من الخدمات. القيمة تُرسل فقط عند تجاوز صريح.
+        durationMinutes: Number(form.get("durationMinutes")) || undefined,
         notes: form.get("notes") || null,
       }),
     });
@@ -87,6 +115,7 @@ export function AppointmentsManager({
         [...current, data.appointment!].sort((a, b) => a.startAt.localeCompare(b.startAt)),
       );
       formEl.reset();
+      setSelectedServiceIds([]);
       setToast({ message: "تم حفظ الموعد", tone: "success" });
     } else {
       setToast({ message: data.message ?? "تعذر حفظ الموعد", tone: "error" });
@@ -165,7 +194,7 @@ export function AppointmentsManager({
         {salons.length > 1 ? (
           <label className="block text-sm font-semibold">
             الفرع
-            <select value={salonId} onChange={(event) => setSalonId(event.target.value)} className="dashboard-field mt-2">
+            <select value={salonId} onChange={(event) => changeSalon(event.target.value)} className="dashboard-field mt-2">
               {salons.map((salon) => (
                 <option key={salon.id} value={salon.id}>
                   {salon.name}
@@ -194,14 +223,57 @@ export function AppointmentsManager({
             className="dashboard-field mt-2"
           />
         </label>
+        {salonServices.length > 0 ? (
+          <fieldset className="block text-sm font-semibold">
+            <legend className="mb-2">الخدمات المطلوبة</legend>
+            <div className="flex flex-wrap gap-2">
+              {salonServices.map((service) => {
+                const selected = selectedServiceIds.includes(service.id);
+                return (
+                  <button
+                    key={service.id}
+                    type="button"
+                    onClick={() => toggleService(service.id)}
+                    aria-pressed={selected}
+                    className={`min-h-11 rounded-xl border px-3 text-xs font-bold transition ${
+                      selected
+                        ? "border-salon-forest bg-salon-forest text-white shadow-sm"
+                        : "border-salon-line bg-white text-salon-charcoal hover:border-salon-forest/40"
+                    }`}
+                  >
+                    {service.name}
+                    <span className={`mr-1.5 text-[10px] ${selected ? "text-white/75" : "text-salon-charcoal/55"}`}>
+                      {service.durationMinutes}د
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="dashboard-muted mt-2 text-xs font-semibold">
+              {derivedMinutes > 0
+                ? `المدة المشتقّة: ${formatDurationLabel(derivedMinutes)}`
+                : "بلا خدمة محددة — تُحجز نصف ساعة ما لم تكتب مدة."}
+            </p>
+          </fieldset>
+        ) : null}
+
         <div className="grid grid-cols-2 gap-3">
           <label className="block text-sm font-semibold">
             الوقت
             <input dir="ltr" lang="en" name="time" type="time" required className="dashboard-field mt-2" />
           </label>
           <label className="block text-sm font-semibold">
-            المدة (دقيقة)
-            <input lang="en" name="durationMinutes" type="number" min={5} max={480} step={5} defaultValue={30} className="dashboard-field mt-2" />
+            تجاوز المدة (دقيقة)
+            <input
+              lang="en"
+              name="durationMinutes"
+              type="number"
+              min={5}
+              max={480}
+              step={5}
+              placeholder={derivedMinutes > 0 ? String(derivedMinutes) : "30"}
+              className="dashboard-field mt-2"
+            />
           </label>
         </div>
         <label className="block text-sm font-semibold">
@@ -241,7 +313,9 @@ export function AppointmentsManager({
               <article key={appointment.id} className="grid gap-3 px-5 py-4 lg:grid-cols-[110px_1fr_auto] lg:items-center">
                 <div className="text-lg font-bold tabular-nums">
                   {timeFormatter.format(new Date(appointment.startAt))}
-                  <span className="block text-xs font-semibold text-salon-charcoal/70">{appointment.durationMinutes} دقيقة</span>
+                  <span className="block text-xs font-semibold text-salon-charcoal/70">
+                    {formatDurationLabel(appointment.durationMinutes)}
+                  </span>
                 </div>
 
                 <div className="min-w-0">
@@ -257,6 +331,11 @@ export function AppointmentsManager({
                     {appointment.salon ? ` · ${appointment.salon.name}` : ""}
                     {appointment.notes ? ` · ${appointment.notes}` : ""}
                   </p>
+                  {appointment.services.length > 0 ? (
+                    <p className="mt-1 text-xs font-semibold text-salon-forest">
+                      {appointment.services.map((service) => service.serviceName).join(" + ")}
+                    </p>
+                  ) : null}
                 </div>
 
                 {appointment.status === "NO_SHOW" ? (

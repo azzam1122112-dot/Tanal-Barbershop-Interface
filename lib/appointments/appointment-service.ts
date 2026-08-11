@@ -4,6 +4,13 @@ import { normalizeSaudiPhone } from "@/lib/phone/saudi-phone";
 import { sendBarberAppointmentPush } from "@/lib/push/barber-push";
 import { nextBookingDisciplineState } from "@/lib/appointments/booking-discipline";
 import { addRiyadhDays, startOfRiyadhDay } from "@/lib/datetime/riyadh";
+import { dayOverlapWindow, overlapWindowStart } from "@/lib/appointments/overlap-window";
+import {
+  appointmentServiceRows,
+  appointmentServicesInclude,
+  resolveAppointmentServices,
+  toAppointmentServiceRows,
+} from "@/lib/appointments/appointment-duration";
 
 type AppointmentPrisma = PrismaClient | Prisma.TransactionClient;
 
@@ -22,6 +29,7 @@ const appointmentInclude = {
   barber: { select: { id: true, name: true } },
   customer: { select: { id: true, name: true, phone: true } },
   salon: { select: { id: true, name: true } },
+  services: appointmentServicesInclude,
 } satisfies Prisma.AppointmentInclude;
 
 export type AppointmentRow = ReturnType<typeof toAppointmentRow>;
@@ -35,7 +43,9 @@ export async function createAppointment(
     customerName: string;
     customerPhone: string;
     startAt: Date | string;
+    /** تجاوز يدوي. يُقدَّم على مجموع الخدمات: الموظف يعرف عميله. */
     durationMinutes?: number;
+    serviceIds?: string[];
     notes?: string | null;
     source?: "STAFF" | "CUSTOMER";
     actorUserId?: string | null;
@@ -46,7 +56,19 @@ export async function createAppointment(
   if (Number.isNaN(startAt.getTime())) {
     throw new BusinessError("وقت الموعد غير صحيح");
   }
-  const durationMinutes = input.durationMinutes && input.durationMinutes > 0 ? input.durationMinutes : 30;
+
+  // الخدمات هي المصدر الافتراضي للمدة؛ الثلاثون دقيقة تبقى للحجز بلا تفصيل
+  // (مكالمة هاتفية «احجز لي بعد العصر») لا كافتراض عن كل موعد.
+  const resolved = await resolveAppointmentServices(prisma, {
+    organizationId: input.organizationId,
+    salonId: input.salonId,
+    serviceIds: input.serviceIds ?? [],
+  });
+  const durationMinutes =
+    input.durationMinutes && input.durationMinutes > 0
+      ? input.durationMinutes
+      : (resolved?.bookedMinutes ?? 30);
+
   const phone = normalizeSaudiPhone(input.customerPhone);
   const name = input.customerName.trim();
   if (!name) throw new BusinessError("اسم العميل مطلوب");
@@ -85,6 +107,7 @@ export async function createAppointment(
         durationMinutes,
         notes: input.notes?.trim() || null,
         source: input.source ?? "STAFF",
+        services: appointmentServiceRows(resolved),
       },
       include: appointmentInclude,
     });
@@ -98,7 +121,13 @@ export async function createAppointment(
         action: "appointment.created",
         entityType: "Appointment",
         entityId: created.id,
-        after: { startAt: startAt.toISOString(), barberId: input.barberId ?? null, customerPhone: phone },
+        after: {
+          startAt: startAt.toISOString(),
+          barberId: input.barberId ?? null,
+          customerPhone: phone,
+          durationMinutes,
+          serviceIds: resolved?.lines.map((line) => line.serviceId) ?? [],
+        },
       },
     });
     return created;
@@ -141,15 +170,14 @@ async function assertNoOverlap(
   input: { barberId: string; startAt: Date; durationMinutes: number; excludeId?: string },
 ) {
   const end = new Date(input.startAt.getTime() + input.durationMinutes * 60 * 1000);
-  // نجلب مواعيد يوم الرياض للحلاق ثم نفحص التداخل بالحساب (المدة عمود لا تعبير SQL).
-  const dayStart = startOfRiyadhDay(input.startAt);
-  const dayEnd = addRiyadhDays(dayStart, 1);
-
+  // نجلب مواعيد الحلاق ثم نفحص التداخل بالحساب (المدة عمود لا تعبير SQL).
+  // النافذة موسّعة للخلف: هذا المسار لا يفحص الدوام، فموعد ممتدّ عبر منتصف
+  // الليل مسموح هنا ويجب أن يظهر عند فحص اليوم التالي.
   const sameDay = await prisma.appointment.findMany({
     where: {
       barberId: input.barberId,
       status: { in: ACTIVE_STATUSES },
-      startAt: { gte: dayStart, lt: dayEnd },
+      startAt: dayOverlapWindow(input.startAt),
       ...(input.excludeId ? { id: { not: input.excludeId } } : {}),
     },
     select: { startAt: true, durationMinutes: true },
@@ -173,17 +201,24 @@ export async function listAppointments(
     salonIds?: string[] | null;
     barberId?: string | null;
     date?: Date | string | null;
+    /** عدد أيام الرياض المعروضة ابتداءً من `date`. الافتراضي يوم واحد. */
+    days?: number;
     status?: AppointmentStatus | null;
   },
 ) {
   const day = filters.date ? new Date(filters.date) : new Date();
   const from = startOfRiyadhDay(day);
-  const to = addRiyadhDays(from, 1);
+  // نافذة الأيام تُحسب بأيام الرياض لا بـ24 ساعة، فلا ينزلق الحد مع التوقيت.
+  const dayCount = Math.min(Math.max(Math.trunc(filters.days ?? 1), 1), 14);
+  const to = addRiyadhDays(from, dayCount);
 
   const appointments = await prisma.appointment.findMany({
     where: {
       organizationId: filters.organizationId,
-      startAt: { gte: from, lt: to },
+      // موسّعة للخلف بأقصى مدة، تمامًا كنافذة فحص التداخل: موعد يبدأ 11:30 مساءً
+      // بمدة ٩٠ دقيقة كان يسقط من الشاشة عند منتصف الليل والحلاق يخدم صاحبه —
+      // ومعه زر «حضر» وبطاقة التواصل.
+      startAt: { gte: overlapWindowStart(from), lt: to },
       ...(filters.salonIds && filters.salonIds.length > 0 ? { salonId: { in: filters.salonIds } } : {}),
       ...(filters.barberId ? { barberId: filters.barberId } : {}),
       ...(filters.status ? { status: filters.status } : {}),
@@ -192,7 +227,14 @@ export async function listAppointments(
     orderBy: { startAt: "asc" },
   });
 
-  return appointments.map(toAppointmentRow);
+  // المعيار تقاطع الموعد مع المدى لا بدايته داخله: ما انتهى قبل بداية المدى
+  // لا يخصّه، وما زال جاريًا عنده يخصّه ولو بدأ أمس.
+  return appointments
+    .filter((appointment) => {
+      if (appointment.startAt >= from) return true;
+      return appointment.startAt.getTime() + appointment.durationMinutes * 60_000 > from.getTime();
+    })
+    .map(toAppointmentRow);
 }
 
 export async function updateAppointmentStatus(
@@ -226,6 +268,11 @@ export async function updateAppointmentStatus(
   }
   if (status === "COMPLETED" && !appointment.visitId) {
     throw new BusinessError("يكتمل الموعد تلقائيًا عند تسجيل زيارته", 409);
+  }
+  // الحضور وعدمه واقعتان لا تُسجَّلان قبل يومهما. صارت الشاشة تعرض ثلاثة أيام،
+  // وضغطة خاطئة على «لم يحضر» لموعد الغد تُعلّق حجز العميل الإلكتروني.
+  if ((status === "ARRIVED" || status === "NO_SHOW") && appointment.startAt >= addRiyadhDays(startOfRiyadhDay(new Date()), 1)) {
+    throw new BusinessError("لا تُسجَّل حالة الحضور قبل يوم الموعد", 409);
   }
 
   const updated = await prisma.$transaction(async (tx) => {
@@ -341,6 +388,7 @@ function toAppointmentRow(
     barber: appointment.barber ? { id: appointment.barber.id, name: appointment.barber.name } : null,
     salon: appointment.salon ? { id: appointment.salon.id, name: appointment.salon.name } : null,
     notes: appointment.notes,
+    services: toAppointmentServiceRows(appointment.services),
     visitId: appointment.visitId,
     cancelReason: appointment.cancelReason,
   };
