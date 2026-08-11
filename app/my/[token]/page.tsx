@@ -38,6 +38,10 @@ export default async function CustomerPortalPage({ params }: { params: Promise<{
     ? view.nextReward.name.includes(String(view.nextReward.discountAmount))
     : false;
 
+  // قبل أول استبدال يتساوى المجموع مع الرصيد، فعرضهما معًا رقمان متطابقان
+  // بتسميتين مختلفتين — يقرؤه العميل كخلل لا كمعلومة. يظهر حين يفترق فعلًا.
+  const showLifetimeEarned = view.lifetimeEarned > view.points;
+
   return (
     <main className="min-h-screen overflow-x-hidden bg-salon-mist px-4 pt-8 pb-[calc(2rem+env(safe-area-inset-bottom))]">
       <div className="mx-auto min-w-0 max-w-3xl space-y-4">
@@ -52,15 +56,17 @@ export default async function CustomerPortalPage({ params }: { params: Promise<{
             تكسب {view.pointsPerRiyal === 1 ? "نقطة" : `${formatNumber(view.pointsPerRiyal)} نقاط`} على كل ريال
           </p>
 
-          <div className="mt-7 grid grid-cols-3 gap-2.5 text-center">
+          <div className={`mt-7 grid gap-2.5 text-center ${showLifetimeEarned ? "grid-cols-3" : "grid-cols-2"}`}>
             <div className="rounded-xl bg-white/[0.08] px-2 py-3">
               <p className="text-[11px] font-semibold text-white/55">زياراتك</p>
               <p className="mt-1 text-lg lux-number">{formatNumber(view.visitCount)}</p>
             </div>
-            <div className="rounded-xl bg-white/[0.08] px-2 py-3">
-              <p className="text-[11px] font-semibold text-white/55">مجموع نقاطك</p>
-              <p className="mt-1 text-lg lux-number">{formatNumber(view.lifetimeEarned)}</p>
-            </div>
+            {showLifetimeEarned ? (
+              <div className="rounded-xl bg-white/[0.08] px-2 py-3">
+                <p className="text-[11px] font-semibold text-white/55">جمعتها كلها</p>
+                <p className="mt-1 text-lg lux-number">{formatNumber(view.lifetimeEarned)}</p>
+              </div>
+            ) : null}
             <div className="rounded-xl bg-white/[0.08] px-2 py-3">
               <p className="text-[11px] font-semibold text-white/55">آخر زيارة</p>
               <p className="mt-1 text-sm font-bold">{view.lastVisitAt ? formatDate(view.lastVisitAt) : "—"}</p>
