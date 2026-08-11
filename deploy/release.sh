@@ -51,18 +51,25 @@ chown -R "$APP_USER:$APP_USER" "$STAGE"
 # TypeScript وTailwind ويفشل البناء. والأهم أن ExecStartPre في وحدة systemd
 # يشغّل `prisma migrate deploy` وحزمة prisma نفسها devDependency — أي أن تقليم
 # حزم التطوير بعد البناء يمنع الخدمة من الإقلاع أصلًا. تبقى كاملة عن قصد.
+# ‏`runuser` يرث مجلد عمل المُشغِّل لا مجلد السكربت، و`npm ci` يقرأ
+# package-lock.json من مجلد العمل. بلا هذا الانتقال يفشل بـ EUSAGE.
+cd "$STAGE"
+
 echo "==> تثبيت الحزم (مع حزم التطوير — لازمة للبناء وللهجرات)"
-runuser -u "$APP_USER" -- env PATH="$NODE_PATH_ENV" NODE_ENV=development \
+runuser -u "$APP_USER" -- env --chdir="$STAGE" PATH="$NODE_PATH_ENV" NODE_ENV=development \
   npm ci --include=dev --no-audit --no-fund
 
 echo "==> توليد عميل Prisma والبناء"
 set -a; . "$ENV_FILE"; set +a
-runuser -u "$APP_USER" -- env PATH="$NODE_PATH_ENV" DATABASE_URL="$DATABASE_URL" \
-  npm run prisma:generate --prefix "$STAGE"
-runuser -u "$APP_USER" -- env PATH="$NODE_PATH_ENV" NODE_ENV=production DATABASE_URL="$DATABASE_URL" \
-  npm run build --prefix "$STAGE"
+runuser -u "$APP_USER" -- env --chdir="$STAGE" PATH="$NODE_PATH_ENV" DATABASE_URL="$DATABASE_URL" \
+  npm run prisma:generate
+runuser -u "$APP_USER" -- env --chdir="$STAGE" PATH="$NODE_PATH_ENV" NODE_ENV=production DATABASE_URL="$DATABASE_URL" \
+  npm run build
 
 echo "==> التبديل وإعادة التشغيل"
+# اخرج من المجلد قبل نقله: البقاء داخله يجعل مجلد العمل يتبع inode المنقول،
+# فيصبح الرجوع (rm -rf على المجلد الحالي) عملية على أرض تتحرك تحت القدمين.
+cd /
 systemctl stop "$SERVICE"
 mv "$APP_DIR" "$PREVIOUS"
 mv "$STAGE" "$APP_DIR"
