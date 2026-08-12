@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand-logo";
 import { Icon, type IconName } from "@/components/icons";
+import { HeroProductShowcase } from "@/components/marketing/hero-product-showcase";
 import { LandingMotion } from "@/components/marketing/landing-motion";
 import landing from "@/components/marketing/landing-page.module.css";
 import { Reveal } from "@/components/reveal";
@@ -478,70 +479,9 @@ export default async function HomePage() {
             </Reveal>
           </div>
 
-          {/* لقطة توضيحية للوحة — معلَّمة كعرض توضيحي، وأرقامها ليست بيانات عميل. */}
+          {/* لقطات فعلية التُقطت من حساب العرض المحلي؛ لا واجهات أو أرقام متخيَّلة. */}
           <Reveal delay={150} className={`${landing.heroFrame} relative mx-auto w-full max-w-[36rem] lg:max-w-none`}>
-            <div className="absolute inset-10 rounded-full bg-violet-500/20 blur-[70px]" aria-hidden="true" />
-            <div className={landing.dashboard}>
-              <div className={landing.dashboardGlow} aria-hidden="true" />
-              <div className="relative h-full p-4 sm:p-6">
-                <div className={landing.dashboardTop}>
-                  <div className="flex min-w-0 items-center gap-3">
-                    <BrandLogo className="h-11 w-11 shrink-0 rounded-2xl border border-salon-goldlight/20 sm:h-14 sm:w-14" priority />
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-bold text-white sm:text-base">إغلاق وردية المساء</p>
-                      <p className="mt-0.5 truncate text-[11px] text-slate-400 sm:text-xs">فرع الملز · اليوم</p>
-                    </div>
-                  </div>
-                  <span className="flex shrink-0 items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-bold text-emerald-300">
-                    <span className={landing.liveDot} /> مباشر
-                  </span>
-                </div>
-
-                <div className={landing.metricRail}>
-                  {[
-                    { label: "مبيعات اليوم", value: "5,630", icon: "cash" as IconName },
-                    { label: "زيارات مكتملة", value: "38", icon: "visits" as IconName },
-                    { label: "فرق الصندوق", value: "0", icon: "check" as IconName },
-                  ].map((metric) => (
-                    <div key={metric.label} className={landing.metric}>
-                      <div className="flex items-center justify-between gap-2 text-slate-400">
-                        <span className="truncate text-[11px] sm:text-xs">{metric.label}</span>
-                        <Icon name={metric.icon} className="h-4 w-4 shrink-0 text-violet-400" aria-hidden="true" />
-                      </div>
-                      <p className="mt-2.5 text-sm font-black text-white sm:text-base" dir="ltr">
-                        {metric.value} <span className="text-[10px] font-semibold text-slate-400">SAR</span>
-                      </p>
-                    </div>
-                  ))}
-                </div>
-
-                <div className={landing.chart}>
-                  <div className="flex items-end justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-[11px] text-slate-400 sm:text-xs">إيراد الأسبوع</p>
-                      <p className="mt-1 truncate text-sm font-bold">اتجاه صاعد بلا فروقات</p>
-                    </div>
-                    <span className="shrink-0 text-[11px] font-bold text-salon-goldlight sm:text-xs">7 أيام</span>
-                  </div>
-                  <div className={landing.bars} aria-hidden="true">
-                    {[38, 52, 44, 66, 58, 74, 92, 78, 88].map((height, index) => (
-                      <span
-                        key={index}
-                        className={landing.bar}
-                        style={{ height: `${height}%`, animationDelay: `${index * 80 + 420}ms` }}
-                      />
-                    ))}
-                  </div>
-                </div>
-                <div className={landing.eventCard}>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-xs font-bold text-white">تم إغلاق وردية المساء</span>
-                    <Icon name="check" className="h-4 w-4 text-emerald-300" />
-                  </div>
-                  <p className="mt-2 text-[11px] leading-5 text-slate-400">الكاش والشبكة مطابقان · المستحقات حُسبت · السجل محفوظ</p>
-                </div>
-              </div>
-            </div>
+            <HeroProductShowcase />
           </Reveal>
         </div>
       </section>
