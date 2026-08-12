@@ -46,7 +46,7 @@ export default function PlatformLoginPage() {
       <section className="relative mx-auto flex min-h-[calc(100vh-4rem)] max-w-md flex-col justify-center">
         <div className="mb-8">
           <BrandLogo className="mb-6 h-20 w-20 ring-1 ring-salon-gold/30" priority />
-          <p className="text-[11px] font-bold uppercase tracking-eyebrow text-salon-goldlight">منصّة XMANSX</p>
+          <p className="text-[11px] font-bold uppercase tracking-eyebrow text-salon-goldlight">منصّة إكس مانس إكس XMANSX</p>
           <h1 className="mt-3 text-4xl font-bold leading-tight tracking-tight">
             دخول <span className="text-gold-sheen">مدير المنصّة</span>
           </h1>

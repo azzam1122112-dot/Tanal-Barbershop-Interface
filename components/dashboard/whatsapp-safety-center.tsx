@@ -151,7 +151,7 @@ export function WhatsAppSafetyCenter({ initialOverview }: { initialOverview: Wha
                 <Icon name="staff" className="h-6 w-6" />
               </span>
               <div>
-                <p className="text-[11px] font-black tracking-[.2em] text-violet-300">XMANSX SHIELD</p>
+                <p className="text-[11px] font-black tracking-[.2em] text-violet-300">إكس مانس إكس XMANSX SHIELD</p>
                 <h2 className="mt-1 text-xl font-black sm:text-2xl">مركز حماية رقم واتساب</h2>
               </div>
               <span className={`rounded-full border px-3 py-1.5 text-[11px] font-black sm:mr-auto ${settings.marketingPaused ? "border-rose-400/25 bg-rose-500/10 text-rose-200" : "border-emerald-400/20 bg-emerald-500/10 text-emerald-300"}`}>

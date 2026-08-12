@@ -1,13 +1,20 @@
 import type { Metadata } from "next";
 import { LegalPage } from "@/components/legal/legal-page";
+import { publicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = { title: "سياسة الإلغاء والاسترداد" };
+export const metadata: Metadata = publicPageMetadata({
+  path: "/refund-policy",
+  title: "سياسة الإلغاء والاسترداد",
+  description:
+    "طريقة إلغاء اشتراك منصة إكس مانس إكس XMANSX وطلب استرداد المبلغ المدفوع للخدمة الرقمية، ومدد المعالجة والحالات المستثناة.",
+});
 
 export default function RefundPolicyPage() {
   return (
     <LegalPage
+      path="/refund-policy"
       title="سياسة الإلغاء والاسترداد"
-      description="توضح هذه السياسة طريقة إلغاء اشتراك XMANSX وطلب استرداد المبلغ المدفوع للخدمة الرقمية."
+      description="توضح هذه السياسة طريقة إلغاء اشتراك إكس مانس إكس XMANSX وطلب استرداد المبلغ المدفوع للخدمة الرقمية."
       sections={[
         {
           title: "الإلغاء",

@@ -191,6 +191,36 @@ enum StockMovementType {
   RETURN
 }
 
+/**
+ * ما يبلّغ عنه الحلاق من الرفّ: نقص وشيك، أو تالف، أو كمية مفقودة.
+ */
+/**
+ * حالة الصنف التشغيلي كما يراها الفرع كله.
+ */
+enum SupplyStatus {
+  AVAILABLE
+  LOW
+  OUT
+}
+
+enum SupplyReportState {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+
+enum StockReportType {
+  LOW_STOCK
+  DAMAGED
+  MISSING
+}
+
+enum StockReportStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+
 enum AttendanceSource {
   SELF
   MANAGER
@@ -277,7 +307,7 @@ model PlatformMfaChallenge {
   ipAddress       String?
   userAgent       String?
   createdAt       DateTime      @default(now())
-  platformAdmin   PlatformAdmin @relation(fields: [platformAdminId], references: [id], onDelete: Cascade)
+  platformAdmin   PlatformAdmin @relation(fields: [platformAdminId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([platformAdminId, expiresAt])
   @@index([expiresAt, consumedAt])
@@ -303,7 +333,9 @@ model PlatformSupportConversation {
   messages      PlatformSupportMessage[]
 
   @@index([status, lastMessageAt])
-  @@index([participantEmail, subjectKey, lastMessageAt])
+  // PostgreSQL قصّ الاسم الأصلي إلى 63 بايت عند تطبيق migration؛ map يطابق
+  // الاسم الفعلي ويمنع Prisma من اقتراح rename وهمي في كل drift check.
+  @@index([participantEmail, subjectKey, lastMessageAt], map: "PlatformSupportConversation_participantEmail_subjectKey_lastMes")
   @@index([assignedAdminId, status])
 }
 
@@ -433,6 +465,9 @@ model Organization {
   appointments            Appointment[]
   products                Product[]
   stockMovements          StockMovement[]
+  stockReports            StockReport[]
+  supplyItems             SupplyItem[]
+  supplyReports           SupplyReport[]
   attendance              AttendanceRecord[]
   billingInvoices         BillingInvoice[]
   barberPushSubscriptions BarberPushSubscription[]
@@ -472,6 +507,9 @@ model Salon {
   appointments         Appointment[]
   products             Product[]
   stockMovements       StockMovement[]
+  stockReports         StockReport[]
+  supplyItems          SupplyItem[]
+  supplyReports        SupplyReport[]
   attendance           AttendanceRecord[]
 
   @@unique([organizationId, slug])
@@ -522,6 +560,8 @@ model User {
   salonAssignments           StaffSalon[]
   collectedCash              CashCollection[]     @relation("CashCollectionCollectedBy")
   reversedCashCollections    CashCollection[]     @relation("CashCollectionReversedBy")
+  resolvedStockReports       StockReport[]        @relation("StockReportResolvedBy")
+  resolvedSupplyReports      SupplyReport[]       @relation("SupplyReportResolvedBy")
   paidCommissions            CommissionPayout[]   @relation("CommissionPayoutPaidBy")
   reversedCommissionPayouts  CommissionPayout[]   @relation("CommissionPayoutReversedBy")
 
@@ -531,42 +571,45 @@ model User {
 }
 
 model Barber {
-  id                   String                   @id @default(cuid())
-  organizationId       String
-  salonId              String
-  name                 String
-  phone                String
-  accessPinHash        String
-  role                 UserRole                 @default(BARBER)
-  isActive             Boolean                  @default(true)
+  id                     String                   @id @default(cuid())
+  organizationId         String
+  salonId                String
+  name                   String
+  phone                  String
+  accessPinHash          String
+  role                   UserRole                 @default(BARBER)
+  isActive               Boolean                  @default(true)
   // بوابة صريحة لحساب العمولة وإظهار مستحقاتها للحلاق.
-  commissionEnabled    Boolean                  @default(false)
+  commissionEnabled      Boolean                  @default(false)
   // نسبة عمولة الحلاق %. null = استخدم النسبة الافتراضية للفرع.
-  commissionRate       Decimal?                 @db.Decimal(5, 2)
+  commissionRate         Decimal?                 @db.Decimal(5, 2)
   // دوام الحلاق للحجز الذاتي. عند التعطيل يرث دوام الفرع وإجازاته.
-  workScheduleEnabled  Boolean                  @default(false)
-  workStartMinute      Int                      @default(960)
-  workEndMinute        Int                      @default(1380)
-  workClosedWeekdays   Int[]                    @default([])
-  lastLoginAt          DateTime?
-  createdAt            DateTime                 @default(now())
-  updatedAt            DateTime                 @updatedAt
-  organization         Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  salon                Salon                    @relation(fields: [salonId], references: [id], onDelete: Cascade)
-  createdCustomers     Customer[]               @relation("CustomerCreatedByBarber")
-  visits               Visit[]
-  auditLogs            AuditLog[]               @relation("BarberAuditLogs")
-  sessions             Session[]
-  dailyCloses          DailyClose[]
-  cashSessions         CashSession[]
-  expenses             CashExpense[]            @relation("CashExpenseBarber")
-  appointments         Appointment[]
-  attendance           AttendanceRecord[]
-  pushSubscriptions    BarberPushSubscription[]
-  cashBalance          BarberCashBalance?
-  cashCustodyMovements CashCustodyMovement[]
-  cashCollections      CashCollection[]
-  commissionPayouts    CommissionPayout[]
+  workScheduleEnabled    Boolean                  @default(false)
+  workStartMinute        Int                      @default(960)
+  workEndMinute          Int                      @default(1380)
+  workClosedWeekdays     Int[]                    @default([])
+  lastLoginAt            DateTime?
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  organization           Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  salon                  Salon                    @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  createdCustomers       Customer[]               @relation("CustomerCreatedByBarber")
+  visits                 Visit[]
+  auditLogs              AuditLog[]               @relation("BarberAuditLogs")
+  sessions               Session[]
+  dailyCloses            DailyClose[]
+  cashSessions           CashSession[]
+  expenses               CashExpense[]            @relation("CashExpenseBarber")
+  appointments           Appointment[]
+  attendance             AttendanceRecord[]
+  pushSubscriptions      BarberPushSubscription[]
+  cashBalance            BarberCashBalance?
+  cashCustodyMovements   CashCustodyMovement[]
+  cashCollections        CashCollection[]
+  commissionPayouts      CommissionPayout[]
+  stockReports           StockReport[]
+  supplyReports          SupplyReport[]           @relation("SupplyReportBarber")
+  escalatedSupplyReports SupplyReport[]           @relation("SupplyReportEscalatedBy")
 
   @@unique([organizationId, phone])
   @@index([salonId, isActive])
@@ -653,13 +696,14 @@ model CustomerAccount {
   phone           String
   /**
    * الرقم **المُثبَتة ملكيته** — `NULL` حتى يقع إثبات فعلي.
-   *
    * التفرّد العالمي باقٍ كما هو ويسري على المُثبَت وحده، و`NULL` مميّز عن `NULL`
    * في PostgreSQL فلا يتزاحم أصحاب الأرقام غير المثبتة. **لا يوجد اليوم أي مسار
    * يملؤه** — يأتي مع المطالبة (PHASE C) أو تحقق SMS لاحقًا.
    */
   phoneNormalized String?               @unique
-  /** لا يُكتب اليوم إطلاقًا. وجوده يمنع ادّعاء التوثيق ضمنًا من امتلاء الرقم. */
+  /**
+   * لا يُكتب اليوم إطلاقًا. وجوده يمنع ادّعاء التوثيق ضمنًا من امتلاء الرقم.
+   */
   phoneVerifiedAt DateTime?
   email           String?
   /**
@@ -676,9 +720,11 @@ model CustomerAccount {
   createdAt       DateTime              @default(now())
   updatedAt       DateTime              @updatedAt
 
-  customers  Customer[]
-  challenges CustomerEmailChallenge[]
-  sessions   CustomerSession[]
+  customers          Customer[]
+  challenges         CustomerEmailChallenge[]
+  sessions           CustomerSession[]
+  passkeys           CustomerPasskey[]
+  webAuthnChallenges CustomerWebAuthnChallenge[]
 
   @@index([status])
 }
@@ -712,6 +758,90 @@ model CustomerEmailChallenge {
 enum CustomerChallengePurpose {
   EMAIL_VERIFICATION
   PASSWORD_RESET
+  /**
+   * دخول برمز بريدي لحساب **موثّق مسبقًا** — الطريقة الاحتياطية حين يتعذّر
+   * مفتاح المرور. غرض مستقل عن `EMAIL_VERIFICATION` عمدًا: ذاك يُثبت البريد مرة
+   * عند التسجيل، وهذا يفتح جلسة جديدة. خلطهما يجعل رمز تفعيلٍ قديمًا صالحًا
+   * لفتح جلسة، ويجعل رمز دخولٍ قادرًا على توثيق بريد لم يُثبت بعد.
+   */
+  LOGIN
+}
+
+/**
+ * مفتاح مرور (Passkey/WebAuthn) — **لا بيانات بيومترية إطلاقًا**.
+ * البصمة وFace ID وقفل الجهاز لا تغادر الجهاز ولا تصل الخادم. ما يُخزَّن هنا هو
+ * المفتاح العام ومعرّف بيانات الاعتماد وعدّاد التوقيع — وكلها عامة بطبيعتها ولا
+ * تكفي وحدها لانتحال أحد، لأن التوقيع يحتاج المفتاح الخاص المحبوس في الجهاز.
+ * **عدة مفاتيح للحساب الواحد** بلا قيد تفرّد على `customerAccountId`: العميل قد
+ * يملك آيفون وحاسبًا ومدير كلمات مرور، وكلها لنفس الحساب. التفرّد على
+ * `credentialId` **عالميًا** لأن معرّف الاعتماد فريد بالمعيار.
+ */
+model CustomerPasskey {
+  id                String @id @default(cuid())
+  customerAccountId String
+
+  /**
+   * معرّف الاعتماد بترميز base64url — فريد عالميًا بحكم المعيار.
+   */
+  credentialId String   @unique
+  /**
+   * المفتاح **العام** بترميز base64url. لا مفتاح خاص ولا سرّ مصادِق هنا.
+   */
+  publicKey    String
+  /**
+   * عدّاد التوقيع لكشف الاستنساخ. بعض المصادِقات تُبقيه صفرًا وهو مقبول.
+   */
+  counter      BigInt   @default(0)
+  /**
+   * وسائط النقل التي أبلغ عنها المتصفح (usb/nfc/ble/internal/hybrid).
+   */
+  transports   String[] @default([])
+  deviceType   String?
+  backedUp     Boolean  @default(false)
+  /**
+   * اسم يختاره العميل. لا نشتقّه من User-Agent — ذاك بيان غير موثوق.
+   */
+  name         String?
+
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+
+  account CustomerAccount @relation(fields: [customerAccountId], references: [id], onDelete: Cascade)
+
+  @@index([customerAccountId, revokedAt])
+}
+
+/**
+ * تحدّي WebAuthn — منفصل عن `CustomerEmailChallenge` عمدًا.
+ * بنيتاهما مختلفتان فعلًا: هذا سرّ عشوائي طويل يُقارن كاملًا وقد يسبق معرفة
+ * الحساب (دخول باكتشاف الاعتماد)، وذاك رمز من ست خانات مربوط بحساب معروف وله
+ * عدّاد محاولات. دمجهما في جدول واحد يفرض أعمدة فارغة في الحالتين ويغري بخلط
+ * الغرضين.
+ * `customerAccountId` قابل لـ NULL: تحدّي المصادقة يُصدر قبل أن نعرف صاحبه.
+ * وتحدّي التسجيل **مربوط بالحساب دائمًا** فلا يُستعمل لحساب آخر.
+ */
+model CustomerWebAuthnChallenge {
+  id                String                  @id @default(cuid())
+  customerAccountId String?
+  purpose           CustomerWebAuthnPurpose
+  /**
+   * تجزئة SHA-256 للتحدي — الخام لا يُخزَّن، كرموز الجلسات والبوابة.
+   */
+  challengeHash     String                  @unique
+  expiresAt         DateTime
+  consumedAt        DateTime?
+  createdAt         DateTime                @default(now())
+
+  account CustomerAccount? @relation(fields: [customerAccountId], references: [id], onDelete: Cascade)
+
+  @@index([customerAccountId, purpose, createdAt])
+  @@index([expiresAt])
+}
+
+enum CustomerWebAuthnPurpose {
+  PASSKEY_REGISTRATION
+  PASSKEY_AUTHENTICATION
 }
 
 /**
@@ -1135,6 +1265,7 @@ model CashSession {
   visits                   Visit[]
   expenses                 CashExpense[]
   cashCollections          CashCollection[]
+  cashCustodyMovements     CashCustodyMovement[]
   // تحويلات التحصيل التي خرجت من الدرج أثناء الجلسة؛ لا تُعد إيرادًا ولا مصروفًا.
   collectionsTotal         Decimal           @default(0) @db.Decimal(12, 2)
 
@@ -1379,6 +1510,7 @@ model CashCustodyMovement {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   salon        Salon        @relation(fields: [salonId], references: [id], onDelete: Cascade)
   barber       Barber?      @relation(fields: [barberId], references: [id], onDelete: SetNull)
+  cashSession  CashSession? @relation(fields: [cashSessionId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, occurredAt])
   @@index([salonId, occurredAt])
@@ -1572,6 +1704,7 @@ model Product {
   salon         Salon           @relation(fields: [salonId], references: [id], onDelete: Cascade)
   visitProducts VisitProduct[]
   movements     StockMovement[]
+  stockReports  StockReport[]
 
   @@unique([salonId, name])
   @@index([salonId, isActive, sortOrder])
@@ -1615,15 +1748,131 @@ model StockMovement {
   recordedByBarberId String?
   createdAt          DateTime          @default(now())
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  salon        Salon        @relation(fields: [salonId], references: [id], onDelete: Cascade)
-  product      Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
-  visit        Visit?       @relation(fields: [visitId], references: [id], onDelete: SetNull)
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  salon        Salon         @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  product      Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  visit        Visit?        @relation(fields: [visitId], references: [id], onDelete: SetNull)
+  stockReports StockReport[]
 
   @@index([productId, createdAt])
   @@index([salonId, createdAt])
   @@index([organizationId, createdAt])
   @@index([visitId])
+}
+
+/**
+ * بلاغ مخزون من الحلاق.
+ * **بلاغ لا حركة:** الحلاق يقف أمام الرفّ فيرى النقص والتالف قبل أي أحد، لكن
+ * خصم المخزون بيده يفتح باب إخراج بضاعة بلا رقابة. فيُسجَّل البلاغ هنا، ولا
+ * يمسّ `Product.stockQuantity` حتى تعتمده الإدارة فتنشأ `StockMovement` مرتبطة.
+ */
+model StockReport {
+  id               String            @id @default(cuid())
+  organizationId   String
+  salonId          String
+  productId        String
+  barberId         String
+  type             StockReportType
+  /**
+   * الكمية المبلَّغ عنها — تلزم للتالف والمفقود، وتُهمل لبلاغ قرب النفاد.
+   */
+  quantity         Int?
+  note             String?
+  status           StockReportStatus @default(OPEN)
+  resolvedByUserId String?
+  resolvedAt       DateTime?
+  resolutionNote   String?
+  /**
+   * الحركة الناتجة عن الاعتماد — أثر يربط القرار بنتيجته في الدفتر.
+   */
+  stockMovementId  String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  salon         Salon          @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  product       Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  barber        Barber         @relation(fields: [barberId], references: [id])
+  resolvedBy    User?          @relation("StockReportResolvedBy", fields: [resolvedByUserId], references: [id])
+  stockMovement StockMovement? @relation(fields: [stockMovementId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status, createdAt])
+  @@index([salonId, status, createdAt])
+  @@index([productId, createdAt])
+  @@index([barberId, createdAt])
+}
+
+/**
+ * صنف تشغيلي: أمواس، رغوة، مناشف، مطهّر.
+ * **مفصول عن `Product` عمدًا وبلا أي حقل مالي.** المنتج يُباع للعميل فله سعر
+ * وعمولة ورصيد يدخل الإيراد؛ وهذا يُستهلك في الخدمة فلا سعر له ولا تكلفة ولا
+ * كمية تُحاسب. الغرض واحد: يعرف الفرع أنه نفد، وتعرف الإدارة أن تورّده.
+ * ولا رصيد رقمي عمدًا: رقمٌ يُدخله الحلاق يدويًا يتباعد عن الرفّ خلال أسبوع
+ * فيصير عبئًا يُهمَل. الحالة الثلاثية تكفي للقرار: أورّد الآن أم لا.
+ */
+model SupplyItem {
+  id              String       @id @default(cuid())
+  organizationId  String
+  salonId         String
+  name            String
+  /**
+   * وحدة العدّ للعرض فقط: «عبوة»، «علبة»، «كرتون».
+   */
+  unit            String?
+  status          SupplyStatus @default(AVAILABLE)
+  isActive        Boolean      @default(true)
+  sortOrder       Int          @default(0)
+  lastReportedAt  DateTime?
+  lastRestockedAt DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  salon        Salon          @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  reports      SupplyReport[]
+
+  @@unique([salonId, name])
+  @@index([salonId, isActive, sortOrder])
+  @@index([organizationId, status])
+}
+
+/**
+ * بلاغ نقص صنف تشغيلي.
+ * **بلاغ واحد مفتوح لكل صنف في الفرع** — يفرضه فهرس فريد جزئي في قاعدة
+ * البيانات لا فحصٌ في الشيفرة وحدها. الغاية أن يرى حلاقو الفرع كلهم أن الأمر
+ * بُلِّغ، فلا تصل الإدارة عشر رسائل عن نفس علبة الرغوة، ويبقى للبلاغ صاحبٌ
+ * واحد ووقتٌ واحد يُقاس عليه زمن الاستجابة.
+ */
+model SupplyReport {
+  id                  String            @id @default(cuid())
+  organizationId      String
+  salonId             String
+  supplyItemId        String
+  /**
+   * أول من بلّغ؛ ومن رفع الحالة لاحقًا يُسجَّل في `escalatedByBarberId`.
+   */
+  barberId            String
+  status              SupplyStatus
+  note                String?
+  state               SupplyReportState @default(OPEN)
+  escalatedByBarberId String?
+  escalatedAt         DateTime?
+  resolvedByUserId    String?
+  resolvedAt          DateTime?
+  resolutionNote      String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  salon        Salon        @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  supplyItem   SupplyItem   @relation(fields: [supplyItemId], references: [id], onDelete: Cascade)
+  barber       Barber       @relation("SupplyReportBarber", fields: [barberId], references: [id])
+  escalatedBy  Barber?      @relation("SupplyReportEscalatedBy", fields: [escalatedByBarberId], references: [id])
+  resolvedBy   User?        @relation("SupplyReportResolvedBy", fields: [resolvedByUserId], references: [id])
+
+  @@index([organizationId, state, createdAt])
+  @@index([salonId, state, createdAt])
+  @@index([supplyItemId, createdAt])
 }
 
 // حضور وانصراف الحلاق. سجل مستقل عن جلسة الصندوق: الجلسة أداة مالية والحضور أداة إدارية.

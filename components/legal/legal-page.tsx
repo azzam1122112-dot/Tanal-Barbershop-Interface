@@ -1,7 +1,19 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand-logo";
+import { JsonLd } from "@/components/seo/json-ld";
 import { LEGAL_VERSION, legalInfo } from "@/lib/legal";
+import { breadcrumbJsonLd, webPageJsonLd } from "@/lib/seo";
+
+const LEGAL_LINKS = [
+  { href: "/terms", label: "الشروط والأحكام" },
+  { href: "/privacy", label: "سياسة الخصوصية" },
+  { href: "/refund-policy", label: "الإلغاء والاسترداد" },
+  { href: "/digital-service-policy", label: "تقديم الخدمة الرقمية" },
+  { href: "/data-processing-agreement", label: "اتفاقية معالجة البيانات" },
+  { href: "/provider", label: "مقدم الخدمة" },
+  { href: "/contact", label: "التواصل والشكاوى" },
+] as const;
 
 export type LegalSection = {
   title: string;
@@ -11,11 +23,20 @@ export type LegalSection = {
 };
 
 export function LegalPage({
+  path,
   title,
   description,
   intro,
   sections,
 }: {
+  /**
+   * مسار الصفحة من جذر الموقع.
+   *
+   * البيانات المنظّمة تحتاج المسار ولا تستطيع اشتقاقه: المكوّن يُصيَّر على
+   * الخادم بلا وصول إلى الطلب، و`usePathname` يحوّله إلى مكوّن عميل فتُفقد
+   * الصفحة تصييرها الساكن. الوسم في `LEGAL_LINKS` أدناه هو نفسه مصدر التسمية.
+   */
+  path: string;
   title: string;
   description: string;
   /**
@@ -27,22 +48,40 @@ export function LegalPage({
   intro?: ReactNode;
   sections: LegalSection[];
 }) {
+  // مسار تنقّل من مستويين يجعل النتيجة تظهر كـ «الرئيسية › سياسة الخصوصية»
+  // بدل رابط خام، ويربط الوثيقة بكيان الموقع المُعلن في الصفحة الرئيسية.
+  const jsonLdGraph = [
+    breadcrumbJsonLd([
+      { name: "الرئيسية", path: "/" },
+      { name: title, path },
+    ]),
+    webPageJsonLd({ path, name: title, description, hasBreadcrumb: true }),
+  ];
+
   return (
     <main className="min-h-screen bg-salon-mist text-salon-ink">
+      <JsonLd graph={jsonLdGraph} />
       <header className="border-b border-white/10 bg-salon-onyx text-white">
         <div className="x-shell flex items-center justify-between gap-4 py-4">
-          <Link href="/" className="flex items-center gap-3">
+          <Link href="/" className="flex min-h-11 items-center gap-3">
             <BrandLogo className="h-10 w-10 rounded-xl border border-white/10" />
-            <span className="font-bold" dir="ltr">XMANSX</span>
+            <span className="font-bold">إكس مانس إكس XMANSX</span>
           </Link>
-          <Link href="/" className="text-sm font-bold text-white/70 hover:text-white">العودة للرئيسية</Link>
+          <Link
+            href="/"
+            className="inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-bold text-white/70 transition hover:bg-white/10 hover:text-white"
+          >
+            العودة للرئيسية
+          </Link>
         </div>
       </header>
 
       <div className="x-shell py-10 sm:py-14">
         <article className="mx-auto max-w-4xl overflow-hidden rounded-3xl border border-salon-line bg-white shadow-[var(--shadow-lg)]">
           <div className="border-b border-salon-line bg-salon-pearl px-6 py-8 sm:px-10">
-            <p className="text-xs font-bold text-violet-700">الإصدار {LEGAL_VERSION}</p>
+            <p className="text-xs font-bold text-violet-700">
+              الإصدار <span dir="ltr">{LEGAL_VERSION}</span>
+            </p>
             <h1 className="mt-3 text-3xl font-bold sm:text-4xl">{title}</h1>
             <p className="mt-4 max-w-3xl text-sm font-semibold leading-8 text-salon-charcoal">{description}</p>
           </div>
@@ -79,14 +118,20 @@ export function LegalPage({
           </div>
         </article>
 
-        <nav aria-label="الروابط القانونية" className="mx-auto mt-6 flex max-w-4xl flex-wrap justify-center gap-x-5 gap-y-2 text-xs font-bold text-violet-800">
-          <Link href="/terms">الشروط والأحكام</Link>
-          <Link href="/privacy">سياسة الخصوصية</Link>
-          <Link href="/refund-policy">الإلغاء والاسترداد</Link>
-          <Link href="/digital-service-policy">تقديم الخدمة الرقمية</Link>
-          <Link href="/data-processing-agreement">اتفاقية معالجة البيانات</Link>
-          <Link href="/provider">مقدم الخدمة</Link>
-          <Link href="/contact">التواصل والشكاوى</Link>
+        {/* مساحة لمس لا نصّ صغير: روابط بارتفاع 44px هي الحدّ الذي يُصيبه الإبهام. */}
+        <nav
+          aria-label="الروابط القانونية"
+          className="mx-auto mt-6 flex max-w-4xl flex-wrap justify-center gap-x-2 gap-y-1 text-xs font-bold text-violet-800"
+        >
+          {LEGAL_LINKS.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="inline-flex min-h-11 items-center rounded-xl px-3 transition hover:bg-white hover:text-violet-950"
+            >
+              {link.label}
+            </Link>
+          ))}
         </nav>
 
         <p className="mt-5 text-center text-xs font-semibold text-salon-charcoal/70">

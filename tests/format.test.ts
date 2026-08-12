@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countAr, formatAmount, formatDate, formatMoney, formatNumber, formatPercent, pluralizeAr } from "../lib/format";
+import { countAr, formatAmount, formatDate, formatMoney, formatNumber, formatPercent, formatRelativeDay, pluralizeAr } from "../lib/format";
 
 /** الأرقام الهندية ٠-٩ — وجودها في المخرجات هو العيب الذي نمنعه. */
 const ARABIC_INDIC = /[٠-٩]/;
@@ -35,6 +35,34 @@ describe("توحيد الأرقام على النظام اللاتيني", () =>
   it("يعيد شرطة للتاريخ الفارغ", () => {
     expect(formatDate(null)).toBe("-");
     expect(formatDate(undefined)).toBe("-");
+  });
+});
+
+describe("التاريخ القريب «اليوم/أمس»", () => {
+  // 08:00 بتوقيت الرياض = 05:00 UTC.
+  const now = new Date("2026-08-13T05:00:00.000Z");
+
+  it("يعدّ ما بعد منتصف ليل الرياض من اليوم نفسه لا من أمس", () => {
+    // 01:30 فجرًا بالرياض = 22:30 UTC من اليوم السابق. القسمة على يوم UTC كانت
+    // تضع هذه الحركة في «أمس» بينما صاحبها يقرأها في صباح يومها.
+    expect(formatRelativeDay("2026-08-12T22:30:00.000Z", now)).toBe("اليوم");
+  });
+
+  it("يميّز أمس بحدود يوم الرياض", () => {
+    expect(formatRelativeDay("2026-08-12T10:00:00.000Z", now)).toBe("أمس");
+    // 00:30 بالرياض من يوم 12 = 21:30 UTC من يوم 11 — ما زال «أمس».
+    expect(formatRelativeDay("2026-08-11T21:30:00.000Z", now)).toBe("أمس");
+  });
+
+  it("يعود للتاريخ الكامل بأرقام لاتينية فيما هو أقدم", () => {
+    const older = formatRelativeDay("2026-08-01T10:00:00.000Z", now);
+    expect(older).toBe(formatDate("2026-08-01T10:00:00.000Z"));
+    // نفس عيب `ar-SA` الخام: «١ أغسطس» بجوار «1,240 نقطة» في البطاقة الواحدة.
+    expect(older).not.toMatch(ARABIC_INDIC);
+  });
+
+  it("يعيد شرطة طويلة للتاريخ الفارغ", () => {
+    expect(formatRelativeDay(null, now)).toBe("—");
   });
 });
 

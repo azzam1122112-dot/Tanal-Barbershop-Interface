@@ -220,7 +220,7 @@ export async function generateWhatsAppMessage(prisma: PrismaClient, input: Gener
   const variables = buildVariables({
     customer,
     points: customer.loyaltyAccount?.points ?? 0,
-    salonName: settings?.salonName ?? "صالون XMANSX",
+    salonName: settings?.salonName ?? "صالون إكس مانس إكس XMANSX",
     visit,
     campaign,
     managerReward,

@@ -6,7 +6,7 @@
  * 2) اختلاط النظامين في الشاشة الواحدة، لأن العدّادات كانت تُطبع بـ `toString()`.
  * لاحقة `-u-nu-latn` تبقي التنسيق العربي (الفواصل والاتجاه) وتجعل الأرقام لاتينية.
  */
-import { parseRiyadhMonthKey, RIYADH_TIME_ZONE } from "@/lib/datetime/riyadh";
+import { addRiyadhDays, isSameRiyadhDay, parseRiyadhMonthKey, RIYADH_TIME_ZONE } from "@/lib/datetime/riyadh";
 
 const LOCALE = "ar-SA-u-nu-latn";
 // التقويم الميلادي صراحةً: `ar-SA` وحده يُخرج الهجري، والشهر المالي ميلادي.
@@ -35,6 +35,24 @@ export function formatPercent(value: number, fractionDigits = 0) {
 export function formatDate(value: Date | string | null | undefined) {
   if (!value) return "-";
   return new Date(value).toLocaleDateString(LOCALE, { timeZone: RIYADH_TIME_ZONE });
+}
+
+/**
+ * تاريخ قريب بصيغة يقرأها الإنسان: «اليوم» و«أمس» ثم التاريخ الكامل.
+ *
+ * **الحدّ يوم رياض لا يوم UTC.** الطرح الحسابي على `getTime()/86400000` يقسّم
+ * الزمن على منتصف ليل غرينتش، وهو الساعة الثالثة فجرًا في الرياض: حركة نقاط
+ * الواحدة والنصف ليلًا تُعرض «أمس» لمن يفتح بطاقته الثامنة صباحًا من اليوم نفسه.
+ *
+ * والتنسيق يمرّ بـ `formatDate` لا بـ `Intl` مباشرة: `ar-SA` وحدها تُخرج أرقامًا
+ * هندية وتقويمًا هجريًا، فتظهر «١٢ أغسطس» بجوار «1,240 نقطة» في البطاقة نفسها.
+ */
+export function formatRelativeDay(value: Date | string | null | undefined, now = new Date()) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (isSameRiyadhDay(date, now)) return "اليوم";
+  if (isSameRiyadhDay(date, addRiyadhDays(now, -1))) return "أمس";
+  return formatDate(date);
 }
 
 export function formatTime(value: Date | string | null | undefined) {

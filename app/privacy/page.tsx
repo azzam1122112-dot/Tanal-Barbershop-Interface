@@ -1,20 +1,27 @@
 import type { Metadata } from "next";
 import { LegalPage } from "@/components/legal/legal-page";
+import { publicPageMetadata } from "@/lib/seo";
 import { legalInfo } from "@/lib/legal";
 
-export const metadata: Metadata = { title: "سياسة الخصوصية" };
+export const metadata: Metadata = publicPageMetadata({
+  path: "/privacy",
+  title: "سياسة الخصوصية",
+  description:
+    "كيف تجمع منصة إكس مانس إكس XMANSX البيانات الشخصية وتستخدمها وتحميها ومدد الاحتفاظ بها، وكيف يمارس صاحب البيانات حقوقه وفق نظام حماية البيانات الشخصية السعودي.",
+});
 
 export default function PrivacyPage() {
   return (
     <LegalPage
+      path="/privacy"
       title="سياسة الخصوصية"
-      description="توضح هذه السياسة كيف تجمع XMANSX البيانات الشخصية وتستخدمها وتحميها، وكيف يستطيع صاحب البيانات ممارسة حقوقه وفق نظام حماية البيانات الشخصية في المملكة."
+      description="توضح هذه السياسة كيف تجمع إكس مانس إكس XMANSX البيانات الشخصية وتستخدمها وتحميها، وكيف يستطيع صاحب البيانات ممارسة حقوقه وفق نظام حماية البيانات الشخصية في المملكة."
       sections={[
         {
           title: "1. هوية جهة التحكم وأدوار الأطراف",
           paragraphs: [
             `بالنسبة لبيانات حساب الاشتراك والدفع والدعم، جهة التحكم هي ${legalInfo.providerName}، ${legalInfo.providerType}، ويمكن التواصل عبر ${legalInfo.privacyEmail}.`,
-            "بالنسبة لبيانات زبائن الصالون وموظفيه التي يدخلها الصالون لتشغيل نشاطه، يكون الصالون جهة التحكم وتعمل XMANSX جهة معالجة لحسابه ووفق تعليماته الموثقة.",
+            "بالنسبة لبيانات زبائن الصالون وموظفيه التي يدخلها الصالون لتشغيل نشاطه، يكون الصالون جهة التحكم وتعمل إكس مانس إكس XMANSX جهة معالجة لحسابه ووفق تعليماته الموثقة.",
           ],
         },
         {

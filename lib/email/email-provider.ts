@@ -34,11 +34,11 @@ class UnconfiguredEmailProvider implements EmailProvider {
 }
 
 /**
- * مزوّد تطوير يطبع الرسالة في السجل — **ممنوع في الإنتاج**.
+ * مزوّد تطوير يسجّل وقوع الإرسال الوهمي فقط — **ممنوع في الإنتاج**.
  *
- * يطبع الرمز، وهو ما تمنعه قاعدة «لا تسجّل OTP». الاستثناء مقصور على جهاز
- * المطوّر ومشروط بطلب صريح عبر `EMAIL_PROVIDER=console`، ويرفض العمل إذا كانت
- * البيئة إنتاجًا مهما ضُبط المتغيّر.
+ * لا يسجّل المستلم أو العنوان أو النص لأن أيًا منها قد يحتوي هوية أو OTP. هو
+ * مخصّص لاختبار أن المسار استدعى مزودًا فقط، ويرفض العمل إذا كانت البيئة إنتاجًا
+ * مهما ضُبط المتغيّر.
  */
 class ConsoleEmailProvider implements EmailProvider {
   readonly name = "console";
@@ -47,7 +47,11 @@ class ConsoleEmailProvider implements EmailProvider {
     if (process.env.NODE_ENV === "production") {
       throw new BusinessError("مزوّد البريد الطباعي غير مسموح في الإنتاج.", 503);
     }
-    logger.warn("email.console_provider", { to: message.to, subject: message.subject, text: message.text });
+    logger.warn("email.console_provider", {
+      simulated: true,
+      hasHtml: Boolean(message.html),
+      tagCount: message.tags?.length ?? 0,
+    });
   }
 }
 

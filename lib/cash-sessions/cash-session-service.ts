@@ -1,4 +1,5 @@
 import { BusinessError } from "@/lib/errors";
+import { runSerializable } from "@/lib/db/serializable-retry";
 import { Prisma } from "@prisma/client";
 import type { AuditActorType, PrismaClient } from "@prisma/client";
 import { aggregateVisitTotals, roundMoney } from "@/lib/visits/visit-totals";
@@ -97,7 +98,7 @@ export async function openCashSession(
       cashSession: await toCashSessionRow(tx, session),
       alreadyOpen: false,
     };
-  });
+  }, "cash_session.open");
 }
 
 export async function closeCashSession(prisma: PrismaClient, input: CashSessionCloseInput) {
@@ -174,7 +175,7 @@ export async function closeCashSession(prisma: PrismaClient, input: CashSessionC
     });
 
     return toStoredCashSessionRow(close);
-  });
+  }, "cash_session.close");
 }
 
 export async function getCashSessionSummary(prisma: CashSessionPrisma, organizationId?: string, salonIds?: string[] | null) {
@@ -362,23 +363,19 @@ function storedTotals(session: Prisma.CashSessionGetPayload<{ include: { barber:
   };
 }
 
-async function runSerializableTransaction<T>(prisma: PrismaClient, callback: (tx: Prisma.TransactionClient) => Promise<T>) {
-  const maxAttempts = 3;
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    try {
-      return await prisma.$transaction(callback, {
-        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-      });
-    } catch (error) {
-      if (!isSerializableWriteConflict(error) || attempt === maxAttempts) {
-        throw error;
-      }
-      await new Promise((resolve) => setTimeout(resolve, 25 * attempt));
-    }
-  }
-  throw new BusinessError("تعذر تنفيذ عملية جلسة الصندوق بعد عدة محاولات");
-}
-
-function isSerializableWriteConflict(error: unknown) {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034";
+/**
+ * جسما `openCashSession` و`closeCashSession` **قاعدة بيانات خالصة**: قراءات
+ * وكتابتان (`cashSession` و`auditLog`) ومساعدات حسابية صرفة. لا رسالة ولا نداء
+ * خارجي ولا ملف، فإعادة التنفيذ تتراجع كاملة مع المعاملة الملغاة ولا تُنتج أثرًا
+ * مكرّرًا. هذا هو شرط تمرير الجسم إلى `runSerializable`.
+ *
+ * ثلاث محاولات بتراجع خطي 25ms وبلا jitter كانت تستسلم مبكرًا وتُعيد المتعارضين
+ * في اللحظة نفسها؛ السياسة الآن موحّدة مع `visit-service` عبر مساعد مشترك.
+ */
+async function runSerializableTransaction<T>(
+  prisma: PrismaClient,
+  callback: (tx: Prisma.TransactionClient) => Promise<T>,
+  operation = "cash_session.transaction",
+) {
+  return runSerializable(prisma, operation, callback);
 }

@@ -7,7 +7,7 @@
  */
 export function DashboardShell({
   title,
-  eyebrow = "XMANSX · الإدارة والتشغيل",
+  eyebrow = "إكس مانس إكس XMANSX · الإدارة والتشغيل",
   description,
   actions,
   children,

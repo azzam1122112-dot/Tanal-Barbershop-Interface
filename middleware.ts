@@ -17,8 +17,13 @@ export function middleware(request: NextRequest) {
 
   // دفاع CSRF: ارفض الطلبات المغيّرة للحالة من أصل غير موثوق.
   if (pathname.startsWith("/api") && MUTATING_METHODS.has(request.method)) {
+    const origin = request.headers.get("origin");
     const allowed = parseAllowedOrigins(process.env.ALLOWED_ORIGINS);
-    if (!isTrustedOrigin(request.headers.get("origin"), getRequestOrigins(request), allowed)) {
+    // كل عمليات حساب العميل متصفح-إلى-خادم، بما فيها التسجيل والدخول قبل وجود
+    // cookie. لذلك غياب Origin عنها fail-closed. نبقي غيابها مسموحًا لبقية API
+    // حتى لا نكسر jobs خادم-لخادم المحمية أصلًا بمفاتيحها التشغيلية.
+    const requiresBrowserOrigin = pathname === "/api/account" || pathname.startsWith("/api/account/");
+    if ((requiresBrowserOrigin && !origin) || !isTrustedOrigin(origin, getRequestOrigins(request), allowed)) {
       return NextResponse.json({ message: "أصل الطلب غير موثوق" }, { status: 403 });
     }
   }

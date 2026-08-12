@@ -54,7 +54,8 @@ const navGroups: NavGroup[] = [
     title: "الكتالوج والنمو",
     items: [
       { href: "/dashboard/services", label: "الخدمات", description: "الأسعار والمدد", icon: "services", roles: ALL_MANAGEMENT },
-      { href: "/dashboard/products", label: "المنتجات", description: "المبيعات والمخزون", icon: "services", roles: ALL_MANAGEMENT },
+      { href: "/dashboard/products", label: "المنتجات والمخزون", description: "الرصيد والتوريد والتالف", icon: "services", roles: BRANCH_OPERATIONS },
+      { href: "/dashboard/supplies", label: "المستلزمات التشغيلية", description: "بلاغات النفاد والتوريد", icon: "adjustments", roles: BRANCH_OPERATIONS },
       { href: "/dashboard/loyalty", label: "الولاء", description: "النقاط والمكافآت", icon: "loyalty", roles: ALL_MANAGEMENT },
       { href: "/dashboard/campaigns", label: "الحملات", description: "العروض والاستهداف", icon: "campaigns", roles: ALL_MANAGEMENT },
       { href: "/dashboard/whatsapp", label: "واتساب", description: "التواصل والموافقات", icon: "whatsapp", roles: ALL_MANAGEMENT },

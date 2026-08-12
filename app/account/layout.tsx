@@ -14,16 +14,22 @@ export const metadata: Metadata = {
  *
  * منفصل عن `/my/[token]`: تلك بطاقة مؤسسة واحدة تُفتح برابط سرّي، وهذه هوية
  * الشخص عبر المنصّة تُفتح بجلسة. لا يشتركان في تخطيط ولا في مسار.
+ *
+ * **لا `justify-center` ولا `min-h-screen` على المحتوى.** التخطيط يخدم نوعين:
+ * نماذج دخول قصيرة وصفحات محتوى تطول بعدد بطاقات العميل. التوسيط الرأسي يجعل
+ * الأولى في منتصف الشاشة والثانية ملتصقة بأعلاها، فيقفز الشعار وترويسة الصفحة
+ * بين مسار وآخر داخل نفس القسم. المحاذاة للأعلى واحدة للجميع.
+ *
+ * والعرض `max-w-lg` لا `max-w-md`: العمود الضيّق كان يترك ~85px لكل خانة في
+ * شبكة بطاقة الولاء الرباعية. المسافة هنا والشبكة هناك حُلّتا معًا.
  */
 export default function AccountLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-salon-mist">
-      <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-10">
-        <Link href="/" className="mb-6 flex items-center gap-3 self-center" aria-label="الصفحة الرئيسية">
+      <main className="mx-auto w-full max-w-lg px-4 pb-12 pt-8 sm:pt-12">
+        <Link href="/" className="mb-6 flex items-center justify-center gap-3" aria-label="الصفحة الرئيسية">
           <BrandLogo className="h-11 w-11 rounded-xl ring-1 ring-salon-line" priority />
-          <span className="text-sm font-bold tracking-[0.2em] text-salon-charcoal/70" dir="ltr">
-            XMANSX
-          </span>
+          <span className="text-sm font-bold text-salon-charcoal/70">إكس مانس إكس XMANSX</span>
         </Link>
         {children}
       </main>

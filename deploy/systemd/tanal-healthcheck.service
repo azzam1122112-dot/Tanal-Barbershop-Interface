@@ -1,0 +1,24 @@
+[Unit]
+Description=XMANSX production readiness monitor
+After=tanal.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=tanal
+Group=tanal
+EnvironmentFile=/etc/tanal/tanal.env
+ExecStart=/srv/tanal/app/deploy/monitor/tanal-healthcheck.sh
+StateDirectory=tanal-monitor
+StateDirectoryMode=0700
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+ProtectKernelModules=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6

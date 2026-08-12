@@ -29,7 +29,7 @@ const COPY: Record<PushState, { label: string; title: string; description: strin
   unsupported: {
     label: "غير مدعوم",
     title: "المتصفح لا يدعم التنبيهات",
-    description: "افتح XMANSX بآخر إصدار من Chrome أو Safari.",
+    description: "افتح إكس مانس إكس XMANSX بآخر إصدار من Chrome أو Safari.",
   },
   "install-ios": {
     label: "خطوة واحدة",
@@ -49,7 +49,7 @@ const COPY: Record<PushState, { label: string; title: string; description: strin
   denied: {
     label: "محظور",
     title: "التنبيهات موقوفة من الجهاز",
-    description: "اسمح بالتنبيهات لتطبيق XMANSX من إعدادات المتصفح أو الهاتف.",
+    description: "اسمح بالتنبيهات لتطبيق إكس مانس إكس XMANSX من إعدادات المتصفح أو الهاتف.",
   },
   inactive: {
     label: "غير مفعّلة",

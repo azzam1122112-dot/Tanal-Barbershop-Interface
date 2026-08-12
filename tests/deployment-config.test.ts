@@ -56,6 +56,7 @@ describe("إعداد النشر", () => {
     expect(readiness).toContain("SELECT 1");
     expect(readiness).toContain("pingRedis");
     expect(readiness).toContain("REDIS_REQUIRED");
+    expect(readiness).toContain("isCustomerAuthProductionReady");
   });
 
   it("لا يبقي أي ارتباط بمزوّد استضافة بعينه", () => {
@@ -73,10 +74,43 @@ describe("إعداد النشر", () => {
 
   it("يحدد دورة حذف آمنة للنسخ الاحتياطية المشفرة", () => {
     const backup = readFileSync(join(process.cwd(), "deploy", "backup", "tanal-backup.sh"), "utf8");
+    const release = readFileSync(join(process.cwd(), "deploy", "release.sh"), "utf8");
     const envExample = readFileSync(join(process.cwd(), ".env.example"), "utf8");
     expect(backup).toContain('BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-30}"');
     expect(backup).toContain("BACKUP_DIR must be an absolute non-root directory");
     expect(backup).toContain("-name 'xmansx_*.dump.age'");
     expect(envExample).toContain('BACKUP_RETENTION_DAYS="30"');
+    expect(envExample).toContain('BACKUP_AGE_RECIPIENT=""');
+    expect(release).toContain("systemctl start tanal-backup.service");
+    expect(release).not.toContain("pg_dump --format=custom");
+  });
+
+  it("يراقب readiness دوريًا وينبّه دون تسجيل الأسرار", () => {
+    const monitor = readFileSync(join(process.cwd(), "deploy", "monitor", "tanal-healthcheck.sh"), "utf8");
+    const service = readFileSync(join(process.cwd(), "deploy", "systemd", "tanal-healthcheck.service"), "utf8");
+    const timer = readFileSync(join(process.cwd(), "deploy", "systemd", "tanal-healthcheck.timer"), "utf8");
+
+    expect(monitor).toContain("/api/health/readiness");
+    expect(monitor).toContain("production_health_alert");
+    expect(monitor).toContain("MONITOR_ALERT_COOLDOWN_SECONDS");
+    expect(monitor).not.toContain("echo $RESEND_API_KEY");
+    expect(service).toContain("StateDirectory=tanal-monitor");
+    expect(timer).toContain("OnUnitActiveSec=2m");
+    expect(timer).toContain("Persistent=true");
+  });
+
+  it("يفشل النشر مغلقًا قبل لمس Production ويبني قبل migration", () => {
+    const release = readFileSync(join(process.cwd(), "deploy", "release.sh"), "utf8");
+    const buildPosition = release.indexOf("npm run build");
+    const switchPosition = release.indexOf('systemctl stop "$SERVICE"');
+
+    expect(release).toContain("REQUIRE_EXPLICIT_SEED_CREDENTIALS must be true");
+    expect(release).toContain("WEBAUTHN_RP_ID is invalid");
+    expect(release).toContain("INBOUND_EMAIL_REQUIRED must be true");
+    expect(release).toContain('SUPPORT_EMAIL_ADDRESS" == "support@xmansx.com"');
+    expect(release).toContain("Node version mismatch");
+    expect(release).not.toContain("npm run prisma:deploy");
+    expect(buildPosition).toBeGreaterThan(-1);
+    expect(switchPosition).toBeGreaterThan(buildPosition);
   });
 });

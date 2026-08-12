@@ -28,6 +28,7 @@ export async function createCustomerWithLoyalty({
   organizationId,
   name,
   phone,
+  accountId,
   createdByBarberId,
   whatsappTransactionalOptIn = false,
   whatsappMarketingOptIn = false,
@@ -39,6 +40,12 @@ export async function createCustomerWithLoyalty({
   organizationId: string;
   name: string;
   phone: string;
+  /**
+   * الهوية العالمية لصاحب السجل. اختياري لأن مسارات التشغيل الداخلية (إنشاء
+   * العميل من شاشة الحلاق أو اللوحة) تبقى بلا حساب — الحلاق لا يملك بريد العميل
+   * ولا يصح أن يُنشئ له هوية. **التسجيل الذاتي في الولاء يمرّره دائمًا.**
+   */
+  accountId?: string | null;
   createdByBarberId?: string | null;
   whatsappTransactionalOptIn?: boolean;
   whatsappMarketingOptIn?: boolean;
@@ -62,6 +69,7 @@ export async function createCustomerWithLoyalty({
     const customer: CustomerWithOperationalSummary = await tx.customer.create({
       data: {
         organizationId,
+        accountId,
         name,
         phone,
         createdByBarberId,

@@ -15,17 +15,25 @@ RESTORE_DATABASE_URL='postgresql://.../xmansx_restore_drill' \
 
 Run a restore drill at least quarterly and record its date, encrypted artifact checksum, migration count, duration, operator, and the follow-up application smoke-test result. Never put database URLs or identity keys in the drill record.
 
-## Current production divergence
+## Current production state
 
-As of 11 August 2026 the `tanal-prod` host does **not** run the script in this
-directory. Its `tanal-backup.service` calls `/usr/local/sbin/tanal-db-backup`, a
-six-line `pg_dump` wrapper that writes **unencrypted** dumps to
-`/var/backups/tanal` and prunes at 14 days. So the encryption, the
-`pg_restore --list` validation, the checksums, and the 30-day retention
-described above are **not** in effect on the live server.
+The last read-only host inspection on 12 August 2026 confirmed that
+`tanal-backup.timer` was enabled and active, the service pointed at the versioned
+`deploy/backup/tanal-backup.sh`, and recent `.dump.age` plus checksum artifacts
+were present. This closes the earlier unencrypted-script divergence recorded on
+11 August.
 
-Closing that gap means installing `tanal-backup.service` from `deploy/systemd/`
-(it points at `tanal-backup.sh` here), providing `BACKUP_AGE_RECIPIENT`, and
-removing `/usr/local/sbin/tanal-db-backup`. Until then, treat the production
-backups as unencrypted at rest and keep the host's disk access restricted
-accordingly.
+The following launch gates are still operational, not code claims:
+
+- prove that a recent encrypted production/staging artifact restores on an
+  isolated database and passes an application smoke test;
+- prove immutable/off-site replication and record the owner, RPO, and RTO;
+- review the legacy `tanal.env.*` artifact found in the backup directory. Do not
+  read it into logs or delete it without operator approval; verify restrictive
+  permissions, remove it through the approved secret-handling procedure, and
+  rotate affected credentials if its custody cannot be proven;
+- alert on timer failure, missing daily artifact, checksum failure, and retention
+  cleanup failure.
+
+Do not describe production backup as launch-ready until these gates have
+evidence. A running timer is necessary but is not a restore guarantee.

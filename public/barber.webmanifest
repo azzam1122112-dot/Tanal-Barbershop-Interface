@@ -1,7 +1,7 @@
 {
   "id": "/barber",
-  "name": "XMANSX — واجهة الحلاق",
-  "short_name": "XMANSX حلاق",
+  "name": "إكس مانس إكس XMANSX — واجهة الحلاق",
+  "short_name": "إكس مانس إكس XMANSX حلاق",
   "description": "تسجيل الزيارات، البحث عن العملاء، وجلسة الصندوق — من جوالك مباشرة.",
   "start_url": "/barber",
   "scope": "/barber",

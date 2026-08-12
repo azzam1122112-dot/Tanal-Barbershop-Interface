@@ -1,17 +1,25 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { ImageResponse } from "next/og";
 
-export const alt = "XMANSX — منصة تشغيل صالونات الحلاقة الرجالية";
+export const alt = "إكس مانس إكس XMANSX — منصة تشغيل صالونات الحلاقة الرجالية";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
 /**
  * صورة معاينة الرابط (واتساب، تويتر، لينكدإن).
  *
- * نصّها لاتيني عمدًا: `ImageResponse` يرسم بخط النظام الافتراضي، وهو لا يحمل
- * محارف عربية، فأي نص عربي هنا يخرج مربعات فارغة. العنوان والوصف العربيان
- * يظهران بجانب الصورة من وسوم `metadata` أصلًا.
+ * **الخط يُقرأ من القرص لا بـ `fetch`:** المسار النسبي عبر `import.meta.url`
+ * يحوّله المحزّم وقت البناء إلى `/_next/static/media/...` وهو عنوان نسبي لا
+ * يقبله `fetch` أثناء التصيير المسبق، فيفشل البناء بـ `Invalid URL`. القراءة من
+ * جذر التطبيق هي النمط المثبَّت في `receipt-pdf.ts`، والملف مضمون في نسخة
+ * الإنتاج عبر `outputFileTracingIncludes` في `next.config.ts`.
  */
 export default async function OpengraphImage() {
+  const arabicBold = await readFile(
+    path.join(process.cwd(), "node_modules", "@ibm", "plex-sans-arabic", "fonts", "complete", "woff", "IBMPlexSansArabic-Bold.woff"),
+  );
+
   return new ImageResponse(
     (
       <div
@@ -24,7 +32,7 @@ export default async function OpengraphImage() {
           padding: "72px",
           background: "linear-gradient(135deg, #09070f 0%, #1a1030 52%, #08060d 100%)",
           color: "#ffffff",
-          fontFamily: "sans-serif",
+          fontFamily: "IBM Plex Sans Arabic",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
@@ -44,7 +52,7 @@ export default async function OpengraphImage() {
             X
           </div>
           <div style={{ display: "flex", flexDirection: "column" }}>
-            <div style={{ fontSize: "38px", fontWeight: 700, letterSpacing: "6px" }}>XMANSX</div>
+            <div style={{ fontSize: "38px", fontWeight: 700 }}>إكس مانس إكس XMANSX</div>
             <div style={{ fontSize: "17px", letterSpacing: "8px", color: "#c4b5fd", marginTop: "6px" }}>
               SOFTWARE SERVICE
             </div>
@@ -91,6 +99,9 @@ export default async function OpengraphImage() {
         </div>
       </div>
     ),
-    size,
+    {
+      ...size,
+      fonts: [{ name: "IBM Plex Sans Arabic", data: arabicBold, weight: 700, style: "normal" }],
+    },
   );
 }

@@ -262,6 +262,79 @@ function safely<T>(run: () => T): T | null {
 }
 
 /**
+ * يطلب رمز دخول بريديًا — الطريقة الاحتياطية حين يتعذّر مفتاح المرور.
+ *
+ * **رد محايد دائمًا** كطلب الاستعادة تمامًا: لا يفرّق بين بريد مسجّل وغيره.
+ *
+ * **حساب غير موثّق لا يستقبل رمز دخول** — مساره التفعيل لا الدخول. لو قبِلناه
+ * لصار رمز الدخول طريقًا لتخطّي التوثيق وفتح جلسة ببريد لم يُثبت أحد ملكيته.
+ */
+export async function requestLoginOtp(prisma: PrismaClient, email: string, meta: ActorMeta = {}) {
+  const emailNormalized = safely(() => normalizeEmail(email));
+  if (!emailNormalized) return;
+
+  const account = await prisma.customerAccount.findUnique({ where: { emailNormalized } });
+  if (!account || account.status !== "ACTIVE" || !account.emailVerifiedAt || !account.email) return;
+
+  await issueEmailChallenge(prisma, {
+    customerAccountId: account.id,
+    purpose: "LOGIN",
+    email: account.email,
+    accountName: account.name,
+  });
+
+  await writeAuditLog({
+    prisma,
+    actorType: "CUSTOMER",
+    action: "customer_account.email_otp_login_sent",
+    entityType: "CustomerAccount",
+    entityId: account.id,
+    ...meta,
+  });
+}
+
+/** يتحقق من رمز الدخول ويفتح جلسة. يستهلك تحدي `LOGIN` وحده لا تحدي التفعيل. */
+export async function loginWithEmailOtp(
+  prisma: PrismaClient,
+  input: { email: string; code: string },
+  meta: ActorMeta = {},
+): Promise<LoginResult> {
+  const emailNormalized = normalizeEmail(input.email);
+  const account = await prisma.customerAccount.findUnique({ where: { emailNormalized } });
+  // بريد غير مسجّل ورمز خاطئ يبدوان واحدًا.
+  if (!account || account.status !== "ACTIVE" || !account.emailVerifiedAt) {
+    throw new BusinessError("الرمز غير صحيح أو انتهت صلاحيته.", 400);
+  }
+
+  const consumed = await consumeEmailChallenge(prisma, { customerAccountId: account.id, purpose: "LOGIN", code: input.code });
+  if (consumed.outcome !== "CONSUMED") {
+    await writeAuditLog({
+      prisma,
+      actorType: "CUSTOMER",
+      action: "customer_account.email_otp_login_failed",
+      entityType: "CustomerAccount",
+      entityId: account.id,
+      ...meta,
+    });
+    assertChallengeUsable(consumed);
+  }
+
+  const { token } = await createCustomerSession(prisma, { customerAccountId: account.id, ...meta });
+  await prisma.customerAccount.update({ where: { id: account.id }, data: { lastLoginAt: new Date() } });
+
+  await writeAuditLog({
+    prisma,
+    actorType: "CUSTOMER",
+    action: "customer_account.email_otp_login_success",
+    entityType: "CustomerAccount",
+    entityId: account.id,
+    ...meta,
+  });
+
+  return { outcome: "SUCCESS", token, accountId: account.id };
+}
+
+/**
  * يطلب رمز استعادة. **يعيد النتيجة نفسها دائمًا** سواء وُجد الحساب أم لا:
  * ردٌّ يفرّق بينهما يجعل النموذج كاشفًا لمن له حساب.
  */

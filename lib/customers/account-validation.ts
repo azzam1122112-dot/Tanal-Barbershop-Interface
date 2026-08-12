@@ -8,8 +8,12 @@ import { adminPasswordSchema } from "@/lib/auth/password";
  * تعقيد. العبارة الطويلة مسموحة، والحد الأعلى يمنع إغراق bcrypt لا أكثر —
  * لا نظام تجزئة ثانٍ ولا سياسة ثانية.
  */
+/** سياق الانضمام الموقّع، يمرّ كما هو ويتحقق منه الخادم. */
+const joinContextField = z.string().trim().max(512).optional();
+
 export const customerRegisterSchema = z
   .object({
+    join: joinContextField,
     name: z.string().trim().min(2, "الاسم مطلوب").max(80),
     phone: z.string().trim().min(1, "رقم الجوال مطلوب"),
     email: z.string().trim().min(3).max(254),
@@ -22,11 +26,13 @@ export const customerRegisterSchema = z
   });
 
 export const customerLoginSchema = z.object({
+  join: joinContextField,
   identifier: z.string().trim().min(1, "أدخل رقم جوالك أو بريدك"),
   password: z.string().min(1, "كلمة المرور مطلوبة"),
 });
 
 export const customerVerifySchema = z.object({
+  join: joinContextField,
   email: z.string().trim().min(3).max(254),
   code: z.string().trim().regex(/^\d{6}$/, "الرمز ست خانات"),
 });

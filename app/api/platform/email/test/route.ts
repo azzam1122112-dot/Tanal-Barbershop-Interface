@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     const template = renderEmailConnectionTest();
     const result = await sendTransactionalEmail({
       to: parsed.data.email,
-      subject: "اختبار ربط البريد · XMANSX",
+      subject: "اختبار ربط البريد · إكس مانس إكس XMANSX",
       ...template,
       idempotencyKey: `platform-email-test/${crypto.randomUUID()}`,
       tags: [{ name: "message_type", value: "connection_test" }],

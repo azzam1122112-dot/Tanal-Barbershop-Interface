@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { NextRequest } from "next/server";
 import { isTrustedOrigin, parseAllowedOrigins, MUTATING_METHODS } from "../lib/auth/origin";
+import { middleware } from "../middleware";
 
 describe("origin / CSRF helpers", () => {
   it("allows requests with no Origin header (server-to-server)", () => {
@@ -39,5 +41,26 @@ describe("origin / CSRF helpers", () => {
     expect(MUTATING_METHODS.has("POST")).toBe(true);
     expect(MUTATING_METHODS.has("DELETE")).toBe(true);
     expect(MUTATING_METHODS.has("GET")).toBe(false);
+  });
+
+  it("fails closed when a mutating customer-account request omits Origin", () => {
+    const missing = middleware(new NextRequest("https://xmansx.com/api/account/register", { method: "POST" }));
+    const crossSite = middleware(new NextRequest("https://xmansx.com/api/account/login", {
+      method: "POST",
+      headers: { origin: "https://evil.example" },
+    }));
+    const sameSite = middleware(new NextRequest("https://xmansx.com/api/account/login", {
+      method: "POST",
+      headers: { origin: "https://xmansx.com" },
+    }));
+
+    expect(missing.status).toBe(403);
+    expect(crossSite.status).toBe(403);
+    expect(sameSite.status).toBe(200);
+  });
+
+  it("keeps authenticated server-to-server jobs usable without Origin", () => {
+    const response = middleware(new NextRequest("https://xmansx.com/api/maintenance/cleanup", { method: "POST" }));
+    expect(response.status).toBe(200);
   });
 });

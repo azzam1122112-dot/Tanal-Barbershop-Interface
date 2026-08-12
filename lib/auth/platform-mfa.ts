@@ -120,8 +120,8 @@ export async function beginPlatformMfaSetup(prisma: MfaPrisma, platformAdminId: 
     where: { id: platformAdminId },
     data: { mfaPendingCiphertext: encryptMfaSecret(secret) },
   });
-  const label = encodeURIComponent(`XMANSX:${admin.email}`);
-  const issuer = encodeURIComponent("XMANSX");
+  const label = encodeURIComponent(`إكس مانس إكس XMANSX:${admin.email}`);
+  const issuer = encodeURIComponent("إكس مانس إكس XMANSX");
   return { secret, otpauthUri: `otpauth://totp/${label}?secret=${secret}&issuer=${issuer}&algorithm=SHA1&digits=6&period=30` };
 }
 
