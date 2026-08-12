@@ -139,7 +139,7 @@ export function SubscriptionSelfService({
 
       <section>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div><p className="text-xs font-black text-salon-gold">اختر ما يناسبك</p><h2 className="mt-1 text-2xl font-bold">الباقات المنشورة من XMANSX</h2></div>
+          <div><p className="text-xs font-black text-salon-gold">اختر ما يناسبك</p><h2 className="mt-1 text-2xl font-bold">الباقات المنشورة من إكس مانس إكس XMANSX</h2></div>
           <div className="grid grid-cols-2 rounded-xl border border-salon-line bg-white p-1 text-sm font-bold">
             <button type="button" onClick={() => setCycle(1)} className={`rounded-lg px-4 py-2 ${cycle === 1 ? "bg-salon-ink text-white" : "text-salon-charcoal"}`}>شهري</button>
             <button type="button" onClick={() => setCycle(12)} className={`rounded-lg px-4 py-2 ${cycle === 12 ? "bg-salon-ink text-white" : "text-salon-charcoal"}`}>سنوي</button>
@@ -248,7 +248,7 @@ function BankTransferCard({ bank }: { bank: { bankName: string | null; accountNa
             <h3 className="mt-1 truncate text-lg font-bold">{bank.bankName ?? "بيانات التحويل البنكي"}</h3>
           </div>
         </div>
-        <span dir="ltr" className="rounded-full border border-white/10 bg-white/[0.07] px-3 py-1.5 text-[10px] font-extrabold tracking-[0.18em] text-white/70">XMANSX</span>
+        <span className="rounded-full border border-white/10 bg-white/[0.07] px-3 py-1.5 text-[10px] font-extrabold text-white/70">إكس مانس إكس XMANSX</span>
       </div>
 
       <div className="mt-7">

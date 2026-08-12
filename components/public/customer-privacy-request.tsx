@@ -79,7 +79,7 @@ export function CustomerPrivacyRequest({ token, initialRequests }: { token: stri
 
         <div className="border-t border-salon-line/70 px-5 pb-5 pt-4">
           <p className="text-xs font-semibold leading-6 text-salon-charcoal">
-            الصالون مسؤول عن بيانات زبائنه، وتساعده XMANSX في تنفيذ طلبك. اقرأ{" "}
+            الصالون مسؤول عن بيانات زبائنه، وتساعده إكس مانس إكس XMANSX في تنفيذ طلبك. اقرأ{" "}
             <Link href="/privacy" className="font-bold text-salon-forest underline">
               سياسة الخصوصية
             </Link>

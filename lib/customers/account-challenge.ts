@@ -111,7 +111,8 @@ export async function issueEmailChallenge(
     data: { codeHash: hashChallengeCode({ challengeId: challenge.id, purpose: input.purpose, code }) },
   });
 
-  const subject = input.purpose === "EMAIL_VERIFICATION" ? "رمز تفعيل حسابك" : "رمز إعادة تعيين كلمة المرور";
+  const emailCopy = challengeEmailCopy(input.purpose);
+  const subject = emailCopy.subject;
   const template = renderCustomerEmail({
     preheader: subject,
     title: subject,
@@ -129,11 +130,32 @@ export async function issueEmailChallenge(
     idempotencyKey: `customer-challenge/${challenge.id}`,
     tags: [{
       name: "message_type",
-      value: input.purpose === "EMAIL_VERIFICATION" ? "account_verification" : "password_reset",
+      value: emailCopy.messageType,
     }],
   });
 
   return { challengeId: challenge.id };
+}
+
+/**
+ * لكل غرض هوية مستقلة في صندوق العميل وتقارير التسليم. إبقاء هذا الاختيار في
+ * switch صريح يمنع سقوط غرض جديد تلقائيًا في قالب أمني مختلف.
+ */
+function challengeEmailCopy(purpose: CustomerChallengePurpose) {
+  switch (purpose) {
+    case "EMAIL_VERIFICATION":
+      return { subject: "رمز تفعيل حسابك", messageType: "account_verification" } as const;
+    case "LOGIN":
+      return { subject: "رمز تسجيل الدخول إلى حسابك", messageType: "account_login" } as const;
+    case "PASSWORD_RESET":
+      return { subject: "رمز إعادة تعيين كلمة المرور", messageType: "password_reset" } as const;
+    default:
+      return assertNever(purpose);
+  }
+}
+
+function assertNever(value: never): never {
+  throw new Error(`Unsupported customer challenge purpose: ${String(value)}`);
 }
 
 export type ChallengeConsumeResult =

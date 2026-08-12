@@ -52,7 +52,7 @@ self.addEventListener("message", (event) => {
 // ثم يتخلص منها المتصفح، بينما تبقى بيانات المواعيد الفعلية شبكة فقط.
 self.addEventListener("push", (event) => {
   let payload = {
-    title: "XMANSX",
+    title: "إكس مانس إكس XMANSX",
     body: "لديك تحديث جديد في جدول المواعيد.",
     url: "/barber#appointments",
     tag: "xmansx-update",

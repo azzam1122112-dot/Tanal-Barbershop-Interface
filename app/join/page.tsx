@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { BrandLogo } from "@/components/brand-logo";
 import { Icon } from "@/components/icons";
-import { LoyaltyJoinForm } from "@/components/public/loyalty-join-form";
+import { JoinOrganizationPanel } from "@/components/public/join-organization-panel";
+import { getRequestCustomerSession } from "@/lib/customers/account-http";
+import { decodeJoinContext, encodeJoinContext } from "@/lib/customers/join-context";
 import { prisma } from "@/lib/db/prisma";
 import { getEffectiveSettings } from "@/lib/settings/system-settings";
 import { getKnownLoginOrgSlug } from "@/lib/tenant/request-org";
@@ -20,17 +22,20 @@ export const metadata: Metadata = {
 export default async function LoyaltyJoinPage({
   searchParams,
 }: {
-  searchParams: Promise<{ org?: string }>;
+  searchParams: Promise<{ org?: string; state?: string }>;
 }) {
   const params = await searchParams;
-  const organizationSlug = params.org ?? await getKnownLoginOrgSlug();
+  // `state` هو سياق موقّع يعود من صفحات المصادقة؛ `org` هو الدخول الأول من رمز
+  // الصالون. الخادم يحلّ الـ slug في الحالتين ولا يثق بمعرّف مؤسسة من الواجهة.
+  const returned = decodeJoinContext(params.state);
+  const organizationSlug = returned?.organizationSlug ?? params.org ?? await getKnownLoginOrgSlug();
   const organization = organizationSlug
     ? await prisma.organization.findUnique({ where: { slug: organizationSlug } })
     : null;
 
-  if (!organization || organization.status === "SUSPENDED") notFound();
+  if (!organization || organization.status !== "ACTIVE") notFound();
 
-  const [settings, rewardRules, owner] = await Promise.all([
+  const [settings, rewardRules, owner, session] = await Promise.all([
     getEffectiveSettings(prisma, { organizationId: organization.id }),
     prisma.rewardRule.findMany({
       where: { organizationId: organization.id, isActive: true },
@@ -42,8 +47,11 @@ export default async function LoyaltyJoinPage({
       select: { email: true, phone: true },
       orderBy: { createdAt: "asc" },
     }),
+    getRequestCustomerSession(),
   ]);
 
+  // سياق جديد في كل عرض: عمره ساعة فلا يبقى رابط انضمام صالحًا بلا حد.
+  const state = encodeJoinContext(organization.slug);
   const brandName = settings?.legalName?.trim() || settings?.salonName || organization.name;
   const pointsPerRiyal = settings ? Number(settings.pointsPerCurrencyUnit) : 1;
   const pointsLabel = pointsPerRiyal === 1 ? "نقطة" : `${pointsPerRiyal} نقاط`;
@@ -59,7 +67,7 @@ export default async function LoyaltyJoinPage({
           <div className="flex min-w-0 items-center gap-3">
             <BrandLogo className="h-11 w-11 rounded-xl ring-1 ring-white/10" priority />
             <div className="min-w-0">
-              <p className="text-[10px] font-bold tracking-[0.24em] text-violet-300" dir="ltr">XMANSX LOYALTY</p>
+              <p className="text-[10px] font-bold text-violet-300">إكس مانس إكس XMANSX · LOYALTY</p>
               <p className="mt-0.5 truncate text-sm font-bold text-white/90">{brandName}</p>
             </div>
           </div>
@@ -150,10 +158,11 @@ export default async function LoyaltyJoinPage({
             </div>
           </section>
 
-          <aside className="loyalty-form-shell mx-auto w-full min-w-0 max-w-lg lg:mx-0" aria-label="نموذج الانضمام">
-            <LoyaltyJoinForm
-              organizationSlug={organization.slug}
+          <aside className="loyalty-form-shell mx-auto w-full min-w-0 max-w-lg lg:mx-0" aria-label="الانضمام لبرنامج الولاء">
+            <JoinOrganizationPanel
+              state={state}
               brandName={brandName}
+              accountName={session?.account.name ?? null}
               controllerEmail={owner?.email ?? null}
               controllerPhone={owner?.phone ?? null}
             />
@@ -162,7 +171,7 @@ export default async function LoyaltyJoinPage({
 
         <footer className="flex flex-col gap-2 border-t border-white/[0.07] pt-5 text-[11px] font-medium text-white/35 sm:flex-row sm:items-center sm:justify-between">
           <p>يعالج الصالون بيانات العضوية وفق إشعار الخصوصية المعروض قبل التسجيل.</p>
-          <p dir="ltr">POWERED BY <span className="font-bold text-white/55">XMANSX</span></p>
+          <p>POWERED BY <span className="font-bold text-white/55">إكس مانس إكس XMANSX</span></p>
         </footer>
       </div>
     </main>

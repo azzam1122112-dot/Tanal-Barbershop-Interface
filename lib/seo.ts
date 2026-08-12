@@ -66,13 +66,19 @@ export const siteVerification: NonNullable<Metadata["verification"]> = {
 };
 
 /**
+ * `Metadata["robots"]` يقبل نصًّا خامًا أيضًا. الشكل الكائني وحده هو ما نستعمله
+ * هنا، وتثبيته يجعل الحقول مقروءة للمستهلك والاختبار بدل `string | Robots`.
+ */
+type RobotsDirectives = Exclude<NonNullable<Metadata["robots"]>, string>;
+
+/**
  * توجيه الفهرسة الافتراضي للصفحات العامة.
  *
  * `max-image-preview: large` هو ما يسمح لصورة المعاينة بالظهور كبيرة في نتائج
  * الجوال، و`max-snippet: -1` يرفع سقف المقتطف. بدونهما تظهر النتيجة سطرًا
  * باهتًا بلا صورة بجوار منافس يعرض بطاقة كاملة.
  */
-export const INDEXABLE_ROBOTS: NonNullable<Metadata["robots"]> = {
+export const INDEXABLE_ROBOTS: RobotsDirectives = {
   index: true,
   follow: true,
   googleBot: {
@@ -85,7 +91,7 @@ export const INDEXABLE_ROBOTS: NonNullable<Metadata["robots"]> = {
 };
 
 /** الصفحات الخاصة: خلف تسجيل دخول أو خلف رمز في الرابط. لا تُفهرَس أبدًا. */
-export const PRIVATE_ROBOTS: NonNullable<Metadata["robots"]> = {
+export const PRIVATE_ROBOTS: RobotsDirectives = {
   index: false,
   follow: false,
   // `noarchive` يمنع بقاء نسخة مخبّأة لدى المحرك بعد حذف الصفحة — يهمّ في
@@ -94,6 +100,25 @@ export const PRIVATE_ROBOTS: NonNullable<Metadata["robots"]> = {
   nocache: true,
   googleBot: { index: false, follow: false, noarchive: true },
 };
+
+/**
+ * صورة بطاقة المشاركة، مُصرَّحًا بها في كل صفحة عامة.
+ *
+ * **لماذا صراحةً ولا نتّكل على `app/opengraph-image.tsx`:** Next **يستبدل** كائن
+ * `openGraph` كاملًا عندما يُعيد تعريفه مقطعٌ أعمق، ولا يدمجه. فور أن عرّفت صفحة
+ * `‎/terms` بطاقتها الخاصة سقطت منها الصورة الموروثة من الجذر، وخرج الرابط في
+ * واتساب مستطيلًا فارغًا. تأكّد من ذلك في ناتج البناء لا في التوقّع.
+ *
+ * المسار هو المسار المولَّد من `app/opengraph-image.tsx` نفسه — صورة واحدة
+ * تُنتَج مرة ولا تتكرّر.
+ */
+export const SOCIAL_IMAGE = {
+  url: absoluteUrl("/opengraph-image"),
+  width: 1200,
+  height: 630,
+  type: "image/png",
+  alt: `${SITE_NAME} — منصة تشغيل صالونات الحلاقة الرجالية`,
+} as const;
 
 export type PublicPageMetadataInput = {
   /** المسار المطلق من جذر الموقع، مثل `/terms`. */
@@ -146,11 +171,13 @@ export function publicPageMetadata({
       url,
       title: ogTitle,
       description: ogDescription,
+      images: [SOCIAL_IMAGE],
     },
     twitter: {
       card: "summary_large_image",
       title: ogTitle,
       description: ogDescription,
+      images: [SOCIAL_IMAGE],
     },
   };
 }
@@ -179,7 +206,7 @@ export function organizationJsonLd() {
       width: 1254,
       height: 1254,
     },
-    image: absoluteUrl("/opengraph-image"),
+    image: SOCIAL_IMAGE.url,
     description: SITE_DESCRIPTION,
     email: legalInfo.supportEmail,
     telephone: `+${legalInfo.supportWhatsApp}`,
@@ -307,7 +334,7 @@ export function softwareApplicationJsonLd({
     applicationSubCategory: "Salon & Barbershop Management",
     operatingSystem: "Web, iOS, Android",
     url: absoluteUrl("/"),
-    image: absoluteUrl("/opengraph-image"),
+    image: SOCIAL_IMAGE.url,
     inLanguage: SITE_LANGUAGE,
     description: SITE_DESCRIPTION,
     publisher: { "@id": ORGANIZATION_ID },

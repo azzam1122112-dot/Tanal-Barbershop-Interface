@@ -204,7 +204,7 @@ export function PlatformSupportInbox({ initialData }: { initialData: InboxData }
                   <article key={message.id} className={`flex ${outbound ? "justify-start" : "justify-end"}`}>
                     <div className={`max-w-[88%] rounded-2xl border px-4 py-3 shadow-sm sm:max-w-[75%] ${outbound ? "border-salon-ink bg-salon-ink text-white" : "border-salon-line bg-white text-salon-ink"}`}>
                       <div className="flex flex-wrap items-center gap-2 text-[10px] font-bold">
-                        <span className={outbound ? "text-salon-goldlight" : "text-salon-gold"}>{outbound ? message.sentByAdmin?.name ?? "فريق XMANSX" : selected.participantName ?? selected.participantEmail}</span>
+                        <span className={outbound ? "text-salon-goldlight" : "text-salon-gold"}>{outbound ? message.sentByAdmin?.name ?? "فريق إكس مانس إكس XMANSX" : selected.participantName ?? selected.participantEmail}</span>
                         <time className={outbound ? "text-white/45" : "text-salon-charcoal/45"}>{fullDate(message.createdAt)}</time>
                       </div>
                       <p className={`mt-2 whitespace-pre-wrap break-words text-sm leading-7 ${outbound ? "text-white/90" : "text-salon-charcoal"}`}>{message.bodyText}</p>
@@ -231,7 +231,7 @@ export function PlatformSupportInbox({ initialData }: { initialData: InboxData }
                 <textarea value={reply} onChange={(event) => setReply(event.target.value)} rows={4} maxLength={10_000} disabled={busy || selected.status === "SPAM"} placeholder={selected.status === "SPAM" ? "أخرج المحادثة من الرسائل المزعجة للرد" : "اكتب ردًا واضحًا واحترافيًا..."} className="dashboard-field w-full resize-y leading-7" />
               </label>
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                <p className="text-[11px] font-semibold text-salon-charcoal/55">سيُرسل من XMANSX ويستقبل رد العميل في المحادثة نفسها.</p>
+                <p className="text-[11px] font-semibold text-salon-charcoal/55">سيُرسل من إكس مانس إكس XMANSX ويستقبل رد العميل في المحادثة نفسها.</p>
                 <button type="button" onClick={() => void sendReply()} disabled={busy || reply.trim().length < 2 || selected.status === "SPAM"} className="dashboard-button-gold min-w-32 px-5 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50">{busy ? "جارٍ التنفيذ..." : "إرسال الرد"}</button>
               </div>
             </footer>

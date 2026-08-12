@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { pingRedis } from "@/lib/cache/redis";
 import { prisma } from "@/lib/db/prisma";
 import { hasValidPlatformMfaEncryptionKey } from "@/lib/auth/platform-mfa";
+import { isCustomerAuthProductionReady } from "@/lib/auth/webauthn-config";
 import { isEmailConfigurationReady } from "@/lib/email/resend-email";
 import { isInboundSupportReady } from "@/lib/email/platform-support";
 
@@ -18,7 +19,13 @@ export async function GET() {
   const securityConfigReady = process.env.NODE_ENV !== "production" || hasValidPlatformMfaEncryptionKey();
   const emailConfigReady = isEmailConfigurationReady();
   const inboundSupportReady = isInboundSupportReady();
-  const ready = database === "ok" && (!redisRequired || redis === "ok") && securityConfigReady && emailConfigReady && inboundSupportReady;
+  const customerAuthReady = isCustomerAuthProductionReady();
+  const ready = database === "ok"
+    && (!redisRequired || redis === "ok")
+    && securityConfigReady
+    && customerAuthReady
+    && emailConfigReady
+    && inboundSupportReady;
 
   return NextResponse.json(
     {

@@ -29,10 +29,10 @@ export async function generateReceiptPdf(receipt: ReceiptData) {
     bufferPages: true,
     info: {
       Title: `${receipt.documentTitle} ${receipt.invoiceNumber ?? ""}`.trim(),
-      Author: receipt.seller.salonName || receipt.seller.name || "XMANSX",
+      Author: receipt.seller.salonName || receipt.seller.name || "إكس مانس إكس XMANSX",
       Subject: "إيصال مبيعات للخدمات المقدمة",
-      Creator: "XMANSX Salon Operations Platform",
-      Producer: "XMANSX",
+      Creator: "إكس مانس إكس XMANSX Salon Operations Platform",
+      Producer: "إكس مانس إكس XMANSX",
     },
   });
 
@@ -253,8 +253,8 @@ function drawPageFooters(doc: PDFKit.PDFDocument) {
   for (let index = range.start; index < range.start + range.count; index += 1) {
     doc.switchToPage(index);
     doc.moveTo(PAGE.margin, 796).lineTo(PAGE.width - PAGE.margin, 796).strokeColor(COLORS.line).lineWidth(0.6).stroke();
-    arabicText(doc, "أُصدر إلكترونيًا عبر منصة", 362, 807, 185, { size: 7.5, color: COLORS.muted });
-    latinText(doc, "XMANSX", 310, 807, 48, { font: "Helvetica-Bold", size: 7.5, color: COLORS.purpleDark, align: "right" });
+    arabicText(doc, "أُصدر إلكترونيًا عبر منصة إكس مانس إكس", 322, 807, 225, { size: 7.5, color: COLORS.muted });
+    latinText(doc, "XMANSX", 266, 807, 52, { font: "Helvetica-Bold", size: 7.5, color: COLORS.purpleDark, align: "right" });
     latinText(doc, `${index - range.start + 1} / ${range.count}`, PAGE.margin, 807, 100, { size: 7.5, color: COLORS.muted, align: "left" });
   }
 }

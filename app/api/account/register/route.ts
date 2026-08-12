@@ -26,7 +26,8 @@ export async function POST(request: Request) {
   try {
     const result = await registerCustomerAccount(prisma, parsed.data, meta);
 
-    const verifyPath = `/account/verify?email=${encodeURIComponent(parsed.data.email)}`;
+    const joinSuffix = parsed.data.join ? `&join=${encodeURIComponent(parsed.data.join)}` : "";
+    const verifyPath = `/account/verify?email=${encodeURIComponent(parsed.data.email)}${joinSuffix}`;
 
     switch (result.outcome) {
       case "CREATED":

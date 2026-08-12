@@ -7,18 +7,18 @@ import { BarberPwa } from "@/components/barber/pwa";
  */
 export const metadata: Metadata = {
   title: {
-    default: "XMANSX — واجهة الحلاق",
-    template: "%s · XMANSX",
+    default: "إكس مانس إكس XMANSX — واجهة الحلاق",
+    template: "%s · إكس مانس إكس XMANSX",
   },
   description: "تسجيل الزيارات، البحث عن العملاء، وجلسة الصندوق — من جوالك مباشرة.",
   manifest: "/barber.webmanifest",
-  applicationName: "XMANSX حلاق",
+  applicationName: "إكس مانس إكس XMANSX حلاق",
   appleWebApp: {
     capable: true,
     // `default` لا `black-translucent`: الأخير يمدّ المحتوى تحت شريط الحالة،
     // وواجهة الحلاق شاشة عمل بأرقام لا لوحة عرض.
     statusBarStyle: "default",
-    title: "XMANSX حلاق",
+    title: "إكس مانس إكس XMANSX حلاق",
   },
   // شاشة تشغيل داخلية لا يفيد فهرستها.
   robots: { index: false, follow: false },

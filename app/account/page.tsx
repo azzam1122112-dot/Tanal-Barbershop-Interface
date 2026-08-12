@@ -1,10 +1,14 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AccountCard } from "@/components/public/account-card";
 import { AccountLogoutButton } from "@/components/public/account-auth-forms";
+import { PasskeyManager } from "@/components/public/passkey-forms";
 import { getRequestCustomerSession } from "@/lib/customers/account-http";
+import { listPasskeys } from "@/lib/customers/passkey-service";
+import { prisma } from "@/lib/db/prisma";
 
 /**
- * صفحة الحساب — هوية فقط، بلا محفظة ولاء بعد.
+ * صفحة الحساب — الهوية، ومدخل إلى محفظة الولاء.
  *
  * **حساب بلا مؤسسات حالة صحيحة لا خطأ:** الربط بالصالونات فعل مستقل في مرحلة
  * المطالبة، ولا يجوز أن تُنشئ زيارةُ هذه الصفحة سجلَ عميل في أي مؤسسة.
@@ -14,9 +18,10 @@ export default async function AccountPage() {
   if (!session) redirect("/account/login");
 
   const { account } = session;
+  const passkeys = await listPasskeys(prisma, account.id);
 
   return (
-    <AccountCard title={`أهلًا ${account.name}`} description="بيانات هويتك على منصة XMANSX.">
+    <AccountCard title={`أهلًا ${account.name}`} description="بيانات هويتك على منصة إكس مانس إكس XMANSX.">
       <dl className="space-y-3.5">
         <Row label="الاسم" value={account.name} />
         <Row label="رقم الجوال" value={account.phone} ltr />
@@ -24,10 +29,19 @@ export default async function AccountPage() {
         <Row label="حالة البريد" value={account.emailVerifiedAt ? "موثّق" : "غير موثّق"} />
       </dl>
 
-      <p className="mt-6 rounded-xl border border-salon-line bg-salon-mist/60 px-3.5 py-3 text-sm font-medium leading-6 text-salon-charcoal/80">
-        ربط بطاقات الولاء لدى الصالونات التي تزورها لم يُفعَّل بعد. حسابك جاهز، وبطاقاتك ستظهر هنا عند إطلاق الربط.
-      </p>
+      <Link
+        href="/account/loyalty"
+        className="mt-6 block w-full rounded-xl bg-salon-ink px-4 py-3.5 text-center text-base font-bold text-white transition hover:bg-salon-charcoal"
+      >
+        برامج الولاء الخاصة بي
+      </Link>
 
+      <div className="mt-4">
+        <PasskeyManager passkeys={passkeys} />
+      </div>
+
+      {/* الخروج آخر شيء على الشاشة. كان فوق مدير مفاتيح الدخول، فيقرأ العميل
+          «تسجيل الخروج» ثم يجد إعدادات أمان تحته — يقطع الصفحة في منتصفها. */}
       <div className="mt-6 flex justify-end">
         <AccountLogoutButton />
       </div>

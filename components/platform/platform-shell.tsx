@@ -55,7 +55,7 @@ export async function PlatformShell({
             <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-l from-transparent via-salon-gold/70 to-transparent" aria-hidden="true" />
             <div className="flex items-center gap-3">
               <BrandLogo className="h-12 w-12 ring-1 ring-salon-gold/30" priority />
-              <div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-salon-goldlight">XMANSX · المنصة</p><p className="mt-1 truncate text-lg font-bold">لوحة مدير النظام</p></div>
+              <div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-salon-goldlight">إكس مانس إكس XMANSX · المنصة</p><p className="mt-1 truncate text-lg font-bold">لوحة مدير النظام</p></div>
             </div>
             <div className="mt-4 rounded-xl border border-white/[0.08] bg-black/20 px-3 py-2.5">
               <p className="truncate text-xs font-bold">{session.admin.name}</p>
@@ -77,7 +77,7 @@ export async function PlatformShell({
         <section className="min-w-0 px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 sm:px-6 lg:px-8 lg:pt-8">
           <div className="dashboard-panel lux-edge flex flex-col gap-4 px-5 py-6 sm:flex-row sm:items-center sm:justify-between lg:px-7">
             <div className="min-w-0">
-              <p className="lux-eyebrow">إدارة منصة XMANSX</p>
+              <p className="lux-eyebrow">إدارة منصة إكس مانس إكس XMANSX</p>
               <h1 className="mt-2.5 text-3xl font-bold leading-[1.15] tracking-tight sm:text-4xl">{title}</h1>
               {description ? <p className="dashboard-muted mt-3 max-w-3xl">{description}</p> : null}
             </div>

@@ -238,7 +238,7 @@ export function PlatformPlans({ initialPlans }: { initialPlans: PlanRow[] }) {
 function PlanFields({ plan }: { plan?: PlanRow }) {
   return (
     <div className="grid gap-3 p-5 sm:grid-cols-2">
-      <label className="text-sm font-bold">اسم الباقة<input name="name" required defaultValue={plan?.name} className="dashboard-field mt-2" placeholder="XMANSX نمو" /></label>
+      <label className="text-sm font-bold">اسم الباقة<input name="name" required defaultValue={plan?.name} className="dashboard-field mt-2" placeholder="إكس مانس إكس XMANSX نمو" /></label>
       {!plan ? <label className="text-sm font-bold">المعرّف<input name="slug" required dir="ltr" className="dashboard-field mt-2" placeholder="xmansx-growth" /></label> : null}
       <label className="text-sm font-bold sm:col-span-2">الوصف<textarea name="description" rows={2} defaultValue={plan?.description ?? ""} className="dashboard-field mt-2 resize-y" placeholder="لمن صُممت هذه الباقة؟" /></label>
       <label className="text-sm font-bold">السعر الشهري<input name="priceMonthly" type="number" min={0} step={0.01} required defaultValue={plan?.priceMonthly ?? 0} className="dashboard-field mt-2" /></label>

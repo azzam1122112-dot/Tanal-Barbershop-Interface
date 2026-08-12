@@ -44,10 +44,10 @@ export function renderCustomerEmail(input: CustomerEmailLayoutInput) {
 
 export function renderEmailConnectionTest() {
   return renderCustomerEmail({
-    preheader: "تم ربط XMANSX بخدمة البريد بنجاح",
+    preheader: "تم ربط إكس مانس إكس XMANSX بخدمة البريد بنجاح",
     title: "اختبار اتصال البريد ناجح",
     body: [
-      "هذه رسالة تشغيلية تجريبية من منصة XMANSX.",
+      "هذه رسالة تشغيلية تجريبية من منصة إكس مانس إكس XMANSX.",
       "وصولها يعني أن نطاق الإرسال ومفتاح Resend وإعدادات الخادم تعمل بصورة صحيحة.",
     ],
   });
@@ -91,10 +91,10 @@ export function renderPlatformSupportReply(input: { customerName?: string | null
   const greeting = input.customerName?.trim() ? `مرحبًا ${input.customerName.trim()}،` : "مرحبًا،";
   const paragraphs = input.message.split(/\n{2,}/).map((paragraph) => paragraph.trim()).filter(Boolean);
   return renderCustomerEmail({
-    preheader: "لديك رد جديد من فريق دعم XMANSX",
-    title: "رد فريق دعم XMANSX",
+    preheader: "لديك رد جديد من فريق دعم إكس مانس إكس XMANSX",
+    title: "رد فريق دعم إكس مانس إكس XMANSX",
     body: [greeting, ...paragraphs],
-    footer: "فريق دعم XMANSX · يمكنك الرد مباشرة على هذه الرسالة لمتابعة المحادثة",
+    footer: "فريق دعم إكس مانس إكس XMANSX · يمكنك الرد مباشرة على هذه الرسالة لمتابعة المحادثة",
   });
 }
 

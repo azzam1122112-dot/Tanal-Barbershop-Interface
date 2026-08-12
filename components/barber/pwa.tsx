@@ -153,7 +153,7 @@ export function BarberPwa() {
   if (installEvent) {
     return (
       <PwaBar tone="onyx" icon="scissors" action={{ label: "تثبيت", onClick: install }} onDismiss={dismiss}>
-        <p className="text-sm font-bold">ثبّت XMANSX كتطبيق</p>
+        <p className="text-sm font-bold">ثبّت إكس مانس إكس XMANSX كتطبيق</p>
         <p className="mt-0.5 text-xs font-medium opacity-80">فتح أسرع من الشاشة الرئيسية، بلا شريط متصفح.</p>
       </PwaBar>
     );
@@ -162,7 +162,7 @@ export function BarberPwa() {
   if (showIosHint) {
     return (
       <PwaBar tone="onyx" icon="scissors" onDismiss={dismiss}>
-        <p className="text-sm font-bold">ثبّت XMANSX كتطبيق</p>
+        <p className="text-sm font-bold">ثبّت إكس مانس إكس XMANSX كتطبيق</p>
         <p className="mt-0.5 text-xs font-medium opacity-80">
           من شريط سفاري: <span className="font-bold">مشاركة</span> ← <span className="font-bold">إضافة إلى الشاشة الرئيسية</span>.
         </p>

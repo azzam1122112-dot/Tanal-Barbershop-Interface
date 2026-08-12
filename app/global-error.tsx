@@ -22,7 +22,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
         }}
       >
         <div style={{ maxWidth: 380, textAlign: "center" }}>
-          <p style={{ fontSize: 12, letterSpacing: "0.18em", color: "#c4b5fd", fontWeight: 700 }}>منصة XMANSX</p>
+          <p style={{ fontSize: 12, letterSpacing: "0.18em", color: "#c4b5fd", fontWeight: 700 }}>منصة إكس مانس إكس XMANSX</p>
           <h1 style={{ marginTop: 12, fontSize: 24 }}>تعذّر تحميل النظام</h1>
           <p style={{ marginTop: 12, lineHeight: 1.8, color: "rgba(255,255,255,0.7)", fontSize: 14 }}>
             حدث خطأ غير متوقع. أعد المحاولة، وإذا استمر الأمر حدّث الصفحة.

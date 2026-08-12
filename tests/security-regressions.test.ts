@@ -41,6 +41,15 @@ describe("security regression controls", () => {
     expect((redacted.nested as Record<string, unknown>).authorization).toBe("[REDACTED]");
   });
 
+  it("never writes email recipients or OTP-bearing bodies through the console provider", () => {
+    const providerSource = readFileSync(join(process.cwd(), "lib", "email", "email-provider.ts"), "utf8");
+    const consoleProvider = providerSource.match(/class ConsoleEmailProvider[\s\S]*?class ResendEmailProvider/)?.[0] ?? "";
+
+    expect(consoleProvider).not.toContain("message.to");
+    expect(consoleProvider).not.toContain("message.text");
+    expect(consoleProvider).not.toContain("message.subject");
+  });
+
   it("rejects passwords beyond the safe bcrypt input policy", () => {
     expect(adminPasswordSchema.safeParse("A".repeat(65)).success).toBe(false);
     expect(adminPasswordSchema.safeParse("ك".repeat(40)).success).toBe(false);

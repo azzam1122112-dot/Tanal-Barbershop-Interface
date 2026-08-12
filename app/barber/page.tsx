@@ -16,6 +16,11 @@ import { BARBER_APPOINTMENTS_DAYS } from "@/lib/appointments/barber-window";
 import { AttendancePanel } from "@/components/barber/attendance-panel";
 import { BarberNotificationCenter } from "@/components/barber/notification-center";
 import { BarberAppointmentsPanel } from "@/components/barber/appointments-panel";
+import { BarberStockPanel } from "@/components/barber/stock-panel";
+import { listProducts } from "@/lib/products/product-service";
+import { listStockReports } from "@/lib/products/stock-report-service";
+import { BarberSuppliesPanel } from "@/components/barber/supplies-panel";
+import { listSupplyItems } from "@/lib/supplies/supply-service";
 import { prisma } from "@/lib/db/prisma";
 import { getBarberMonthlyCommission } from "@/lib/commissions/barber-monthly-commission";
 import { getBarberCommissionBalance } from "@/lib/commissions/commission-payout";
@@ -49,7 +54,8 @@ export default async function BarberHomePage() {
     salonId: session.salonId,
   });
   const barberExpenseLimit = settings ? Number(settings.barberExpenseLimit) : 0;
-  const [sessionExpenses, openAttendance, nextDaysAppointments] = await Promise.all([
+  const [sessionExpenses, openAttendance, nextDaysAppointments, stockProducts, stockReports, supplyItems] =
+    await Promise.all([
     summary.cashSession ? getSessionExpenses(prisma, summary.cashSession.id) : Promise.resolve([]),
     getOpenAttendance(prisma, session.barber.id),
     // ثلاثة أيام لا يوم واحد: تنبيه حجز الغد كان يصل الحلاق ولا يجد له أثرًا في
@@ -59,6 +65,24 @@ export default async function BarberHomePage() {
       salonIds: [session.salonId],
       barberId: session.barber.id,
       days: BARBER_APPOINTMENTS_DAYS,
+    }),
+    // مخزون فرعه كاملًا — بما نفد. قائمة البيع تخفي الناقص، وهذه تشرحه.
+    listProducts(prisma, {
+      organizationId: session.organizationId,
+      salonIds: [session.salonId],
+      onlyActive: true,
+    }),
+    listStockReports(prisma, {
+      organizationId: session.organizationId,
+      salonIds: [session.salonId],
+      barberId: session.barber.id,
+      take: 10,
+    }),
+    // مستلزمات تشغيلية: قناة بلاغ بحتة بلا سعر ولا كمية ولا أثر مالي.
+    listSupplyItems(prisma, {
+      organizationId: session.organizationId,
+      salonIds: [session.salonId],
+      onlyActive: true,
     }),
   ]);
   const upcomingAppointments = nextDaysAppointments.filter(
@@ -73,7 +97,7 @@ export default async function BarberHomePage() {
             <div className="flex min-w-0 items-center gap-3">
               <BrandLogo className="h-12 w-12 border border-salon-line shadow-sm" priority />
               <div className="min-w-0">
-                <p className="truncate text-xs font-bold text-salon-forest">{workplace || "منصة XMANSX"}</p>
+                <p className="truncate text-xs font-bold text-salon-forest">{workplace || "منصة إكس مانس إكس XMANSX"}</p>
                 {/* الاسم يلتف على سطرين بدل أن يُقصّ: «مرحبًا حلاق تجر…» ليست تحية. */}
                 <h1 className="mt-1 text-xl font-bold leading-tight text-salon-ink sm:text-2xl">
                   مرحبًا {session.barber.name}
@@ -154,6 +178,41 @@ export default async function BarberHomePage() {
                 initialAppointments={upcomingAppointments}
                 barberName={session.barber.name}
                 salonName={salon?.name ?? organization?.name}
+              />
+            ) : null}
+
+            {!subscription.blockReason && supplyItems.length > 0 ? (
+              <BarberSuppliesPanel
+                initialItems={supplyItems.map((item) => ({
+                  id: item.id,
+                  name: item.name,
+                  unit: item.unit,
+                  status: item.status,
+                  statusLabel: item.statusLabel,
+                  lastRestockedAt: item.lastRestockedAt,
+                  openReport: item.openReport,
+                }))}
+              />
+            ) : null}
+
+            {!subscription.blockReason && stockProducts.length > 0 ? (
+              <BarberStockPanel
+                products={stockProducts.map((product) => ({
+                  id: product.id,
+                  name: product.name,
+                  stockQuantity: product.stockQuantity,
+                  lowStockThreshold: product.lowStockThreshold,
+                }))}
+                initialReports={stockReports.map((report) => ({
+                  id: report.id,
+                  type: report.type,
+                  typeLabel: report.typeLabel,
+                  status: report.status,
+                  statusLabel: report.statusLabel,
+                  quantity: report.quantity,
+                  createdAt: report.createdAt,
+                  product: { id: report.product.id, name: report.product.name },
+                }))}
               />
             ) : null}
           </div>

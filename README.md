@@ -198,6 +198,8 @@ npm run start:prod
 | `ROOT_DOMAIN` | نطاقات المؤسسات الفرعية — **اتركه فارغًا** إن كنت تخدم نطاقًا واحدًا |
 | `WEB_PUSH_PUBLIC_KEY` و`WEB_PUSH_PRIVATE_KEY` | زوج VAPID ثابت لتنبيهات حجوزات الحلاق — أنشئه مرة واحدة بـ `npx web-push generate-vapid-keys` |
 | `WEB_PUSH_SUBJECT` | جهة التواصل الرسمية لخدمة Push: `mailto:support@xmansx.com` |
+| `PUBLIC_GOOGLE_SITE_VERIFICATION` و`PUBLIC_BING_SITE_VERIFICATION` و`PUBLIC_YANDEX_SITE_VERIFICATION` | إثبات ملكية الموقع في أدوات مشرفي المواقع — **اضبطها وقت البناء أيضًا** |
+| `INDEXNOW_KEY` | إبلاغ فوري لمحركات البحث بتحديث الصفحات (اتركه فارغًا لتعطيله) |
 
 > **تحذير `ROOT_DOMAIN`:** قيمة خاطئة تجعل النظام يفسّر جزءًا من اسم المضيف كنطاق فرعي لمؤسسة، فتفشل **كل** عمليات الدخول برسالة «لم نجد مؤسسة بهذا المعرّف». على مضيف من ثلاثة مقاطع مثل `app.example.com` اتركه فارغًا أو اضبطه على المضيف الكامل. لتفعيل نطاقات المؤسسات (`owner.tanal.com`) اضبطه على النطاق الجذر ووجّه wildcard DNS لـ `*.tanal.com`.
 
@@ -225,6 +227,13 @@ scp /tmp/tanal-<sha>.tar.gz root@<host>:/tmp/
 `deploy/release.sh` يأخذ نسخة احتياطية من قاعدة البيانات، ثم يبني الإصدار الجديد
 في مجلد مستقل **والتطبيق الحالي ما زال يخدم الطلبات**، فيقتصر التوقف على لحظة
 التبديل وإعادة التشغيل. وإن فشل فحص الصحة بعده يرجع تلقائيًا للإصدار السابق.
+
+النسخة السابقة للنشر تمر إلزاميًا عبر `tanal-backup.service`: custom-format،
+فحص `pg_restore --list`، تشفير age، وSHA-256. لا ينشئ سكربت الإصدار dump خامًا.
+كما يرفض الإصدار قبل أي تغيير إذا كانت إعدادات Session/OTP/Redis/Email/WebAuthn
+أو Node 22.22.3 غير مكتملة. يتم البناء أولًا، ثم يطبّق `ExecStartPre` migrations
+بعد تبديل المجلد وقبل قبول الطلبات؛ migrations الهادمة ممنوعة لأنها لا تُعكس
+بمجرد الرجوع إلى كود الإصدار السابق.
 
 > **لا تضبط `NODE_ENV=production` قبل `npm ci`.** عندها يتخطّى npm حزم التطوير
 > فيسقط TypeScript وTailwind ويفشل البناء. والأهم أن `ExecStartPre` في وحدة
@@ -280,6 +289,24 @@ install -m 0644 deploy/systemd/tanal-maintenance.{service,timer} /etc/systemd/sy
 systemctl daemon-reload && systemctl enable --now tanal-maintenance.timer
 ```
 
+### مراقبة الجاهزية
+
+المراقب المجاني المرفق يفحص readiness كل دقيقتين، يسجل الفشل كـ`daemon.crit`
+في journal، ويرسل عبر Resend تنبيهًا محدودًا بـ`MONITOR_ALERT_COOLDOWN_SECONDS`:
+
+```bash
+install -m 0755 deploy/monitor/tanal-healthcheck.sh /srv/tanal/app/deploy/monitor/
+install -m 0644 deploy/systemd/tanal-healthcheck.{service,timer} /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now tanal-healthcheck.timer
+systemctl start tanal-healthcheck.service
+systemctl status tanal-healthcheck.timer tanal-healthcheck.service
+```
+
+يجب أن يحتوي `/etc/tanal/tanal.env` على `MONITOR_ALERT_EMAIL` و`MONITOR_EMAIL_FROM`
+من نطاق Resend الموثق. لا تختبر مسار الفشل على Production دون نافذة معتمدة؛ اختبره
+أولًا في Staging، ثم راقب وصول الرسالة وظهور الحدث في journal.
+
 > **حالة الإنتاج (11 أغسطس 2026): هذه الوحدة غير مثبّتة على `tanal-prod`،** ولا
 > يوجد أي جدول cron بديل لها. أي أن الجلسات المنتهية وعدادات المحاولات وسجلات
 > التدقيق **لا تُحذف أبدًا** حاليًا، فمدة الاحتفاظ المعلنة في سياسة الخصوصية غير
@@ -287,7 +314,10 @@ systemctl daemon-reload && systemctl enable --now tanal-maintenance.timer
 
 ### النسخ الاحتياطي
 
-المشروع لا يتضمن جدولة نسخ احتياطي. اضبطها على مستوى قاعدة البيانات (`pg_dump` مجدول أو لقطات المزوّد) **قبل** استقبال أي بيانات حقيقية — بيانات الزيارات والصندوق لا تُستعاد من مكان آخر.
+الجدولة المشفرة موجودة في `deploy/systemd/tanal-backup.{service,timer}`، وإجراءات
+الاستعادة الآمنة في `deploy/backup/README.md`. وجود timer أو artifact وحده لا
+يكفي: لا تُغلق بوابة الإطلاق حتى تنجح استعادة أحدث ملف `.dump.age` على قاعدة
+منفصلة مع smoke test، وتثبت نسخة off-site ومالك العملية وRPO/RTO.
 
 ## فحص قاعدة جديدة من الصفر
 
@@ -374,6 +404,50 @@ CUSTOMER_OTP_PEPPER="قيمة-عشوائية-قوية-خاصة-ببيئة-الإ
 - جلسات الصندوق: `/dashboard/daily-close`
 - واتساب اليدوي: `/dashboard/whatsapp`
 - الإعدادات: `/dashboard/settings`
+
+## الظهور في محركات البحث (SEO)
+
+كل ما يقرأه المحرك مولَّد من الكود: `app/robots.ts` و`app/sitemap.ts` و`lib/seo.ts`.
+لا ملفات ثابتة تُحدَّث يدويًا وتتباعد عن الموقع.
+
+**ما يعمل تلقائيًا بلا إعداد:** رابط أساسي (canonical) لكل صفحة عامة مبني على
+`PUBLIC_APP_URL` لا على مضيف الطلب، بطاقة مشاركة بصورة لكل صفحة، بيانات منظّمة
+(`Organization` و`WebSite` و`SoftwareApplication` بأسعار الباقات الفعلية و`FAQPage`
+ومسار تنقّل للوثائق القانونية)، و`noindex` على كل ما هو خلف تسجيل دخول أو خلف رمز
+في الرابط.
+
+**خطوات التفعيل بعد أول نشر** — بدونها لن تظهر النتائج مهما كان الكود سليمًا:
+
+1. **اضبط `PUBLIC_APP_URL` وقت البناء** على النطاق النهائي. الصفحات العامة
+   مُصيَّرة مسبقًا، فضبطه وقت التشغيل وحده يترك `localhost` في الروابط المدمجة.
+2. **Google Search Console** — أضف النطاق، انسخ رمز «وسم HTML» إلى
+   `PUBLIC_GOOGLE_SITE_VERIFICATION`، أعد البناء والنشر، ثم تحقّق. بعدها أرسل
+   `https://<domain>/sitemap.xml` واطلب فهرسة الصفحة الرئيسية من «فحص عنوان URL».
+3. **Bing Webmaster Tools** — `PUBLIC_BING_SITE_VERIFICATION` بالطريقة نفسها
+   (يغطي Bing وYahoo وDuckDuckGo وECOSIA وواجهات بحث الذكاء الاصطناعي المبنية عليه).
+4. **Yandex Webmaster** — `PUBLIC_YANDEX_SITE_VERIFICATION` إن كان السوق الروسي مهمًا.
+5. **IndexNow** — ولّد رمزًا واضبطه في `INDEXNOW_KEY`:
+   ```bash
+   node -e "console.log(require('crypto').randomBytes(16).toString('hex'))"
+   ```
+   تأكّد أن `https://<domain>/indexnow/<KEY>.txt` يعيد الرمز، ثم بعد كل نشرٍ يغيّر
+   محتوى صفحة عامة:
+   ```bash
+   npm run seo:indexnow                      # كل الصفحات العامة
+   npm run seo:indexnow -- /terms /privacy   # صفحات بعينها
+   ```
+6. **تحقّق من البيانات المنظّمة** على
+   [validator.schema.org](https://validator.schema.org/) و«اختبار النتائج الغنية» من Google.
+
+> **الملكية والنطاقات الفرعية:** كل صفحة عامة تُقدَّم أيضًا من نطاق كل مستأجر
+> (`owner.<root>`)، لكن رابطها الأساسي يشير دائمًا إلى النطاق الرئيسي فتُجمَّع
+> النسخ ولا يُوزَّع وزن النطاق. أثبت ملكية **النطاق الجذر** في أدوات المشرفين
+> (خاصية Domain لا URL prefix) ليشمل التحقق النطاقات الفرعية كلها.
+
+> **ما لا يفعله الكود:** الترتيب يحتاج محتوى وروابط خارجية. الأسرع أثرًا: نشاط
+> تجاري على خرائط Google (Business Profile) باسم مطابق، وذكر النطاق في أدلة
+> برمجيات السعودية، ومقالات تشرح المشكلات التي تحلّها المنصّة. البنية التقنية
+> هنا تضمن أن يُفهرس ما تنشره ويُعرض جيدًا — لا أن يوجد ما يُفهرَس.
 
 ## منصّة SaaS متعددة المستأجرين
 

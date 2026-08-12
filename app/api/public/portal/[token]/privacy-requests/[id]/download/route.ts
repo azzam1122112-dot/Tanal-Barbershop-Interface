@@ -58,7 +58,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
     exportVersion: 1,
     exportedAt: new Date().toISOString(),
     controller: profile?.privacyNoticeControllerName ?? null,
-    processor: "XMANSX",
+    processor: "إكس مانس إكس XMANSX",
     profile,
     loyaltyAccount,
     loyaltyTransactions,

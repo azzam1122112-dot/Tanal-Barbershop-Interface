@@ -14,7 +14,7 @@ export default async function PlatformSupportPage() {
     <PlatformShell
       active="support"
       title="صندوق دعم العملاء"
-      description="استقبل رسائل العملاء ورد عليها من عنوان XMANSX الرسمي، مع تعيين المسؤول والأولوية وتتبع حالة كل محادثة."
+      description="استقبل رسائل العملاء ورد عليها من عنوان إكس مانس إكس XMANSX الرسمي، مع تعيين المسؤول والأولوية وتتبع حالة كل محادثة."
       actions={(
         <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-bold ${inbound.enabled ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-900"}`}>
           <span className={`h-2 w-2 rounded-full ${inbound.enabled ? "bg-emerald-500" : "bg-amber-500"}`} />

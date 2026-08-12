@@ -53,7 +53,7 @@ export default async function DashboardShellLayout({ children }: { children: Rea
             <div className="flex items-center gap-3">
               <BrandLogo className="h-12 w-12 ring-1 ring-salon-gold/30" priority />
               <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-salon-goldlight">XMANSX · {roleCopy.panelEyebrow}</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-salon-goldlight">إكس مانس إكس XMANSX · {roleCopy.panelEyebrow}</p>
                 <p className="mt-1 truncate text-lg font-bold">{roleCopy.panelTitle}</p>
               </div>
             </div>

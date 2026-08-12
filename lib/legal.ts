@@ -33,6 +33,6 @@ export const legalInfo = {
   privacyEmail: process.env.PUBLIC_PRIVACY_EMAIL?.trim() || SUPPORT_EMAIL,
 } as const;
 
-export function supportWhatsAppLink(message = "السلام عليكم، أحتاج مساعدة بخصوص منصة XMANSX.") {
+export function supportWhatsAppLink(message = "السلام عليكم، أحتاج مساعدة بخصوص منصة إكس مانس إكس XMANSX.") {
   return `https://wa.me/${legalInfo.supportWhatsApp}?text=${encodeURIComponent(message)}`;
 }

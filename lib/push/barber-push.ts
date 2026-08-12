@@ -168,7 +168,7 @@ export async function sendBarberAppointmentPush(
     organizationId: input.organizationId,
     barberId: input.barberId,
     payload: {
-      title: "موعد جديد • XMANSX",
+      title: "موعد جديد • إكس مانس إكس XMANSX",
       body: `${input.customerName} — ${date}، ${time}`,
       url: "/barber#appointments",
       tag: `appointment-${input.appointmentId}`,
@@ -184,7 +184,7 @@ export async function sendBarberTestPush(
   return sendToBarber(prisma, {
     ...input,
     payload: {
-      title: "تنبيهات XMANSX جاهزة",
+      title: "تنبيهات إكس مانس إكس XMANSX جاهزة",
       body: "ستصلك المواعيد الجديدة هنا فور تأكيدها.",
       url: "/barber#appointments",
       tag: "xmansx-push-test",

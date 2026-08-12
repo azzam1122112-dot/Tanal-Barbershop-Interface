@@ -16,6 +16,16 @@ const POLICIES = {
   /** الإرسال أغلى من التحقق: كل نداء رسالة فعلية. */
   challengeSend: { windowMs: 15 * 60_000, maxAttempts: 4, lockMs: 30 * 60_000 },
   challengeVerify: { windowMs: 10 * 60_000, maxAttempts: 10, lockMs: 15 * 60_000 },
+  /** تفعيل/إلغاء مفتاح مرور: عمليات نادرة بطبيعتها، وحدّها يمنع الإغراق. */
+  passkeyRegister: { windowMs: 15 * 60_000, maxAttempts: 10, lockMs: 15 * 60_000 },
+  /**
+   * الدخول بمفتاح مرور — حدّ **على العنوان وحده**.
+   *
+   * لا معرّف حساب هنا أصلًا (الدخول يسبق معرفة صاحبه)، وهذا مكسب لا نقص:
+   * لا يستطيع أحد أن يقفل حساب غيره بمحاولات فاشلة. والحدّ سخيّ لأن الفشل
+   * الشائع هنا إلغاء المستخدم لنافذة البصمة لا هجومًا.
+   */
+  passkeyAuth: { windowMs: 10 * 60_000, maxAttempts: 30, lockMs: 10 * 60_000 },
 } satisfies Record<string, RateLimitPolicy>;
 
 export type CustomerRateLimitScope = keyof typeof POLICIES;

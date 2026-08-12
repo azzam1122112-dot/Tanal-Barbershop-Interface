@@ -67,10 +67,7 @@ export function HeroProductShowcase() {
             <span className="h-2 w-2 rounded-full bg-white/25" />
             <span className="h-2 w-2 rounded-full bg-white/15" />
           </div>
-          <span className="inline-flex items-center gap-2 text-[10px] font-bold text-slate-400 sm:text-[11px]">
-            <span className={landing.realPulse} />
-            لقطة فعلية من حساب عرض تجريبي
-          </span>
+
         </div>
 
         <div className={landing.productViewport} aria-live="off">

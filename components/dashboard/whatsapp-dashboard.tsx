@@ -324,7 +324,7 @@ export function WhatsAppDashboard({
           </svg>
         </span>
         <div className="min-w-0">
-          <p className="text-sm font-bold text-violet-950">إرسال يدوي تحميه سياسة XMANSX</p>
+          <p className="text-sm font-bold text-violet-950">إرسال يدوي تحميه سياسة إكس مانس إكس XMANSX</p>
           <p className="mt-1 text-sm font-medium leading-6 text-salon-charcoal">
             قبل تجهيز أي رابط <span dir="ltr">wa.me</span> يتحقق النظام من نوع الموافقة، فترة التهدئة، وحدود التواصل. هذه الضوابط تقلل مخاطر الحظر ولا تمثل ضمانًا من واتساب.
           </p>

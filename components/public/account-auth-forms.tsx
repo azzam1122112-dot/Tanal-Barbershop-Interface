@@ -87,8 +87,13 @@ function Submit({ loading, children }: { loading: boolean; children: ReactNode }
   );
 }
 
-/** يرسل النموذج ويوحّد قراءة الرد: رسالة، أو تحويل، أو خطأ. */
-function useSubmit(endpoint: string) {
+/**
+ * يرسل النموذج ويوحّد قراءة الرد: رسالة، أو تحويل، أو خطأ.
+ *
+ * `join` سياق موقّع يُمرَّر كما هو ولا يُفكّ في المتصفح — الواجهة لا تعرف أي
+ * مؤسسة يحمل، والخادم وحده يتحقق منه ويحلّه ويقرر وجهة العودة.
+ */
+function useSubmit(endpoint: string, join?: string | null) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
@@ -98,7 +103,7 @@ function useSubmit(endpoint: string) {
     setLoading(true);
     setFeedback(null);
     const form = new FormData(event.currentTarget);
-    const payload = transform ? transform(form) : Object.fromEntries(form.entries());
+    const payload = { ...(transform ? transform(form) : Object.fromEntries(form.entries())), ...(join ? { join } : {}) };
 
     try {
       const response = await fetch(endpoint, {
@@ -129,8 +134,8 @@ function useSubmit(endpoint: string) {
   return { submit, loading, feedback, setFeedback };
 }
 
-export function AccountRegisterForm() {
-  const { submit, loading, feedback } = useSubmit("/api/account/register");
+export function AccountRegisterForm({ join }: { join?: string | null }) {
+  const { submit, loading, feedback } = useSubmit("/api/account/register", join);
 
   return (
     <form onSubmit={submit} className="space-y-4" noValidate>
@@ -143,7 +148,7 @@ export function AccountRegisterForm() {
       <Submit loading={loading}>إنشاء الحساب</Submit>
       <p className="text-center text-sm font-medium text-salon-charcoal/70">
         لديك حساب؟{" "}
-        <Link href="/account/login" className="font-bold text-salon-ink underline">
+        <Link href={join ? `/account/login?join=${encodeURIComponent(join)}` : "/account/login"} className="font-bold text-salon-ink underline">
           سجّل الدخول
         </Link>
       </p>
@@ -151,8 +156,8 @@ export function AccountRegisterForm() {
   );
 }
 
-export function AccountLoginForm() {
-  const { submit, loading, feedback } = useSubmit("/api/account/login");
+export function AccountLoginForm({ join }: { join?: string | null }) {
+  const { submit, loading, feedback } = useSubmit("/api/account/login", join);
 
   return (
     <form onSubmit={submit} className="space-y-4" noValidate>
@@ -165,7 +170,7 @@ export function AccountLoginForm() {
         <Link href="/account/forgot-password" className="font-bold text-salon-ink underline">
           نسيت كلمة المرور؟
         </Link>
-        <Link href="/account/register" className="font-bold text-salon-ink underline">
+        <Link href={join ? `/account/register?join=${encodeURIComponent(join)}` : "/account/register"} className="font-bold text-salon-ink underline">
           حساب جديد
         </Link>
       </div>
@@ -173,8 +178,8 @@ export function AccountLoginForm() {
   );
 }
 
-export function AccountVerifyForm({ email }: { email: string }) {
-  const { submit, loading, feedback, setFeedback } = useSubmit("/api/account/verify");
+export function AccountVerifyForm({ email, join }: { email: string; join?: string | null }) {
+  const { submit, loading, feedback, setFeedback } = useSubmit("/api/account/verify", join);
   const [resending, setResending] = useState(false);
 
   async function resend() {

@@ -2,17 +2,19 @@ import type { Metadata } from "next";
 import { LegalPage } from "@/components/legal/legal-page";
 import { legalInfo, supportWhatsAppLink } from "@/lib/legal";
 import { getSupportAvailability, supportMailtoLink, supportTelLink } from "@/lib/legal-contact";
+import { publicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = publicPageMetadata({
+  path: "/contact",
   title: "التواصل والشكاوى",
   description:
-    "قنوات التواصل مع دعم منصة XMANSX: واتساب واتصال وبريد رسمي موحّد للدعم والشكاوى والخصوصية والفوترة.",
-};
+    "قنوات التواصل مع دعم منصة إكس مانس إكس XMANSX: واتساب واتصال وبريد رسمي موحّد للدعم والشكاوى والخصوصية والفوترة.",
+});
 
 // حالة التوفّر تُحسب وقت الطلب: صفحة مُخزَّنة ستقول «متاح الآن» منتصف الليل.
 export const dynamic = "force-dynamic";
 
-const WHATSAPP_MESSAGE = "السلام عليكم، أحتاج مساعدة بخصوص منصة XMANSX.\nاسم الصالون:\nوصف المشكلة:";
+const WHATSAPP_MESSAGE = "السلام عليكم، أحتاج مساعدة بخصوص منصة إكس مانس إكس XMANSX.\nاسم الصالون:\nوصف المشكلة:";
 
 /**
  * تصنيف الطلبات المعتمد. يُرسل كعنوان جاهز بدل أن يُطلب من الزائر كتابته:
@@ -30,6 +32,7 @@ export default function ContactPage() {
 
   return (
     <LegalPage
+      path="/contact"
       title="التواصل والشكاوى"
       description="اختر الأسرع لك: واتساب للاستفسار العاجل، والاتصال لما يحتاج شرحًا، والبريد لما يحتاج مرفقات أو أثرًا مكتوبًا. القنوات الثلاث تصل الفريق نفسه."
       intro={

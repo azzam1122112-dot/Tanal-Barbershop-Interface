@@ -12,7 +12,7 @@ export function buildBarberLoginMessage({ name, phone, loginUrl, pin }: BarberLo
 
   return [
     `مرحبًا ${name}،`,
-    "هذه بيانات دخولك إلى تطبيق الحلاق في منصة XMANSX:",
+    "هذه بيانات دخولك إلى تطبيق الحلاق في منصة إكس مانس إكس XMANSX:",
     `رابط الدخول: ${loginUrl}`,
     `رقم الجوال: ${phone}`,
     pinLine,

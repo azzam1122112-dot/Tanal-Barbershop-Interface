@@ -5,6 +5,7 @@ import { GENERIC_LOGIN_ERROR, loginCustomerAccount } from "@/lib/customers/accou
 import { setCustomerSessionCookie } from "@/lib/customers/account-http";
 import { consumeCustomerRateLimit } from "@/lib/customers/account-rate-limit";
 import { customerLoginSchema } from "@/lib/customers/account-validation";
+import { joinReturnPath } from "@/lib/customers/join-context";
 import { toErrorResponse } from "@/lib/http/error-response";
 
 export async function POST(request: Request) {
@@ -32,13 +33,17 @@ export async function POST(request: Request) {
         {
           message: "فعّل بريدك أولًا لإتمام الدخول.",
           emailVerificationRequired: true,
-          redirectTo: `/account/verify?email=${encodeURIComponent(result.email)}`,
+          // السياق يستمر عبر خطوة التفعيل حتى يعود العميل لصفحة انضمامه بعدها.
+          redirectTo: `/account/verify?email=${encodeURIComponent(result.email)}${
+            parsed.data.join ? `&join=${encodeURIComponent(parsed.data.join)}` : ""
+          }`,
         },
         { status: 403 },
       );
     }
 
-    const response = NextResponse.json({ redirectTo: "/account" });
+    // العودة إلى صفحة الانضمام إن جاء العميل منها، وإلا صفحة حسابه.
+    const response = NextResponse.json({ redirectTo: joinReturnPath(parsed.data.join) });
     setCustomerSessionCookie(response, result.token);
     return response;
   } catch (error) {
