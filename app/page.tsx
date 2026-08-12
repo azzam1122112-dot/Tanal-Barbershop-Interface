@@ -2,44 +2,40 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand-logo";
 import { Icon, type IconName } from "@/components/icons";
+import { LandingMotion } from "@/components/marketing/landing-motion";
+import landing from "@/components/marketing/landing-page.module.css";
 import { Reveal } from "@/components/reveal";
+import { JsonLd } from "@/components/seo/json-ld";
 import { prisma } from "@/lib/db/prisma";
 import { formatMoney } from "@/lib/format";
 import { getDefaultSignupPlan, listPublicPlans } from "@/lib/plans/subscription-service";
-import { serializeJsonForHtml } from "@/lib/security/serialization";
+import {
+  SITE_KEYWORDS,
+  SITE_NAME,
+  faqPageJsonLd,
+  organizationJsonLd,
+  publicPageMetadata,
+  softwareApplicationJsonLd,
+  webPageJsonLd,
+  webSiteJsonLd,
+} from "@/lib/seo";
 import { legalInfo, supportWhatsAppLink } from "@/lib/legal";
 
 const WHATSAPP_DISPLAY = legalInfo.supportPhone;
-const WHATSAPP_LINK = supportWhatsAppLink("السلام عليكم، أرغب بالاستفسار عن منصة XMANSX لإدارة صالونات الحلاقة.");
+const WHATSAPP_LINK = supportWhatsAppLink("السلام عليكم، أرغب بالاستفسار عن منصة إكس مانس إكس XMANSX لإدارة صالونات الحلاقة.");
 
 const DEFAULT_TRIAL_DAYS = 14;
 
-export const metadata: Metadata = {
+export const metadata: Metadata = publicPageMetadata({
+  path: "/",
   title: "منصة تشغيل صالونات الحلاقة الرجالية",
-  description: "منصة عربية لتشغيل صالونات الحلاقة: صندوق وعمولات وإيصالات زيارة تشغيلية وحجوزات وولاء ومخزون وتقارير للفروع. تجربة مجانية بدون بطاقة بنكية.",
-  keywords: [
-    "برنامج إدارة صالون حلاقة",
-    "نظام صالون رجالي",
-    "كاشير صالون حلاقة",
-    "إيصالات صالون حلاقة",
-    "برنامج ولاء صالون",
-    "إدارة عمولات الحلاقين",
-    "XMANSX",
-  ],
-  alternates: { canonical: "/" },
-  openGraph: {
-    type: "website",
-    locale: "ar_SA",
-    siteName: "XMANSX",
-    title: "XMANSX · منصة تشغيل صالونات الحلاقة الرجالية",
-    description: "صندوق مضبوط، عمولات دقيقة، إيصالات زيارة واضحة، وولاء وحجوزات وتقارير. تجربة مجانية بدون بطاقة بنكية.",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "XMANSX · منصة تشغيل صالونات الحلاقة الرجالية",
-    description: "صندوق مضبوط، عمولات دقيقة، إيصالات زيارة واضحة، وولاء وحجوزات وتقارير. تجربة مجانية بدون بطاقة بنكية.",
-  },
-};
+  description:
+    "منصة عربية لتشغيل صالونات الحلاقة: صندوق وعمولات وإيصالات زيارة تشغيلية وحجوزات وولاء ومخزون وتقارير للفروع. تجربة مجانية بدون بطاقة بنكية.",
+  keywords: SITE_KEYWORDS,
+  socialTitle: `${SITE_NAME} · منصة تشغيل صالونات الحلاقة الرجالية`,
+  socialDescription:
+    "صندوق مضبوط، عمولات دقيقة، إيصالات زيارة واضحة، وولاء وحجوزات وتقارير. تجربة مجانية بدون بطاقة بنكية.",
+});
 
 // الصفحة عامة وثقيلة بصريًا لكن بياناتها بطيئة التغيّر. ISR يمنع استعلام
 // PostgreSQL مع كل زيارة، وتُبطَل النسخة فور تعديل الباقات من لوحة المنصة.
@@ -256,7 +252,7 @@ const faqs: { question: string; answer: string }[] = [
   {
     question: "ما الفرق بين إيصال الزيارة وفاتورة الاشتراك؟",
     answer:
-      "إيصال الزيارة مرجع تشغيلي يصدره الصالون لعملية مسجلة داخل حسابه. أما فاتورة اشتراك XMANSX فتظهر للمالك بعد اعتماد دفع الباقة، وتوثّق قيمة الاشتراك وفترته وحالة السداد.",
+      "إيصال الزيارة مرجع تشغيلي يصدره الصالون لعملية مسجلة داخل حسابه. أما فاتورة اشتراك إكس مانس إكس XMANSX فتظهر للمالك بعد اعتماد دفع الباقة، وتوثّق قيمة الاشتراك وفترته وحالة السداد.",
   },
   {
     question: "كيف أوقف الاشتراك؟",
@@ -297,7 +293,7 @@ const preContractFacts: { icon: IconName; title: string; description: string; hr
   {
     icon: "staff",
     title: "بيانات زبائنك تحت تحكمك",
-    description: "الصالون جهة التحكم وXMANSX جهة معالجة. تتاح لك نسخة شاملة قبل الحذف بعد مهلة عدم النشاط.",
+    description: "الصالون جهة التحكم وإكس مانس إكس XMANSX جهة معالجة. تتاح لك نسخة شاملة قبل الحذف بعد مهلة عدم النشاط.",
     href: "/data-processing-agreement",
     linkLabel: "اتفاقية معالجة البيانات",
   },
@@ -310,18 +306,20 @@ function SectionHeading({
   title,
   description,
   align = "center",
+  dark = false,
 }: {
   eyebrow: string;
   title: string;
   description: string;
   align?: "center" | "start";
+  dark?: boolean;
 }) {
   const centered = align === "center";
   return (
     <div className={centered ? "mx-auto max-w-3xl text-center" : "max-w-3xl"}>
       <p className="x-eyebrow">{eyebrow}</p>
       <h2 className={`x-h2 x-balance mt-4 font-bold ${centered ? "" : ""}`}>{title}</h2>
-      <p className={`x-lead mt-5 max-w-2xl text-slate-600 ${centered ? "mx-auto" : ""}`}>{description}</p>
+      <p className={`x-lead mt-5 max-w-2xl ${dark ? "text-slate-400" : "text-slate-600"} ${centered ? "mx-auto" : ""}`}>{description}</p>
     </div>
   );
 }
@@ -338,50 +336,33 @@ export default async function HomePage() {
         }
       : faq,
   );
-  const faqJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    mainEntity: pageFaqs.map((faq) => ({
-      "@type": "Question",
-      name: faq.question,
-      acceptedAnswer: { "@type": "Answer", text: faq.answer },
-    })),
-  };
-
-  const productJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    name: "XMANSX",
-    applicationCategory: "BusinessApplication",
-    operatingSystem: "Web",
-    inLanguage: "ar",
-    description:
-      "منصة عربية لتشغيل صالونات الحلاقة الرجالية: الزيارات والصندوق والإيصالات والحجوزات والولاء والعمولات والمخزون والتقارير.",
-    offers: [
-      {
-        "@type": "Offer",
-        name: "التجربة المجانية",
-        price: "0",
-        priceCurrency: "SAR",
-        description: `تجربة مجانية ${trialDays} يومًا بدون بطاقة بنكية`,
-      },
-      ...publicPlans.map((plan) => ({
-        "@type": "Offer",
-        name: plan.name,
-        price: String(plan.priceMonthly),
-        priceCurrency: "SAR",
-        description: plan.description ?? `اشتراك ${plan.name} الشهري`,
-      })),
-    ],
-  };
+  /**
+   * الهوية المؤسسية والموقع يُعلنان من الرئيسية وحدها: هي الصفحة التي يقرأ منها
+   * Google كيان النطاق كاملًا (الاسم والشعار وقنوات التواصل)، وتكرارها في كل
+   * صفحة يزيد وزن الصفحة بلا مقابل.
+   *
+   * الأسعار والأسئلة تُبنى من البيانات المعروضة نفسها — لا نص ثابت يتباعد عن
+   * الشاشة بعد أول تعديل باقة من لوحة المنصّة.
+   */
+  const jsonLdGraph = [
+    organizationJsonLd(),
+    webSiteJsonLd(),
+    webPageJsonLd({
+      path: "/",
+      name: `${SITE_NAME} · منصة تشغيل صالونات الحلاقة الرجالية`,
+      description:
+        "منصة عربية لتشغيل صالونات الحلاقة: صندوق وعمولات وإيصالات زيارة وحجوزات وولاء ومخزون وتقارير للفروع.",
+    }),
+    softwareApplicationJsonLd({ trialDays, plans: publicPlans }),
+    faqPageJsonLd(pageFaqs),
+  ];
 
   return (
-    <main className="x-site min-h-screen overflow-x-hidden text-salon-ink">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonForHtml(faqJsonLd) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonForHtml(productJsonLd) }} />
+    <LandingMotion>
+      <JsonLd graph={jsonLdGraph} />
 
       {/* ===== الترويسة ===== */}
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-salon-onyx/95 text-white shadow-[0_10px_40px_rgba(9,7,15,.16)] backdrop-blur-[2px]">
+      <header className={`${landing.header} sticky top-0 z-50 border-b border-white/10 text-white shadow-[0_10px_40px_rgba(9,7,15,.16)]`}>
         <div className="x-shell flex items-center justify-between gap-3 py-2.5 sm:gap-4 sm:py-3">
           <Link href="/" className="flex min-w-0 items-center gap-2.5 sm:gap-3" aria-label="العودة إلى الصفحة الرئيسية">
             <BrandLogo
@@ -389,9 +370,7 @@ export default async function HomePage() {
               priority
             />
             <div className="min-w-0 leading-tight">
-              <p className="truncate text-sm font-bold tracking-[0.12em] sm:text-base" dir="ltr">
-                XMANSX
-              </p>
+              <p className="truncate text-sm font-bold sm:text-base">إكس مانس إكس XMANSX</p>
               <p
                 className="hidden text-[9px] font-semibold uppercase tracking-[0.28em] text-salon-goldlight sm:block"
                 dir="ltr"
@@ -403,7 +382,7 @@ export default async function HomePage() {
 
           <nav className="hidden items-center gap-5 text-sm font-semibold text-white/70 md:flex lg:gap-7">
             <a className="transition-colors hover:text-white" href="#solution">
-              لماذا XMANSX
+              لماذا إكس مانس إكس XMANSX
             </a>
             <a className="transition-colors hover:text-white" href="#features">
               الإمكانات
@@ -445,8 +424,7 @@ export default async function HomePage() {
       </header>
 
       {/* ===== الواجهة البطولية ===== */}
-      <section className="x-hero relative isolate overflow-hidden text-white">
-        <div className="x-grid absolute inset-0 opacity-30" aria-hidden="true" />
+      <section className={`${landing.hero} relative isolate overflow-hidden text-white`}>
         <div
           className="pointer-events-none absolute -right-40 -top-48 h-[38rem] w-[38rem] rounded-full bg-violet-600/25 blur-[120px]"
           aria-hidden="true"
@@ -458,28 +436,23 @@ export default async function HomePage() {
 
         <div className="x-shell relative grid items-center gap-12 pb-16 pt-12 sm:gap-14 sm:pb-24 sm:pt-20 lg:grid-cols-[1.05fr_.95fr] lg:py-28">
           <div>
-            <Reveal
-              as="p"
-              className="inline-flex items-center gap-2 rounded-full border border-salon-goldlight/25 bg-salon-goldlight/[.08] px-3.5 py-2 text-[11px] font-bold text-salon-goldlight sm:px-4 sm:text-xs"
-            >
-              <span className="h-2 w-2 shrink-0 rounded-full bg-violet-400 shadow-[0_0_14px_3px_rgba(167,139,250,.7)]" />
-              {trialDays} يومًا مجانًا · بدون بطاقة بنكية
+            <Reveal as="p" className={landing.heroKicker}>
+              تشغيل الصالون، لكن بمشهد أوضح
             </Reveal>
 
-            <Reveal as="h1" delay={70} className="x-h1 x-balance mt-6 font-bold sm:mt-7">
-              صالونك يشتغل بانضباط.
+            <Reveal as="h1" delay={70} className={`${landing.heroTitle} mt-7 font-bold`}>
+              كل كرسي يتحرّك.
               <br />
-              <span className="x-gradient-text">وأرقامك تقول لك لماذا.</span>
+              <span className={landing.heroTitleAccent}>ولا رقم يضيع.</span>
             </Reveal>
 
-            <Reveal as="p" delay={140} className="x-lead mt-5 max-w-2xl text-slate-300 sm:mt-6">
-              نظام عربي واحد لصالون الحلاقة الرجالي: صندوق يُقفل بفرق مفسَّر، عمولات تُحسب لحظة الزيارة، إيصال زيارة
-              واضح، ونقاط تساعدك على تكرار الزيارة.
+            <Reveal as="p" delay={140} className={`${landing.heroCopy} mt-7`}>
+              منصة تشغيل عربية تربط الزيارة بالصندوق والعمولة والمخزون والولاء لحظةً بلحظة؛ لتعرف ماذا حدث، ومن نفّذه، وما الذي يحتاج قرارك الآن.
             </Reveal>
 
             <Reveal delay={210} className="mt-7 flex flex-col gap-3 sm:mt-8 sm:flex-row">
               <Link href="/signup" className="x-button-primary min-h-[3.25rem] px-6 text-[0.95rem] sm:min-h-14 sm:px-7 sm:text-base">
-                ابدأ {trialDays} يومًا مجانًا <span aria-hidden="true">←</span>
+                شغّل تجربتك {trialDays} يومًا <span aria-hidden="true">←</span>
               </Link>
               <a
                 href={WHATSAPP_LINK}
@@ -506,11 +479,12 @@ export default async function HomePage() {
           </div>
 
           {/* لقطة توضيحية للوحة — معلَّمة كعرض توضيحي، وأرقامها ليست بيانات عميل. */}
-          <Reveal delay={150} className="relative mx-auto w-full max-w-[34rem] lg:max-w-none">
+          <Reveal delay={150} className={`${landing.heroFrame} relative mx-auto w-full max-w-[36rem] lg:max-w-none`}>
             <div className="absolute inset-10 rounded-full bg-violet-500/20 blur-[70px]" aria-hidden="true" />
-            <div className="animate-float relative rounded-[2rem] border border-white/10 bg-white/[.055] p-2.5 shadow-[0_35px_100px_rgba(0,0,0,.5)] sm:p-4">
-              <div className="relative overflow-hidden rounded-[1.5rem] border border-violet-300/15 bg-[#0c0913] p-4 sm:p-6">
-                <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-4 sm:gap-4 sm:pb-5">
+            <div className={landing.dashboard}>
+              <div className={landing.dashboardGlow} aria-hidden="true" />
+              <div className="relative h-full p-4 sm:p-6">
+                <div className={landing.dashboardTop}>
                   <div className="flex min-w-0 items-center gap-3">
                     <BrandLogo className="h-11 w-11 shrink-0 rounded-2xl border border-salon-goldlight/20 sm:h-14 sm:w-14" priority />
                     <div className="min-w-0">
@@ -518,19 +492,18 @@ export default async function HomePage() {
                       <p className="mt-0.5 truncate text-[11px] text-slate-400 sm:text-xs">فرع الملز · اليوم</p>
                     </div>
                   </div>
-                  <span className="shrink-0 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-bold text-emerald-300">
-                    مطابق
+                  <span className="flex shrink-0 items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-bold text-emerald-300">
+                    <span className={landing.liveDot} /> مباشر
                   </span>
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-2.5 sm:mt-5 sm:gap-3">
+                <div className={landing.metricRail}>
                   {[
-                    { label: "كاش", value: "2,480", icon: "cash" as IconName },
-                    { label: "شبكة", value: "3,150", icon: "billing" as IconName },
-                    { label: "مصروفات", value: "120", icon: "adjustments" as IconName },
-                    { label: "الفرق", value: "0", icon: "check" as IconName },
+                    { label: "مبيعات اليوم", value: "5,630", icon: "cash" as IconName },
+                    { label: "زيارات مكتملة", value: "38", icon: "visits" as IconName },
+                    { label: "فرق الصندوق", value: "0", icon: "check" as IconName },
                   ].map((metric) => (
-                    <div key={metric.label} className="rounded-2xl border border-white/[.07] bg-white/[.045] p-3 sm:p-4">
+                    <div key={metric.label} className={landing.metric}>
                       <div className="flex items-center justify-between gap-2 text-slate-400">
                         <span className="truncate text-[11px] sm:text-xs">{metric.label}</span>
                         <Icon name={metric.icon} className="h-4 w-4 shrink-0 text-violet-400" aria-hidden="true" />
@@ -542,7 +515,7 @@ export default async function HomePage() {
                   ))}
                 </div>
 
-                <div className="mt-4 rounded-2xl border border-white/[.07] bg-gradient-to-l from-violet-500/[.12] to-white/[.03] p-3.5 sm:mt-5 sm:p-4">
+                <div className={landing.chart}>
                   <div className="flex items-end justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-[11px] text-slate-400 sm:text-xs">إيراد الأسبوع</p>
@@ -550,18 +523,23 @@ export default async function HomePage() {
                     </div>
                     <span className="shrink-0 text-[11px] font-bold text-salon-goldlight sm:text-xs">7 أيام</span>
                   </div>
-                  <div className="mt-3.5 flex h-14 items-end gap-1.5 sm:h-16 sm:gap-2" aria-hidden="true">
-                    {[35, 48, 40, 62, 54, 78, 92].map((height, index) => (
+                  <div className={landing.bars} aria-hidden="true">
+                    {[38, 52, 44, 66, 58, 74, 92, 78, 88].map((height, index) => (
                       <span
                         key={index}
-                        className="flex-1 rounded-t-md bg-gradient-to-t from-violet-700 to-violet-300"
-                        style={{ height: `${height}%`, opacity: 0.55 + index * 0.06 }}
+                        className={landing.bar}
+                        style={{ height: `${height}%`, animationDelay: `${index * 80 + 420}ms` }}
                       />
                     ))}
                   </div>
                 </div>
-
-                <p className="mt-3 text-center text-[10px] text-slate-500">عرض توضيحي للواجهة — أرقامه للتوضيح فقط</p>
+                <div className={landing.eventCard}>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs font-bold text-white">تم إغلاق وردية المساء</span>
+                    <Icon name="check" className="h-4 w-4 text-emerald-300" />
+                  </div>
+                  <p className="mt-2 text-[11px] leading-5 text-slate-400">الكاش والشبكة مطابقان · المستحقات حُسبت · السجل محفوظ</p>
+                </div>
               </div>
             </div>
           </Reveal>
@@ -569,19 +547,12 @@ export default async function HomePage() {
       </section>
 
       {/* ===== شريط الثقة ===== */}
-      <section className="relative z-10 -mt-px border-b border-salon-line bg-white">
-        <div className="x-shell grid grid-cols-2 gap-y-5 py-7 sm:grid-cols-4 sm:gap-y-0 sm:py-8">
-            {pageTrustBar.map((item) => (
-            <div
-              key={item.label}
-              className="px-2 text-center sm:border-l sm:border-salon-line sm:px-3 sm:last:border-l-0"
-            >
-              <p className="text-xl font-black text-violet-700 sm:text-2xl lg:text-3xl" dir={item.ltr ? "ltr" : undefined}>
-                {item.value}
-              </p>
-              <p className="mt-1.5 text-[11px] font-semibold leading-5 text-slate-500 sm:text-xs lg:text-sm">
-                {item.label}
-              </p>
+      <section className={`${landing.trustTicker} relative z-10 -mt-px`} aria-label="مزايا التجربة">
+        <div className={landing.trustTrack}>
+          {[...pageTrustBar, ...pageTrustBar].map((item, index) => (
+            <div key={`${item.label}-${index}`} className={landing.trustItem} aria-hidden={index >= pageTrustBar.length}>
+              <strong className="text-lg font-black text-violet-300" dir={item.ltr ? "ltr" : undefined}>{item.value}</strong>
+              <span className="text-xs font-semibold text-slate-400">{item.label}</span>
             </div>
           ))}
         </div>
@@ -589,68 +560,56 @@ export default async function HomePage() {
 
       {/* ===== الوجع مقابل الحل ===== */}
       <section id="solution" className="scroll-mt-24 py-16 sm:py-24 lg:py-28">
-        <div className="x-shell">
-          <SectionHeading
-            eyebrow="من الفوضى إلى الانضباط"
-            title="ست مشاكل يعرفها كل صاحب صالون. ولكلٍّ منها جواب."
-            description="هذه ليست قائمة مزايا عامة — هي ما يحدث فعلًا آخر الدوام، وما يفعله النظام حياله."
-          />
+        <div className="x-shell grid gap-10 lg:grid-cols-[.7fr_1.3fr] lg:gap-20">
+          <div className="lg:sticky lg:top-32 lg:self-start">
+            <span className={landing.sectionNumber} dir="ltr">01</span>
+            <SectionHeading
+              align="start"
+              eyebrow="من الفوضى إلى الانضباط"
+              title="المشكلة ليست في البيع. بل فيما لا تراه بعده."
+              description="نلتقط الفجوات التي تظهر آخر الوردية، ونحوّلها إلى سجل واضح وإجراء يمكن تتبعه."
+            />
+          </div>
 
-          <div className="mt-10 overflow-hidden rounded-3xl border border-salon-line bg-white shadow-[0_30px_80px_-50px_rgba(48,24,95,.35)] sm:mt-14">
-            <div className="hidden grid-cols-2 border-b border-salon-line md:grid">
-              <p className="px-6 py-4 text-sm font-bold text-slate-500 lg:px-8">اليوم بدون نظام</p>
-              <p className="border-r border-white/10 bg-[#110c1c] px-6 py-4 text-sm font-bold text-salon-goldlight lg:px-8">
-                مع XMANSX
-              </p>
-            </div>
-
-            <div className="divide-y divide-salon-line">
-              {painPairs.map((pair) => (
-                <div key={pair.before} className="grid md:grid-cols-2">
-                  <div className="flex items-start gap-3 bg-slate-50/70 px-5 py-4 sm:px-6 lg:px-8">
-                    <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-red-50 text-xs font-bold text-red-500" aria-hidden="true">
-                      ×
-                    </span>
-                    <p className="x-body text-slate-500">{pair.before}</p>
-                  </div>
-                  <div className="flex items-start gap-3 border-r-0 bg-[#110c1c] px-5 py-4 text-slate-200 sm:px-6 md:border-r md:border-white/10 lg:px-8">
-                    <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-violet-500/20 text-salon-goldlight" aria-hidden="true">
-                      <Icon name="check" className="h-3.5 w-3.5" />
-                    </span>
-                    <p className="x-body">{pair.after}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+          <div className={landing.storyList}>
+            {painPairs.map((pair, index) => (
+              <Reveal key={pair.before} delay={(index % 3) * 55} className={landing.storyItem}>
+                <span className={landing.storyIndex} dir="ltr">0{index + 1}</span>
+                <p className="text-sm font-semibold leading-7 text-slate-500 line-through decoration-red-300/70">{pair.before}</p>
+                <span className={landing.storyArrow} aria-hidden="true">←</span>
+                <p className="text-base font-bold leading-8 text-salon-ink">{pair.after}</p>
+              </Reveal>
+            ))}
           </div>
         </div>
       </section>
 
       {/* ===== الإمكانات ===== */}
-      <section id="features" className="scroll-mt-24 border-y border-salon-line bg-white py-16 sm:py-24 lg:py-28">
-        <div className="x-shell">
-          <SectionHeading
-            eyebrow="منظومة واحدة"
-            title="وحدات تعمل معًا، لا جزر منفصلة."
-            description="الزيارة الواحدة تحرّك المخزون والنقاط والعمولة وإيصال الزيارة والصندوق في اللحظة نفسها — أو لا تُحفظ أصلًا."
-          />
-          <div className="mt-10 grid gap-4 sm:mt-14 sm:grid-cols-2 lg:grid-cols-4">
+      <section id="features" className={`${landing.systemStage} scroll-mt-24 py-16 sm:py-24 lg:py-28`}>
+        <div className="x-shell relative z-10">
+          <div className="grid gap-8 lg:grid-cols-[.65fr_1.35fr] lg:items-end">
+            <span className={`${landing.sectionNumber} !text-white/10`} dir="ltr">02</span>
+            <SectionHeading
+              align="start"
+              dark
+              eyebrow="منظومة واحدة"
+              title="عملية واحدة. أثرها يصل لكل مكان."
+              description="الزيارة تحرّك المخزون والنقاط والعمولة والإيصال والصندوق في اللحظة نفسها — بلا نسخ بيانات بين أنظمة متفرقة."
+            />
+          </div>
+          <div className={`${landing.featureRows} mt-12 sm:mt-16`}>
             {platformFeatures.map((feature, index) => (
               <Reveal
                 key={feature.title}
-                delay={(index % 4) * 70}
-                className="rounded-2xl border border-salon-line bg-salon-pearl p-5 transition duration-300 hover:-translate-y-1 hover:border-violet-300 hover:shadow-[0_24px_50px_-30px_rgba(109,40,217,.38)] sm:p-6"
+                delay={(index % 4) * 45}
+                className={landing.featureRow}
               >
-                <div className="flex items-start justify-between gap-3">
-                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-violet-600 text-white shadow-[0_10px_25px_-10px_rgba(124,58,237,.8)] sm:h-12 sm:w-12">
-                    <Icon name={feature.icon} className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true" />
-                  </span>
-                  <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-bold text-violet-600">
-                    {feature.tag}
-                  </span>
-                </div>
-                <h3 className="x-h3 mt-5 font-bold">{feature.title}</h3>
-                <p className="x-body mt-2.5 text-slate-600">{feature.description}</p>
+                <span className={landing.featureIcon}>
+                  <Icon name={feature.icon} className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <h3 className="text-lg font-bold sm:text-xl">{feature.title}</h3>
+                <p className="x-body text-slate-400">{feature.description}</p>
+                <span className="text-[10px] font-bold text-violet-300">{feature.tag}</span>
               </Reveal>
             ))}
           </div>
@@ -660,25 +619,30 @@ export default async function HomePage() {
       {/* ===== داخل الصالون ===== */}
       <section id="field" className="scroll-mt-24 py-16 sm:py-24 lg:py-28">
         <div className="x-shell">
-          <div className="grid gap-10 lg:grid-cols-[.9fr_1.1fr] lg:items-start lg:gap-16">
-            <SectionHeading
-              align="start"
-              eyebrow="مصمَّم لواقع الكرسي"
-              title="بُنيت من داخل الصالون، لا من مكتب إداري."
-              description="القرارات الصغيرة هنا هي الفرق بين نظام يُستعمل ونظام يُهجر بعد أسبوعين."
-            />
-            <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-10 lg:grid-cols-[.8fr_1.2fr] lg:items-start lg:gap-20">
+            <div>
+              <span className={landing.sectionNumber} dir="ltr">03</span>
+              <SectionHeading
+                align="start"
+                eyebrow="مصمَّم لواقع الكرسي"
+                title="الواجهة تخدم الوردية، لا تستعرض نفسها."
+                description="قرارات صغيرة تجعل النظام سريعًا عند الزحام وآمنًا عند تغيّر الورديات."
+              />
+            </div>
+            <div className="border-t border-salon-line">
               {fieldReality.map((item, index) => (
                 <Reveal
                   key={item.title}
-                  delay={(index % 2) * 80}
-                  className="rounded-2xl border border-salon-line bg-white p-5 shadow-[0_18px_45px_-36px_rgba(48,24,95,.4)] sm:p-6"
+                  delay={index * 55}
+                  className="grid gap-4 border-b border-salon-line py-6 sm:grid-cols-[3.5rem_1fr] sm:gap-6 sm:py-8"
                 >
-                  <span className="grid h-11 w-11 place-items-center rounded-xl bg-violet-50 text-violet-700">
+                  <span className="grid h-12 w-12 place-items-center rounded-full border border-violet-200 text-violet-700">
                     <Icon name={item.icon} className="h-5 w-5" aria-hidden="true" />
                   </span>
-                  <h3 className="x-h3 mt-4 font-bold">{item.title}</h3>
-                  <p className="x-body mt-2.5 text-slate-600">{item.description}</p>
+                  <div>
+                    <h3 className="x-h3 font-bold">{item.title}</h3>
+                    <p className="x-body mt-2.5 text-slate-600">{item.description}</p>
+                  </div>
                 </Reveal>
               ))}
             </div>
@@ -757,28 +721,27 @@ export default async function HomePage() {
       </section>
 
       {/* ===== رحلة التشغيل ===== */}
-      <section id="journey" className="x-hero relative scroll-mt-24 overflow-hidden py-16 text-white sm:py-24 lg:py-28">
-        <div className="x-grid absolute inset-0 opacity-20" aria-hidden="true" />
-        <div className="x-shell relative">
-          <div className="max-w-3xl">
-            <p className="x-eyebrow text-salon-goldlight">يوم عمل كامل</p>
-            <h2 className="x-h2 x-balance mt-4 font-bold">من فتح الصندوق إلى قرار التوسّع.</h2>
-            <p className="x-lead mt-5 text-slate-400">
-              أربع خطوات تتبع ما يحدث فعلًا في الصالون، وتحوّل كل يوم إلى رقم يمكن الاستناد إليه.
-            </p>
+      <section id="journey" className="relative scroll-mt-24 overflow-hidden bg-[#f7f5fb] py-16 sm:py-24 lg:py-28">
+        <div className="x-shell">
+          <div className="grid gap-6 lg:grid-cols-[.55fr_1.45fr] lg:items-end">
+            <span className={landing.sectionNumber} dir="ltr">04</span>
+            <SectionHeading
+              align="start"
+              eyebrow="يوم عمل كامل"
+              title="من أول كرسي إلى آخر قرار."
+              description="أربع محطات تتبع ما يحدث فعلًا في الصالون، وتحوّل الحركة اليومية إلى معرفة قابلة للتصرف."
+            />
           </div>
-          <div className="mt-10 grid gap-px overflow-hidden rounded-3xl border border-white/10 bg-white/10 sm:mt-14 sm:grid-cols-2 lg:grid-cols-4">
-            {journey.map((step) => (
-              <div key={step.number} className="relative bg-[#100c18] p-6 transition-colors hover:bg-[#171020] sm:p-7">
-                <div className="flex items-center justify-between">
-                  <span className="text-3xl font-light text-violet-400/45" dir="ltr">
-                    {step.number}
-                  </span>
-                  <Icon name={step.icon} className="h-6 w-6 text-salon-goldlight" aria-hidden="true" />
-                </div>
-                <h3 className="mt-8 text-lg font-bold sm:mt-12 sm:text-xl">{step.title}</h3>
-                <p className="x-body mt-2.5 text-slate-400">{step.description}</p>
-              </div>
+          <div className={`${landing.workflow} mt-14 grid gap-6 md:grid-cols-2 lg:grid-cols-4 lg:gap-10`}>
+            {journey.map((step, index) => (
+              <Reveal key={step.number} delay={index * 70} className={`${landing.workflowStep} text-center md:text-right lg:text-center`}>
+                <span className={landing.workflowMarker}>
+                  <Icon name={step.icon} className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <span className="text-xs font-bold text-violet-600" dir="ltr">{step.number}</span>
+                <h3 className="mt-3 text-xl font-bold">{step.title}</h3>
+                <p className="x-body mt-3 text-slate-600">{step.description}</p>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -787,26 +750,28 @@ export default async function HomePage() {
       {/* ===== الأدوار ===== */}
       <section className="py-16 sm:py-24 lg:py-28">
         <div className="x-shell">
-          <SectionHeading
-            eyebrow="لكل دور واجهته"
-            title="نظام يفهمه فريقك ويثق به زبونك."
-            description="الحلاق لا يرى ما لا يخصّه، والمالك لا ينتظر أحدًا ليعرف رقمه، والزبون لا يحتاج تطبيقًا يُنزّله."
-          />
-          <div className="mt-10 grid gap-4 sm:mt-14 sm:gap-5 md:grid-cols-2">
+          <div className="grid gap-6 lg:grid-cols-[.55fr_1.45fr] lg:items-end">
+            <span className={landing.sectionNumber} dir="ltr">05</span>
+            <SectionHeading
+              align="start"
+              eyebrow="لكل دور واجهته"
+              title="نفس الحقيقة. بالقدر المناسب لكل شخص."
+              description="الحلاق يرى ما يسرّع عمله، المدير ما يحتاج متابعته، والمالك الصورة الكاملة — دون كشف صلاحيات لا تخص الدور."
+            />
+          </div>
+          <div className={`${landing.roleStrip} mt-12 sm:mt-16`}>
             {audiences.map((audience, index) => (
               <Reveal
                 key={audience.label}
-                delay={(index % 2) * 80}
-                className="flex gap-4 rounded-2xl border border-salon-line bg-white p-5 shadow-[0_18px_45px_-36px_rgba(48,24,95,.4)] sm:gap-5 sm:p-7"
+                delay={index * 65}
+                className={landing.role}
               >
-                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-violet-50 text-violet-700 sm:h-12 sm:w-12">
+                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full border border-violet-200 text-violet-700">
                   <Icon name={audience.icon} className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true" />
                 </span>
-                <div className="min-w-0">
-                  <p className="text-xs font-bold text-violet-600">{audience.label}</p>
-                  <h3 className="x-h3 mt-1.5 font-bold">{audience.title}</h3>
-                  <p className="x-body mt-2.5 text-slate-600">{audience.description}</p>
-                </div>
+                <p className="mt-12 text-xs font-bold text-violet-600">{audience.label}</p>
+                <h3 className="mt-3 text-2xl font-bold leading-snug">{audience.title}</h3>
+                <p className="x-body mt-4 text-slate-600 transition-colors">{audience.description}</p>
               </Reveal>
             ))}
           </div>
@@ -819,18 +784,16 @@ export default async function HomePage() {
           <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-700 via-violet-800 to-[#160b2d] px-6 py-10 text-white shadow-[0_35px_90px_-40px_rgba(91,33,182,.65)] sm:px-10 sm:py-14 lg:flex lg:items-center lg:justify-between lg:gap-12 lg:px-12">
             <div className="x-grid absolute inset-0 opacity-20" aria-hidden="true" />
             <div className="relative max-w-2xl">
-              <p className="text-[11px] font-bold tracking-[.18em] text-salon-goldlight" dir="ltr">
-                XMANSX SOFTWARE SERVICE
-              </p>
+              <p className="text-[11px] font-bold text-salon-goldlight">إكس مانس إكس XMANSX · SOFTWARE SERVICE</p>
               <h2 className="x-h2 x-balance mt-4 font-bold">من يرى الأرقام، ومن يستطيع تغييرها.</h2>
               <p className="x-lead mt-4 text-violet-100/85">
                 صلاحيات حسب الدور والفرع، وسجل تدقيق يحفظ من نفّذ كل عملية حسّاسة ومتى وما القيمة قبلها وبعدها. أنت تعرف
                 دائمًا من فعل ماذا.
               </p>
             </div>
-            <div className="relative mt-8 grid grid-cols-2 gap-3 lg:mt-0 lg:min-w-[19rem]">
+            <div className="relative mt-8 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-white/15 bg-white/15 lg:mt-0 lg:min-w-[21rem]">
               {securityPoints.map((point) => (
-                <div key={point.text} className="rounded-2xl border border-white/15 bg-white/10 p-4">
+                <div key={point.text} className="bg-[#211236]/80 p-4">
                   <Icon name={point.icon} className="h-5 w-5 text-salon-goldlight" aria-hidden="true" />
                   <p className="mt-3 text-xs font-bold leading-5">{point.text}</p>
                 </div>
@@ -850,7 +813,7 @@ export default async function HomePage() {
           />
 
           {publicPlans.length > 0 ? (
-            <div className="mt-10 grid items-stretch gap-5 sm:mt-14 lg:grid-cols-3">
+            <div className={`${landing.pricingGrid} mt-10 sm:mt-14`}>
               {publicPlans.map((plan) => {
                 const annualPrice = plan.priceYearly;
                 const annualSaving = annualPrice == null ? 0 : Math.max(0, plan.priceMonthly * 12 - annualPrice);
@@ -858,20 +821,16 @@ export default async function HomePage() {
                 return (
                   <article
                     key={plan.id}
-                    className={`relative flex flex-col overflow-hidden rounded-3xl border p-6 shadow-[0_24px_65px_-45px_rgba(48,24,95,.55)] sm:p-7 ${
-                      plan.isFeatured
-                        ? "border-violet-500 bg-[#110a1d] text-white ring-4 ring-violet-100"
-                        : "border-salon-line bg-white"
-                    }`}
+                    className={`${landing.priceCard} ${plan.isFeatured ? landing.priceFeatured : ""}`}
                   >
                     {plan.isFeatured ? (
-                      <span className="absolute left-5 top-5 rounded-full bg-violet-500 px-3 py-1 text-[11px] font-bold text-white">
+                      <span className="absolute left-5 top-5 rounded-full bg-violet-500 px-3 py-1 text-[11px] font-bold text-white shadow-lg">
                         موصى بها
                       </span>
                     ) : null}
 
                     <p className={`text-xs font-bold ${plan.isFeatured ? "text-salon-goldlight" : "text-violet-700"}`}>
-                      باقة XMANSX
+                      باقة إكس مانس إكس XMANSX
                     </p>
                     <h3 className="mt-2 text-2xl font-bold">{plan.name}</h3>
                     <p className={`mt-3 min-h-12 text-sm leading-6 ${plan.isFeatured ? "text-slate-300" : "text-slate-600"}`}>
@@ -893,7 +852,7 @@ export default async function HomePage() {
                       )}
                     </div>
 
-                    <div className={`mt-5 grid grid-cols-3 gap-2 text-xs font-bold ${plan.isFeatured ? "text-slate-200" : "text-slate-700"}`}>
+                    <div className={`mt-5 grid grid-cols-3 gap-px overflow-hidden rounded-xl border text-xs font-bold ${plan.isFeatured ? "border-white/10 bg-white/10 text-slate-200" : "border-salon-line bg-salon-line text-slate-700"}`}>
                       <span className={`rounded-xl p-3 ${plan.isFeatured ? "bg-white/5" : "bg-slate-50"}`}>
                         {plan.maxSalons} {plan.maxSalons === 1 ? "فرع" : "فروع"}
                       </span>
@@ -951,10 +910,10 @@ export default async function HomePage() {
             description="هذه المعلومات جزء من قرار الاشتراك: ماذا تشتري، وكيف تُفعّل الخدمة، وكيف توقفها، وما الذي يحدث لبيانات نشاطك."
           />
 
-          <div className="mt-10 grid gap-4 sm:mt-14 md:grid-cols-2 xl:grid-cols-4">
+          <div className={`${landing.legalRail} mt-10 sm:mt-14`}>
             {preContractFacts.map((fact, index) => (
-              <Reveal key={fact.title} delay={index * 55} className="flex h-full flex-col rounded-3xl border border-salon-line bg-salon-pearl p-6">
-                <span className="grid h-11 w-11 place-items-center rounded-2xl bg-violet-100 text-violet-700">
+              <Reveal key={fact.title} delay={index * 55} className={`${landing.legalItem} flex h-full flex-col`}>
+                <span className="grid h-11 w-11 place-items-center rounded-full border border-violet-200 text-violet-700">
                   <Icon name={fact.icon} className="h-5 w-5" aria-hidden="true" />
                 </span>
                 <h3 className="mt-5 text-lg font-bold">{fact.title}</h3>
@@ -966,14 +925,14 @@ export default async function HomePage() {
             ))}
           </div>
 
-          <div className="mt-6 overflow-hidden rounded-3xl border border-violet-200 bg-gradient-to-l from-violet-50 via-white to-salon-pearl">
+          <div className="mt-12 overflow-hidden rounded-[2rem] border border-violet-200 bg-gradient-to-l from-violet-50 via-white to-salon-pearl">
             <div className="grid gap-7 p-6 sm:p-8 lg:grid-cols-[1.2fr_.8fr] lg:items-center lg:p-10">
               <div>
                 <p className="text-xs font-bold text-violet-700">مقدم الخدمة</p>
-                <h3 className="mt-2 text-2xl font-bold">{legalInfo.brandName} يقدمها ممارس عمل حر موثّق.</h3>
+                <h3 className="mt-2 text-2xl font-bold">إكس مانس إكس XMANSX يقدمها ممارس عمل حر موثّق.</h3>
                 <p className="x-body mt-3 max-w-2xl text-slate-600">
                   مقدم الخدمة {legalInfo.providerName}، بموجب وثيقة عمل حر رقم <span dir="ltr">{legalInfo.freelanceDocumentNumber}</span>
-                  {" "}في نشاط {legalInfo.freelanceActivity}. XMANSX اسم المنصة وليس شركة أو مؤسسة مستقلة.
+                  {" "}في نشاط {legalInfo.freelanceActivity}. إكس مانس إكس XMANSX اسم المنصة وليس شركة أو مؤسسة مستقلة.
                 </p>
                 <div className="mt-5 flex flex-wrap gap-3">
                   <Link href="/provider" className="x-button-primary min-h-11 px-5 text-sm">بيانات مقدم الخدمة</Link>
@@ -1027,14 +986,13 @@ export default async function HomePage() {
       </section>
 
       {/* ===== الدعوة الختامية ===== */}
-      <section className="bg-[#0a0710] py-16 text-white sm:py-20">
-        <div className="x-shell">
+      <section className={`${landing.cta} py-20 text-white sm:py-28`}>
+        <div className={landing.ctaRing} aria-hidden="true" />
+        <div className="x-shell relative">
           <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
           <BrandLogo className="h-20 w-20 rounded-3xl border border-salon-goldlight/20 shadow-[0_0_45px_rgba(124,58,237,.3)] sm:h-24 sm:w-24" />
-          <p className="mt-6 text-[11px] font-bold tracking-[.24em] text-salon-goldlight" dir="ltr">
-            XMANSX SOFTWARE SERVICE
-          </p>
-          <h2 className="x-h2 x-balance mt-4 font-bold">جرّبها على وردية واحدة.</h2>
+          <p className="mt-6 text-[11px] font-bold text-salon-goldlight">إكس مانس إكس XMANSX · SOFTWARE SERVICE</p>
+          <h2 className="x-h2 x-balance mt-4 font-bold">وردية واحدة تكشف الفرق.</h2>
           <p className="x-lead mt-4 max-w-2xl text-slate-400">
             افتح الصندوق صباحًا وأقفله مساءً داخل النظام. إن لم يوفّر عليك الوقت ويكشف لك رقمًا لم تكن تراه، لا شيء
             يلزمك بالاستمرار.
@@ -1066,10 +1024,8 @@ export default async function HomePage() {
               <div className="flex items-center gap-3">
                 <BrandLogo className="h-10 w-10 rounded-xl border border-white/10" />
                 <div>
-                  <p className="font-bold text-white">إكس مانس إكس</p>
-                  <p className="mt-0.5 text-[11px]" dir="ltr">
-                    XMANSX SOFTWARE SERVICE
-                  </p>
+                  <p className="font-bold text-white">إكس مانس إكس XMANSX</p>
+                  <p className="mt-0.5 text-[11px]" dir="ltr">SOFTWARE SERVICE</p>
                 </div>
               </div>
               <p className="x-body mt-4 max-w-xs text-slate-500">
@@ -1115,7 +1071,7 @@ export default async function HomePage() {
               <ul className="mt-4 space-y-2.5 text-sm">
                 <li>
                   <a className="inline-flex min-h-8 items-center transition-colors hover:text-white" href="#solution">
-                    لماذا XMANSX
+                    لماذا إكس مانس إكس XMANSX
                   </a>
                 </li>
                 <li>
@@ -1168,11 +1124,11 @@ export default async function HomePage() {
           >
             <p>{legalInfo.providerName} · وثيقة عمل حر <span dir="ltr">{legalInfo.freelanceDocumentNumber}</span></p>
             <p>
-              جميع الحقوق محفوظة © <span dir="ltr">XMANSX</span>
+              جميع الحقوق محفوظة © <span>إكس مانس إكس XMANSX</span>
             </p>
           </div>
         </div>
       </footer>
-    </main>
+    </LandingMotion>
   );
 }
