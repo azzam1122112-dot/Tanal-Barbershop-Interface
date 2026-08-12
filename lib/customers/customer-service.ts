@@ -32,7 +32,7 @@ export async function createCustomerWithLoyalty({
   createdByBarberId,
   whatsappTransactionalOptIn = false,
   whatsappMarketingOptIn = false,
-  enrollInLoyalty = true,
+  enrollInLoyalty = false,
   whatsappConsentSource,
   privacyNotice,
 }: {
@@ -49,7 +49,16 @@ export async function createCustomerWithLoyalty({
   createdByBarberId?: string | null;
   whatsappTransactionalOptIn?: boolean;
   whatsappMarketingOptIn?: boolean;
-  /** العضوية اختيارية للحلاق؛ التسجيل الذاتي ومسارات الإدارة تبقي القيمة الافتراضية مفعّلة. */
+  /**
+   * إنشاء حساب ولاء مع سجل العميل. **الافتراضي `false` — العضوية لا تُمنح إلا
+   * بطلب صريح، ولا يطلبها إلا التسجيل الذاتي.**
+   *
+   * كان الافتراضي `true`، فكان كل مسار إنشاء عميل يمنح العضوية ما لم ينفِها —
+   * ومنها شاشة الحلاق. العضوية تعني رصيد نقاط باسم شخص وسجلًّا يتراكم عليه، ولا
+   * يجوز أن تُفتح **إلا بيد صاحبها** بعد توثيق بريده (`enrollAccountInOrganization`
+   * يرفض حسابًا بلا `emailVerifiedAt`). الفشل المغلق هنا مقصود: من ينسى التمرير
+   * لا يمنح عضوية بالخطأ.
+   */
   enrollInLoyalty?: boolean;
   whatsappConsentSource?: WhatsAppConsentSource;
   privacyNotice?: { acknowledgedAt: Date; version: string; controllerName: string };

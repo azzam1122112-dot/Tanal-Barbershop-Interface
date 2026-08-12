@@ -169,6 +169,7 @@ async function createVisit(targetBarberId: string, name: string, grossAmount: nu
 
 async function createCustomer(name: string, targetBarberId: string) {
   const result = await createCustomerWithLoyalty({
+    enrollInLoyalty: true,
     prisma,
     organizationId: "org_default",
     name,

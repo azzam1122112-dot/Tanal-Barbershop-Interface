@@ -20,6 +20,8 @@ const TABS = [
   { segment: "appointments", label: "مواعيدي", icon: "calendar" },
   { segment: "offers", label: "العروض", icon: "campaigns" },
   { segment: "visits", label: "زياراتي", icon: "scissors" },
+  // «حسابي» يستقبل ما لا يُفعل في كل زيارة: التثبيت وطلبات الخصوصية وبياناتك.
+  { segment: "account", label: "حسابي", icon: "customers" },
 ] as const;
 
 export function PortalTabs({ token }: { token: string }) {

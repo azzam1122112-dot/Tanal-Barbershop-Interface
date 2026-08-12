@@ -2,18 +2,21 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 import { getPortalCard, getPortalIdentity } from "@/lib/customers/portal-view";
-import { PortalInstall } from "@/components/public/portal-install";
-import { CustomerPrivacyRequest } from "@/components/public/customer-privacy-request";
 import { NextAppointmentCard } from "@/components/public/next-appointment-card";
-import { getPortalVisits } from "@/lib/customers/portal-view";
 
+/**
+ * تبويب «بطاقتي» — أربعة عناصر لا سبعة.
+ *
+ * كان يحمل بعدها: دعوةَ تثبيت، ونموذجَ طلبات خصوصية بأربعة حقول، وسطرَ تحذير.
+ * ثلاثتها إداريّة تُفعل مرة في العمر، وقد انتقلت إلى تبويب «حسابي». وما بقي هو
+ * ما يفتح العميل بطاقته من أجله: متى موعدي، كم رصيدي، ما التالي، وأين العروض.
+ */
 export default async function CustomerPortalPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const identity = await getPortalIdentity(token);
   if (!identity) notFound();
 
   const card = await getPortalCard(identity);
-  const { dataSubjectRequests } = await getPortalVisits(identity);
 
   // قبل أول استبدال يتساوى المجموع مع الرصيد، فعرضهما معًا رقمان متطابقان
   // بتسميتين مختلفتين — يقرؤه العميل كخلل لا كمعلومة. يظهر حين يفترق فعلًا.
@@ -113,13 +116,16 @@ export default async function CustomerPortalPage({ params }: { params: Promise<{
         </span>
       </Link>
 
-      <PortalInstall />
-
-      <CustomerPrivacyRequest token={token} initialRequests={dataSubjectRequests} />
-
-      <p className="pb-2 text-center text-xs font-semibold text-salon-charcoal/70">
-        هذا الرابط خاص بك — لا تشاركه مع أحد.
-      </p>
+      {/* لا موعد قادم = الحجز هو الفعل المقصود. من له موعد يراه أعلى الشاشة
+          ولا يحتاج دعوة ثانية، ويجد «إدارة مواعيدي» على بطاقته. */}
+      {card.nextAppointment ? null : (
+        <Link
+          href={`/my/${token}/appointments`}
+          className="flex min-h-12 items-center justify-center rounded-2xl bg-salon-ink text-sm font-bold text-white transition hover:bg-salon-charcoal"
+        >
+          احجز موعدك القادم
+        </Link>
+      )}
     </div>
   );
 }

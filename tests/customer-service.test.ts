@@ -7,9 +7,11 @@ const prisma = new PrismaClient();
 const unique = Date.now().toString().slice(-8);
 const phone = `9665${unique}`;
 const ordinaryPhone = `9666${unique}`;
+const implicitPhone = `9667${unique}`;
 let barberId = "";
 let customerId = "";
 let ordinaryCustomerId = "";
+let implicitCustomerId = "";
 
 describe("customer creation service", () => {
   beforeAll(async () => {
@@ -21,12 +23,13 @@ describe("customer creation service", () => {
   });
 
   afterAll(async () => {
-    await prisma.customer.deleteMany({ where: { id: { in: [customerId, ordinaryCustomerId].filter(Boolean) } } });
+    await prisma.customer.deleteMany({ where: { id: { in: [customerId, ordinaryCustomerId, implicitCustomerId].filter(Boolean) } } });
     await prisma.$disconnect();
   });
 
   it("creates a new customer and loyalty account", async () => {
     const result = await createCustomerWithLoyalty({
+      enrollInLoyalty: true,
       prisma,
       organizationId: "org_default",
       name: "عميل اختبار",
@@ -43,6 +46,7 @@ describe("customer creation service", () => {
 
   it("prevents duplicate customers for the same phone", async () => {
     const result = await createCustomerWithLoyalty({
+      enrollInLoyalty: true,
       prisma,
       organizationId: "org_default",
       name: "اسم آخر",
@@ -52,6 +56,23 @@ describe("customer creation service", () => {
 
     expect(result.created).toBe(false);
     expect(result.customer.id).toBe(customerId);
+  });
+
+  // العضوية لا تُمنح إلا بطلب صريح، ولا يطلبها إلا التسجيل الذاتي بعد توثيق
+  // البريد. الافتراضي مغلق حتى لا يمنحها مسارٌ جديد بالنسيان — كما كان يفعل
+  // معالج إنشاء العميل من شاشة الحلاق.
+  it("never grants loyalty membership unless explicitly requested", async () => {
+    const result = await createCustomerWithLoyalty({
+      prisma,
+      organizationId: "org_default",
+      name: "عميل بلا طلب صريح",
+      phone: implicitPhone,
+      createdByBarberId: barberId,
+    });
+
+    implicitCustomerId = result.customer.id;
+    expect(result.created).toBe(true);
+    expect(result.customer.loyaltyAccount).toBeNull();
   });
 
   it("creates an operational customer without forcing a loyalty membership", async () => {

@@ -46,6 +46,41 @@ export async function ensurePortalToken(prisma: PrismaClient, customerId: string
   return issuePortalToken(prisma, customer.id);
 }
 
+/**
+ * يصدر رابط بوابة لصاحب الحساب الموحّد نفسه.
+ *
+ * **الملكية إثبات أقوى من الرابط السرّي:** الرمز في `/my/[token]` هو السر بذاته،
+ * وهذا المسار لا يصدره إلا لجلسة حساب **تملك** سجل العميل (`accountId`) داخل
+ * المؤسسة — فمن معه الجلسة يملك البطاقة أصلًا ولا يكشف له هذا شيئًا جديدًا.
+ *
+ * **ولماذا كان لا بدّ منه:** التسجيل الذاتي من `/join` ينتهي في
+ * `/account/loyalty/[slug]` — بطاقة فيها النقاط والفروع وسجل النقاط، وليس فيها
+ * حجزٌ ولا عروضٌ ولا قائمة أسعار. كل ذلك يعيش في `/my/[token]` التي لا تُفتح إلا
+ * برابط يسلّمه الحلاق يدًا بيد. فمن سجّل نفسه كاملًا **لم يكن يستطيع الحجز
+ * أبدًا**، بينما تَعِده صفحةُ الانضمام بأن «نقاطك ومكافآتك وحجوزاتك في بطاقة
+ * واحدة». هذا الجسر يفي بالوعد.
+ *
+ * إصدار رمز جديد يبطل السابق (سياسة الرمز الواحد): من فتح بطاقته من المحفظة
+ * يبطل عنده الرابط الذي أرسله الحلاق سابقًا — وهو المقصود، لأن الجديد بيده.
+ */
+export async function issueAccountPortalToken(
+  prisma: PrismaClient,
+  input: { accountId: string; organizationSlug: string },
+) {
+  const slug = input.organizationSlug.trim().toLowerCase();
+  if (!slug) throw new BusinessError("البطاقة غير متاحة", 404);
+
+  const customer = await prisma.customer.findFirst({
+    // الملكية مفروضة داخل `where` لا بعده: بطاقة حساب آخر لا تُجلب أصلًا.
+    where: { accountId: input.accountId, organization: { slug, status: "ACTIVE" } },
+    select: { id: true },
+  });
+  // بطاقة غير مملوكة، أو مرجع مجهول، أو مؤسسة موقوفة: رسالة واحدة لا تفرّق بينها.
+  if (!customer) throw new BusinessError("البطاقة غير متاحة", 404);
+
+  return issuePortalToken(prisma, customer.id);
+}
+
 /** يبطل الرابط القديم ويصدر رمزًا جديدًا. */
 export async function rotatePortalToken(prisma: PrismaClient, customerId: string, organizationId: string) {
   const customer = await prisma.customer.findFirst({

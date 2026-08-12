@@ -62,8 +62,8 @@ export default async function LoyaltyJoinPage({
       <div aria-hidden="true" className="loyalty-ambient loyalty-ambient-bottom" />
       <div aria-hidden="true" className="loyalty-grid absolute inset-0 opacity-50" />
 
-      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 pb-7 pt-5 sm:px-7 sm:pb-10 sm:pt-7 lg:px-10">
-        <nav className="flex items-center justify-between border-b border-white/[0.08] pb-5" aria-label="هوية برنامج الولاء">
+      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-5xl flex-col px-4 pb-7 pt-5 sm:px-7 sm:pb-10 sm:pt-7">
+        <nav className="flex items-center justify-between gap-3 border-b border-white/[0.08] pb-5" aria-label="هوية برنامج الولاء">
           <div className="flex min-w-0 items-center gap-3">
             <BrandLogo className="h-11 w-11 rounded-xl ring-1 ring-white/10" priority />
             <div className="min-w-0">
@@ -72,93 +72,52 @@ export default async function LoyaltyJoinPage({
             </div>
           </div>
           <span className="inline-flex shrink-0 items-center gap-2 rounded-full border border-emerald-300/15 bg-emerald-300/[0.07] px-3 py-2 text-[11px] font-bold text-emerald-200">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-40" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-300" />
-            </span>
-            تسجيل آمن ومجاني
+            <Icon name="check" className="h-3.5 w-3.5" />
+            مجاني
           </span>
         </nav>
 
-        <div className="grid flex-1 items-center gap-10 py-9 lg:grid-cols-[minmax(0,1.08fr)_minmax(380px,0.72fr)] lg:gap-16 lg:py-12 xl:gap-24">
-          <section className="mx-auto w-full max-w-2xl lg:mx-0">
-            <div className="loyalty-enter loyalty-enter-one inline-flex items-center gap-2 rounded-full border border-violet-300/20 bg-violet-300/[0.08] px-3.5 py-2 text-xs font-bold text-violet-200">
-              <Icon name="loyalty" className="h-4 w-4" />
-              عضوية تليق بكل زيارة
-            </div>
-
-            <h1 className="loyalty-enter loyalty-enter-two mt-6 text-[clamp(2.35rem,7vw,5.4rem)] font-bold leading-[1.08] tracking-tight">
+        {/* النموذج أولًا على الجوال. الترتيب المقلوب — عنوان بـ5.4rem وبطاقةُ
+            عرضٍ متحركة وشريطُ ثلاث خطوات قبله — كان يجعل من يقف في الصالون
+            والحلاق ينتظره يمرّر شاشتين ليجد الزر. الشرح يبقى، لكنه يلي الفعل. */}
+        <div className="grid flex-1 items-center gap-9 py-8 lg:grid-cols-[minmax(0,1fr)_minmax(360px,0.8fr)] lg:gap-14">
+          <section className="order-2 mx-auto w-full max-w-xl lg:order-1 lg:mx-0">
+            <h1 className="loyalty-enter loyalty-enter-one text-[clamp(1.75rem,4.5vw,2.75rem)] font-bold leading-[1.15] tracking-tight">
               زيارتك اليوم،
               <span className="loyalty-title-gradient mt-1 block">مكافأتك غدًا.</span>
             </h1>
-            <p className="loyalty-enter loyalty-enter-three mt-6 max-w-xl text-base font-medium leading-8 text-white/58 sm:text-lg sm:leading-9">
-              سجّل مرة واحدة، واجمع {pointsLabel} مع كل ريال. نقاطك ومكافآتك وحجوزاتك تبقى معك في بطاقة رقمية واحدة.
+            <p className="loyalty-enter loyalty-enter-two mt-4 text-sm font-medium leading-7 text-white/58 sm:text-base sm:leading-8">
+              سجّل مرة واحدة، واجمع {pointsLabel} مع كل ريال. نقاطك ومكافآتك وحجوزاتك في بطاقة رقمية واحدة.
             </p>
 
-            <div className="loyalty-enter loyalty-enter-four relative mt-9 max-w-xl sm:mt-11">
-              <div className="loyalty-member-card relative overflow-hidden rounded-[1.75rem] border border-white/[0.13] p-5 shadow-2xl sm:p-7">
-                <div aria-hidden="true" className="loyalty-card-orbit" />
-                <div className="relative flex items-start justify-between gap-5">
-                  <div>
-                    <p className="text-[10px] font-bold tracking-[0.25em] text-violet-200/70" dir="ltr">MEMBER BENEFIT</p>
-                    <h2 className="mt-2 text-xl font-bold sm:text-2xl">بطاقة المكافآت الرقمية</h2>
-                  </div>
-                  <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-violet-200/20 bg-violet-200/[0.1] text-violet-200 shadow-[0_0_32px_rgba(167,139,250,0.16)]">
-                    <Icon name="loyalty" className="h-6 w-6" />
-                  </div>
-                </div>
-
-                <div className="relative mt-8 flex items-end justify-between gap-5 border-t border-white/[0.1] pt-5">
-                  <div>
-                    <p className="text-xs font-semibold text-white/45">معدل الكسب</p>
-                    <p className="mt-1 text-lg font-bold text-white">
-                      <span className="text-3xl tabular-nums text-violet-200">{pointsPerRiyal}</span> {pointsPerRiyal === 1 ? "نقطة" : "نقاط"} / ريال
-                    </p>
-                  </div>
-                  <div className="text-left">
-                    <p className="text-xs font-semibold text-white/45">العضوية</p>
-                    <p className="mt-1 text-sm font-bold text-emerald-200">مجانية دائمًا</p>
-                  </div>
-                </div>
+            {/* حقيقتان تخصّان هذا الصالون بالذات — لا بطاقة عرض تمثيلية. */}
+            <dl className="loyalty-enter loyalty-enter-three mt-7 grid grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-white/[0.1] bg-white/[0.04] px-4 py-3.5">
+                <dt className="text-[11px] font-semibold text-white/45">معدل الكسب</dt>
+                <dd className="mt-1 text-sm font-bold text-white">
+                  <span className="text-2xl tabular-nums text-violet-200">{pointsPerRiyal}</span>{" "}
+                  {pointsPerRiyal === 1 ? "نقطة" : "نقاط"} / ريال
+                </dd>
               </div>
-
-              <div className="loyalty-reward-float absolute -bottom-5 left-4 rounded-2xl border border-violet-200/20 bg-[#1d1729]/95 px-4 py-3 shadow-[0_18px_50px_-20px_rgba(0,0,0,0.9)] backdrop-blur sm:-left-5 sm:bottom-6">
-                {rewardRules.length > 0 ? (
-                  <div className="flex items-center gap-3">
-                    <span className="grid h-9 w-9 place-items-center rounded-xl bg-violet-400 text-sm font-black text-white">
-                      {rewardRules.length}
-                    </span>
-                    <div>
-                      <p className="text-[10px] font-semibold text-white/45">مكافآت متاحة</p>
-                      <p className="mt-0.5 text-xs font-bold text-white">
-                        تبدأ من {rewardRules[0].requiredPoints} نقطة
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-3">
-                    <Icon name="check" className="h-5 w-5 text-emerald-300" />
-                    <p className="text-xs font-bold">نقاطك تُحفظ تلقائيًا</p>
-                  </div>
-                )}
+              <div className="rounded-2xl border border-white/[0.1] bg-white/[0.04] px-4 py-3.5">
+                <dt className="text-[11px] font-semibold text-white/45">
+                  {rewardRules.length > 0 ? "مكافآت متاحة" : "رصيدك"}
+                </dt>
+                <dd className="mt-1 text-sm font-bold text-white">
+                  {rewardRules.length > 0 ? (
+                    <>
+                      <span className="text-2xl tabular-nums text-violet-200">{rewardRules.length}</span> تبدأ من{" "}
+                      {rewardRules[0].requiredPoints} نقطة
+                    </>
+                  ) : (
+                    "يُحفظ تلقائيًا مع كل زيارة"
+                  )}
+                </dd>
               </div>
-            </div>
-
-            <div className="mt-12 grid max-w-xl grid-cols-3 gap-2 border-t border-white/[0.08] pt-6 sm:gap-5">
-              {[
-                ["01", "سجّل بياناتك"],
-                ["02", "اجمع النقاط"],
-                ["03", "استمتع بمكافأتك"],
-              ].map(([number, label]) => (
-                <div key={number} className="flex items-center gap-2.5">
-                  <span className="text-xs font-black tabular-nums text-violet-300">{number}</span>
-                  <span className="text-[11px] font-semibold leading-5 text-white/48 sm:text-xs">{label}</span>
-                </div>
-              ))}
-            </div>
+            </dl>
           </section>
 
-          <aside className="loyalty-form-shell mx-auto w-full min-w-0 max-w-lg lg:mx-0" aria-label="الانضمام لبرنامج الولاء">
+          <aside className="loyalty-form-shell order-1 mx-auto w-full min-w-0 max-w-lg lg:order-2 lg:mx-0" aria-label="الانضمام لبرنامج الولاء">
             <JoinOrganizationPanel
               state={state}
               brandName={brandName}

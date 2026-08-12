@@ -26,6 +26,11 @@ const POLICIES = {
    * الشائع هنا إلغاء المستخدم لنافذة البصمة لا هجومًا.
    */
   passkeyAuth: { windowMs: 10 * 60_000, maxAttempts: 30, lockMs: 10 * 60_000 },
+  /**
+   * فتح بطاقة الصالون من المحفظة: كل نداء **يُصدر رمزًا جديدًا ويبطل السابق**،
+   * فالضغط المتكرر كتابةٌ في القاعدة وإبطالٌ لرابط قد يكون مفتوحًا على جهاز آخر.
+   */
+  portalLink: { windowMs: 10 * 60_000, maxAttempts: 10, lockMs: 10 * 60_000 },
 } satisfies Record<string, RateLimitPolicy>;
 
 export type CustomerRateLimitScope = keyof typeof POLICIES;

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Badge } from "@/components/dashboard/ui";
 import { ActivityList, BranchList } from "@/components/public/wallet-cards";
+import { OpenPortalButton } from "@/components/public/open-portal-button";
 import { getRequestCustomerSession } from "@/lib/customers/account-http";
 import { getCustomerOrganizationLoyalty } from "@/lib/customers/loyalty-wallet";
 import { prisma } from "@/lib/db/prisma";
@@ -55,6 +56,15 @@ export default async function LoyaltyCardPage({
           <Fact label="الزيارات" value={formatNumber(card.visitCount)} />
           <Fact label="آخر نشاط" value={formatRelativeDay(card.lastActivityAt)} />
         </dl>
+
+        {/* الإجراء داخل بطاقة الترويسة لا لوحًا رابعًا أسفل الصفحة: هذه صفحة
+            قراءة (أرصدة وفروع وسجل)، والفعل الوحيد فيها يجب أن يُرى بلا تمرير.
+            ولا يُعرض لمؤسسة موقوفة — الخادم يرفضه أصلًا. */}
+        {card.organizationActive ? (
+          <div className="mt-5 border-t border-salon-line/70 pt-5">
+            <OpenPortalButton reference={card.reference} />
+          </div>
+        ) : null}
       </div>
 
       {card.rewards.length > 0 ? (

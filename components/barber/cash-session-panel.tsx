@@ -5,12 +5,16 @@ import { formatAmount as formatMoney, formatDateTime, formatNumber } from "@/lib
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
 /**
- * لوحة الكاش عند الحلاق.
+ * لوحة الكاش عند الحلاق — مكوّنان لا واحد.
  *
  * **مبدأ الشاشة:** الرقم الذي يهم الحلاق هو ما في جيبه الآن (رصيد العهدة)، لا
- * ما جمعته الجلسة الجارية. لذلك بطاقة «الكاش الذي لديك» تسبق كل شيء وتبقى
- * ظاهرة بعد إغلاق الجلسة — قبل هذا التغيير كان المبلغ يختفي من شاشته لحظة
- * الإغلاق وهو ما زال في يده.
+ * ما جمعته الجلسة الجارية. لذلك يبقى مبلغ العهدة ظاهرًا بعد إغلاق الجلسة —
+ * قبل هذا التغيير كان المبلغ يختفي من شاشته لحظة الإغلاق وهو ما زال في يده.
+ *
+ * **ولماذا مكوّنان:** العهدة **مبلغ يُقرأ** وسجلّ تسليماته أرشيف، أما الجلسة
+ * **عملٌ يُفعل** (فتح، مصروف، إنهاء). عرضهما لوحين متلاصقين جعل بطاقتَي تدرّج
+ * داكن برقمين بحجم بطولي فوق بعضهما فلم يعد أيهما هو «الرقم». الآن: العهدة
+ * شارة في الترويسة تفصيلها في تبويب «يومي»، والجلسة في تبويب «العمل».
  */
 
 type CashSession = {
@@ -54,7 +58,6 @@ export function CashSessionPanel({
   initialExpenses = [],
   custodyBalance = 0,
   custodyInitialized = false,
-  collections = [],
   expenseLimit = 0,
 }: {
   initialSession: CashSession;
@@ -63,7 +66,6 @@ export function CashSessionPanel({
   custodyBalance?: number;
   /** هل عدّ المدير العهدة عدًّا فعليًا مرة واحدة على الأقل؟ */
   custodyInitialized?: boolean;
-  collections?: BarberCollection[];
   /** سقف ما يسجّله الحلاق بنفسه من الدرج. صفر = بلا سقف. */
   expenseLimit?: number;
 }) {
@@ -77,7 +79,6 @@ export function CashSessionPanel({
   const [savingExpense, setSavingExpense] = useState(false);
   const [showAllExpenses, setShowAllExpenses] = useState(false);
   const [removingExpenseId, setRemovingExpenseId] = useState<string | null>(null);
-  const [showCollections, setShowCollections] = useState(false);
   const { confirm, confirmDialog } = useConfirm();
 
   const expensesTotal = expenses.reduce((total, expense) => total + expense.amount, 0);
@@ -87,7 +88,6 @@ export function CashSessionPanel({
   // ما يجب أن يكون في الدرج فعليًا بعد ما صُرف منه.
   const expectedCash = Math.round((((cashSession?.openingCashAmount ?? 0) + (cashSession?.cashTotal ?? 0)) - drawerExpensesTotal - (cashSession?.collectionsTotal ?? 0)) * 100) / 100;
   const visibleExpenses = showAllExpenses ? expenses : expenses.slice(0, 4);
-  const lastCollection = collections[0] ?? null;
 
   async function addExpense(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -214,85 +214,8 @@ export function CashSessionPanel({
   }
 
   return (
-    <div className="space-y-4">
+    <>
       {confirmDialog}
-
-      {/* بطاقة العهدة: النقد الذي في يده الآن — تبقى مهما كانت حالة الجلسة. */}
-      <section className="lux-edge relative overflow-hidden rounded-2xl border border-salon-gold/35 bg-gradient-to-br from-salon-ink via-salon-forest to-salon-ink p-5 text-white shadow-[var(--shadow-lg)]">
-        <div aria-hidden="true" className="pointer-events-none absolute -left-10 -top-12 h-36 w-36 rounded-full bg-salon-gold/20 blur-2xl" />
-        <div className="relative">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="lux-eyebrow">عهدتك النقدية</p>
-              <h2 className="mt-1 text-lg font-bold">الكاش الذي لديك الآن</h2>
-            </div>
-            <span
-              className={`shrink-0 rounded-full border px-2.5 py-1 text-[0.65rem] font-bold ${
-                custodyInitialized
-                  ? "border-white/20 bg-white/10 text-white/85"
-                  : "border-salon-gold/50 bg-salon-gold/20 text-white"
-              }`}
-            >
-              {custodyInitialized ? "مطابَق مع الإدارة" : "بانتظار العد الأول"}
-            </span>
-          </div>
-
-          <p className="lux-number mt-4 text-5xl text-white">{formatMoney(custodyBalance)}</p>
-          <p className="mt-1.5 text-xs font-semibold leading-5 text-white/70">
-            {custodyInitialized
-              ? "يزيد مع كل بيع نقدي، وينقص بمصروفات الدرج، ويصفر عندما يستلمه مدير الفرع."
-              : "لم يعدّ مدير الفرع عهدتك بعد. اطلب منه تثبيت أول رصيد فعلي حتى يُعتمد هذا الرقم في التحصيل."}
-          </p>
-
-          <div className="mt-4 grid grid-cols-2 gap-2 border-t border-white/15 pt-4">
-            <div className="rounded-xl bg-white/10 px-3 py-2.5 text-center">
-              <p className="lux-number text-lg text-white">{formatMoney(lastCollection?.amount ?? 0)}</p>
-              <p className="text-[11px] font-bold text-white/65">آخر مبلغ سلّمته</p>
-            </div>
-            <div className="rounded-xl bg-white/10 px-3 py-2.5 text-center">
-              <p className="text-sm font-bold text-white">
-                {lastCollection ? formatDateTime(lastCollection.collectedAt) : "لا يوجد"}
-              </p>
-              <p className="text-[11px] font-bold text-white/65">تاريخ التسليم</p>
-            </div>
-          </div>
-
-          {collections.length > 0 ? (
-            <>
-              <button
-                type="button"
-                onClick={() => setShowCollections((current) => !current)}
-                aria-expanded={showCollections}
-                className="mt-3 w-full rounded-xl border border-white/20 bg-white/5 py-2.5 text-xs font-bold text-white/90 transition active:scale-[0.99]"
-              >
-                {showCollections ? "إخفاء سجل التسليم" : `سجل تسليماتي (${formatNumber(collections.length)})`}
-              </button>
-              {showCollections ? (
-                <ul className="mt-2 space-y-1.5">
-                  {collections.map((collection) => (
-                    <li
-                      key={collection.id}
-                      className="flex items-baseline justify-between gap-3 rounded-xl bg-white/10 px-3 py-2 text-xs font-semibold text-white/85"
-                    >
-                      <span className="min-w-0">
-                        <span className="block truncate">{formatDateTime(collection.collectedAt)}</span>
-                        <span className="block truncate text-[11px] text-white/60">
-                          استلمها {collection.collectedByName ?? "الإدارة"} · بقي لديك {formatMoney(collection.remainingAfter)}
-                        </span>
-                      </span>
-                      <span className="lux-number shrink-0 text-sm text-salon-goldlight">{formatMoney(collection.amount)}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-            </>
-          ) : (
-            <p className="mt-3 rounded-xl border border-dashed border-white/20 px-3 py-2.5 text-center text-[11px] font-semibold text-white/60">
-              لم يسجَّل لك أي تحصيل بعد. كل تسليم يوثّقه المدير سيظهر هنا باسمه ووقته.
-            </p>
-          )}
-        </div>
-      </section>
 
       {cashSession ? (
         <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-[var(--shadow-md)]">
@@ -490,7 +413,105 @@ export function CashSessionPanel({
           </div>
         </section>
       )}
-    </div>
+    </>
+  );
+}
+
+/**
+ * بطاقة العهدة: النقد الذي في يد الحلاق الآن وسجلّ تسليماته للإدارة.
+ *
+ * تعيش في تبويب «يومي» لا في تبويب العمل: الرقم **يُقرأ ولا يُفعل به شيء** من
+ * هذه الشاشة — من يسلّمه هو المدير من لوحته. وملخّصه يبقى شارةً في الترويسة
+ * ظاهرةً في كل التبويبات، فلا يحتاج الحلاق فتح تبويب ليعرف كم بيده.
+ */
+export function BarberCustodyCard({
+  custodyBalance = 0,
+  custodyInitialized = false,
+  collections = [],
+}: {
+  custodyBalance?: number;
+  custodyInitialized?: boolean;
+  collections?: BarberCollection[];
+}) {
+  const [showCollections, setShowCollections] = useState(false);
+  const lastCollection = collections[0] ?? null;
+
+  return (
+    <section className="lux-edge relative overflow-hidden rounded-2xl border border-salon-gold/35 bg-gradient-to-br from-salon-ink via-salon-forest to-salon-ink p-5 text-white shadow-[var(--shadow-lg)]">
+      <div aria-hidden="true" className="pointer-events-none absolute -left-10 -top-12 h-36 w-36 rounded-full bg-salon-gold/20 blur-2xl" />
+      <div className="relative">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="lux-eyebrow">عهدتك النقدية</p>
+            <h2 className="mt-1 text-lg font-bold">الكاش الذي لديك الآن</h2>
+          </div>
+          <span
+            className={`shrink-0 rounded-full border px-2.5 py-1 text-[0.65rem] font-bold ${
+              custodyInitialized
+                ? "border-white/20 bg-white/10 text-white/85"
+                : "border-salon-gold/50 bg-salon-gold/20 text-white"
+            }`}
+          >
+            {custodyInitialized ? "مطابَق مع الإدارة" : "بانتظار العد الأول"}
+          </span>
+        </div>
+
+        <p className="lux-number mt-4 text-5xl text-white">{formatMoney(custodyBalance)}</p>
+        <p className="mt-1.5 text-xs font-semibold leading-5 text-white/70">
+          {custodyInitialized
+            ? "يزيد مع كل بيع نقدي، وينقص بمصروفات الدرج، ويصفر عندما يستلمه مدير الفرع."
+            : "لم يعدّ مدير الفرع عهدتك بعد. اطلب منه تثبيت أول رصيد فعلي حتى يُعتمد هذا الرقم في التحصيل."}
+        </p>
+
+        <div className="mt-4 grid grid-cols-2 gap-2 border-t border-white/15 pt-4">
+          <div className="rounded-xl bg-white/10 px-3 py-2.5 text-center">
+            <p className="lux-number text-lg text-white">{formatMoney(lastCollection?.amount ?? 0)}</p>
+            <p className="text-[11px] font-bold text-white/65">آخر مبلغ سلّمته</p>
+          </div>
+          <div className="rounded-xl bg-white/10 px-3 py-2.5 text-center">
+            <p className="text-sm font-bold text-white">
+              {lastCollection ? formatDateTime(lastCollection.collectedAt) : "لا يوجد"}
+            </p>
+            <p className="text-[11px] font-bold text-white/65">تاريخ التسليم</p>
+          </div>
+        </div>
+
+        {collections.length > 0 ? (
+          <>
+            <button
+              type="button"
+              onClick={() => setShowCollections((current) => !current)}
+              aria-expanded={showCollections}
+              className="mt-3 w-full rounded-xl border border-white/20 bg-white/5 py-2.5 text-xs font-bold text-white/90 transition active:scale-[0.99]"
+            >
+              {showCollections ? "إخفاء سجل التسليم" : `سجل تسليماتي (${formatNumber(collections.length)})`}
+            </button>
+            {showCollections ? (
+              <ul className="mt-2 space-y-1.5">
+                {collections.map((collection) => (
+                  <li
+                    key={collection.id}
+                    className="flex items-baseline justify-between gap-3 rounded-xl bg-white/10 px-3 py-2 text-xs font-semibold text-white/85"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate">{formatDateTime(collection.collectedAt)}</span>
+                      <span className="block truncate text-[11px] text-white/60">
+                        استلمها {collection.collectedByName ?? "الإدارة"} · بقي لديك {formatMoney(collection.remainingAfter)}
+                      </span>
+                    </span>
+                    <span className="lux-number shrink-0 text-sm text-salon-goldlight">{formatMoney(collection.amount)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </>
+        ) : (
+          <p className="mt-3 rounded-xl border border-dashed border-white/20 px-3 py-2.5 text-center text-[11px] font-semibold text-white/60">
+            لم يسجَّل لك أي تحصيل بعد. كل تسليم يوثّقه المدير سيظهر هنا باسمه ووقته.
+          </p>
+        )}
+      </div>
+    </section>
   );
 }
 

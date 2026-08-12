@@ -29,8 +29,8 @@ describe("tenant isolation", () => {
     const orgA = await makeOrg("a");
     const orgB = await makeOrg("b");
 
-    const a = await createCustomerWithLoyalty({ prisma, organizationId: orgA, name: "عميل أ", phone: sharedPhone });
-    const b = await createCustomerWithLoyalty({ prisma, organizationId: orgB, name: "عميل ب", phone: sharedPhone });
+    const a = await createCustomerWithLoyalty({ enrollInLoyalty: true, prisma, organizationId: orgA, name: "عميل أ", phone: sharedPhone });
+    const b = await createCustomerWithLoyalty({ enrollInLoyalty: true, prisma, organizationId: orgB, name: "عميل ب", phone: sharedPhone });
     customerIds.push(a.customer.id, b.customer.id);
 
     expect(a.created).toBe(true);
@@ -44,18 +44,18 @@ describe("tenant isolation", () => {
     const orgA = await makeOrg("c");
     const orgB = await makeOrg("d");
 
-    const a = await createCustomerWithLoyalty({ prisma, organizationId: orgA, name: "عميل ج", phone: sharedPhone });
+    const a = await createCustomerWithLoyalty({ enrollInLoyalty: true, prisma, organizationId: orgA, name: "عميل ج", phone: sharedPhone });
     customerIds.push(a.customer.id);
 
     // Looking up the same phone scoped to org B must NOT find org A's customer — it creates a fresh one.
-    const b = await createCustomerWithLoyalty({ prisma, organizationId: orgB, name: "عميل د", phone: sharedPhone });
+    const b = await createCustomerWithLoyalty({ enrollInLoyalty: true, prisma, organizationId: orgB, name: "عميل د", phone: sharedPhone });
     customerIds.push(b.customer.id);
 
     expect(b.created).toBe(true);
     expect(b.customer.id).not.toBe(a.customer.id);
 
     // Re-lookup scoped to org A returns org A's customer (idempotent), not org B's.
-    const again = await createCustomerWithLoyalty({ prisma, organizationId: orgA, name: "عميل ج مكرر", phone: sharedPhone });
+    const again = await createCustomerWithLoyalty({ enrollInLoyalty: true, prisma, organizationId: orgA, name: "عميل ج مكرر", phone: sharedPhone });
     expect(again.created).toBe(false);
     expect(again.customer.id).toBe(a.customer.id);
   });
@@ -68,7 +68,7 @@ describe("tenant isolation", () => {
       phone: `9665${Date.now().toString().slice(-8)}`, passwordHash: "test-only", role: "ADMIN",
     } });
 
-    const a = await createCustomerWithLoyalty({ prisma, organizationId: orgA, name: "عميل هـ", phone: sharedPhone });
+    const a = await createCustomerWithLoyalty({ enrollInLoyalty: true, prisma, organizationId: orgA, name: "عميل هـ", phone: sharedPhone });
     customerIds.push(a.customer.id);
 
     // Issuing a manager reward for org A's customer while scoped to org B must be rejected.

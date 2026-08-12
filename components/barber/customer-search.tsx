@@ -23,7 +23,6 @@ export function CustomerSearch() {
   const [customer, setCustomer] = useState<CustomerSummary | null>(null);
   const [notFoundPhone, setNotFoundPhone] = useState("");
   const [newName, setNewName] = useState("");
-  const [enrollInLoyalty, setEnrollInLoyalty] = useState(false);
   const [transactionalConsent, setTransactionalConsent] = useState(false);
   const [marketingConsent, setMarketingConsent] = useState(false);
   const [message, setMessage] = useState("");
@@ -89,7 +88,6 @@ export function CustomerSearch() {
       body: JSON.stringify({
         name: newName,
         phone: notFoundPhone,
-        enrollInLoyalty,
         whatsappTransactionalOptIn: transactionalConsent,
         whatsappMarketingOptIn: marketingConsent,
       }),
@@ -109,7 +107,6 @@ export function CustomerSearch() {
     setCustomer(null);
     setNotFoundPhone("");
     setNewName("");
-    setEnrollInLoyalty(false);
     setTransactionalConsent(false);
     setMarketingConsent(false);
     setMessage("");
@@ -155,8 +152,11 @@ export function CustomerSearch() {
         </div>
       </form>
 
+      {/* `z-[100]` كبقية نوافذ الحلاق (تأكيد العملية، نقل الموعد): الورقة تنزل
+          إلى حافة الشاشة حيث يقف شريط التبويبات، وعند `z-40` كان الشريط يغطّي
+          زرّي «تسجيل زيارة» و«الملف». */}
       {sheetOpen ? (
-        <div className="fixed inset-0 z-40 flex items-end justify-center bg-salon-ink/35 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(4rem,env(safe-area-inset-top))] backdrop-blur-sm sm:items-center sm:pt-4" role="dialog" aria-modal="true">
+        <div className="fixed inset-0 z-[100] flex items-end justify-center bg-salon-ink/35 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(4rem,env(safe-area-inset-top))] backdrop-blur-sm sm:items-center sm:pt-4" role="dialog" aria-modal="true">
           <button type="button" aria-label="إغلاق" className="absolute inset-0 cursor-default" onClick={closeSheet} />
           <div className="barber-card relative mx-auto w-full max-w-md overflow-hidden shadow-[0_28px_70px_-24px_rgba(16,25,22,0.45)]">
             <div className="barber-card-head flex items-center justify-between gap-3 py-3">
@@ -211,7 +211,7 @@ export function CustomerSearch() {
                   <p className="text-xs font-bold text-salon-forest">عميل جديد</p>
                   <h2 className="mt-1 text-2xl font-bold">تسجيل العملية لعميل جديد</h2>
                   <p className="mt-1 text-sm font-semibold leading-6 text-salon-charcoal/70">
-                    أضف الاسم ثم تابع للعملية. عضوية الولاء اختيارية ولا تمنع تسجيل الزيارة.
+                    أضف الاسم ثم تابع للعملية مباشرة.
                   </p>
                 </div>
                 <input value={notFoundPhone} readOnly className="barber-field h-12 bg-salon-mist" />
@@ -222,20 +222,12 @@ export function CustomerSearch() {
                   placeholder="اسم العميل"
                   className="barber-field h-14 text-lg"
                 />
-                <label className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-3.5 transition ${enrollInLoyalty ? "border-violet-300 bg-violet-50" : "border-salon-line bg-salon-mist"}`}>
-                  <input
-                    type="checkbox"
-                    checked={enrollInLoyalty}
-                    onChange={(event) => setEnrollInLoyalty(event.target.checked)}
-                    className="mt-1 h-5 w-5 accent-violet-600"
-                  />
-                  <span>
-                    <strong className="block text-sm font-bold text-salon-ink">إضافة العميل إلى برنامج الولاء</strong>
-                    <small className="mt-1 block text-[11px] font-semibold leading-5 text-salon-charcoal/65">
-                      فعّلها فقط إذا رغب العميل؛ وإلا ستُسجّل العملية بلا نقاط.
-                    </small>
-                  </span>
-                </label>
+                {/* لا خيار «إضافة إلى الولاء» هنا: العضوية يفتحها العميل بنفسه
+                    من رمز الصالون بحساب بريده موثَّق، فلا تُفتح باسمه بيد غيره. */}
+                <p className="rounded-2xl border border-salon-line bg-salon-mist px-3.5 py-3 text-[11px] font-semibold leading-5 text-salon-charcoal/75">
+                  هذا سجل تشغيلي لتسجيل الزيارة. للانضمام لبرنامج الولاء يمسح العميل رمز الصالون
+                  ويسجّل نفسه بنفسه.
+                </p>
                 <div className="space-y-2 rounded-2xl border border-violet-200 bg-violet-50/70 p-3">
                   <p className="text-xs font-bold text-violet-900">اسأل العميل وحدد موافقته</p>
                   <label className="flex cursor-pointer items-center gap-3 rounded-xl bg-white px-3 py-2.5 text-sm font-bold">
@@ -249,7 +241,7 @@ export function CustomerSearch() {
                   <p className="text-[11px] leading-5 text-slate-500">لا تفعّل أي خيار دون موافقة العميل الصريحة.</p>
                 </div>
                 <button disabled={loading} aria-busy={loading} className="barber-gold-button h-14 w-full text-lg">
-                  {loading ? "جاري الحفظ..." : enrollInLoyalty ? "حفظ مع الولاء وفتح العملية" : "حفظ كعميل عادي وفتح العملية"}
+                  {loading ? "جاري الحفظ..." : "حفظ العميل وفتح العملية"}
                 </button>
               </form>
             ) : null}

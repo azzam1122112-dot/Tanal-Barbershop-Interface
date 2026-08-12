@@ -20,51 +20,59 @@ type PushState =
   | "active"
   | "error";
 
-const COPY: Record<PushState, { label: string; title: string; description: string }> = {
+/**
+ * شريط تنبيهات المواعيد.
+ *
+ * **صفٌّ واحد لا بطاقة:** التفعيل مهمة تُنفَّذ **مرة واحدة في عمر الجهاز**،
+ * وكانت تحتلّ بطاقة بعنوان ووصف وشارة حالة فوق زر البيع مباشرة. الشرح الطويل
+ * انتقل إلى `detail` ولا يُعرض إلا حين تكون هناك خطوة على الحلاق أن يفعلها؛
+ * وبعد التفعيل يبقى سطر أخضر واحد فيه التجربة والإيقاف خلف زر «خيارات».
+ */
+const COPY: Record<PushState, { label: string; title: string; detail: string }> = {
   loading: {
     label: "جاري الفحص",
     title: "نجهّز قناة التنبيهات",
-    description: "نتأكد من جاهزية هذا الجهاز لاستقبال مواعيدك.",
+    detail: "نتأكد من جاهزية هذا الجهاز لاستقبال مواعيدك.",
   },
   unsupported: {
     label: "غير مدعوم",
     title: "المتصفح لا يدعم التنبيهات",
-    description: "افتح إكس مانس إكس XMANSX بآخر إصدار من Chrome أو Safari.",
+    detail: "افتح إكس مانس إكس XMANSX بآخر إصدار من Chrome أو Safari.",
   },
   "install-ios": {
     label: "خطوة واحدة",
-    title: "ثبّت التطبيق أولًا",
-    description: "على iPhone: مشاركة ← إضافة إلى الشاشة الرئيسية، ثم افتح التطبيق من الأيقونة.",
+    title: "ثبّت التطبيق لتصلك المواعيد",
+    detail: "على iPhone: مشاركة ← إضافة إلى الشاشة الرئيسية، ثم افتح التطبيق من الأيقونة.",
   },
   development: {
     label: "جاهز للنشر",
     title: "التنبيهات مهيأة بالكامل",
-    description: "تظهر خاصية التفعيل عند تشغيل نسخة الإنتاج الآمنة عبر HTTPS.",
+    detail: "تظهر خاصية التفعيل عند تشغيل نسخة الإنتاج الآمنة عبر HTTPS.",
   },
   unconfigured: {
     label: "قيد التجهيز",
     title: "الخدمة تحتاج مفاتيح التشغيل",
-    description: "سيظهر زر التفعيل فور إكمال إعداد Web Push على الخادم.",
+    detail: "سيظهر زر التفعيل فور إكمال إعداد Web Push على الخادم.",
   },
   denied: {
     label: "محظور",
     title: "التنبيهات موقوفة من الجهاز",
-    description: "اسمح بالتنبيهات لتطبيق إكس مانس إكس XMANSX من إعدادات المتصفح أو الهاتف.",
+    detail: "اسمح بالتنبيهات لتطبيق إكس مانس إكس XMANSX من إعدادات المتصفح أو الهاتف.",
   },
   inactive: {
     label: "غير مفعّلة",
     title: "موعد جديد؟ ستعرف فورًا",
-    description: "فعّلها مرة واحدة لتصل حجوزاتك حتى عندما يكون التطبيق مغلقًا.",
+    detail: "فعّلها مرة واحدة لتصل حجوزاتك حتى عندما يكون التطبيق مغلقًا.",
   },
   active: {
     label: "مباشر الآن",
     title: "تنبيهات المواعيد تعمل",
-    description: "هذا الجهاز متصل وسيستقبل كل حجز جديد يُسند إليك.",
+    detail: "هذا الجهاز متصل وسيستقبل كل حجز جديد يُسند إليك.",
   },
   error: {
     label: "تعذر الاتصال",
     title: "لم يكتمل تفعيل التنبيهات",
-    description: "تحقق من الإنترنت ثم حاول مرة أخرى.",
+    detail: "تحقق من الإنترنت ثم حاول مرة أخرى.",
   },
 };
 
@@ -73,6 +81,7 @@ export function BarberNotificationCenter() {
   const [config, setConfig] = useState<PushConfig | null>(null);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [optionsOpen, setOptionsOpen] = useState(false);
 
   const inspect = useCallback(async () => {
     if (typeof window === "undefined") return;
@@ -213,67 +222,78 @@ export function BarberNotificationCenter() {
   const copy = COPY[state];
   const isActive = state === "active";
   const canEnable = state === "inactive" || state === "error";
+  // الشرح يظهر فقط حين تبقى خطوة على الحلاق. بعد التفعيل السطر يكفي.
+  const showDetail = !isActive && state !== "loading";
 
   return (
-    <section className={`barber-notification-card ${isActive ? "is-active" : ""}`} aria-labelledby="push-title">
-      <div className="relative z-[1] p-4 sm:p-5">
-        <div className="flex items-start gap-3.5">
-          <span className="barber-notification-icon" aria-hidden="true">
-            <Icon name="bell" className="h-5 w-5" />
-            {isActive ? <span className="barber-notification-pulse" /> : null}
+    <section className="barber-card p-3" aria-labelledby="push-title">
+      <div className="flex items-center gap-3">
+        <span className="barber-notification-icon" aria-hidden="true">
+          <Icon name="bell" className="h-4 w-4" />
+          {isActive ? <span className="barber-notification-pulse" /> : null}
+        </span>
+
+        <div className="min-w-0 flex-1">
+          <h2 id="push-title" className="truncate text-sm font-bold text-salon-ink">
+            {copy.title}
+          </h2>
+          <span className={`push-status-chip push-status-${state} mt-1`}>
+            <span aria-hidden="true" />
+            {copy.label}
           </span>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="lux-eyebrow">تنبيهات ذكية</p>
-              <span className={`push-status-chip push-status-${state}`}>
-                <span aria-hidden="true" />
-                {copy.label}
-              </span>
-            </div>
-            <h2 id="push-title" className="mt-2 text-lg font-bold text-salon-ink">
-              {copy.title}
-            </h2>
-            <p className="mt-1.5 text-sm font-semibold leading-6 text-salon-charcoal/75">
-              {copy.description}
-            </p>
-          </div>
         </div>
 
-        {state === "loading" ? (
-          <div className="mt-4 h-11 animate-pulse rounded-xl bg-salon-line/40" />
-        ) : null}
-
         {canEnable ? (
-          <button type="button" onClick={enable} disabled={busy} className="barber-gold-button mt-4 min-h-12 w-full">
-            <Icon name="bell" className="h-4 w-4" />
-            {busy ? "جاري التفعيل..." : "فعّل تنبيهات المواعيد"}
+          <button type="button" onClick={enable} disabled={busy} className="barber-gold-button min-h-11 shrink-0 text-sm">
+            {busy ? "جاري التفعيل..." : "فعّل"}
           </button>
         ) : null}
 
-        {isActive ? (
-          <div className="mt-4 grid grid-cols-[1fr_auto] gap-2">
-            <button type="button" onClick={sendTest} disabled={busy} className="barber-primary-button min-h-11">
-              <Icon name="check" className="h-4 w-4" />
-              {busy ? "جاري الإرسال..." : "جرّب التنبيه"}
-            </button>
-            <button type="button" onClick={disable} disabled={busy} className="barber-ghost-button min-h-11 px-3 text-xs">
-              إيقاف
-            </button>
-          </div>
-        ) : null}
-
         {state === "denied" ? (
-          <button type="button" onClick={() => void inspect()} className="barber-ghost-button mt-4 min-h-11 w-full">
+          <button
+            type="button"
+            onClick={() => void inspect()}
+            className="barber-ghost-button min-h-11 shrink-0 text-sm"
+          >
             تحقق مجددًا
           </button>
         ) : null}
 
-        {feedback ? (
-          <p className="mt-3 text-xs font-bold text-salon-forest" role="status" aria-live="polite">
-            {feedback}
-          </p>
+        {isActive ? (
+          <button
+            type="button"
+            onClick={() => setOptionsOpen((current) => !current)}
+            aria-expanded={optionsOpen}
+            className="barber-ghost-button min-h-11 shrink-0 px-3 text-xs"
+          >
+            {optionsOpen ? "إخفاء" : "خيارات"}
+          </button>
         ) : null}
       </div>
+
+      {state === "loading" ? <div className="mt-2 h-3 animate-pulse rounded-full bg-salon-line/40" /> : null}
+
+      {showDetail ? (
+        <p className="mt-2 text-xs font-semibold leading-5 text-salon-charcoal/70">{copy.detail}</p>
+      ) : null}
+
+      {isActive && optionsOpen ? (
+        <div className="mt-3 grid grid-cols-[1fr_auto] gap-2">
+          <button type="button" onClick={sendTest} disabled={busy} className="barber-primary-button min-h-11 text-sm">
+            <Icon name="check" className="h-4 w-4" />
+            {busy ? "جاري الإرسال..." : "جرّب التنبيه"}
+          </button>
+          <button type="button" onClick={disable} disabled={busy} className="barber-ghost-button min-h-11 px-3 text-xs">
+            إيقاف
+          </button>
+        </div>
+      ) : null}
+
+      {feedback ? (
+        <p className="mt-2 text-xs font-bold text-salon-forest" role="status" aria-live="polite">
+          {feedback}
+        </p>
+      ) : null}
     </section>
   );
 }

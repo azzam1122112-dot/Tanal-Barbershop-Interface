@@ -95,6 +95,7 @@ describe("إعداد النشر", () => {
     expect(monitor).toContain("MONITOR_ALERT_COOLDOWN_SECONDS");
     expect(monitor).not.toContain("echo $RESEND_API_KEY");
     expect(service).toContain("StateDirectory=tanal-monitor");
+    expect(service).toContain("ExecStart=/usr/bin/bash /srv/tanal/app/deploy/monitor/tanal-healthcheck.sh");
     expect(timer).toContain("OnUnitActiveSec=2m");
     expect(timer).toContain("Persistent=true");
   });

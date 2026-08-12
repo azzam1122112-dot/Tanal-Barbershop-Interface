@@ -242,6 +242,7 @@ async function createVisit({
 
 async function createCustomer(name: string) {
   const result = await createCustomerWithLoyalty({
+    enrollInLoyalty: true,
     prisma,
     organizationId: "org_default",
     name,

@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import nextConfig from "../next.config";
 import { adminPasswordSchema } from "../lib/auth/password";
+import { customerCreateSchema } from "../lib/auth/validation";
 import { redactForLog } from "../lib/logger";
 import { isTrustedPushEndpoint } from "../lib/push/barber-push";
 import { serializeJsonForHtml } from "../lib/security/serialization";
@@ -17,6 +18,31 @@ describe("security regression controls", () => {
     expect(isTrustedPushEndpoint("https://localhost/internal")).toBe(false);
     expect(isTrustedPushEndpoint("https://user:pass@fcm.googleapis.com/fcm/send/example")).toBe(false);
     expect(isTrustedPushEndpoint("https://attacker.example/webpush")).toBe(false);
+  });
+
+  /**
+   * الحلاق لا يمنح عضوية ولاء لأحد — العضوية يفتحها العميل بنفسه بحساب بريده
+   * موثَّق. الفرض في ثلاث طبقات؛ هذه تحرس أولاها: المخطط **يُسقط** الحقل من أي
+   * طلب معدَّل يدويًا بدل أن يقبله. وتحرس معه بقاء الحلاق بلا مسار يُصدر رابط
+   * بوابة عميل — الرابط مفتاحٌ يفتح سجل الزيارات والرصيد بلا كلمة مرور.
+   */
+  it("strips loyalty enrollment from barber-side customer creation", () => {
+    const parsed = customerCreateSchema.parse({
+      name: "عميل",
+      phone: "0501234567",
+      enrollInLoyalty: true,
+    });
+
+    expect(parsed).not.toHaveProperty("enrollInLoyalty");
+  });
+
+  it("keeps portal-link issuance out of the barber API surface", () => {
+    const barberRoutes = join(process.cwd(), "app", "api", "barber", "customers");
+    expect(existsSync(join(barberRoutes, "[id]", "portal-link", "route.ts"))).toBe(false);
+    // ويبقى للإدارة: المسؤول القانوني عن البيانات يحتاج استرجاعًا استثنائيًا.
+    expect(
+      existsSync(join(process.cwd(), "app", "api", "dashboard", "customers", "[id]", "portal-link", "route.ts")),
+    ).toBe(true);
   });
 
   it("escapes script-closing characters in JSON-LD", () => {

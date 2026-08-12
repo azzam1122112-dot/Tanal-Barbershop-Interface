@@ -56,6 +56,11 @@ completed three consecutive suites of 81 files / 533 tests. Its drift contained
 only 71 manual composite tenant constraints and the same 11 manual composite
 unique indexes.
 
+The subsequent hardened release candidate retained the same 57 migrations and
+database drift, added encrypted pre-deploy enforcement and readiness-monitor
+regressions, and independently passed three consecutive suites of 81 files / 535
+tests plus typecheck, lint, and a 144-route production build under Node 22.22.3.
+
 This is migration/test evidence, not a second restore claim. The restore drill
 above covers the earlier 57-migration snapshot. The exact frozen release commit
 must receive its own encrypted-artifact restore evidence before launch.
@@ -63,3 +68,16 @@ must receive its own encrypted-artifact restore evidence before launch.
 ## Production acceptance gates
 
 Before launch, operations must run the same drill against a recent encrypted staging backup, verify an application smoke test, copy the encrypted archive to immutable off-site storage, monitor the systemd timer, and document RPO/RTO ownership. A backup is not considered valid until a restore has succeeded.
+
+## Production backup evidence — 2026-08-12
+
+- `tanal-backup.timer`: enabled and active; last backup service result was success.
+- Newest inspected encrypted PostgreSQL artifact: present; detached SHA-256 verification passed.
+- Storage permissions: backup directory `0750`; encrypted artifacts and checksums are produced as `0600` by the reviewed script.
+- Hetzner automatic whole-server backups: enabled; recent images were visually verified as `Available`.
+- Offline identity separation: PASS — no `age` private identity was found on the Production host.
+- Readiness monitor: installed, active on a two-minute timer, and a live success execution passed.
+- Off-site encrypted database export: NOT CONFIGURED (`rclone`/`restic` absent).
+- Latest encrypted artifact restore: NOT TESTED because the offline `age` identity location has not been supplied.
+
+No Production database was reset, restored over, migrated, or otherwise modified while collecting this evidence.

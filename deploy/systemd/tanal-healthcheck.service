@@ -8,7 +8,9 @@ Type=oneshot
 User=tanal
 Group=tanal
 EnvironmentFile=/etc/tanal/tanal.env
-ExecStart=/srv/tanal/app/deploy/monitor/tanal-healthcheck.sh
+# استدعاء Bash صراحةً يجعل الخدمة مستقلة عن حفظ بتّ التنفيذ عند نقل الإصدار
+# من Windows أو من أرشيف لا يحتفظ بصلاحيات Unix.
+ExecStart=/usr/bin/bash /srv/tanal/app/deploy/monitor/tanal-healthcheck.sh
 StateDirectory=tanal-monitor
 StateDirectoryMode=0700
 PrivateTmp=true

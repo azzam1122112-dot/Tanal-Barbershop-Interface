@@ -309,6 +309,7 @@ describe("daily close and operation alerts", () => {
 
 async function createCustomer(name: string) {
   const result = await createCustomerWithLoyalty({
+    enrollInLoyalty: true,
     prisma,
     organizationId: "org_default",
     name,
