@@ -11,6 +11,13 @@ type SettingsPrisma = PrismaClient | Prisma.TransactionClient;
  * **استخدمها دائمًا بدل `systemSettings.findFirst({})`** — الاستعلام بلا قيد
  * قد يعيد إعدادات مؤسسة أخرى في بيئة متعددة المستأجرين، فتُحتسب النقاط
  * أو إعدادات الحساب بقيم خاطئة.
+ *
+ * **الوراثة صريحة الاتجاه:** صف الفرع (`salonId` مضبوط) **تجاوزٌ** لصف المؤسسة
+ * (`salonId = null`)، لا برنامج مستقل. لذلك السقوط للمؤسسة يقصد صف المؤسسة
+ * تحديدًا: `findFirst({ organizationId })` وحده كان يعيد **أي** صف للمؤسسة، فإذا
+ * كان لكل فرع تجاوزه ولا صف مؤسسة، ورث الفرع الجديد إعدادات فرع آخر بترتيب غير
+ * محدد — أي أن معدّل نقاط الرياض يحكم جدة بالصدفة. السقوط الأخير مرتَّب بالأقدم
+ * ليبقى توافقًا مع بيانات أقدم بلا صف مؤسسة، ونتيجته ثابتة لا عشوائية.
  */
 export async function getEffectiveSettings(
   prisma: SettingsPrisma,
@@ -21,7 +28,14 @@ export async function getEffectiveSettings(
     if (salonSettings) return salonSettings;
   }
   if (scope.organizationId) {
-    return prisma.systemSettings.findFirst({ where: { organizationId: scope.organizationId } });
+    const organizationSettings = await prisma.systemSettings.findFirst({
+      where: { organizationId: scope.organizationId, salonId: null },
+    });
+    if (organizationSettings) return organizationSettings;
+    return prisma.systemSettings.findFirst({
+      where: { organizationId: scope.organizationId },
+      orderBy: { createdAt: "asc" },
+    });
   }
   return null;
 }

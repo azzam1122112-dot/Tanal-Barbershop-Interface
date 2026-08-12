@@ -2,11 +2,15 @@ import { formatNumber } from "@/lib/format";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { DashboardShell, Notice, SectionPanel, StatCard } from "@/components/dashboard/ui";
+import { LoyaltyProgramReportPanel } from "@/components/dashboard/loyalty-report";
 import { RewardRuleManager } from "@/components/dashboard/reward-rule-manager";
 import { canAccessDashboard, canOperateLoyalty, canSetLoyaltyPolicy } from "@/lib/auth/access";
 import { dashboardScope } from "@/lib/auth/salon-scope";
+import { getRiyadhMonthRange } from "@/lib/datetime/riyadh";
 import { getRequestSession } from "@/lib/auth/http";
 import { prisma } from "@/lib/db/prisma";
+import { getLoyaltyProgramReport } from "@/lib/reports/loyalty-report";
+import { getEffectiveSettings } from "@/lib/settings/system-settings";
 import { toSafeRewardRule } from "@/lib/loyalty/reward-summary";
 
 export default async function DashboardLoyaltyPage() {
@@ -16,11 +20,12 @@ export default async function DashboardLoyaltyPage() {
   if (!canOperateLoyalty(session)) redirect("/dashboard/forbidden");
 
   const canEditPolicy = canSetLoyaltyPolicy(session);
-  const { organizationId, orgWhere, activeSalonId } = dashboardScope(session);
-  const [settings, rewardRules, rewardReadyCount, activeCampaignsCount] = await Promise.all([
-    activeSalonId
-      ? prisma.systemSettings.findFirst({ where: { salonId: activeSalonId } })
-      : prisma.systemSettings.findFirst({ where: orgWhere }),
+  const { organizationId, orgWhere, salonIds, activeSalonId } = dashboardScope(session);
+  const monthRange = getRiyadhMonthRange();
+  const [settings, branchOverride, rewardRules, rewardReadyCount, activeCampaignsCount, report] = await Promise.all([
+    // نفس دالة الحساب التي تستعملها الزيارة — فما يُعرض هنا هو ما يُطبَّق فعلًا.
+    getEffectiveSettings(prisma, { organizationId, salonId: activeSalonId }),
+    activeSalonId ? prisma.systemSettings.findFirst({ where: { salonId: activeSalonId }, select: { id: true } }) : null,
     prisma.rewardRule.findMany({ where: orgWhere, orderBy: [{ sortOrder: "asc" }, { requiredPoints: "asc" }] }),
     countRewardReadyCustomers(organizationId),
     organizationId
@@ -28,7 +33,11 @@ export default async function DashboardLoyaltyPage() {
           where: { organizationId, isActive: true, startAt: { lte: new Date() }, endAt: { gte: new Date() } },
         })
       : Promise.resolve(0),
+    organizationId
+      ? getLoyaltyProgramReport(prisma, { organizationId, salonIds, from: monthRange.from, to: monthRange.to })
+      : Promise.resolve(null),
   ]);
+  const inheritsPolicy = activeSalonId !== null && branchOverride === null;
 
   return (
     <DashboardShell
@@ -40,11 +49,28 @@ export default async function DashboardLoyaltyPage() {
       }
     >
       <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="كل ريال يساوي" value={`${settings ? Number(settings.pointsPerCurrencyUnit) : 1} نقطة`} />
+        <StatCard
+          label="كل ريال يساوي"
+          value={`${settings ? Number(settings.pointsPerCurrencyUnit) : 1} نقطة`}
+          hint={activeSalonId ? (inheritsPolicy ? "موروث من المؤسسة" : "تجاوز خاص بهذا الفرع") : undefined}
+        />
         <StatCard label="احتساب النقاط" value={settings?.pointsCalculatedAfterDiscount ?? true ? "بعد الخصم" : "قبل الخصم"} />
         <StatCard label="عملاء جاهزون لمكافأة" value={formatNumber(rewardReadyCount)} />
         <StatCard label="حملات فعّالة الآن" value={formatNumber(activeCampaignsCount)} />
       </div>
+
+      {activeSalonId ? (
+        <Notice tone={inheritsPolicy ? "info" : "gold"} className="mt-6" title={inheritsPolicy ? "هذا الفرع يرث سياسة المؤسسة" : "هذا الفرع يطبّق تجاوزًا لسياسة المؤسسة"}>
+          {inheritsPolicy
+            ? "لا يوجد إعداد خاص بهذا الفرع، فيُطبَّق معدّل المؤسسة كما هو. أي تعديل على إعداد المؤسسة يسري عليه تلقائيًا."
+            : "معدّل الكسب هنا يخالف معدّل المؤسسة. التجاوز يغيّر سرعة تجميع النقاط في هذا الفرع فقط —"}
+          {" "}
+          رصيد العميل ومكافآته وعضويته تبقى واحدة على مستوى المؤسسة في كل الحالات: الفرع لا يملك محفظة ولا برنامج ولاء
+          مستقلًا.
+        </Notice>
+      ) : null}
+
+      {report ? <LoyaltyProgramReportPanel report={report} scopeLabel={activeSalonId ? "الفرع النشط" : "كل الفروع"} /> : null}
 
       {canEditPolicy ? null : (
         <Notice tone="gold" className="mt-6" title="سياسة الولاء يضبطها المالك أو المدير">

@@ -1,6 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/config";
+import { CUSTOMER_SESSION_COOKIE_NAME } from "@/lib/customers/account-config";
 import { MUTATING_METHODS, isTrustedOrigin, parseAllowedOrigins } from "@/lib/auth/origin";
+
+/** صفحات حساب العميل التي تُفتح بلا جلسة (الدخول والتسجيل والتفعيل والاستعادة). */
+const PUBLIC_ACCOUNT_PATHS = new Set([
+  "/account/login",
+  "/account/register",
+  "/account/verify",
+  "/account/forgot-password",
+  "/account/reset-password",
+]);
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -13,7 +23,16 @@ export function middleware(request: NextRequest) {
     }
   }
 
+  // **جلسة الموظف وحدها** تفتح مسارات الموظفين. كوكي العميل باسم مستقل ولا
+  // يُقرأ هنا إطلاقًا، فحيازته لا تمنح شيئًا من اللوحة أو تطبيق الحلاق أو الإيصال.
   const hasSession = Boolean(request.cookies.get(SESSION_COOKIE_NAME)?.value);
+
+  // وبالمقابل: جلسة الموظف ليست تسجيل دخول عميل. حساب العميل يُحرس بكوكيه هو.
+  if (pathname.startsWith("/account") && !PUBLIC_ACCOUNT_PATHS.has(pathname)) {
+    if (!request.cookies.get(CUSTOMER_SESSION_COOKIE_NAME)?.value) {
+      return redirectToPublicOrigin(request, "/account/login");
+    }
+  }
 
   if (pathname.startsWith("/dashboard") && pathname !== "/dashboard/login" && !hasSession) {
     return redirectToPublicOrigin(request, "/dashboard/login");
@@ -77,5 +96,5 @@ function getRequestOrigins(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/barber/:path*", "/platform/:path*", "/receipt/:path*", "/api/:path*"],
+  matcher: ["/dashboard/:path*", "/barber/:path*", "/platform/:path*", "/receipt/:path*", "/account/:path*", "/api/:path*"],
 };

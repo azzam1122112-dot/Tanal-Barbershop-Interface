@@ -5,6 +5,7 @@ import type { PaymentMethod, PrismaClient } from "@prisma/client";
 import { computeCampaignDiscount } from "@/lib/campaigns/campaign-eligibility";
 import { calculateVisitCommission } from "@/lib/commissions/commission";
 import { calculateVisitTotals } from "@/lib/loyalty/calculations";
+import { getLoyaltyBalance, recordLoyaltyMovement } from "@/lib/loyalty/ledger";
 import { roundMoney } from "@/lib/visits/visit-totals";
 import { getEffectiveSettings } from "@/lib/settings/system-settings";
 import { recordStockMovement } from "@/lib/products/product-service";
@@ -50,37 +51,37 @@ export async function cancelVisit(prisma: PrismaClient, visitId: string, meta: A
       sumPoints(visit.loyaltyTransactions.filter((transaction) => transaction.type === "REDEEM").map((transaction) => transaction.points)),
     );
     const customerId = visit.customerId;
-    const balanceBefore = customerId ? await getBalance(tx, customerId) : 0;
+    // قراءة خالصة: عميل بلا عضوية يبقى بلا عضوية، ولا تُنشأ له واحدة بالإلغاء.
+    const balanceBefore = customerId ? (await getLoyaltyBalance(tx, customerId)) ?? 0 : 0;
     const balanceAfterEarnReversal = balanceBefore - pointsEarnedToReverse;
-    const balanceAfterRestore = balanceAfterEarnReversal + redeemedPointsToRestore;
     if (balanceAfterEarnReversal < 0) {
       throw new BusinessError("لا يمكن عكس النقاط لأن رصيد العميل غير كافٍ");
     }
 
+    // العكس يُنسب إلى فرع الزيارة الأصلية لا إلى فرع الموظف الملغي، وإلا صدرت
+    // النقاط من فرع وعُكست في آخر فاختلّ صافي كل فرع في التقرير.
     if (customerId && pointsEarnedToReverse > 0) {
-      await tx.loyaltyTransaction.create({
-        data: {
-          organizationId: visit.organizationId,
-          customerId,
-          visitId: visit.id,
-          type: "REVERSAL",
-          points: -pointsEarnedToReverse,
-          balanceAfter: balanceAfterEarnReversal,
-          description: `عكس نقاط زيارة ملغاة: ${meta.reason}`,
-        },
+      await recordLoyaltyMovement(tx, {
+        organizationId: visit.organizationId,
+        customerId,
+        salonId: visit.salonId,
+        visitId: visit.id,
+        type: "REVERSAL",
+        points: -pointsEarnedToReverse,
+        description: `عكس نقاط زيارة ملغاة: ${meta.reason}`,
+        recordedByUserId: meta.actorUserId,
       });
     }
     if (customerId && redeemedPointsToRestore > 0) {
-      await tx.loyaltyTransaction.create({
-        data: {
-          organizationId: visit.organizationId,
-          customerId,
-          visitId: visit.id,
-          type: "REVERSAL",
-          points: redeemedPointsToRestore,
-          balanceAfter: balanceAfterRestore,
-          description: `إعادة نقاط مكافأة زيارة ملغاة: ${meta.reason}`,
-        },
+      await recordLoyaltyMovement(tx, {
+        organizationId: visit.organizationId,
+        customerId,
+        salonId: visit.salonId,
+        visitId: visit.id,
+        type: "REVERSAL",
+        points: redeemedPointsToRestore,
+        description: `إعادة نقاط مكافأة زيارة ملغاة: ${meta.reason}`,
+        recordedByUserId: meta.actorUserId,
       });
     }
     if (visit.discountType === "MANAGER_REWARD" && visit.managerReward) {
@@ -93,9 +94,7 @@ export async function cancelVisit(prisma: PrismaClient, visitId: string, meta: A
       });
     }
 
-    if (customerId) {
-      await tx.loyaltyAccount.updateMany({ where: { customerId }, data: { points: balanceAfterRestore } });
-    }
+    // لا كتابة مباشرة على الرصيد هنا: حركتا العكس أعلاه حدّثتاه في نفس المعاملة.
 
     // إلغاء الزيارة يعيد المنتجات المباعة للمخزون بحركة مسجّلة لا بتعديل صامت.
     if (visit.organizationId) {
@@ -247,27 +246,23 @@ export async function updateVisitAmount(prisma: PrismaClient, visitId: string, g
     const currentEarned = sumPoints(visit.loyaltyTransactions.filter((transaction) => transaction.type === "EARN").map((transaction) => transaction.points));
     const pointsAdjustment = totals.pointsEarned - currentEarned;
     const customerId = visit.customerId;
-    const balanceBefore = customerId ? await getBalance(tx, customerId) : 0;
-    const balanceAfter = balanceBefore + pointsAdjustment;
-    if (balanceAfter < 0) {
+    // قراءة خالصة: تعديل مبلغ زيارة لعميل غير مشترك لا يُدخله برنامج الولاء.
+    const enrolledBalance = customerId ? await getLoyaltyBalance(tx, customerId) : null;
+    const balanceAfter = (enrolledBalance ?? 0) + pointsAdjustment;
+    if (enrolledBalance !== null && balanceAfter < 0) {
       throw new BusinessError("لا يمكن تعديل المبلغ لأن رصيد العميل لا يكفي لعكس النقاط");
     }
 
-    if (customerId && pointsAdjustment !== 0) {
-      await tx.loyaltyTransaction.create({
-        data: {
-          organizationId: visit.organizationId,
-          customerId,
-          visitId: visit.id,
-          type: "ADJUST",
-          points: pointsAdjustment,
-          balanceAfter,
-          description: `تصحيح نقاط بعد تعديل مبلغ زيارة: ${meta.reason}`,
-        },
-      });
-      await tx.loyaltyAccount.update({
-        where: { customerId },
-        data: { points: balanceAfter },
+    if (customerId && enrolledBalance !== null && pointsAdjustment !== 0) {
+      await recordLoyaltyMovement(tx, {
+        organizationId: visit.organizationId,
+        customerId,
+        salonId: visit.salonId,
+        visitId: visit.id,
+        type: "ADJUST",
+        points: pointsAdjustment,
+        description: `تصحيح نقاط بعد تعديل مبلغ زيارة: ${meta.reason}`,
+        recordedByUserId: meta.actorUserId,
       });
     }
 
@@ -467,15 +462,6 @@ async function getCompletedVisitForAdmin(tx: AdminVisitPrisma, visitId: string, 
   return visit;
 }
 
-async function getBalance(tx: AdminVisitPrisma, customerId: string) {
-  const customer = await tx.customer.findUniqueOrThrow({ where: { id: customerId }, select: { organizationId: true } });
-  const account = await tx.loyaltyAccount.upsert({
-    where: { customerId },
-    update: {},
-    create: { customerId, organizationId: customer.organizationId, points: 0, lifetimeEarned: 0 },
-  });
-  return account.points;
-}
 
 async function isPostCloseAdjustment(tx: AdminVisitPrisma, visit: Pick<VisitForAdmin, "cashSessionId">) {
   if (!visit.cashSessionId) return false;

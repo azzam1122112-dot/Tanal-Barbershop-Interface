@@ -308,6 +308,47 @@ dropdb -h localhost -p 55432 -U tanal_user tanal_loyalty_fresh_check
 
 لا تحفظ رابط قاعدة الفحص داخل `.env`، واستخدمه كمتغير بيئة مؤقت في نافذة الطرفية فقط.
 
+## البريد التشغيلي للعملاء (Resend)
+
+طبقة البريد في `lib/email/resend-email.ts` تستخدم واجهة Resend الثابتة من
+الخادم فقط، وتُلزم كل رسالة بمفتاح منع تكرار. يوجد قالب عربي مشترك ورسائل جاهزة
+لتأكيد الموعد وإلغائه في `lib/email/customer-email-templates.ts`.
+
+إعدادات الإنتاج المطلوبة:
+
+```env
+RESEND_API_KEY="re_..."
+EMAIL_FROM="XMANSX | إكس مانس <notifications@xmansx.com>"
+EMAIL_REPLY_TO="support@xmansx.com"
+EMAIL_PLATFORM_TAG="xmansx"
+RESEND_INBOUND_API_KEY="re_..."
+RESEND_WEBHOOK_SECRET="whsec_..."
+SUPPORT_EMAIL_ADDRESS="support@xmansx.com"
+INBOUND_EMAIL_REQUIRED="true"
+EMAIL_REQUIRED="true"
+CUSTOMER_OTP_PEPPER="قيمة-عشوائية-قوية-خاصة-ببيئة-الإنتاج"
+```
+
+- أنشئ مفتاحًا مستقلًا باسم XMANSX وبصلاحية `sending_access` فقط؛ لا تعِد استخدام
+  مفتاح مشروع آخر.
+- تحقّق من نطاق `xmansx.com` في Resend قبل الإرسال لعملاء حقيقيين، ليظهر
+  عنوان المرسل الرسمي `notifications@xmansx.com` للمستلم.
+- يضاف وسم `platform=xmansx` تلقائيًا لكل رسالة لفصل تقارير المنصة عن بقية
+  المنصات داخل فريق Resend المشترك.
+- مفتاح `RESEND_INBOUND_API_KEY` مستقل ومخزن على الخادم فقط بصلاحية `full_access`
+  لأن Resend لا يسمح لمفتاح `sending_access` باسترجاع محتوى الرسائل والمرفقات.
+- سجّل Webhook الإنتاجي على `https://www.xmansx.com/api/webhooks/resend` واختر
+  حدث `email.received`، ثم ضع سر التوقيع في `RESEND_WEBHOOK_SECRET`.
+- يظهر صندوق البريد لمدير المنصة فقط في `/platform/support`، ويتحقق من توقيع
+  كل حدث ويمنع التكرار ولا يعرض HTML الوارد مباشرة.
+- لا يُعاد المفتاح من أي API ولا يُسجّل في السجلات. مسار
+  `GET /api/platform/email/test` يعرض جاهزية الإعداد فقط، و`POST` يرسل اختبارًا
+  بعد مصادقة مدير المنصة.
+- عند `EMAIL_REQUIRED=true` يفشل فحص الجاهزية إذا غاب المفتاح أو عنوان المرسل،
+  فيمنع نشر إصدار يبدو سليمًا وهو غير قادر على مراسلة العملاء.
+- استخدم `CUSTOMER_OTP_PEPPER` مستقلًا وقويًا لتوقيع رموز تحقق العملاء؛ تدويره
+  يبطل الرموز الحية فقط، وعمرها عشر دقائق.
+
 ## حسابات seed التجريبية
 
 - مدير النظام:

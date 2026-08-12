@@ -35,6 +35,8 @@ type BookableSalon = {
   slotMinutes: number;
   horizonDays: number;
   closedWeekdays: number[];
+  /** حدّ المواعيد القائمة للعميل في هذا الفرع. */
+  maxActivePerCustomer: number;
   barbers: BookableBarber[];
   services: BookableService[];
 };
@@ -95,6 +97,17 @@ function formatDayLabel(dateKey: string) {
       month: "short",
     }).format(date),
   };
+}
+
+/**
+ * عدد المواعيد بصيغته العربية الصحيحة: المفرد والمثنى وجمع القلة والكثرة.
+ * «2 مواعيد» تُقرأ ترجمةً آلية، والبوابة يقرأها العميل لا المطوّر.
+ */
+function appointmentsCount(count: number) {
+  if (count === 1) return "موعد واحد";
+  if (count === 2) return "موعدان";
+  if (count <= 10) return `${count} مواعيد`;
+  return `${count} موعدًا`;
 }
 
 function formatSlotTime(minuteOfDay: number) {
@@ -270,7 +283,11 @@ export function PortalBooking({
   const [bookingWindow, setBookingWindow] = useState<BookingWindow | null>(null);
   const [estimatedTotal, setEstimatedTotal] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  // خطآن لا واحد: خطأ **الإجراء** (تأكيد/إلغاء) وخطأ **جلب الشبكة**. كانا حالة
+  // واحدة، وكل فشل حجز يستدعي `loadSlots` بعده مباشرة — فتمسح بدايتُها الرسالةَ
+  // في نفس الدورة، ويضغط العميل «تأكيد» فلا يرى شيئًا يشرح الرفض.
   const [error, setError] = useState<string>("");
+  const [slotsError, setSlotsError] = useState<string>("");
   /**
    * الحجز الناجح يحلّ محلّ النموذج بدل سطر نصّي أسفله.
    *
@@ -287,7 +304,7 @@ export function PortalBooking({
   const loadSlots = useCallback(async () => {
     if (!salonId) return;
     setLoadingSlots(true);
-    setError("");
+    setSlotsError("");
     try {
       const query = new URLSearchParams({ salonId });
       // الشبكة تُحسب بمدة الخدمات المختارة: خانةٌ حُسبت بنصف ساعة تعرض وقتًا
@@ -304,7 +321,7 @@ export function PortalBooking({
       };
       if (!response.ok) {
         setDays([]);
-        setError(data.message ?? "تعذر جلب الأوقات المتاحة");
+        setSlotsError(data.message ?? "تعذر جلب الأوقات المتاحة");
         return;
       }
       const nextDays = data.days ?? [];
@@ -320,7 +337,7 @@ export function PortalBooking({
       setActiveDate(firstOpen?.date ?? nextDays[0]?.date ?? "");
     } catch {
       setDays([]);
-      setError("تعذر الاتصال. تحقق من اتصالك وحاول مجددًا.");
+      setSlotsError("تعذر الاتصال. تحقق من اتصالك وحاول مجددًا.");
     } finally {
       setLoadingSlots(false);
     }
@@ -414,6 +431,10 @@ export function PortalBooking({
   const activeDay = days.find((day) => day.date === activeDate) ?? null;
   const activeBarber = salon?.barbers.find((barber) => barber.id === barberId) ?? null;
   const windowNotice = buildWindowNotice(bookingWindow, durationMinutes, salon?.slotMinutes ?? 0);
+  // الحدّ يُقرأ من الفرع المختار — كل فرع قد يضبطه على قيمة مختلفة.
+  const maxActive = salon?.maxActivePerCustomer ?? salons[0]?.maxActivePerCustomer ?? 0;
+  const atActiveLimit = maxActive > 0 && upcoming.length >= maxActive;
+
   const visibleSlots = activeDay && barberId
     ? activeDay.slots
         .map((slot) => ({
@@ -508,6 +529,29 @@ export function PortalBooking({
       {/* لا تُعرض سياسة الحضور لمن لا مخالفة عليه: تحذير استباقي قبل أن يُخطئ
           أحد. صاحب المخالفة يراها أعلاه، والباقي يجدها في إيصال حجزه. */}
 
+      {/* الحدّ يُعرض **قبل** الاختيار لا بعد الضغط: العميل كان يختار خدماته
+          ويومه وحلاقه ثم يُرفض، والرسالة تُمسح قبل أن تُقرأ. */}
+      {atActiveLimit && !bookingPolicy.blocked && salons.length > 0 && !justBooked ? (
+        <section
+          className="overflow-hidden rounded-2xl border border-salon-gold/40 bg-salon-gold/[0.09]"
+          role="status"
+        >
+          <div className="border-b border-salon-gold/30 px-5 py-3">
+            <p className="text-xs font-bold text-salon-ink">وصلت إلى حدّ المواعيد القائمة</p>
+          </div>
+          <div className="px-5 py-4">
+            <h2 className="lux-section-title">لديك {appointmentsCount(upcoming.length)} الآن</h2>
+            <p className="mt-2 text-sm font-semibold leading-6 text-salon-charcoal">
+              الحدّ الأقصى {appointmentsCount(maxActive)} في وقت واحد. ألغِ موعدًا من قائمة «حجوزاتك
+              القادمة» أعلاه لتحجز غيره، أو انتظر حتى ينتهي أقرب موعد.
+            </p>
+            <p className="mt-3 rounded-xl bg-white/70 px-3 py-2.5 text-xs font-bold text-salon-charcoal/75">
+              الحدّ يحمي أوقات الحلاقين من مقاعد محجوزة لا تُستخدم.
+            </p>
+          </div>
+        </section>
+      ) : null}
+
       {salons.length === 0 && !bookingPolicy.blocked ? (
         <section className="barber-card px-5 py-5">
           <h2 className="lux-section-title">احجز موعدك</h2>
@@ -515,7 +559,7 @@ export function PortalBooking({
             الحجز الإلكتروني غير متاح حاليًا. تواصل مع الصالون مباشرة لحجز موعدك، أو احجز عند زيارتك القادمة.
           </p>
         </section>
-      ) : salons.length === 0 || bookingPolicy.blocked ? null : justBooked ? (
+      ) : salons.length === 0 || bookingPolicy.blocked || atActiveLimit ? null : justBooked ? (
         <BookingConfirmation
           appointment={justBooked}
           arriveEarlyMinutes={arriveEarlyMinutes}
@@ -754,6 +798,15 @@ export function PortalBooking({
               </div>
             )}
 
+            {slotsError ? (
+              <p
+                role="alert"
+                className="mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs font-bold text-red-700"
+              >
+                {slotsError}
+              </p>
+            ) : null}
+
             {/* الشبكة تتقلّص كلما طالت الخدمات، والاختفاء بلا سبب يُقرأ كعطل:
                 خدمة واحدة تمتدّ إلى 10:30 م وثلاث تتوقف عند 9:30 م. */}
             {windowNotice ? (
@@ -772,7 +825,13 @@ export function PortalBooking({
           ) : null}
 
           {error ? (
-            <p className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{error}</p>
+            <p
+              role="alert"
+              aria-live="assertive"
+              className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700"
+            >
+              {error}
+            </p>
           ) : null}
 
           <button

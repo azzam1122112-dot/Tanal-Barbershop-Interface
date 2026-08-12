@@ -4,6 +4,7 @@ import type { PaymentMethod, PrismaClient } from "@prisma/client";
 import { getAvailableCampaigns, getEligibleCampaignOrThrow } from "@/lib/campaigns/campaign-eligibility";
 import { assertOpenCashSession } from "@/lib/cash-sessions/cash-session-service";
 import { calculateVisitTotals } from "@/lib/loyalty/calculations";
+import { recordLoyaltyMovement } from "@/lib/loyalty/ledger";
 import { getEffectiveSettings } from "@/lib/settings/system-settings";
 import { issueInvoiceNumber } from "@/lib/invoicing/invoice-number";
 import { assertSubscriptionActive } from "@/lib/plans/subscription-guard";
@@ -521,49 +522,37 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
       });
     }
 
+    // الاستبدال ثم الكسب، كلٌّ حركة دفتر تحمل فرعها ومنفّذها وتحدّث الرصيد معها.
+    // الرصيد واحد للمؤسسة: `input.salonId` يُسجَّل على الحركة ولا يختار حسابًا.
     const createdTransactions = [];
     if (reward) {
       createdTransactions.push(
-        await tx.loyaltyTransaction.create({
-          data: {
-            organizationId: input.organizationId,
-            customerId: customer!.id,
-            visitId: visit.id,
-            type: "REDEEM",
-            points: -redeemedPoints,
-            balanceAfter: balanceAfterRedeem,
-            description: `استبدال ${redeemedPoints} نقطة مقابل خصم ${discountAmount} ريال`,
-          },
+        await recordLoyaltyMovement(tx, {
+          organizationId: input.organizationId,
+          customerId: customer!.id,
+          salonId: input.salonId,
+          visitId: visit.id,
+          type: "REDEEM",
+          points: -redeemedPoints,
+          description: `استبدال ${redeemedPoints} نقطة مقابل خصم ${discountAmount} ريال`,
+          recordedByBarberId: input.barberId,
         }),
       );
     }
 
-    const finalBalance = balanceAfterRedeem + earnedPoints;
     if (loyaltyAccount && earnedPoints > 0) {
       createdTransactions.push(
-        await tx.loyaltyTransaction.create({
-          data: {
-            organizationId: input.organizationId,
-            customerId: customer!.id,
-            visitId: visit.id,
-            type: "EARN",
-            points: earnedPoints,
-            balanceAfter: finalBalance,
-            description: "نقاط زيارة",
-          },
+        await recordLoyaltyMovement(tx, {
+          organizationId: input.organizationId,
+          customerId: customer!.id,
+          salonId: input.salonId,
+          visitId: visit.id,
+          type: "EARN",
+          points: earnedPoints,
+          description: "نقاط زيارة",
+          recordedByBarberId: input.barberId,
         }),
       );
-    }
-
-    if (loyaltyAccount) {
-      await tx.loyaltyAccount.update({
-        where: { customerId: customer!.id },
-        data: {
-          points: finalBalance,
-          lifetimeEarned: earnedPoints > 0 ? { increment: earnedPoints } : undefined,
-          lifetimeRedeemed: redeemedPoints > 0 ? { increment: redeemedPoints } : undefined,
-        },
-      });
     }
 
     if (customer) {

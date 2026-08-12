@@ -63,6 +63,8 @@ export type BookableSalon = {
   slotMinutes: number;
   horizonDays: number;
   closedWeekdays: number[];
+  /** حدّ المواعيد القائمة للعميل — تعرضه الواجهة قبل أن يختار، لا بعد الضغط. */
+  maxActivePerCustomer: number;
   barbers: BookableBarber[];
   services: BookableService[];
 };
@@ -123,6 +125,7 @@ export async function listBookableSalons(
       slotMinutes: config.slotMinutes,
       horizonDays: config.horizonDays,
       closedWeekdays: config.closedWeekdays,
+      maxActivePerCustomer: config.maxActivePerCustomer,
       // الترتيب نفسه المعتمد في بقية الشاشات، فلا تختلف قائمة الخدمات بين مكان وآخر.
       services: onlyActiveServices(services.map((service) => ({ ...service, isActive: true }))).map(
         (service) => ({

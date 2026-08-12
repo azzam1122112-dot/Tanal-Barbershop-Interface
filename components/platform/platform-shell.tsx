@@ -6,12 +6,13 @@ import { LogoutButton } from "@/components/logout-button";
 import { getRequestSession } from "@/lib/auth/http";
 import { canAccessPlatform } from "@/lib/auth/access";
 
-type PlatformSection = "overview" | "orgs" | "plans" | "admins";
+type PlatformSection = "overview" | "orgs" | "plans" | "support" | "admins";
 
 const navItems: { href: string; key: PlatformSection; label: string; description: string; icon: IconName }[] = [
   { href: "/platform", key: "overview", label: "مركز القيادة", description: "المتابعة والإجراءات", icon: "home" },
   { href: "/platform/organizations", key: "orgs", label: "المؤسسات", description: "الاشتراك والوصول", icon: "customers" },
   { href: "/platform/plans", key: "plans", label: "الباقات", description: "التسعير والحدود", icon: "billing" },
+  { href: "/platform/support", key: "support", label: "دعم العملاء", description: "البريد والمحادثات", icon: "bell" },
   { href: "/platform/admins", key: "admins", label: "مديرو المنصة", description: "الحسابات والأمان", icon: "staff" },
 ];
 

@@ -226,25 +226,45 @@ enum DataSubjectRequestStatus {
   REJECTED
 }
 
+enum PlatformSupportStatus {
+  OPEN
+  PENDING
+  RESOLVED
+  SPAM
+}
+
+enum PlatformSupportPriority {
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum PlatformSupportDirection {
+  INBOUND
+  OUTBOUND
+}
+
 // ===== Platform / Tenancy =====
 
 // مدير المنصة (super-admin) — يدير كل المؤسسات والباقات. خارج أي مستأجر.
 model PlatformAdmin {
-  id                    String                 @id @default(cuid())
+  id                    String                        @id @default(cuid())
   name                  String
-  email                 String                 @unique
+  email                 String                        @unique
   passwordHash          String
-  isActive              Boolean                @default(true)
+  isActive              Boolean                       @default(true)
   mfaEnabledAt          DateTime?
   mfaSecretCiphertext   String?
   mfaPendingCiphertext  String?
-  mfaRecoveryCodeHashes String[]               @default([])
+  mfaRecoveryCodeHashes String[]                      @default([])
   mfaLastUsedStep       BigInt?
   lastLoginAt           DateTime?
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
+  createdAt             DateTime                      @default(now())
+  updatedAt             DateTime                      @updatedAt
   sessions              Session[]
   mfaChallenges         PlatformMfaChallenge[]
+  assignedSupport       PlatformSupportConversation[] @relation("PlatformSupportAssignedAdmin")
+  sentSupportMessages   PlatformSupportMessage[]      @relation("PlatformSupportSentByAdmin")
 }
 
 model PlatformMfaChallenge {
@@ -261,6 +281,73 @@ model PlatformMfaChallenge {
 
   @@index([platformAdminId, expiresAt])
   @@index([expiresAt, consumedAt])
+}
+
+// صندوق دعم المنصة مستقل عن بيانات المؤسسات التشغيلية. الرسائل هنا موجهة إلى
+// إدارة XMANSX نفسها، ولا تُعرض لأي مالك أو مدير مؤسسة.
+model PlatformSupportConversation {
+  id               String                  @id @default(cuid())
+  participantEmail String
+  participantName  String?
+  subject          String
+  subjectKey       String
+  status           PlatformSupportStatus   @default(OPEN)
+  priority         PlatformSupportPriority @default(NORMAL)
+  unreadCount      Int                     @default(0)
+  lastMessageAt    DateTime
+  assignedAdminId  String?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  assignedAdmin PlatformAdmin?           @relation("PlatformSupportAssignedAdmin", fields: [assignedAdminId], references: [id], onDelete: SetNull)
+  messages      PlatformSupportMessage[]
+
+  @@index([status, lastMessageAt])
+  @@index([participantEmail, subjectKey, lastMessageAt])
+  @@index([assignedAdminId, status])
+}
+
+model PlatformSupportMessage {
+  id              String                   @id @default(cuid())
+  conversationId  String
+  providerEmailId String?                  @unique
+  providerEventId String?                  @unique
+  direction       PlatformSupportDirection
+  fromAddress     String
+  toAddresses     String[]
+  ccAddresses     String[]                 @default([])
+  subject         String
+  bodyText        String                   @db.Text
+  messageId       String?
+  inReplyTo       String?
+  references      String[]                 @default([])
+  sentByAdminId   String?
+  createdAt       DateTime                 @default(now())
+
+  conversation PlatformSupportConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sentByAdmin  PlatformAdmin?              @relation("PlatformSupportSentByAdmin", fields: [sentByAdminId], references: [id], onDelete: SetNull)
+  attachments  PlatformSupportAttachment[]
+
+  @@index([conversationId, createdAt])
+  @@index([messageId])
+  @@index([sentByAdminId, createdAt])
+}
+
+model PlatformSupportAttachment {
+  id                   String   @id @default(cuid())
+  messageId            String
+  providerAttachmentId String
+  filename             String
+  contentType          String
+  contentDisposition   String?
+  contentId            String?
+  size                 Int?
+  createdAt            DateTime @default(now())
+
+  message PlatformSupportMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, providerAttachmentId])
+  @@index([messageId])
 }
 
 // الباقة هي مصدر الحقيقة للوحة المنصة وصفحة الهبوط وصفحة اشتراك المؤسسة.
@@ -542,9 +629,131 @@ model BarberPushSubscription {
   @@index([organizationId])
 }
 
+/**
+ * هوية الشخص على مستوى منصة XMANSX كلها — **ليست كيان مستأجر**.
+ * لا تحمل `organizationId` ولا `salonId` ولا قيد مستأجرين مركّبًا، ولا تُربط بها
+ * أي بيانات تشغيلية: الزيارات والمواعيد والنقاط تبقى كلها على `Customer` المملوك
+ * لمؤسسته. دورها الوحيد أن تجمع سجلات العميل عبر المؤسسات تحت شخص واحد لتسجيل
+ * دخول موحّد لاحقًا.
+ * **قاعدة أمنية دائمة:** ممنوع في أي كود تخدمه مؤسسة (لوحة، API حلاق، بوابة)
+ * أن يعبر `Customer → account → customers` — العبور يكشف لموظفي مؤسسة أن عميلهم
+ * زبون عند منافس. الحارس آلي في `.semgrep.yml` (`xmansx-no-cross-tenant-account-traversal`).
+ * **لا تُنشأ تلقائيًا:** لا عند فتح صفحة، ولا بمطابقة جوال، ولا بتعبئة رجعية.
+ * إنشاؤها فعل صريح في مرحلة التسجيل/المطالبة القادمة.
+ */
+model CustomerAccount {
+  id String @id @default(cuid())
+
+  name            String
+  /**
+   * **بيانات تواصل غير موثوقة**، بالشكل المعياري `+9665XXXXXXXX`.
+   * غير فريد عمدًا: من كتبه لم يثبت ملكيته، وحجزُ رقم بلا إثبات يمنع صاحبه
+   * الحقيقي من التسجيل إلى الأبد (Phone Squatting / Denial of Registration).
+   */
+  phone           String
+  /**
+   * الرقم **المُثبَتة ملكيته** — `NULL` حتى يقع إثبات فعلي.
+   *
+   * التفرّد العالمي باقٍ كما هو ويسري على المُثبَت وحده، و`NULL` مميّز عن `NULL`
+   * في PostgreSQL فلا يتزاحم أصحاب الأرقام غير المثبتة. **لا يوجد اليوم أي مسار
+   * يملؤه** — يأتي مع المطالبة (PHASE C) أو تحقق SMS لاحقًا.
+   */
+  phoneNormalized String?               @unique
+  /** لا يُكتب اليوم إطلاقًا. وجوده يمنع ادّعاء التوثيق ضمنًا من امتلاء الرقم. */
+  phoneVerifiedAt DateTime?
+  email           String?
+  /**
+   * بريد مصغَّر الحالة عبر `normalizeEmail`. NULL مسموح ومتعدد.
+   */
+  emailNormalized String?               @unique
+  emailVerifiedAt DateTime?
+  /**
+   * يبقى فارغًا حتى مرحلة المصادقة — لا تُكتب فيه قيمة في هذه المرحلة.
+   */
+  passwordHash    String?
+  status          CustomerAccountStatus @default(ACTIVE)
+  lastLoginAt     DateTime?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  customers  Customer[]
+  challenges CustomerEmailChallenge[]
+  sessions   CustomerSession[]
+
+  @@index([status])
+}
+
+/**
+ * تحدٍّ بريدي لمرة واحدة: تفعيل البريد أو استعادة كلمة المرور.
+ * **الرمز لا يُخزَّن خامًا** — SHA-256 فقط، كرمز جلسة الموظف ورمز بوابة العميل.
+ * قاعدة البيانات لا تعرف الرمز، فتسريبها لا يمنح دخولًا.
+ * `purpose` يجعل الجدول واحدًا لغرضين بدل جدولين متطابقين، و`consumedAt`
+ * يمنع إعادة الاستعمال، و`attemptCount` يحدّ التخمين على التحدي نفسه لا على
+ * صاحبه فقط.
+ * **اسمه `CustomerEmailChallenge` لا `EmailVerificationChallenge`** لأنه يخدم
+ * الاستعادة أيضًا؛ اسم يذكر التفعيل وحده يغري بجدول ثانٍ لنفس البنية.
+ */
+model CustomerEmailChallenge {
+  id                String                   @id @default(cuid())
+  customerAccountId String
+  purpose           CustomerChallengePurpose
+  codeHash          String
+  expiresAt         DateTime
+  attemptCount      Int                      @default(0)
+  consumedAt        DateTime?
+  createdAt         DateTime                 @default(now())
+
+  account CustomerAccount @relation(fields: [customerAccountId], references: [id], onDelete: Cascade)
+
+  @@index([customerAccountId, purpose, createdAt])
+  @@index([expiresAt])
+}
+
+enum CustomerChallengePurpose {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+}
+
+/**
+ * جلسة العميل — **منفصلة تمامًا عن `Session`** الخاصة بالموظفين والمنصّة.
+ * الفصل بنيوي لا تجميلي: جدول مستقل وكوكي باسم مستقل، فلا يوجد مسار يجعل جلسة
+ * عميل تُقرأ حيث تُتوقَّع جلسة موظف. `middleware` يحرس مسارات الموظفين بوجود
+ * `tanal_session` وحدها، وكوكي العميل باسم آخر فلا يفتح شيئًا منها.
+ */
+model CustomerSession {
+  id                String    @id @default(cuid())
+  customerAccountId String
+  tokenHash         String    @unique
+  expiresAt         DateTime
+  lastUsedAt        DateTime  @default(now())
+  revokedAt         DateTime?
+  ipAddress         String?
+  userAgent         String?
+  createdAt         DateTime  @default(now())
+
+  account CustomerAccount @relation(fields: [customerAccountId], references: [id], onDelete: Cascade)
+
+  @@index([customerAccountId, expiresAt])
+  @@index([expiresAt])
+}
+
+/**
+ * حالتان فقط عمدًا. «بانتظار التحقق» مشتقّة من `emailVerifiedAt IS NULL` ولا
+ * يصح تكرارها كقيمة حالة: مصدران للحقيقة نفسها ينحرفان أول مرة يُحدَّث أحدهما.
+ */
+enum CustomerAccountStatus {
+  ACTIVE
+  DISABLED
+}
+
 model Customer {
   id                             String                 @id @default(cuid())
   organizationId                 String
+  /**
+   * الهوية العالمية لصاحب هذا السجل — اختيارية ودائمًا كذلك.
+   * `NULL` هو وضع كل العملاء القدامى وليس حالة ناقصة تُصلَّح بتعبئة رجعية.
+   */
+  accountId                      String?
   name                           String
   phone                          String
   // المفتاح العام مشتق من وجود موافقة واحدة على الأقل، ويُبقى للتوافق مع الواجهات القديمة.
@@ -578,6 +787,14 @@ model Customer {
   createdAt                      DateTime               @default(now())
   updatedAt                      DateTime               @updatedAt
   organization                   Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /**
+   * `SetNull` لا `Cascade` ولا `Restrict`: حذف الهوية العالمية يجب ألا يمسّ سجل
+   * المؤسسة التشغيلي (زياراته وفواتيره ملك المؤسسة لا الشخص) فيعود السجل إلى
+   * حالته القديمة `accountId = NULL`. و`Restrict` كان سيجعل الهوية غير قابلة
+   * للحذف ما دام مرتبطًا بها سجل واحد — أي منع حق الشخص في حذف هويته.
+   * ولا مسار عكسي أصلًا: المفتاح على `Customer`، فحذف عميل لا يمسّ الحساب.
+   */
+  account                        CustomerAccount?       @relation(fields: [accountId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   createdByBarber                Barber?                @relation("CustomerCreatedByBarber", fields: [createdByBarberId], references: [id])
   visits                         Visit[]
   loyaltyAccount                 LoyaltyAccount?
@@ -589,6 +806,13 @@ model Customer {
   dataSubjectRequests            DataSubjectRequest[]
 
   @@unique([organizationId, phone])
+  /**
+   * هوية واحدة لا تملك سجلّين في المؤسسة نفسها.
+   * PostgreSQL يعتبر NULL مميّزًا عن NULL في الفهارس الفريدة، فالقيد **لا يقيّد**
+   * صفوف `accountId = NULL` إطلاقًا — آلاف العملاء القدامى يتعايشون في المؤسسة
+   * الواحدة. (سلوك مُثبَّت باختبار لا مفترض.)
+   */
+  @@unique([accountId, organizationId])
   @@index([organizationId, lastVisitAt])
   @@index([organizationId, whatsappOptIn])
   @@index([organizationId, whatsappMarketingOptIn])
@@ -699,6 +923,12 @@ model VisitService {
   @@index([serviceId])
 }
 
+/**
+ * عضوية الولاء. **نطاقها المؤسسة لا الفرع**: `customerId @unique` مع كون `Customer`
+ * مملوكًا لمؤسسة واحدة يعطي عمليًا `UNIQUE(customer, organization)` — فلا يمكن أن
+ * يملك العميل رصيدين، ولا أن ينشأ له رصيد ثانٍ بزيارة فرع آخر. الفرع يُسجَّل على
+ * حركة الدفتر لأغراض التقارير فقط، ولا يملك وعاء نقاط.
+ */
 model LoyaltyAccount {
   id               String       @id @default(cuid())
   organizationId   String
@@ -714,24 +944,43 @@ model LoyaltyAccount {
   @@index([organizationId, points])
 }
 
+/**
+ * دفتر حركات النقاط — سجل التدقيق ومصدر مراجعة الرصيد.
+ * `salonId` **مكان وقوع الحركة لا نطاقها**: يُسجَّل ليجيب تقرير الفرع عن «كم نقطة
+ * صُدرت من جدة»، ولا يشارك في تحديد أي رصيد. اختياري لأن حركة قد تقع بلا فرع
+ * (تسوية إدارية، انتهاء صلاحية مستقبلًا)، ولأن الحركات التاريخية عُبِّئت من
+ * `Visit.salonId` وقد تبقى فيها حركة بلا زيارة.
+ * `balanceBefore/balanceAfter` لقطة الرصيد حول الحركة على نمط `StockMovement`:
+ * الدفتر يُقرأ وحده فيُعرف من أين جاء الرقم بلا إعادة حساب السلسلة كاملة.
+ * المنفّذ عمودان لا واحد لأن الفاعل قد يكون حلاقًا (كسب/استبدال في الزيارة) أو
+ * موظف لوحة (عكس أو تسوية)، وكلاهما جدول مختلف — نفس نمط `StockMovement`.
+ */
 model LoyaltyTransaction {
-  id             String                 @id @default(cuid())
-  organizationId String
-  customerId     String
-  visitId        String?
-  type           LoyaltyTransactionType
-  points         Int
-  balanceAfter   Int
-  description    String?
-  createdAt      DateTime               @default(now())
-  organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  customer       Customer               @relation(fields: [customerId], references: [id])
-  visit          Visit?                 @relation(fields: [visitId], references: [id])
+  id                 String                 @id @default(cuid())
+  organizationId     String
+  customerId         String
+  // مكان وقوع الحركة للتقارير فقط. لا يدخل في تحديد الرصيد إطلاقًا.
+  salonId            String?
+  visitId            String?
+  type               LoyaltyTransactionType
+  points             Int
+  balanceBefore      Int
+  balanceAfter       Int
+  description        String?
+  recordedByUserId   String?
+  recordedByBarberId String?
+  createdAt          DateTime               @default(now())
+  organization       Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer           Customer               @relation(fields: [customerId], references: [id])
+  visit              Visit?                 @relation(fields: [visitId], references: [id])
 
   @@index([customerId, createdAt])
   @@index([visitId])
   @@index([type])
   @@index([organizationId])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, salonId, createdAt])
+  @@index([organizationId, type, createdAt])
 }
 
 model RewardRule {
