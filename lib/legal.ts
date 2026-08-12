@@ -1,5 +1,14 @@
 export const LEGAL_VERSION = "2026-08-10.2";
 
+/**
+ * بريد واحد لكل شيء: الدعم والفواتير وطلبات الخصوصية.
+ *
+ * كان `privacyEmail` يكرّر العنوان نفسه حرفيًا، فتظهر صفحة التواصل بصندوقين
+ * اسمهما مختلف وعنوانهما واحد. الاشتقاق يمنع تباعدهما صامتًا، ويبقى الفصل
+ * ممكنًا بمتغيّر بيئة يوم تُفتح خانة بريد مستقلة فعلًا.
+ */
+const SUPPORT_EMAIL = process.env.PUBLIC_SUPPORT_EMAIL?.trim() || "support@xmansx.com";
+
 export const legalInfo = {
   brandName: "إكس مانس إكس",
   brandNameLatin: "XMANSX",
@@ -12,7 +21,7 @@ export const legalInfo = {
   freelanceVerificationUrl: "https://freelance.sa/certificate-validation",
   ecommerceVerificationNumber: process.env.PUBLIC_ECOMMERCE_VERIFICATION_NUMBER?.trim() || "",
   ecommerceVerificationUrl: process.env.PUBLIC_ECOMMERCE_VERIFICATION_URL?.trim() || "",
-  supportEmail: process.env.PUBLIC_SUPPORT_EMAIL?.trim() || "support@xmansx.com",
+  supportEmail: SUPPORT_EMAIL,
   supportPhone: process.env.PUBLIC_SUPPORT_PHONE?.trim() || "0537720207",
   supportWhatsApp: process.env.PUBLIC_SUPPORT_WHATSAPP?.trim() || "966537720207",
   businessAddress:
@@ -21,7 +30,7 @@ export const legalInfo = {
   primaryHostingLocation:
     process.env.PUBLIC_DATA_HOSTING_LOCATION?.trim() ||
     "لم يُعلن بعد — يجب نشر موقع الاستضافة الفعلي قبل إدخال بيانات حقيقية",
-  privacyEmail: process.env.PUBLIC_PRIVACY_EMAIL?.trim() || "support@xmansx.com",
+  privacyEmail: process.env.PUBLIC_PRIVACY_EMAIL?.trim() || SUPPORT_EMAIL,
 } as const;
 
 export function supportWhatsAppLink(message = "السلام عليكم، أحتاج مساعدة بخصوص منصة XMANSX.") {

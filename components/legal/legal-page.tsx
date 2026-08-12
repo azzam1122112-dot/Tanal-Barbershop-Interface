@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand-logo";
 import { LEGAL_VERSION, legalInfo } from "@/lib/legal";
@@ -12,10 +13,18 @@ export type LegalSection = {
 export function LegalPage({
   title,
   description,
+  intro,
   sections,
 }: {
   title: string;
   description: string;
+  /**
+   * محتوى يسبق البنود داخل نفس البطاقة.
+   *
+   * صفحة التواصل ليست وثيقة تُقرأ بل إجراء يُتخذ: أزرار الاتصال تسبق الشروح،
+   * وبقية الصفحات القانونية تتركه فارغًا فلا يتغيّر شيء عندها.
+   */
+  intro?: ReactNode;
   sections: LegalSection[];
 }) {
   return (
@@ -38,6 +47,8 @@ export function LegalPage({
             <p className="mt-4 max-w-3xl text-sm font-semibold leading-8 text-salon-charcoal">{description}</p>
           </div>
 
+          {intro ? <div className="border-b border-salon-line px-6 py-8 sm:px-10">{intro}</div> : null}
+
           <div className="space-y-8 px-6 py-8 sm:px-10 sm:py-10">
             {sections.map((section) => (
               <section key={section.title} className="scroll-mt-24">
@@ -55,8 +66,8 @@ export function LegalPage({
                     {link.description ? `${link.description} ` : null}
                     <a
                       href={link.href}
-                      target="_blank"
-                      rel="noreferrer"
+                      target={link.href.startsWith("http") ? "_blank" : undefined}
+                      rel={link.href.startsWith("http") ? "noreferrer" : undefined}
                       className="font-bold text-violet-800 underline decoration-violet-300 underline-offset-4 hover:text-violet-950"
                     >
                       {link.label}
