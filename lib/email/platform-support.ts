@@ -101,6 +101,39 @@ export function isSupportRecipient(recipient: string, supportAddress: string) {
   return recipientDomain === supportDomain && (recipientLocal === supportLocal || recipientLocal.startsWith(`${supportLocal}+`));
 }
 
+const TRUSTED_RESEND_ATTACHMENT_HOSTS = new Set(["inbound-cdn.resend.com", "cdn.resend.app"]);
+
+/**
+ * يقبل فقط روابط CDN التي يعيدها Resend للمرفق المطلوب نفسه.
+ *
+ * تستخدم وثائق Resend `inbound-cdn.resend.com`، بينما تعيد منطقة الإنتاج
+ * الحالية `cdn.resend.app`. الحصر بالمضيفين والمسار يمنع تحويل هذا المسار
+ * المحمي إلى Open Redirect إذا أعاد المزود أو وسيط الشبكة رابطًا غير متوقع.
+ */
+export function isTrustedResendAttachmentUrl(value: string, emailId: string, attachmentId: string) {
+  try {
+    const url = new URL(value);
+    if (
+      url.protocol !== "https:" ||
+      url.username ||
+      url.password ||
+      url.port ||
+      !TRUSTED_RESEND_ATTACHMENT_HOSTS.has(url.hostname.toLowerCase())
+    ) {
+      return false;
+    }
+
+    const encodedEmailId = encodeURIComponent(emailId);
+    const encodedAttachmentId = encodeURIComponent(attachmentId);
+    return [
+      `/${encodedEmailId}/attachments/${encodedAttachmentId}`,
+      `/receiving/${encodedEmailId}/attachments/${encodedAttachmentId}`,
+    ].includes(url.pathname);
+  } catch {
+    return false;
+  }
+}
+
 export async function processResendReceivedEmail(
   db: PrismaClient,
   event: ResendReceivedEvent,
@@ -346,11 +379,10 @@ export async function getSupportAttachmentDownload(
   );
   const payload = await response.json().catch(() => null) as { download_url?: string } | null;
   if (!response.ok || !payload?.download_url) throw new BusinessError("تعذر تجهيز رابط المرفق", 502);
-  const url = new URL(payload.download_url);
-  if (url.protocol !== "https:" || !(url.hostname === "resend.com" || url.hostname.endsWith(".resend.com"))) {
-    throw new Error("Unexpected attachment host");
+  if (!isTrustedResendAttachmentUrl(payload.download_url, attachment.message.providerEmailId, attachment.providerAttachmentId)) {
+    throw new BusinessError("رابط المرفق المستلم من مزود البريد غير موثوق", 502);
   }
-  return { attachment, downloadUrl: url.toString() };
+  return { attachment, downloadUrl: payload.download_url };
 }
 
 async function retrieveReceivedEmail(emailId: string, apiKey: string, fetchImpl: typeof fetch) {

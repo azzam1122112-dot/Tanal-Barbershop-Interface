@@ -1,9 +1,11 @@
 import type { PrismaClient } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 import {
+  getSupportAttachmentDownload,
   getSupportConfiguration,
   isInboundSupportReady,
   isSupportRecipient,
+  isTrustedResendAttachmentUrl,
   normalizeSupportSubject,
   parseMailbox,
   processResendReceivedEmail,
@@ -33,6 +35,74 @@ describe("Platform support email", () => {
     expect(isSupportRecipient("support+cm12345678@xmansx.com", "support@xmansx.com")).toBe(true);
     expect(isSupportRecipient("billing@xmansx.com", "support@xmansx.com")).toBe(false);
     expect(isSupportRecipient("support@example.com", "support@xmansx.com")).toBe(false);
+  });
+
+  it("accepts only Resend CDN URLs for the exact requested attachment", () => {
+    const emailId = "bdbb1015-6313-48fd-9061-d57287f9eb8c";
+    const attachmentId = "30f7bfb2-6d1e-43ce-b294-655acaa6e6b8";
+
+    expect(isTrustedResendAttachmentUrl(
+      `https://cdn.resend.app/receiving/${emailId}/attachments/${attachmentId}?Signature=test`,
+      emailId,
+      attachmentId,
+    )).toBe(true);
+    expect(isTrustedResendAttachmentUrl(
+      `https://inbound-cdn.resend.com/${emailId}/attachments/${attachmentId}?signature=test`,
+      emailId,
+      attachmentId,
+    )).toBe(true);
+    expect(isTrustedResendAttachmentUrl(
+      `https://cdn.resend.app/receiving/${emailId}/attachments/different`,
+      emailId,
+      attachmentId,
+    )).toBe(false);
+    expect(isTrustedResendAttachmentUrl(
+      `https://cdn.resend.app.evil.example/receiving/${emailId}/attachments/${attachmentId}`,
+      emailId,
+      attachmentId,
+    )).toBe(false);
+    expect(isTrustedResendAttachmentUrl(
+      `http://cdn.resend.app/receiving/${emailId}/attachments/${attachmentId}`,
+      emailId,
+      attachmentId,
+    )).toBe(false);
+  });
+
+  it("retrieves the current production CDN URL for a stored inbound attachment", async () => {
+    const emailId = "bdbb1015-6313-48fd-9061-d57287f9eb8c";
+    const attachmentId = "30f7bfb2-6d1e-43ce-b294-655acaa6e6b8";
+    const attachment = {
+      id: "attachment-row",
+      messageId: "message-row",
+      providerAttachmentId: attachmentId,
+      filename: "invoice.pdf",
+      contentType: "application/pdf",
+      contentDisposition: "attachment",
+      contentId: null,
+      size: 2048,
+      createdAt: new Date(),
+      message: { providerEmailId: emailId },
+    };
+    const db = {
+      platformSupportAttachment: { findFirst: vi.fn().mockResolvedValue(attachment) },
+    } as unknown as PrismaClient;
+    const downloadUrl = `https://cdn.resend.app/receiving/${emailId}/attachments/${attachmentId}?Signature=test`;
+    const fetchImpl = vi.fn().mockResolvedValue(new Response(JSON.stringify({ download_url: downloadUrl }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }));
+
+    const result = await getSupportAttachmentDownload(db, "message-row", "attachment-row", {
+      env: supportEnv,
+      fetchImpl,
+    });
+
+    expect(result.downloadUrl).toBe(downloadUrl);
+    expect(result.attachment.filename).toBe("invoice.pdf");
+    expect(fetchImpl).toHaveBeenCalledWith(
+      `https://api.resend.com/emails/receiving/${emailId}/attachments/${attachmentId}`,
+      expect.objectContaining({ headers: { Authorization: "Bearer re_inbound_test" } }),
+    );
   });
 
   it("normalizes reply subjects and parses a display mailbox safely", () => {
