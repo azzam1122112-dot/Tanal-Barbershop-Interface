@@ -22,6 +22,9 @@ type Invoice = {
   paidAt: string | null;
   periodStart: string | null;
   periodEnd: string | null;
+  invoiceEmailRecipient: string | null;
+  invoiceEmailSentAt: string | null;
+  invoiceEmailLastError: string | null;
   createdAt: string;
 };
 
@@ -190,13 +193,20 @@ export function SubscriptionSelfService({
 
       <section className="dashboard-panel overflow-hidden">
         <div className="border-b border-salon-line px-5 py-4"><h2 className="text-xl font-bold">سجل الطلبات والدفعات</h2></div>
-        <div className="table-scroll-wrap"><div className="table-scroll"><table className="dashboard-table min-w-[860px]"><thead><tr><th>التاريخ</th><th>الباقة</th><th>المبلغ</th><th>المدة</th><th>المرجع</th><th>الحالة</th><th>الفاتورة</th></tr></thead><tbody>
-          {invoices.map((invoice) => <tr key={invoice.id}><td>{formatDate(invoice.paidAt ?? invoice.createdAt)}</td><td className="font-bold">{invoice.planName ?? "-"}</td><td>{formatMoney(invoice.amount)}</td><td>{invoice.periodMonths} شهر</td><td dir="ltr">{invoice.reference ?? "-"}</td><td><PaymentStatus status={invoice.status} /></td><td>{invoice.status === "PAID" && invoice.invoiceNumber ? <Link href={`/dashboard/subscription/invoices/${invoice.id}`} className="font-bold text-violet-800 underline">عرض {invoice.invoiceNumber}</Link> : "-"}</td></tr>)}
-          {invoices.length === 0 ? <tr><td colSpan={7} className="py-8 text-center text-salon-charcoal">لا توجد طلبات دفع بعد.</td></tr> : null}
+        <div className="table-scroll-wrap"><div className="table-scroll"><table className="dashboard-table min-w-[980px]"><thead><tr><th>التاريخ</th><th>الباقة</th><th>المبلغ</th><th>المدة</th><th>المرجع</th><th>الحالة</th><th>الفاتورة</th><th>البريد</th></tr></thead><tbody>
+          {invoices.map((invoice) => <tr key={invoice.id}><td>{formatDate(invoice.paidAt ?? invoice.createdAt)}</td><td className="font-bold">{invoice.planName ?? "-"}</td><td>{formatMoney(invoice.amount)}</td><td>{invoice.periodMonths} شهر</td><td dir="ltr">{invoice.reference ?? "-"}</td><td><PaymentStatus status={invoice.status} /></td><td>{invoice.status === "PAID" && invoice.invoiceNumber ? <Link href={`/dashboard/subscription/invoices/${invoice.id}`} className="font-bold text-violet-800 underline">عرض {invoice.invoiceNumber}</Link> : "-"}</td><td><InvoiceEmailStatus invoice={invoice} /></td></tr>)}
+          {invoices.length === 0 ? <tr><td colSpan={8} className="py-8 text-center text-salon-charcoal">لا توجد طلبات دفع بعد.</td></tr> : null}
         </tbody></table></div></div>
       </section>
     </div>
   );
+}
+
+function InvoiceEmailStatus({ invoice }: { invoice: Invoice }) {
+  if (invoice.status !== "PAID") return <span className="text-salon-charcoal">-</span>;
+  if (invoice.invoiceEmailSentAt) return <span className="font-bold text-green-700">تم الإرسال</span>;
+  if (invoice.invoiceEmailLastError) return <span className="font-bold text-amber-800">تحتاج إعادة إرسال</span>;
+  return <span className="text-salon-charcoal">قيد التجهيز</span>;
 }
 
 function PaymentStatus({ status }: { status: Invoice["status"] }) {

@@ -1,4 +1,4 @@
-import { formatDateTime } from "@/lib/format";
+import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
 
 type CallToAction = { label: string; url: string };
 
@@ -16,7 +16,7 @@ export function renderCustomerEmail(input: CustomerEmailLayoutInput) {
   const cta = input.cta
     ? `<a href="${escapeAttribute(assertHttpsUrl(input.cta.url))}" style="display:inline-block;margin-top:8px;border-radius:12px;background:#163a2d;color:#fff;text-decoration:none;padding:12px 22px;font-weight:700">${escapeHtml(input.cta.label)}</a>`
     : "";
-  const footer = escapeHtml(input.footer ?? "XMANSX · إدارة الصالونات والعناية بالعملاء");
+  const footer = escapeHtml(input.footer ?? "إكس مانس إكس XMANSX · إدارة الصالونات والعناية بالعملاء");
 
   const html = `<!doctype html>
 <html lang="ar" dir="rtl">
@@ -26,7 +26,7 @@ export function renderCustomerEmail(input: CustomerEmailLayoutInput) {
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f5f3ed;padding:28px 12px">
       <tr><td align="center">
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#fff;border:1px solid #e6dfd2;border-radius:18px;overflow:hidden">
-          <tr><td style="background:#11271f;color:#fff;padding:24px 28px"><strong style="font-size:22px;letter-spacing:.02em">XMANSX</strong></td></tr>
+          <tr><td style="background:#11271f;color:#fff;padding:24px 28px"><strong style="font-size:22px;letter-spacing:.02em">إكس مانس إكس XMANSX</strong></td></tr>
           <tr><td style="padding:30px 28px">
             <h1 style="margin:0 0 20px;font-size:25px;line-height:1.5;color:#17221e">${safeTitle}</h1>
             ${paragraphs}${cta}
@@ -95,6 +95,34 @@ export function renderPlatformSupportReply(input: { customerName?: string | null
     title: "رد فريق دعم XMANSX",
     body: [greeting, ...paragraphs],
     footer: "فريق دعم XMANSX · يمكنك الرد مباشرة على هذه الرسالة لمتابعة المحادثة",
+  });
+}
+
+export function renderSubscriptionInvoiceEmail(input: {
+  ownerName: string;
+  organizationName: string;
+  invoiceNumber: string;
+  planName: string;
+  amount: number;
+  periodStart: string;
+  periodEnd: string;
+  invoiceUrl: string;
+}) {
+  return renderCustomerEmail({
+    preheader: `تم تفعيل باقة ${input.planName} وإرفاق الفاتورة ${input.invoiceNumber}`,
+    title: "تم تفعيل اشتراك مؤسستك",
+    body: [
+      `مرحبًا ${input.ownerName}، تم تفعيل اشتراك ${input.organizationName} بنجاح.`,
+      `رقم الفاتورة: ${input.invoiceNumber}`,
+      `الباقة: ${input.planName}`,
+      `مبلغ الاشتراك: ${formatMoney(input.amount)}`,
+      `تاريخ التفعيل: ${formatDate(input.periodStart)}`,
+      `تاريخ الانتهاء: ${formatDate(input.periodEnd)}`,
+      "ضريبة القيمة المضافة: غير مطبقة، وقيمتها صفر.",
+      "أرفقنا نسخة PDF الرسمية، ويمكنك الرجوع إلى الفاتورة في صفحة الاشتراك في أي وقت.",
+    ],
+    cta: { label: "عرض الفاتورة", url: input.invoiceUrl },
+    footer: "فريق فوترة إكس مانس إكس XMANSX · support@xmansx.com",
   });
 }
 

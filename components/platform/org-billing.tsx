@@ -16,6 +16,9 @@ type Invoice = {
   paidAt: string | null;
   periodStart: string | null;
   periodEnd: string | null;
+  invoiceEmailRecipient: string | null;
+  invoiceEmailSentAt: string | null;
+  invoiceEmailLastError: string | null;
 };
 
 type PlanOption = { id: string; name: string; priceMonthly: number; priceYearly: number | null };
@@ -76,7 +79,7 @@ export function OrgBilling({
     if (response.ok && data.invoice) {
       setInvoices((current) => [data.invoice!, ...current]);
       formEl.reset();
-      setMessage({ text: `تم تجديد الاشتراك حتى ${formatDate(data.invoice.periodEnd)}`, tone: "success" });
+      setMessage({ text: data.message ?? `تم تجديد الاشتراك حتى ${formatDate(data.invoice.periodEnd)}`, tone: "success" });
     } else {
       setMessage({ text: data.message ?? "تعذر تسجيل الدفعة", tone: "error" });
     }
@@ -142,6 +145,34 @@ export function OrgBilling({
       setMessage({ text: data.message ?? "تمت مراجعة الطلب", tone: "success" });
     } else {
       setMessage({ text: data.message ?? "تعذر مراجعة الطلب", tone: "error" });
+    }
+    setPendingId(null);
+  }
+
+  async function resendInvoice(invoice: Invoice) {
+    setPendingId(invoice.id);
+    setMessage(null);
+    const response = await fetch(`/api/platform/organizations/${organizationId}/payments/${invoice.id}/email`, {
+      method: "POST",
+    });
+    const data = (await response.json().catch(() => ({}))) as {
+      email?: { sent: boolean; recipient: string | null; message: string };
+      message?: string;
+    };
+    if (response.ok && data.email?.sent) {
+      setInvoices((current) => current.map((item) => item.id === invoice.id ? {
+        ...item,
+        invoiceEmailRecipient: data.email?.recipient ?? null,
+        invoiceEmailSentAt: new Date().toISOString(),
+        invoiceEmailLastError: null,
+      } : item));
+      setMessage({ text: data.message ?? "تم إرسال الفاتورة", tone: "success" });
+    } else {
+      setInvoices((current) => current.map((item) => item.id === invoice.id ? {
+        ...item,
+        invoiceEmailLastError: data.message ?? "تعذر إرسال الفاتورة",
+      } : item));
+      setMessage({ text: data.message ?? "تعذر إرسال الفاتورة", tone: "error" });
     }
     setPendingId(null);
   }
@@ -237,7 +268,7 @@ export function OrgBilling({
       </form>
 
       <div className="border-t border-salon-line/70">
-        <table className="dashboard-table min-w-[880px]">
+        <table className="dashboard-table min-w-[1040px]">
           <thead>
             <tr>
               <th>التاريخ</th>
@@ -248,6 +279,7 @@ export function OrgBilling({
               <th>الطريقة</th>
               <th>المرجع</th>
               <th>الحالة</th>
+              <th>البريد</th>
               <th></th>
             </tr>
           </thead>
@@ -267,20 +299,26 @@ export function OrgBilling({
                   <InvoiceStatus status={invoice.status} />
                 </td>
                 <td className="px-4 py-3">
+                  {invoice.invoiceEmailSentAt ? <span className="font-bold text-green-700">تم الإرسال</span> : invoice.status === "PAID" ? <span className="font-bold text-amber-800">لم تُرسل</span> : "-"}
+                </td>
+                <td className="px-4 py-3">
                   {invoice.status === "PENDING" ? (
                     <div className="flex gap-2">
                       <button type="button" disabled={pendingId === invoice.id} onClick={() => void reviewRequest(invoice, "APPROVE")} className="rounded-lg bg-green-700 px-3 py-1.5 text-xs font-bold text-white">اعتماد</button>
                       <button type="button" disabled={pendingId === invoice.id} onClick={() => void reviewRequest(invoice, "REJECT")} className="dashboard-danger-button px-3 py-1.5 text-xs">رفض</button>
                     </div>
                   ) : invoice.status === "PAID" ? (
-                    <button
-                      type="button"
-                      disabled={pendingId === invoice.id}
-                      onClick={() => void voidInvoice(invoice)}
-                      className="dashboard-danger-button px-3 py-1.5 text-xs"
-                    >
-                      إلغاء
-                    </button>
+                    <div className="flex gap-2">
+                      <button type="button" disabled={pendingId === invoice.id} onClick={() => void resendInvoice(invoice)} className="dashboard-button-soft px-3 py-1.5 text-xs">إرسال الفاتورة</button>
+                      <button
+                        type="button"
+                        disabled={pendingId === invoice.id}
+                        onClick={() => void voidInvoice(invoice)}
+                        className="dashboard-danger-button px-3 py-1.5 text-xs"
+                      >
+                        إلغاء
+                      </button>
+                    </div>
                   ) : null}
                 </td>
               </tr>

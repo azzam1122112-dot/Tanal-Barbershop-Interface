@@ -50,6 +50,7 @@ describe("Resend customer email infrastructure", () => {
       text: "تم",
       idempotencyKey: "appointment-booked/appointment-1",
       tags: [{ name: "message_type", value: "appointment_booked" }],
+      attachments: [{ filename: "invoice.pdf", content: Buffer.from("%PDF-test").toString("base64") }],
     }, { fetchImpl, env: configuredEnv });
 
     expect(result).toEqual({ id: "email-123" });
@@ -69,6 +70,7 @@ describe("Resend customer email infrastructure", () => {
         { name: "platform", value: "xmansx" },
         { name: "message_type", value: "appointment_booked" },
       ],
+      attachments: [{ filename: "invoice.pdf", content: Buffer.from("%PDF-test").toString("base64") }],
     });
   });
 

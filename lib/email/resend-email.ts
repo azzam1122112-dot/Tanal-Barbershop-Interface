@@ -33,6 +33,7 @@ export type TransactionalEmailInput = {
   replyTo?: string;
   threading?: { inReplyTo: string; references?: string[] };
   tags?: Array<{ name: string; value: string }>;
+  attachments?: Array<{ filename: string; content: string }>;
 };
 
 export class EmailDeliveryError extends Error {
@@ -106,6 +107,7 @@ export async function sendTransactionalEmail(
 
   const replyTo = input.replyTo ? normalizeEmail(input.replyTo) : config.replyTo;
   const threadingHeaders = buildThreadingHeaders(input.threading);
+  const attachments = normalizeAttachments(input.attachments);
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
@@ -126,6 +128,7 @@ export async function sendTransactionalEmail(
         text: input.text,
         ...(replyTo ? { reply_to: replyTo } : {}),
         ...(threadingHeaders ? { headers: threadingHeaders } : {}),
+        ...(attachments.length ? { attachments } : {}),
         ...buildTags(config.platformTag, input.tags),
       }),
       signal: controller.signal,
@@ -166,6 +169,28 @@ export async function sendTransactionalEmail(
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function normalizeAttachments(attachments: TransactionalEmailInput["attachments"]) {
+  if (!attachments?.length) return [];
+  if (attachments.length > 5) throw new EmailDeliveryError("عدد مرفقات البريد يتجاوز الحد المسموح");
+
+  let encodedBytes = 0;
+  return attachments.map((attachment) => {
+    const filename = attachment.filename.trim();
+    const content = attachment.content.trim();
+    if (!filename || filename.length > 180 || /[\x00-\x1f\x7f/\\]/.test(filename)) {
+      throw new EmailDeliveryError("اسم مرفق البريد غير صالح");
+    }
+    if (!content || !/^[A-Za-z0-9+/]+={0,2}$/.test(content)) {
+      throw new EmailDeliveryError("محتوى مرفق البريد غير صالح");
+    }
+    encodedBytes += content.length;
+    if (encodedBytes > 12 * 1024 * 1024) {
+      throw new EmailDeliveryError("حجم مرفقات البريد يتجاوز الحد المسموح");
+    }
+    return { filename, content };
+  });
 }
 
 function buildThreadingHeaders(threading: TransactionalEmailInput["threading"]) {

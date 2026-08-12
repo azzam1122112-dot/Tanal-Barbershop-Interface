@@ -431,7 +431,17 @@ export async function getInvoiceForOrganization(prisma: BillingPrisma, organizat
   const invoice = await prisma.billingInvoice.findFirst({
     where: { id: invoiceId, organizationId, status: "PAID" },
     include: {
-      plan: { select: { id: true, name: true, description: true } },
+      plan: {
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          features: true,
+          maxSalons: true,
+          maxBarbers: true,
+          maxCustomers: true,
+        },
+      },
       organization: {
         select: {
           name: true,
@@ -450,6 +460,14 @@ export async function getInvoiceForOrganization(prisma: BillingPrisma, organizat
   return {
     ...toInvoiceRow(invoice),
     planDescription: invoice.plan?.description ?? null,
+    planFeatures: invoice.plan?.features ?? [],
+    planLimits: invoice.plan
+      ? {
+          maxSalons: invoice.plan.maxSalons,
+          maxBarbers: invoice.plan.maxBarbers,
+          maxCustomers: invoice.plan.maxCustomers,
+        }
+      : null,
     buyer: {
       name: invoice.buyerName ?? invoice.organization.name,
       city: invoice.buyerCity ?? invoice.organization.city,
@@ -506,6 +524,11 @@ function toInvoiceRow(
     paidAt: invoice.paidAt?.toISOString() ?? null,
     periodStart: invoice.periodStart?.toISOString() ?? null,
     periodEnd: invoice.periodEnd?.toISOString() ?? null,
+    invoiceEmailRecipient: invoice.invoiceEmailRecipient,
+    invoiceEmailProviderId: invoice.invoiceEmailProviderId,
+    invoiceEmailSentAt: invoice.invoiceEmailSentAt?.toISOString() ?? null,
+    invoiceEmailLastError: invoice.invoiceEmailLastError,
+    invoiceEmailAttempts: invoice.invoiceEmailAttempts,
     createdAt: invoice.createdAt.toISOString(),
   };
 }

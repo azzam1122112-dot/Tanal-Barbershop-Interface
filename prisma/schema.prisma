@@ -1674,6 +1674,12 @@ model BillingInvoice {
   paidAt                    DateTime?
   periodStart               DateTime?
   periodEnd                 DateTime?
+  // تتبّع تسليم نسخة الفاتورة الرسمية إلى البريد المسجّل للمالك.
+  invoiceEmailRecipient     String?
+  invoiceEmailProviderId    String?
+  invoiceEmailSentAt        DateTime?
+  invoiceEmailLastError     String?
+  invoiceEmailAttempts      Int                  @default(0)
   // مدير المنصة الذي سجّل الدفعة — الفوترة من اختصاصه لا اختصاص المستأجر.
   recordedByPlatformAdminId String?
   createdAt                 DateTime             @default(now())

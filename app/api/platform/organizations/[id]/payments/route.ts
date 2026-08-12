@@ -3,6 +3,7 @@ import { z } from "zod";
 import { parseJsonBody, requirePlatformApi } from "@/lib/auth/http";
 import { prisma } from "@/lib/db/prisma";
 import { listInvoices, recordManualPayment } from "@/lib/billing/billing-service";
+import { deliverSubscriptionInvoiceEmail } from "@/lib/billing/subscription-invoice-delivery";
 import { toErrorResponse } from "@/lib/http/error-response";
 
 const paymentSchema = z.object({
@@ -46,7 +47,19 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       note: parsed.data.note,
       recordedByPlatformAdminId: session.admin.id,
     });
-    return NextResponse.json({ invoice }, { status: 201 });
+    const email = await deliverSubscriptionInvoiceEmail(prisma, id, invoice.id);
+    return NextResponse.json({
+      invoice: {
+        ...invoice,
+        invoiceEmailRecipient: email.recipient,
+        invoiceEmailSentAt: email.sent ? new Date().toISOString() : null,
+        invoiceEmailLastError: email.sent ? null : email.message,
+      },
+      email,
+      message: email.sent
+        ? "تم تفعيل الاشتراك وإرسال الفاتورة إلى البريد المسجّل"
+        : `تم تفعيل الاشتراك، لكن ${email.message}`,
+    }, { status: 201 });
   } catch (error) {
     return toErrorResponse(error, "تعذر تسجيل الدفعة");
   }
