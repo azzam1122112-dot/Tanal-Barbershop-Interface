@@ -63,6 +63,12 @@ echo "==> توليد عميل Prisma والبناء"
 set -a; . "$ENV_FILE"; set +a
 runuser -u "$APP_USER" -- env --chdir="$STAGE" PATH="$NODE_PATH_ENV" DATABASE_URL="$DATABASE_URL" \
   npm run prisma:generate
+# بعض صفحات Next تجمع ملخصات قاعدة البيانات أثناء البناء. لذلك يجب أن ترى
+# مخطط الإصدار الجديد قبل `next build`؛ الهجرات قابلة لإعادة التنفيذ، وسيكرر
+# ExecStartPre الأمر بلا أثر عند تشغيل الخدمة بعد التبديل.
+echo "==> تطبيق هجرات قاعدة البيانات قبل جمع الصفحات"
+runuser -u "$APP_USER" -- env --chdir="$STAGE" PATH="$NODE_PATH_ENV" DATABASE_URL="$DATABASE_URL" \
+  npm run prisma:deploy
 runuser -u "$APP_USER" -- env --chdir="$STAGE" PATH="$NODE_PATH_ENV" NODE_ENV=production DATABASE_URL="$DATABASE_URL" \
   npm run build
 
