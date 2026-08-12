@@ -65,6 +65,7 @@ describe("visit preview and confirm", () => {
     inactiveServiceId = inactiveService.id;
 
     const customerResult = await createCustomerWithLoyalty({
+      enrollInLoyalty: true,
       prisma,
       organizationId: "org_default",
       name: "عميل زيارة",
@@ -75,6 +76,7 @@ describe("visit preview and confirm", () => {
     createdCustomerIds.push(customerId);
 
     const rewardCustomer = await createCustomerWithLoyalty({
+      enrollInLoyalty: true,
       prisma,
       organizationId: "org_default",
       name: "عميل مكافآت",
@@ -89,6 +91,7 @@ describe("visit preview and confirm", () => {
     });
 
     const inactiveCustomer = await createCustomerWithLoyalty({
+      enrollInLoyalty: true,
       prisma,
       organizationId: "org_default",
       name: "عميل منقطع",
@@ -103,6 +106,7 @@ describe("visit preview and confirm", () => {
     });
 
     const activeCustomer = await createCustomerWithLoyalty({
+      enrollInLoyalty: true,
       prisma,
       organizationId: "org_default",
       name: "عميل نشط",
@@ -117,6 +121,7 @@ describe("visit preview and confirm", () => {
     });
 
     const pointsCustomer = await createCustomerWithLoyalty({
+      enrollInLoyalty: true,
       prisma,
       organizationId: "org_default",
       name: "عميل نقاط للحملات",

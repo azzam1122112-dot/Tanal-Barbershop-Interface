@@ -142,10 +142,17 @@ export const updateStaffSchema = z.object({
   salonIds: staffSalonIdsSchema.optional(),
 });
 
+/**
+ * إنشاء عميل من شاشة الحلاق — **سجل تشغيلي لا عضوية ولاء**.
+ *
+ * لا حقل `enrollInLoyalty` هنا بقصد: كان موجودًا بافتراضي `true`، فأي طلب لا
+ * يذكره يمنح العضوية. والعضوية لا يفتحها إلا صاحبها من `/join` بحساب بريده
+ * موثَّق. حذف الحقل من المخطط يجعل `z.object` **يُسقطه من أي طلب يرسله** بدل
+ * أن يقبله — فلا تُفتح عضوية بطلب معدَّل يدويًا.
+ */
 export const customerCreateSchema = z.object({
   name: z.string().trim().min(2, "اسم العميل مطلوب"),
   phone: phoneSchema,
-  enrollInLoyalty: z.boolean().optional().default(true),
   whatsappTransactionalOptIn: z.boolean().optional().default(false),
   whatsappMarketingOptIn: z.boolean().optional().default(false),
 });

@@ -1,6 +1,5 @@
 import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 import Link from "next/link";
-import { CustomerPortalShare } from "@/components/barber/customer-portal-share";
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { canAccessBarberApp } from "@/lib/auth/access";
@@ -127,7 +126,12 @@ export default async function BarberCustomerPage({ params }: { params: Promise<{
         ) : (
           <SectionCard title="برنامج الولاء">
             <p className="mt-2 rounded-2xl border border-salon-line bg-salon-mist px-4 py-4 text-sm font-semibold leading-7 text-salon-charcoal">
-              هذا عميل عادي وغير مشترك في الولاء. يمكن تسجيل زياراته وفواتيره بصورة طبيعية دون إضافة نقاط.
+              غير مشترك في الولاء. زياراته وفواتيره تُسجَّل بصورة طبيعية دون نقاط.
+              {/* لا زر تسجيل هنا ولا في أي شاشة حلاق: العضوية يفتحها العميل
+                  بنفسه من رمز الصالون بحساب بريده موثَّق. */}
+              <span className="mt-2 block text-xs font-semibold text-salon-charcoal/70">
+                للانضمام يمسح العميل رمز الصالون المعلَّق ويسجّل نفسه — لا يُسجَّل أحد نيابة عنه.
+              </span>
             </p>
           </SectionCard>
         )}
@@ -149,14 +153,11 @@ export default async function BarberCustomerPage({ params }: { params: Promise<{
           <p className="mt-2 text-sm leading-6 text-salon-charcoal">قد تظهر حملات متاحة عند تسجيل الزيارة حسب المبلغ والخدمات وحالة العميل.</p>
         </SectionCard>
 
-        {summary.loyaltyEnabled ? (
-          <SectionCard title="صفحة نقاط العميل">
-            <p className="mt-2 text-sm leading-6 text-salon-charcoal">
-              سلّم العميل رابطه ليتابع رصيده ومكافآته بنفسه في أي وقت.
-            </p>
-            <CustomerPortalShare customerId={summary.id} customerName={summary.name} customerPhone={summary.phone} />
-          </SectionCard>
-        ) : null}
+        {/* حُذف «مشاركة رابط صفحة العميل» من شاشة الحلاق. الرابط مفتاحٌ يفتح سجل
+            زيارات العميل ورصيده بلا كلمة مرور، فإصداره بيد الحلاق يضع بيانات
+            العميل تحت تصرّف غيره — وهو عين ما مُنع من أجله التسجيل نيابةً عنه.
+            العميل يفتح صفحته بحسابه الموثَّق من `/account/loyalty`، والاسترجاع
+            الاستثنائي يبقى للإدارة وحدها في لوحة العملاء. */}
         </div>
       </section>
       {/* شريط الإجراء الأساسي: ثابت أسفل الشاشة ليبقى «تسجيل زيارة» على بُعد لمسة

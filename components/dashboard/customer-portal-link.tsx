@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
+import { buildCustomerPortalShareMessage } from "@/lib/customers/portal-share";
+import { toSaudiWhatsAppPhone } from "@/lib/phone/saudi-phone";
 
 /**
  * زر يولّد رابط بوابة العميل ويجهّز رسالة واتساب جاهزة للإرسال يدويًا.
@@ -37,9 +39,13 @@ export function CustomerPortalLink({
     setLoading(false);
   }
 
+  // `toSaudiWhatsAppPhone` لا `replace(/\D/g, "")`: الأخير يترك «0501234567»
+  // كما هو فيفتح wa.me رقمًا بلا مفتاح دولة ولا يصل أحدًا. والرسالة من
+  // `buildCustomerPortalShareMessage` — النص المحلي كان يسلّم مفتاح صفحة العميل
+  // بلا أي تحذير من مشاركته.
   const waHref = link
-    ? `https://wa.me/${customerPhone.replace(/\D/g, "")}?text=${encodeURIComponent(
-        `مرحبًا ${customerName}، تابع رصيد نقاطك ومكافآتك من هنا: ${link}`,
+    ? `https://wa.me/${toSaudiWhatsAppPhone(customerPhone)}?text=${encodeURIComponent(
+        buildCustomerPortalShareMessage({ customerName, portalUrl: link }),
       )}`
     : null;
 

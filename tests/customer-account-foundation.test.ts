@@ -105,7 +105,7 @@ describe("global CustomerAccount foundation", () => {
 
   describe("legacy behaviour is untouched", () => {
     it("creates a customer with loyalty, visits and appointments without any account", async () => {
-      const created = await createCustomerWithLoyalty({ prisma, organizationId: ORG, name: `عميل قديم ${Date.now()}`, phone: uniqueLegacyPhone() });
+      const created = await createCustomerWithLoyalty({ enrollInLoyalty: true, prisma, organizationId: ORG, name: `عميل قديم ${Date.now()}`, phone: uniqueLegacyPhone() });
       createdCustomerIds.push(created.customer.id);
       const barber = await prisma.barber.findFirstOrThrow({ where: { organizationId: ORG, isActive: true } });
 
@@ -123,7 +123,7 @@ describe("global CustomerAccount foundation", () => {
 
     it("never creates or backfills an account implicitly", async () => {
       const before = await prisma.customerAccount.count();
-      const created = await createCustomerWithLoyalty({ prisma, organizationId: ORG, name: `بلا حساب ${Date.now()}`, phone: uniqueLegacyPhone() });
+      const created = await createCustomerWithLoyalty({ enrollInLoyalty: true, prisma, organizationId: ORG, name: `بلا حساب ${Date.now()}`, phone: uniqueLegacyPhone() });
       createdCustomerIds.push(created.customer.id);
 
       // ولا حتى عند وجود رقم مطابق لحساب قائم: لا دمج تلقائي بالجوال.

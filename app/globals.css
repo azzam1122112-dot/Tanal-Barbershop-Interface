@@ -277,6 +277,13 @@ select {
     @apply mx-auto w-full max-w-md md:max-w-3xl lg:max-w-5xl;
   }
 
+  /* الشاشة الرئيسية عمود واحد بتبويبات: عرض تطبيق لا عرض صفحة. اتساعها إلى
+     `max-w-5xl` كان له معنى حين حملت ثلاثة عشر لوحًا تتقاسم عمودين؛ ومع
+     التبويبات صارت تمدّد خمس بطاقات قصيرة على 64rem. */
+  .barber-container.is-app {
+    @apply md:max-w-lg lg:max-w-lg;
+  }
+
   /* عمودان من التابلت فما فوق: العمل والبحث يمينًا، الصندوق والملخص يسارًا.
      العناصر تبقى بترتيبها الطبيعي على الجوال. */
   .barber-grid {
@@ -332,29 +339,70 @@ select {
     box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.9);
   }
 
-  .barber-notification-card {
-    @apply relative overflow-hidden rounded-2xl border border-salon-line/70;
-    background:
-      radial-gradient(circle at 8% 12%, rgba(124, 58, 237, 0.11), transparent 34%),
-      var(--surface-card);
-    box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255, 255, 255, 0.88);
+  /* شريط التبويبات السفلي: التنقّل الوحيد في شاشة الحلاق.
+     `z-40` فوق أشرطة PWA (`z-30`) — وهي تُرفع فوقه بـ `--barber-bottom-gap`. */
+  .barber-tabbar {
+    @apply fixed inset-x-0 bottom-0 z-40 border-t border-salon-line/70;
+    background: rgba(252, 251, 248, 0.97);
+    padding-bottom: env(safe-area-inset-bottom);
+    box-shadow: 0 -14px 34px -26px rgba(16, 25, 22, 0.55);
   }
 
-  .barber-notification-card::after {
-    content: "";
-    @apply pointer-events-none absolute -bottom-16 -left-10 h-32 w-32 rounded-full opacity-40;
-    background: radial-gradient(circle, rgba(124, 58, 237, 0.22), transparent 68%);
+  /* نفس لغة `PortalTabs` في بوابة العميل: أيقونة وتسمية ومؤشر سفلي. */
+  .barber-tab {
+    @apply flex min-h-16 flex-1 flex-col items-center justify-center gap-1 px-1 text-[11px] font-bold text-salon-charcoal/55 transition;
   }
 
-  .barber-notification-card.is-active {
-    @apply border-salon-gold/35;
-    background:
-      radial-gradient(circle at 8% 12%, rgba(124, 58, 237, 0.16), transparent 36%),
-      linear-gradient(180deg, #ffffff 0%, #fbf9ff 100%);
+  .barber-tab[aria-selected="true"] {
+    @apply text-salon-forest;
+  }
+
+  /* مؤشر بصري فوق اللون وحده: اللون لا يفرّق التبويب النشط لمن لا يميّزه. */
+  .barber-tab-indicator {
+    @apply block h-0.5 w-6 rounded-full bg-transparent;
+  }
+
+  .barber-tab[aria-selected="true"] .barber-tab-indicator {
+    @apply bg-salon-forest;
+  }
+
+  .barber-tab-badge {
+    @apply absolute -top-1.5 grid h-4 min-w-[1rem] place-items-center rounded-full bg-salon-forest px-1 text-[10px] font-black leading-none text-white;
+    inset-inline-start: -0.375rem;
+  }
+
+  .barber-tab-badge.is-alert {
+    @apply bg-amber-500;
+  }
+
+  /* شارة حالة في ترويسة الشاشة: العهدة وحالة الجلسة — بلا لوح خاص لكل منهما. */
+  .barber-status-chip {
+    @apply inline-flex shrink-0 items-center gap-1.5 rounded-full border border-salon-line bg-white px-3 py-1 text-[11px] font-bold text-salon-charcoal/75;
+  }
+
+  .barber-status-chip > span[aria-hidden] {
+    @apply h-1.5 w-1.5 rounded-full bg-current;
+  }
+
+  .barber-status-chip.is-open {
+    @apply border-emerald-200 bg-emerald-50 text-emerald-700;
+  }
+
+  .barber-status-chip.is-closed {
+    @apply border-amber-200 bg-amber-50 text-amber-800;
+  }
+
+  /* أشرطة PWA ثابتة أسفل الشاشة كشريط التبويبات. `--barber-bottom-gap` يضبطه
+     شريط التبويبات عند وجوده (شاشة الحلاق الرئيسية) فترتفع الأشرطة فوقه؛ وفي
+     بقية صفحات `/barber` يبقى صفرًا فلا يتغيّر موضعها. */
+  .barber-pwa-bar {
+    @apply fixed inset-x-0 z-30 px-3 pt-3;
+    bottom: var(--barber-bottom-gap, 0px);
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
   }
 
   .barber-notification-icon {
-    @apply relative grid h-12 w-12 shrink-0 place-items-center rounded-xl text-white;
+    @apply relative grid h-10 w-10 shrink-0 place-items-center rounded-xl text-white;
     background: linear-gradient(145deg, #17141f 0%, #2e2543 100%);
     box-shadow:
       0 10px 22px -12px rgba(28, 19, 52, 0.85),
@@ -744,40 +792,9 @@ html:has(.x-site) {
   animation: loyalty-title-pan 8s ease-in-out infinite;
 }
 
-.loyalty-member-card {
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.105), rgba(255, 255, 255, 0.025)),
-    radial-gradient(circle at 88% 12%, rgba(139, 92, 246, 0.22), transparent 36%),
-    rgba(18, 13, 27, 0.74);
-  box-shadow:
-    0 36px 80px -36px rgba(0, 0, 0, 0.95),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(18px);
-}
-
-.loyalty-member-card::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(115deg, transparent 26%, rgba(255, 255, 255, 0.075) 46%, transparent 66%);
-  transform: translateX(80%);
-  animation: loyalty-card-sheen 7s ease-in-out infinite;
-}
-
-.loyalty-card-orbit {
-  position: absolute;
-  width: 13rem;
-  height: 13rem;
-  left: -5.5rem;
-  top: -7rem;
-  border: 1px solid rgba(196, 181, 253, 0.12);
-  border-radius: 999px;
-  box-shadow: 0 0 0 2.25rem rgba(124, 58, 237, 0.025), 0 0 0 4.5rem rgba(124, 58, 237, 0.018);
-}
-
-.loyalty-reward-float {
-  animation: loyalty-float 5s ease-in-out infinite;
-}
+/* حُذفت `.loyalty-member-card` و`.loyalty-card-orbit` و`.loyalty-reward-float`
+   مع بطاقة العرض التمثيلية في `/join`: مجسّم بطاقة متحرك ببريقٍ دائم ومدارٍ
+   وشارةٍ عائمة، كلها تقف بين العميل وزرّ الانضمام وهو واقف في الصالون. */
 
 .loyalty-form-shell {
   animation: loyalty-form-in 700ms 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -793,10 +810,6 @@ html:has(.x-site) {
 
 .loyalty-enter-three {
   animation-delay: 150ms;
-}
-
-.loyalty-enter-four {
-  animation-delay: 220ms;
 }
 
 .loyalty-input {
@@ -897,27 +910,6 @@ html:has(.x-site) {
   }
 }
 
-@keyframes loyalty-float {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-7px);
-  }
-}
-
-@keyframes loyalty-card-sheen {
-  0%,
-  25% {
-    transform: translateX(90%);
-  }
-  55%,
-  100% {
-    transform: translateX(-120%);
-  }
-}
-
 @keyframes loyalty-title-pan {
   0%,
   100% {
@@ -944,9 +936,6 @@ html:has(.x-site) {
     background-size: 48px 48px;
   }
 
-  .loyalty-member-card {
-    backdrop-filter: blur(10px);
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

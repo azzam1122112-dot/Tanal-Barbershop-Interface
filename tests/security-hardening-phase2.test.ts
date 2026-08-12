@@ -92,8 +92,8 @@ describe("security hardening phase 2", () => {
     const organization = await prisma.organization.create({ data: { name: "Quota security", slug: `quota-org-${suffix}`, planId: plan.id } });
     organizationIds.push(organization.id);
     const results = await Promise.allSettled([
-      createCustomerWithLoyalty({ prisma, organizationId: organization.id, name: "A", phone: `96651${suffix.padEnd(7, "1").slice(0, 7)}` }),
-      createCustomerWithLoyalty({ prisma, organizationId: organization.id, name: "B", phone: `96652${suffix.padEnd(7, "2").slice(0, 7)}` }),
+      createCustomerWithLoyalty({ enrollInLoyalty: true, prisma, organizationId: organization.id, name: "A", phone: `96651${suffix.padEnd(7, "1").slice(0, 7)}` }),
+      createCustomerWithLoyalty({ enrollInLoyalty: true, prisma, organizationId: organization.id, name: "B", phone: `96652${suffix.padEnd(7, "2").slice(0, 7)}` }),
     ]);
     expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
     expect(await prisma.customer.count({ where: { organizationId: organization.id } })).toBe(1);

@@ -42,6 +42,7 @@ describe("cash sessions", () => {
     createdServiceIds.push(serviceId);
 
     const customer = await createCustomerWithLoyalty({
+      enrollInLoyalty: true,
       prisma,
       organizationId: "org_default",
       name: "عميل جلسة صندوق",

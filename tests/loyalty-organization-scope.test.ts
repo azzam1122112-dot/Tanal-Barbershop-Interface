@@ -329,7 +329,7 @@ async function createService(salonId: string) {
 }
 
 async function createMember(name: string, phone = uniquePhone(), organizationId = ORG) {
-  const result = await createCustomerWithLoyalty({ prisma, organizationId, name, phone });
+  const result = await createCustomerWithLoyalty({ enrollInLoyalty: true, prisma, organizationId, name, phone });
   createdCustomerIds.push(result.customer.id);
   return result.customer;
 }

@@ -21,13 +21,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "بيانات العميل غير صحيحة" }, { status: 400 });
   }
 
+  // **الحلاق لا يمنح عضوية ولاء أبدًا.** ما يُنشأ هنا سجل تشغيلي (اسم وجوال)
+  // تُسجَّل عليه الزيارات والفواتير. العضوية رصيدٌ باسم شخص وسجلٌّ يتراكم عليه،
+  // ولا تُفتح إلا بيد صاحبه من `/join` بحساب بريده موثَّق — فلا يقف بين العميل
+  // وبياناته أحد. القيمة صريحة لا اتكالًا على الافتراضي: هذا سطر أمني يُقرأ.
   const result = await createCustomerWithLoyalty({
     prisma,
     organizationId: session.organizationId,
     name: parsed.data.name,
     phone: parsed.data.phone,
     createdByBarberId: session.barber.id,
-    enrollInLoyalty: parsed.data.enrollInLoyalty,
+    enrollInLoyalty: false,
     whatsappTransactionalOptIn: parsed.data.whatsappTransactionalOptIn,
     whatsappMarketingOptIn: parsed.data.whatsappMarketingOptIn,
     whatsappConsentSource: "IN_PERSON",
@@ -49,11 +53,7 @@ export async function POST(request: Request) {
     {
       created: result.created,
       customer: toCustomerSummary(result.customer),
-      message: result.created
-        ? parsed.data.enrollInLoyalty
-          ? "تم إنشاء العميل وتفعيل الولاء"
-          : "تم إنشاء العميل بدون عضوية ولاء"
-        : "العميل موجود مسبقًا",
+      message: result.created ? "تم حفظ العميل" : "العميل موجود مسبقًا",
     },
     { status: result.created ? 201 : 200 },
   );

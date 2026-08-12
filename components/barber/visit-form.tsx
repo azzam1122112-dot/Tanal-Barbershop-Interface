@@ -141,16 +141,18 @@ export function VisitForm({
       setLinkedCustomer(null);
       setLinkedCustomerId(null);
       setCustomerLookupState("missing");
-      setCustomerMessage("الرقم غير مسجل. يمكن التسجيل في الولاء أو المتابعة كزائر دون حفظه.");
+      setCustomerMessage("الرقم غير مسجل. احفظ العميل باسمه أو تابع كزائر دون حفظه.");
     } else {
       setCustomerMessage(data.message ?? "تعذر البحث عن العميل");
     }
     setLoadingCustomer(false);
   }
 
-  async function enrollCustomer() {
+  // حفظ سجل تشغيلي فقط — **بلا عضوية ولاء**. العضوية يفتحها العميل بنفسه من
+  // رمز الصالون بحساب بريده موثَّق، فلا تُفتح باسمه بيد غيره.
+  async function saveCustomer() {
     if (joinName.trim().length < 2) {
-      setCustomerMessage("اكتب اسم العميل للتسجيل في الولاء");
+      setCustomerMessage("اكتب اسم العميل لحفظه");
       return;
     }
     setLoadingCustomer(true);
@@ -160,7 +162,6 @@ export function VisitForm({
       body: JSON.stringify({
         name: joinName,
         phone: customerPhone,
-        enrollInLoyalty: true,
         whatsappTransactionalOptIn: transactionalConsent,
         whatsappMarketingOptIn: marketingConsent,
       }),
@@ -173,10 +174,10 @@ export function VisitForm({
       setLinkedCustomer(data.customer);
       setLinkedCustomerId(data.customer.id);
       setCustomerLookupState("idle");
-      setCustomerMessage("تم التسجيل في الولاء وربط العميل بالعملية");
+      setCustomerMessage("تم حفظ العميل وربطه بالعملية");
       setPreview(null);
     } else {
-      setCustomerMessage(data.message ?? "تعذر تسجيل العميل");
+      setCustomerMessage(data.message ?? "تعذر حفظ العميل");
     }
     setLoadingCustomer(false);
   }
@@ -432,7 +433,7 @@ export function VisitForm({
         <div className="barber-card-head flex items-start justify-between gap-3">
           <div>
             <p className="text-xs font-bold text-salon-forest">قبل الدفع · اختياري</p>
-            <h2 className="mt-1 text-lg font-bold">العميل والولاء</h2>
+            <h2 className="mt-1 text-lg font-bold">العميل</h2>
           </div>
           <span className="rounded-xl border border-salon-line bg-white px-3 py-1 text-xs font-bold text-salon-charcoal">
             {linkedCustomerId ? "عميل مرتبط" : "زائر"}
@@ -486,7 +487,7 @@ export function VisitForm({
 
           {customerLookupState === "missing" ? (
             <div className="space-y-3 rounded-2xl border border-violet-200 bg-violet-50/70 p-3">
-              <input value={joinName} onChange={(event) => setJoinName(event.target.value)} placeholder="اسم العميل للتسجيل في الولاء" className="barber-field bg-white" />
+              <input value={joinName} onChange={(event) => setJoinName(event.target.value)} placeholder="اسم العميل" className="barber-field bg-white" />
               <div className="grid gap-2 text-xs font-semibold text-violet-950 sm:grid-cols-2">
                 <label className="flex items-center gap-2 rounded-xl bg-white px-3 py-2.5">
                   <input type="checkbox" checked={transactionalConsent} onChange={(event) => setTransactionalConsent(event.target.checked)} />
@@ -498,7 +499,7 @@ export function VisitForm({
                 </label>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <button type="button" onClick={enrollCustomer} disabled={loadingCustomer} className="barber-gold-button h-12">تسجيل في الولاء</button>
+                <button type="button" onClick={saveCustomer} disabled={loadingCustomer} className="barber-gold-button h-12">حفظ العميل</button>
                 <button type="button" onClick={continueAsGuest} className="barber-ghost-button h-12">متابعة كزائر</button>
               </div>
             </div>

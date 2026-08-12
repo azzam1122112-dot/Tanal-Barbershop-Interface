@@ -5,6 +5,7 @@ import { getRequestMeta, parseJsonBody } from "@/lib/auth/http";
 import { requireCustomerApi } from "@/lib/customers/account-http";
 import { decodeJoinContext } from "@/lib/customers/join-context";
 import { enrollAccountInOrganization } from "@/lib/customers/organization-enrollment";
+import { ensurePortalToken } from "@/lib/customers/customer-portal";
 import { consumeCustomerRateLimit } from "@/lib/customers/account-rate-limit";
 import { toErrorResponse } from "@/lib/http/error-response";
 
@@ -54,12 +55,24 @@ export async function POST(request: Request) {
       );
     }
 
-    // الوجهة بطاقة المؤسسة نفسها: «تم الانضمام» وحدها تترك العميل واقفًا.
-    // والعضو مسبقًا يُنقل إلى بطاقته أيضًا — أنفع من إخباره أنه عضو.
+    // الوجهة **بوابة الصالون** لا بطاقة المحفظة: المحفظة تعرض رصيدًا وسجل نقاط
+    // بلا حجز ولا عروض ولا قائمة أسعار، فمن سجّل نفسه للتوّ كان يهبط في شاشة
+    // قراءة لا تفعل شيئًا — بينما من سجّله الحلاق يستلم رابط البوابة كاملة.
+    // المسارَان يلتقيان هنا. وفشل إصدار الرمز لا يُفشل انضمامًا تم فعلًا:
+    // نعود إلى بطاقة المحفظة، ومنها زر يفتح البوابة.
+    const walletHref = `/account/loyalty/${encodeURIComponent(result.reference)}`;
+    let redirectTo = walletHref;
+    try {
+      const portalToken = await ensurePortalToken(prisma, result.customerId, result.organizationId);
+      redirectTo = `/my/${portalToken}`;
+    } catch {
+      // نُبقي وجهة المحفظة.
+    }
+
     return NextResponse.json({
       outcome: result.outcome,
       message: result.outcome === "ENROLLED" ? "تم انضمامك إلى برنامج الولاء بنجاح." : "أنت مشترك في هذا البرنامج بالفعل.",
-      redirectTo: `/account/loyalty/${encodeURIComponent(result.reference)}`,
+      redirectTo,
     });
   } catch (error) {
     return toErrorResponse(error, "تعذر إتمام الانضمام");

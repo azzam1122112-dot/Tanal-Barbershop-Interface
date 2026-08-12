@@ -145,9 +145,36 @@ function buildWindowNotice(
 function formatLeadDuration(minutes: number) {
   const hours = Math.floor(minutes / 60);
   const remainder = minutes % 60;
+  // أقل من ساعة يُصاغ بالدقائق وحدها: الفرع الذي مهلته ثلاثون دقيقة كان يقرأ
+  // عميله «0 ساعات و30 دقيقة».
+  if (hours === 0) return `${remainder} دقيقة`;
   const hourLabel = hours === 1 ? "ساعة" : hours === 2 ? "ساعتين" : `${hours} ساعات`;
   if (remainder === 0) return hourLabel;
   return `${hourLabel} و${remainder} دقيقة`;
+}
+
+/**
+ * ترويسة خطوة في نموذج الحجز.
+ *
+ * الحجز أربع خطوات متسلسلة (خدمات ← يوم ← حلاق ← وقت) وكانت تُعرض أقسامًا
+ * متساوية بلا ترتيب معلن، فيقرؤها العميل كوميضٍ من الحقول لا كمسار. والترقيم
+ * يُحسب لا يُكتب: الفرع يظهر لمن له فرعان فأكثر، والحلاق لمن فرعه فيه حلاقون.
+ */
+function Step({ number, title, hint }: { number: number; title: string; hint?: string }) {
+  return (
+    <div className="mb-2 flex items-center justify-between gap-3">
+      <span className="flex min-w-0 items-center gap-2">
+        <span
+          aria-hidden="true"
+          className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-salon-ink text-[0.6rem] font-black text-white"
+        >
+          {number}
+        </span>
+        <span className="text-xs font-black text-salon-charcoal">{title}</span>
+      </span>
+      {hint ? <span className="shrink-0 text-[0.65rem] font-bold text-salon-charcoal/60">{hint}</span> : null}
+    </div>
+  );
 }
 
 function formatAppointment(startAt: string) {
@@ -444,6 +471,15 @@ export function PortalBooking({
         .filter((slot) => slot.barberStatus !== "OFF_DUTY")
     : [];
 
+  // ترقيم الخطوات محسوب لا مكتوب: الفرع والحلاق قسمان مشروطان، وترقيمٌ ثابت
+  // كان سيعطي «٣ الحلاق» لفرعٍ بلا قائمة حلاقين فيقفز العميل من ٢ إلى ٤.
+  let stepCount = 0;
+  const branchStep = salons.length > 1 ? ++stepCount : 0;
+  const serviceStep = salon && salon.services.length > 0 ? ++stepCount : 0;
+  const dayStep = ++stepCount;
+  const barberStep = salon && salon.barbers.length > 0 ? ++stepCount : 0;
+  const timeStep = ++stepCount;
+
   return (
     <div id="appointments" className="min-w-0 space-y-4">
       {confirmDialog}
@@ -573,9 +609,10 @@ export function PortalBooking({
           <h2 className="lux-section-title">احجز موعدك</h2>
 
           {salons.length > 1 ? (
-            <label className="mt-4 block">
-              <span className="mb-2 block text-xs font-black text-salon-charcoal">الفرع</span>
+            <div className="mt-4">
+              <Step number={branchStep} title="الفرع" />
               <select
+                aria-label="الفرع"
                 value={salonId}
                 onChange={(event) => setSalonId(event.target.value)}
                 className="w-full rounded-2xl border border-salon-line bg-salon-pearl px-4 py-3 text-sm font-bold"
@@ -586,16 +623,13 @@ export function PortalBooking({
                   </option>
                 ))}
               </select>
-            </label>
+            </div>
           ) : null}
 
           {/* الخدمات قبل الوقت: الشبكة بلا معنى قبل معرفة كم تستغرق الزيارة. */}
           {salon && salon.services.length > 0 ? (
             <div className="mt-5">
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <span className="block text-xs font-black text-salon-charcoal">الخدمات المطلوبة</span>
-                <span className="text-[0.65rem] font-bold text-salon-charcoal/60">اختياري</span>
-              </div>
+              <Step number={serviceStep} title="الخدمات المطلوبة" hint="اختياري" />
               <div className="grid gap-2 sm:grid-cols-2">
                 {salon.services.map((service) => {
                   const active = serviceIds.includes(service.id);
@@ -645,20 +679,31 @@ export function PortalBooking({
             </div>
           ) : null}
 
-          <div className="mt-4 flex items-start gap-3 rounded-2xl border border-salon-gold/30 bg-salon-gold/10 px-4 py-3">
-            <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-salon-ink text-xs font-bold text-white" aria-hidden="true">
-              {leadMinutes === 120 ? "+2" : `+${leadMinutes}د`}
-            </span>
-            <div>
-              <p className="text-sm font-bold text-salon-ink">الحجز يبدأ بعد ساعتين من الآن</p>
-              <p className="mt-1 text-xs font-semibold leading-5 text-salon-charcoal/70">
-                نعرض تلقائيًا أول وقت يسمح به النظام بعد {formatLeadDuration(leadMinutes)} أو أكثر.
-              </p>
+          {/* المهلة تُقرأ من إعداد الفرع لا تُكتب. كان العنوان «الحجز يبدأ بعد
+              ساعتين من الآن» نصًّا ثابتًا بينما الشارة والسطر تحته يحسبان
+              `leadMinutes`، فيقرأ عميلُ فرعٍ مهلته نصف ساعة «ساعتين» ثم يجد
+              أوقاتًا متاحة أقرب — تناقض على سطرين متلاصقين. */}
+          {leadMinutes > 0 ? (
+            <div className="mt-4 flex items-start gap-3 rounded-2xl border border-salon-gold/30 bg-salon-gold/10 px-4 py-3">
+              <span
+                className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-salon-ink text-[0.6rem] font-bold text-white"
+                aria-hidden="true"
+              >
+                مهلة
+              </span>
+              <div>
+                <p className="text-sm font-bold text-salon-ink">
+                  أقرب موعد بعد {formatLeadDuration(leadMinutes)} من الآن
+                </p>
+                <p className="mt-1 text-xs font-semibold leading-5 text-salon-charcoal/70">
+                  نعرض تلقائيًا أول وقت يسمح به النظام؛ ما قبله يظهر بعلامة «قبل المهلة».
+                </p>
+              </div>
             </div>
-          </div>
+          ) : null}
 
           <div className="mt-5">
-            <span className="mb-2 block text-xs font-black text-salon-charcoal">اليوم</span>
+            <Step number={dayStep} title="اليوم" />
             <div className="table-scroll -mx-1 flex gap-2 overflow-x-auto px-1 pb-2">
               {days.map((day) => {
                 const label = formatDayLabel(day.date);
@@ -694,10 +739,7 @@ export function PortalBooking({
 
           {salon && salon.barbers.length > 0 ? (
             <div className="mt-4">
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <span className="block text-xs font-black text-salon-charcoal">اختر الحلاق</span>
-                <span className="text-[0.65rem] font-bold text-salon-charcoal/60">التوافر لليوم المختار</span>
-              </div>
+              <Step number={barberStep} title="اختر الحلاق" hint="التوافر لليوم المختار" />
               <div className="grid gap-2 sm:grid-cols-2">
                 {salon.barbers.map((barber) => {
                   const statuses = activeDay?.slots.map(
@@ -744,12 +786,11 @@ export function PortalBooking({
           ) : null}
 
           <div className="mt-4">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <span className="block text-xs font-black text-salon-charcoal">الوقت</span>
-              {activeBarber ? (
-                <span className="text-[0.65rem] font-bold text-salon-charcoal/60">جدول {activeBarber.name}</span>
-              ) : null}
-            </div>
+            <Step
+              number={timeStep}
+              title="الوقت"
+              hint={activeBarber ? `جدول ${activeBarber.name}` : undefined}
+            />
             {loadingSlots ? (
               <p className="rounded-2xl bg-salon-mist px-4 py-6 text-center text-sm font-bold text-salon-charcoal">
                 جاري جلب الأوقات...

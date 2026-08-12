@@ -58,6 +58,8 @@ export async function selfRegisterForLoyalty(
     organizationId: input.organizationId,
     name,
     phone,
+    // تسجيل ذاتي: العضوية مطلوبة صراحةً بعد أن صار الافتراضي `false`.
+    enrollInLoyalty: true,
     whatsappTransactionalOptIn: input.whatsappTransactionalOptIn ?? false,
     whatsappMarketingOptIn: input.whatsappMarketingOptIn ?? false,
     whatsappConsentSource: "WEBSITE",

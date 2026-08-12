@@ -35,6 +35,7 @@ export const getPortalIdentity = cache(async (token: string) => {
       visitCount: true,
       lastVisitAt: true,
       portalTokenExpiresAt: true,
+      accountId: true,
       bookingNoShowCount: true,
       bookingBlockedAt: true,
       bookingBlockReason: true,
@@ -54,6 +55,12 @@ export const getPortalIdentity = cache(async (token: string) => {
     organizationId: customer.organizationId,
     brandName: settings?.legalName?.trim() || settings?.salonName || customer.organization?.name || "",
     customer: { id: customer.id, name: customer.name, phone: customer.phone },
+    /**
+     * هل لهذه البطاقة حساب موحّد؟ من انضم من `/join` له حساب، ومن سجّله الحلاق
+     * على الكرسي لا. الفرق يحكم عرضَ رابط «حسابي على المنصّة» في تبويب حسابي:
+     * إرساله لمن لا حساب له يقوده إلى شاشة دخول لا يملك بيانات دخولها.
+     */
+    hasUnifiedAccount: Boolean(customer.accountId),
     points: customer.loyaltyAccount?.points ?? 0,
     lifetimeEarned: customer.loyaltyAccount?.lifetimeEarned ?? 0,
     visitCount: customer.visitCount,
@@ -205,9 +212,42 @@ export async function getPortalOffers(identity: PortalIdentity) {
   };
 }
 
-/** تبويب «زياراتي»: آخر الزيارات وطلبات الخصوصية. */
+/**
+ * تبويب «حسابي»: طلبات الخصوصية القائمة وحدها.
+ *
+ * منفصلة عن `getPortalVisits` عمدًا: تبويب «بطاقتي» كان يستدعي تلك ليقرأ منها
+ * `dataSubjectRequests` فيجلب معها عشر زيارات بثلاثة `include` **لا يعرضها**.
+ */
+export async function getPortalAccount(identity: PortalIdentity) {
+  const dataSubjectRequests = await prisma.dataSubjectRequest.findMany({
+    where: { customerId: identity.customer.id },
+    orderBy: { createdAt: "desc" },
+    take: 10,
+    select: { id: true, type: true, status: true, createdAt: true, identityVerifiedAt: true, executedAt: true },
+  });
+
+  return {
+    dataSubjectRequests: dataSubjectRequests.map((request) => ({
+      id: request.id,
+      type: request.type,
+      status: request.status,
+      createdAt: request.createdAt.toISOString(),
+      identityVerifiedAt: request.identityVerifiedAt?.toISOString() ?? null,
+      executedAt: request.executedAt?.toISOString() ?? null,
+    })),
+  };
+}
+
+/**
+ * تبويب «زياراتي»: آخر الزيارات **وحركة النقاط**.
+ *
+ * الرصيد بلا سجل رقمٌ يُطلب تصديقه: «كيف صار رصيدي ٣٤٠؟» لم يكن له جواب في
+ * البوابة إطلاقًا — الاستبدال والتسوية والعكس والانتهاء لا يظهر منها شيء، وقائمة
+ * الزيارات تُظهر المكتسب وحده. السجل موجود أصلًا في `LoyaltyTransaction` ويُعرض
+ * كاملًا في محفظة الحساب؛ هذه تعرض آخر عشر حركات في مكان الرصيد نفسه.
+ */
 export async function getPortalVisits(identity: PortalIdentity) {
-  const [visits, dataSubjectRequests] = await Promise.all([
+  const [visits, dataSubjectRequests, movements] = await Promise.all([
     prisma.visit.findMany({
       where: { customerId: identity.customer.id, status: "COMPLETED" },
       orderBy: { visitedAt: "desc" },
@@ -227,9 +267,22 @@ export async function getPortalVisits(identity: PortalIdentity) {
       take: 10,
       select: { id: true, type: true, status: true, createdAt: true, identityVerifiedAt: true, executedAt: true },
     }),
+    prisma.loyaltyTransaction.findMany({
+      where: { customerId: identity.customer.id },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+      select: { id: true, type: true, points: true, balanceAfter: true, createdAt: true },
+    }),
   ]);
 
   return {
+    pointsMovements: movements.map((movement) => ({
+      id: movement.id,
+      type: movement.type,
+      points: movement.points,
+      balanceAfter: movement.balanceAfter,
+      createdAt: movement.createdAt.toISOString(),
+    })),
     recentVisits: visits.map((visit) => ({
       id: visit.id,
       visitedAt: visit.visitedAt.toISOString(),

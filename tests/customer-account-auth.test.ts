@@ -172,6 +172,7 @@ describe("customer account registration", () => {
   it("never links or claims a legacy customer that shares the phone", async () => {
     const identity = newIdentity();
     const legacy = await createCustomerWithLoyalty({
+      enrollInLoyalty: true,
       prisma,
       organizationId: ORG,
       name: "عميل قديم",
