@@ -10,7 +10,7 @@ Production deployment or production migration: **not performed**.
 
 **NOT READY**
 
-The code-level gates are green, but launch acceptance is blocked by missing production customer-auth configuration, unproved live email delivery/DNS, no real-device passkey evidence, and no restore proof for a recent encrypted production/staging artifact. The shared working tree also received concurrent uncommitted stock/supply feature work during this audit, so a release freeze and an approved immutable commit are still required.
+The code-level gates and required production customer-auth configuration are green. Launch acceptance remains blocked by the three approved end-to-end email deliveries, a real Windows Hello/passkey ceremony, and an isolated restore of the newest encrypted production artifact. The release candidate is isolated on a dedicated branch, but the exact commit still requires explicit approval before Production deployment.
 
 ## B — Authentication
 
@@ -25,16 +25,16 @@ The code-level gates are green, but launch acceptance is blocked by missing prod
 ## C — Email
 
 - Provider: Resend is selected when the production key is present; no key is hardcoded.
-- Production configuration: provider key/from/reply-to/webhook secret are set, but the provider-selection variable is omitted by design and auto-detected.
+- Production configuration: provider, sending key, independent inbound key, from/reply-to, webhook secret, and fail-closed email flags are `SET` and validated without exposing their values.
 - DNS: **PASS** for public records. SPF exists on the Resend sending subdomain, DKIM exists on the Resend selector, and DMARC exists on the apex. The authenticated Resend tab identifies `xmansx.com` as verified.
 - Templates: Arabic/RTL XMANSX templates exist for verification OTP, login OTP, and password reset; expiry is stated and no localhost/stack trace placeholder was found. Login OTP now has its own subject/tag.
 - Logging: development console delivery no longer logs recipient, subject, body, or OTP.
-- Delivery test: **NOT TESTED**. No real email was sent without an explicitly approved test recipient/window.
+- Delivery test: **PARTIAL**. Resend contains a recent message to the intended test inbox with authoritative `sent` and `delivered` events. The required fresh verification/login/reset trio remains pending confirmation of the recipient address.
 
 ## D — WebAuthn
 
 - Required production target: RP name `XMANSX`, RP ID `xmansx.com`, primary origin `https://xmansx.com`; the implementation also permits the reviewed `https://www.xmansx.com` origin.
-- Production environment state: the three explicit WebAuthn variables are missing; readiness now fails closed in production when they or the independent session/OTP secrets are invalid.
+- Production environment state: RP name, RP ID, origin, independent session secret, and OTP pepper are `SET` and pass the production validation audit.
 - Hardening: `residentKey=required`, `userVerification=required`, and verification requires user verification. There is no silent downgrade to `preferred`.
 - HTTPS: **PASS** for the live edge. HTTP redirects to HTTPS, HSTS/CSP are present, the certificate matches `xmansx.com`, and it had 87 days remaining at inspection. Live end-to-end passkey behavior was not exercised.
 - Biometrics: no biometric material is stored; only WebAuthn credential public material and metadata are stored.
@@ -72,7 +72,7 @@ The code-level gates are green, but launch acceptance is blocked by missing prod
 - Debug routes: no `/api/dev`, `/debug`, test-login bypass, or production customer-auth bypass was found. Existing test-email/push endpoints require the appropriate authenticated platform/staff context.
 - Headers: HSTS in production, CSP, frame denial, content-type protection, referrer policy, permissions policy, COOP, and no-store API/private-page caching are configured.
 - Release safety: the release script now fails closed on the required production configuration and exact Node version, runs the encrypted backup service instead of creating a raw dump, builds before touching the schema, and lets systemd apply migrations immediately before starting the new application.
-- Monitoring: a hardened two-minute systemd readiness monitor and throttled Resend alert path are included and regression-tested. Installation and a controlled failure alert on Production remain unproved.
+- Monitoring: the two-minute systemd readiness monitor is installed, enabled, active, and its live success execution is proven. A Windows-to-Linux executable-bit defect found during installation was fixed by invoking Bash explicitly and preserving the executable bit. The controlled failure/alert path remains untested to avoid intentionally disturbing Production without a separate alert-test window.
 - Private indexing: account, wallet, dashboard, barber, platform, receipt, and legacy customer portal routes are excluded from public indexing; marketing pages remain public.
 - Tenant isolation, IDOR, CSRF, rate-limit, and session-separation tests pass.
 
@@ -97,10 +97,11 @@ The code-level gates are green, but launch acceptance is blocked by missing prod
 
 ## K — Backup/Restore
 
-- Host read-only evidence: encrypted `.dump.age` artifacts/checksums existed and the systemd backup timer was enabled and active at inspection time.
+- Host evidence: encrypted `.dump.age` artifacts/checksums exist; the newest inspected artifact was created on 2026-08-12 and its SHA-256 verification passed. The systemd backup timer is enabled/active and its last service result is success.
+- Hetzner disk backups: enabled; recent automated images were visually verified as `Available`.
 - Local isolated custom-format restore drill: **PASS**; no production data was used and the restored database/dump were cleaned up after validation.
 - Production/staging encrypted artifact decryption + isolated restore + application smoke test: **NOT TESTED**.
-- Immutable off-site copy, owner, RPO, RTO, and restore duration for production: **NOT PROVEN**.
+- The offline `age` identity is correctly absent from Production, but its recovery location was not supplied. `rclone`/`restic` off-site export is not configured, so encrypted database off-site copy, owner, RPO, RTO, and production-artifact restore duration remain **NOT PROVEN**.
 - A legacy `tanal.env.*` artifact was observed in the backup directory. It was not read or deleted; controlled review and possible credential rotation remain required.
 
 ## L — Manual E2E
@@ -132,23 +133,23 @@ Only state is shown; secret values are intentionally omitted.
 | `DIRECT_URL` | No/currently unused | Direct migration connection when supported | Optional | Recommended if provider requires it | Yes | MISSING |
 | `REDIS_URL` | Yes | Distributed rate limits/readiness | Can fall back only when explicitly allowed | Required | Yes | SET |
 | `REDIS_REQUIRED` | Yes | Fail-closed Redis policy | May be false | Must be true | No | SET |
-| `SESSION_SECRET` | Yes | Signed join/session context | Non-production fallback allowed | Independent >=32-byte secret required | Yes | MISSING |
+| `SESSION_SECRET` | Yes | Signed join/session context | Non-production fallback allowed | Independent >=32-byte secret required | Yes | SET |
 | `CUSTOMER_OTP_PEPPER` | Yes | OTP HMAC pepper | Required by secure flows | Independent >=32-byte secret required | Yes | SET |
-| `EMAIL_PROVIDER` | No | Explicit provider selection | Console/auto | `resend` recommended; auto-selects with key | No | MISSING |
+| `EMAIL_PROVIDER` | No | Explicit provider selection | Console/auto | Must be `resend` for this deployment | No | SET |
 | `RESEND_API_KEY` | Yes | Production delivery | Optional | Required for Resend | Yes | SET |
 | `EMAIL_FROM` | Yes | Verified sender identity | Optional/simulated | Verified domain sender required | No | SET |
 | `EMAIL_REPLY_TO` | Recommended | Reply mailbox | Optional | Customer support mailbox | No | SET |
 | `EMAIL_REQUIRED` | Yes | Fail-closed delivery readiness | May be false | Must be true | No | SET |
 | `RESEND_WEBHOOK_SECRET` | Yes when webhook enabled | Verify delivery webhooks | Optional | Required for webhook | Yes | SET |
-| `WEBAUTHN_RP_NAME` | Yes | Passkey relying-party label | Safe local default | Explicit `XMANSX` required | No | MISSING |
-| `WEBAUTHN_RP_ID` | Yes | Passkey RP scope | Localhost derivation | Explicit approved domain required | No | MISSING |
-| `WEBAUTHN_ORIGIN` | Yes | Passkey expected origin | Local origin derivation | Explicit HTTPS origin required | No | MISSING |
+| `WEBAUTHN_RP_NAME` | Yes | Passkey relying-party label | Safe local default | Explicit `XMANSX` required | No | SET |
+| `WEBAUTHN_RP_ID` | Yes | Passkey RP scope | Localhost derivation | Explicit approved domain required | No | SET |
+| `WEBAUTHN_ORIGIN` | Yes | Passkey expected origin | Local origin derivation | Explicit HTTPS origin required | No | SET |
 | `PUBLIC_APP_URL` | Yes | Canonical application URL | Localhost allowed | Canonical HTTPS URL | No | SET |
 | `NEXT_PUBLIC_SITE_URL` | No/current equivalent is `PUBLIC_APP_URL` | Public canonical URL alias | Not used | Not used by reviewed code | No | MISSING |
 | `ALLOWED_ORIGINS` | Yes | Origin/CSRF allowlist | Local origins | Approved HTTPS origins only | No | SET |
 | `PLATFORM_MFA_ENCRYPTION_KEY` | Yes | Protect platform MFA secret material | Required for MFA testing | Required | Yes | SET |
 | `MAINTENANCE_TOKEN` | Yes | Authenticate maintenance endpoint | Optional local execution | Required/rotatable | Yes | SET |
-| `REQUIRE_EXPLICIT_SEED_CREDENTIALS` | Yes | Prevent implicit production seed credentials | Optional locally | Must be true | No | MISSING |
+| `REQUIRE_EXPLICIT_SEED_CREDENTIALS` | Yes | Prevent implicit production seed credentials | Optional locally | Must be true | No | SET |
 | `ROOT_DOMAIN` | Yes | Domain routing/cookies | Local default possible | Explicit production domain | No | SET |
 | `LOG_LEVEL` | Recommended | Runtime log threshold | Debug/info | Info/warn per policy | No | SET |
 
@@ -165,17 +166,18 @@ Only state is shown; secret values are intentionally omitted.
 
 - Safety checkpoint: `a46143b` (`chore: checkpoint customer account and passkey work`).
 - Production-readiness commit: recorded in the final handoff; a commit cannot embed its own final hash in its committed contents.
+- Hardened release candidate: `9e139886f8c40da5fbec4494ce99a7b5a9be10cd` on `release/production-readiness-2026-08-12`.
+- Monitor execution fix on the current integration branch: `6b377c1c52347cdc872cd830c68dd20918a632a8`.
 
 ## Q — Launch blockers
 
-1. Set and validate independent production `SESSION_SECRET` plus explicit WebAuthn RP name/ID/origin.
-2. Set `REQUIRE_EXPLICIT_SEED_CREDENTIALS=true` and re-check readiness.
-3. Complete approved live verification/login/reset delivery; DNS and Resend domain verification are already proven.
-4. Complete at least one real-device passkey journey, then the full device matrix.
-5. Restore a recent encrypted production/staging artifact into isolation and prove application smoke, off-site copy, RPO/RTO, and alerting.
-6. Freeze feature work and select an immutable release commit; review/merge or explicitly exclude the concurrent stock/supply work.
-7. Install the included readiness monitor and prove the controlled failure alert; connect journal event patterns for 500s, email/OTP/passkey failures, exhausted P2034 retries, migration failure, and backup failure to the accountable operator.
-8. Run the manual E2E journeys against staging with production-equivalent HTTPS, Redis, email, and WebAuthn configuration.
+1. Confirm the approved inbox and complete fresh verification/login/reset delivery; DNS, Resend domain verification, API-key activity, and a prior delivered message are already proven.
+2. Complete at least one real-device Windows Hello/passkey journey, then the remaining device matrix.
+3. Supply the offline `age` identity location; restore the newest encrypted artifact into an isolated `_restore_drill` database and run application smoke.
+4. Configure/prove encrypted database off-site copy and record accountable owner, RPO, and RTO. Hetzner whole-server backups are already enabled and available.
+5. Approve the exact immutable release commit; stock/supply work remains excluded from the readiness release branch.
+6. Prove the controlled monitor alert in an agreed test window and connect remaining journal event patterns to the accountable operator.
+7. Run the remaining manual E2E journeys against the approved production-equivalent target.
 
 ## R — Recommended launch sequence
 

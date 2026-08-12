@@ -13,21 +13,21 @@ Every item needs dated evidence and an accountable operator.
 
 ## 2. Runtime environment
 
-- [ ] Node is exactly the version declared by `.node-version` / `.nvmrc`.
-- [ ] `DATABASE_URL`, Redis, email, session, OTP, WebAuthn, MFA, maintenance, and public-origin variables are `SET` and validated.
-- [ ] `SESSION_SECRET` and `CUSTOMER_OTP_PEPPER` are independent secrets of at least 32 bytes.
-- [ ] `WEBAUTHN_RP_NAME`, `WEBAUTHN_RP_ID`, and `WEBAUTHN_ORIGIN` match the approved production domain strategy.
-- [ ] `REQUIRE_EXPLICIT_SEED_CREDENTIALS=true`; seed is not part of production launch.
-- [ ] No secret appears in Git, CI logs, shell history, or deployment output.
-- [ ] `/api/health/readiness` returns 200 only after all required dependencies are ready.
+- [x] Node is exactly the version declared by `.node-version` / `.nvmrc` (22.22.3 verified on Production, 2026-08-12).
+- [x] `DATABASE_URL`, Redis, email, session, OTP, WebAuthn, MFA, maintenance, and public-origin variables are `SET` and validated.
+- [x] `SESSION_SECRET` and `CUSTOMER_OTP_PEPPER` are independent secrets of at least 32 bytes.
+- [x] `WEBAUTHN_RP_NAME`, `WEBAUTHN_RP_ID`, and `WEBAUTHN_ORIGIN` match the approved production domain strategy.
+- [x] `REQUIRE_EXPLICIT_SEED_CREDENTIALS=true`; seed is not part of production launch.
+- [x] No secret appears in the reviewed Git release scope or audit outputs.
+- [x] `/api/health/readiness` returned HTTP 200 after dependency/configuration validation.
 
 ## 3. Email
 
-- [ ] Resend sending key is scoped to this platform and `EMAIL_FROM` uses the verified XMANSX domain.
-- [ ] SPF, DKIM, and DMARC are verified from the actual sending-domain configuration.
+- [x] Resend uses named, separate production-sending and inbound-processing keys; `EMAIL_FROM` uses the verified XMANSX domain.
+- [x] SPF, DKIM, and DMARC are verified from the actual sending-domain configuration.
 - [ ] Deliver one verification OTP, one login OTP, and one password reset to approved test inboxes.
 - [ ] Confirm Arabic RTL rendering, correct subject/tag, ten-minute expiry text, and no localhost/stack trace.
-- [ ] Confirm delivery, bounce, complaint, and provider-failure visibility.
+- [x] Confirm delivery, bounce, complaint, and provider-failure visibility in Resend; a recent message showed `sent` and `delivered` events.
 
 ## 4. Database and migrations
 
@@ -75,6 +75,9 @@ For each of iPhone Safari, Android Chrome, and Windows Edge/Chrome:
 
 ## 9. Backup, monitoring, and rollback
 
+- [x] Encrypted PostgreSQL backup timer is active; latest checksum verified.
+- [x] Hetzner automatic disk backups are enabled and recent images are `Available`.
+- [x] Two-minute readiness monitor is installed, enabled, and its success path passed.
 - [ ] Restore the newest encrypted production/staging backup into an isolated database.
 - [ ] Run an application smoke test against the restored database.
 - [ ] Record backup owner, immutable/off-site location, RPO, RTO, and restore duration.
