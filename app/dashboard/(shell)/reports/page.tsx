@@ -1,7 +1,8 @@
-import { formatDate, formatMoney, formatNumber } from "@/lib/format";
+import { formatDate, formatMoney, formatNumber, formatReportPeriod } from "@/lib/format";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { DashboardShell, Notice, SectionPanel, StatCard } from "@/components/dashboard/ui";
+import { DashboardShell, Notice, ReportPrintMeta, SectionPanel, StatCard } from "@/components/dashboard/ui";
+import { PrintButton } from "@/components/ui/print-button";
 import { canAccessDashboard } from "@/lib/auth/access";
 import { dashboardScope } from "@/lib/auth/salon-scope";
 import { getRequestSession } from "@/lib/auth/http";
@@ -27,14 +28,14 @@ export default async function DashboardReportsPage({
   const { organizationId, orgWhere, salonWhere, salonIds } = dashboardScope(session);
   const params = await searchParams;
   const presetRange = getPresetRange(params.preset);
-  const filters: ReportFilters = {
+  const filters = {
     organizationId,
     salonIds,
     from: params.from ? startOfDay(params.from) : presetRange.from,
     to: params.to ? endExclusive(params.to) : presetRange.to,
     barberId: params.barberId,
     paymentMethod: params.paymentMethod === "CASH" || params.paymentMethod === "NETWORK" ? params.paymentMethod : undefined,
-  };
+  } satisfies ReportFilters;
 
   const [barbers, reports, expenses] = await Promise.all([
     prisma.barber.findMany({ where: { ...orgWhere, ...salonWhere }, orderBy: { name: "asc" } }),
@@ -51,10 +52,21 @@ export default async function DashboardReportsPage({
     commissionAccrued: revenue.commissionAmount,
     expensesTotal: expenses.total,
   });
+  const scopeLabel = reportScopeLabel({
+    barberName: barbers.find((barber) => barber.id === filters.barberId)?.name,
+    paymentMethod: filters.paymentMethod,
+    salonScoped: Boolean(salonIds?.length),
+  });
 
   return (
-    <DashboardShell title="التقارير المالية والتشغيلية" description="قراءة واضحة للدخل، الأداء، الخصومات، العملاء، وحركة الخدمات حسب الفترة والحلاق وطريقة الدفع.">
-        <form className="dashboard-panel mt-6 grid gap-3 p-4 lg:grid-cols-[150px_150px_150px_1fr_150px_120px]">
+    <DashboardShell
+      title="التقارير المالية والتشغيلية"
+      description="قراءة واضحة للدخل، الأداء، الخصومات، العملاء، وحركة الخدمات حسب الفترة والحلاق وطريقة الدفع."
+      actions={<PrintButton label="طباعة التقرير" />}
+    >
+        <ReportPrintMeta period={formatReportPeriod(filters.from, filters.to)} scope={scopeLabel} printedAt={formatDate(new Date())} />
+
+        <form className="dashboard-panel mt-6 grid gap-3 p-4 print:hidden lg:grid-cols-[150px_150px_150px_1fr_150px_120px]">
           <select name="preset" defaultValue={params.preset ?? "today"} className="dashboard-field">
             <option value="today">اليوم</option>
             <option value="yesterday">أمس</option>
@@ -254,4 +266,19 @@ function startOfDay(value: string) {
 
 function endExclusive(value: string) {
   return addRiyadhDays(parseRiyadhDateKey(value), 1);
+}
+
+function reportScopeLabel({
+  barberName,
+  paymentMethod,
+  salonScoped,
+}: {
+  barberName?: string;
+  paymentMethod?: "CASH" | "NETWORK";
+  salonScoped: boolean;
+}) {
+  const parts = [salonScoped ? "الفروع المسموح بها" : "كل الفروع"];
+  if (barberName) parts.push(`الحلاق: ${barberName}`);
+  if (paymentMethod) parts.push(`الدفع: ${paymentMethod === "CASH" ? "كاش" : "شبكة"}`);
+  return parts.join(" · ");
 }

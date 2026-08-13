@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 import { formatDate } from "@/lib/format";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 type AdminRow = {
   id: string;
@@ -23,7 +24,7 @@ export function PlatformAdmins({ initialAdmins, currentAdminId }: { initialAdmin
     setPending(true);
     const formEl = event.currentTarget;
     const form = new FormData(formEl);
-    const response = await fetch("/api/platform/admins", {
+    const response = await safeFetch("/api/platform/admins", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: form.get("name"), email: form.get("email"), password: form.get("password") }),
@@ -40,7 +41,7 @@ export function PlatformAdmins({ initialAdmins, currentAdminId }: { initialAdmin
   }
 
   async function toggleActive(admin: AdminRow) {
-    const response = await fetch(`/api/platform/admins/${admin.id}`, {
+    const response = await safeFetch(`/api/platform/admins/${admin.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ isActive: !admin.isActive }),
@@ -59,7 +60,7 @@ export function PlatformAdmins({ initialAdmins, currentAdminId }: { initialAdmin
     setSavingPassword(true);
     const formEl = event.currentTarget;
     const form = new FormData(formEl);
-    const response = await fetch("/api/platform/auth/password", {
+    const response = await safeFetch("/api/platform/auth/password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ currentPassword: form.get("currentPassword"), newPassword: form.get("newPassword") }),

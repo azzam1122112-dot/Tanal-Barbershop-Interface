@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 type ConsentSource = "IN_PERSON" | "WEBSITE" | "WHATSAPP" | "PHONE" | "IMPORTED" | "OTHER";
 
@@ -24,7 +25,7 @@ export function CustomerWhatsAppToggle({
 
   async function update(next: { transactionalOptIn?: boolean; marketingOptIn?: boolean; optOutReason?: string }) {
     setLoading(true);
-    const response = await fetch(`/api/dashboard/customers/${customerId}/whatsapp-preference`, {
+    const response = await safeFetch(`/api/dashboard/customers/${customerId}/whatsapp-preference`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...next, consentSource: source }),

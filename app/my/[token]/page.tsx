@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { formatDate, formatMoney, formatNumber } from "@/lib/format";
+import { countAr, formatDate, formatMoney, formatNumber } from "@/lib/format";
 import { getPortalCard, getPortalIdentity } from "@/lib/customers/portal-view";
+import { rewardNameMentionsAmount } from "@/lib/loyalty/reward-summary";
 import { NextAppointmentCard } from "@/components/public/next-appointment-card";
 
 /**
@@ -22,9 +23,10 @@ export default async function CustomerPortalPage({ params }: { params: Promise<{
   // بتسميتين مختلفتين — يقرؤه العميل كخلل لا كمعلومة. يظهر حين يفترق فعلًا.
   const showLifetimeEarned = identity.lifetimeEarned > identity.points;
 
-  // اسم القاعدة كثيرًا ما يكون «خصم ٢٥ ريال»، فإلحاق المبلغ به ينتج تكرارًا.
+  // القاعدة مشتركة مع تبويب «العروض»: `includes` النصية كانت تُطابق «خصم ٢٥٠
+  // ريال» لمكافأة قيمتها ٢٥ فتحذف مبلغًا مختلفًا عن الاسم.
   const nextRewardMentionsAmount = card.nextReward
-    ? card.nextReward.name.includes(String(card.nextReward.discountAmount))
+    ? rewardNameMentionsAmount(card.nextReward.name, card.nextReward.discountAmount)
     : false;
 
   return (
@@ -105,10 +107,22 @@ export default async function CustomerPortalPage({ params }: { params: Promise<{
       >
         <span className="min-w-0">
           <span className="block text-sm font-bold text-salon-ink">
-            {card.unlockedCount > 0 ? `لديك ${formatNumber(card.unlockedCount)} مكافأة جاهزة` : "عروض الصالون"}
+            {card.unlockedCount > 0
+              ? `لديك ${countAr(card.unlockedCount, {
+                  one: "خصم واحد جاهز",
+                  two: "خصمان جاهزان",
+                  few: "خصومات جاهزة",
+                  many: "خصمًا جاهزًا",
+                })}`
+              : "عروض الصالون"}
           </span>
+          {/* **تاريخ الانتهاء هو ما يحرّك العميل، لا وجود عرضٍ ما.** الحملات
+              محدودة بفترة، وسطرٌ عام («عروض الصالون») يجعل العرض الذي ينتهي بعد
+              يومين يمرّ دون أن يُفتح. */}
           <span className="mt-0.5 block text-xs font-semibold text-salon-charcoal/70">
-            الخدمات والأسعار والمكافآت والهدايا
+            {card.soonestCampaignEndsAt
+              ? `عرض ساري حتى ${formatDate(card.soonestCampaignEndsAt)} · الأسعار والمكافآت`
+              : "الخدمات والأسعار والمكافآت والهدايا"}
           </span>
         </span>
         <span aria-hidden="true" className="shrink-0 text-lg font-black text-salon-gold">

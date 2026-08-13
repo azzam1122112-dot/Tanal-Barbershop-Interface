@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { PrintButton } from "@/components/receipt/print-button";
+import { PrintButton } from "@/components/ui/print-button";
 
 /**
  * ملصق التسجيل الذاتي: رابط + رمز QR يُطبع ويُعلَّق في الصالون

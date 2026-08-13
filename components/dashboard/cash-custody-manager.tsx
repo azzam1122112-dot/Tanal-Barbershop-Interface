@@ -4,6 +4,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { Badge, Field, InlineEmpty, Notice, SectionPanel, StatCard, TablePanel } from "@/components/dashboard/ui";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 import { formatDateTime, formatMoney, formatNumber } from "@/lib/format";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 type Policy = { salonId: string; mode: "DISABLED" | "INTERVAL" | "WEEKDAYS"; intervalDays: number; weekdays: number[]; thresholdAmount: number | null; reminderHour: number };
 type BarberRow = {
@@ -42,7 +43,7 @@ export function CashCustodyManager({
   const [reverseId, setReverseId] = useState<string | null>(null);
 
   async function refresh(message?: string) {
-    const response = await fetch("/api/dashboard/cash-custody", { cache: "no-store" });
+    const response = await safeFetch("/api/dashboard/cash-custody", { cache: "no-store" });
     const next = (await response.json().catch(() => ({}))) as DashboardData & { message?: string };
     if (!response.ok) throw new Error(next.message ?? "تعذر تحديث دفتر العهدة");
     setData(next);
@@ -53,7 +54,7 @@ export function CashCustodyManager({
     setBusy(true);
     setToast(null);
     try {
-      const response = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const response = await safeFetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const result = (await response.json().catch(() => ({}))) as { message?: string };
       if (!response.ok) throw new Error(result.message ?? "تعذر حفظ العملية");
       await refresh(result.message ?? success);

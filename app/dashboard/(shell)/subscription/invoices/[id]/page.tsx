@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { PrintButton } from "@/components/receipt/print-button";
+import { PrintButton } from "@/components/ui/print-button";
 import { BrandLogo } from "@/components/brand-logo";
 import { SubscriptionInvoiceEmailButton } from "@/components/dashboard/subscription-invoice-email-button";
 import { getRequestSession } from "@/lib/auth/http";

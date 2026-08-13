@@ -2,9 +2,9 @@
 
 import { FormEvent, useState } from "react";
 import { formatMoney } from "@/lib/format";
+import { safeFetch } from "@/lib/http/safe-fetch";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 import { InlineEmpty } from "@/components/dashboard/ui";
-
 type Product = {
   id: string;
   name: string;
@@ -52,7 +52,7 @@ export function ProductsManager({
     const formEl = event.currentTarget;
     const form = new FormData(formEl);
 
-    const response = await fetch("/api/dashboard/products", {
+    const response = await safeFetch("/api/dashboard/products", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -78,10 +78,10 @@ export function ProductsManager({
     setLoading(false);
   }
 
-  async function patchProduct(product: Product, body: Record<string, unknown>) {
+  async function patchProduct(product: Product, body: Record<string, unknown>, successMessage?: string) {
     setPendingId(product.id);
     setToast(null);
-    const response = await fetch(`/api/dashboard/products/${product.id}`, {
+    const response = await safeFetch(`/api/dashboard/products/${product.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -90,6 +90,7 @@ export function ProductsManager({
 
     if (response.ok && data.product) {
       setProducts((current) => current.map((item) => (item.id === product.id ? data.product! : item)));
+      setToast({ message: successMessage ?? "تم تحديث المنتج", tone: "success" });
     } else {
       setToast({ message: data.message ?? "تعذر تحديث المنتج", tone: "error" });
     }
@@ -108,7 +109,7 @@ export function ProductsManager({
     // «جرد/تسوية» يقبل الإشارة كما أدخلها المستخدم؛ الباقي محدّد الاتجاه.
     const quantity = type === "ADJUSTMENT" ? Number(form.get("quantity")) : raw * sign;
 
-    const response = await fetch(`/api/dashboard/products/${product.id}/stock`, {
+    const response = await safeFetch(`/api/dashboard/products/${product.id}/stock`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ type, quantity, reason: form.get("reason") || null }),
@@ -236,7 +237,15 @@ export function ProductsManager({
                       <button
                         type="button"
                         disabled={isPending}
-                        onClick={() => void patchProduct(product, { isActive: !product.isActive })}
+                        onClick={() =>
+                          void patchProduct(
+                            product,
+                            { isActive: !product.isActive },
+                            product.isActive
+                              ? `أُخفي ${product.name} — لن يظهر عند تسجيل الزيارة`
+                              : `فُعّل ${product.name} — صار متاحًا للبيع`,
+                          )
+                        }
                         className="dashboard-button-soft px-3 py-2 text-xs"
                       >
                         {product.isActive ? "تعطيل" : "تفعيل"}

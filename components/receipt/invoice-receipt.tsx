@@ -1,6 +1,6 @@
 import { formatDateTime, formatMoney, formatNumber } from "@/lib/format";
 import type { ReceiptData } from "@/lib/invoicing/receipt";
-import { PrintButton } from "./print-button";
+import { PrintButton } from "@/components/ui/print-button";
 import { ShareReceiptPdfButton } from "./share-pdf-button";
 
 /**

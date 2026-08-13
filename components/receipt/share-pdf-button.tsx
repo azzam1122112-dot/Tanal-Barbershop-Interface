@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 export function ShareReceiptPdfButton({
   visitId,
@@ -17,7 +18,7 @@ export function ShareReceiptPdfButton({
     setLoading(true);
     setMessage("");
 
-    const response = await fetch(`/api/receipt/${visitId}/pdf`, {
+    const response = await safeFetch(`/api/receipt/${visitId}/pdf`, {
       credentials: "same-origin",
       signal,
     });

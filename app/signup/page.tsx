@@ -5,6 +5,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { BrandLogo } from "@/components/brand-logo";
 import { formatDate } from "@/lib/format";
 import { absoluteBrowserUrl } from "@/lib/public-url";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 type CreatedAccount = {
   slug: string;
@@ -28,7 +29,7 @@ export default function SignupPage() {
   const [created, setCreated] = useState<CreatedAccount | null>(null);
 
   useEffect(() => {
-    void fetch("/api/auth/signup")
+    void safeFetch("/api/auth/signup")
       .then((response) => response.json())
       .then((data: { plan?: { name?: string; trialDays?: number } }) => {
         if (data.plan?.name && data.plan.trialDays) setTrial({ name: data.plan.name, days: data.plan.trialDays });
@@ -43,7 +44,7 @@ export default function SignupPage() {
     const form = new FormData(event.currentTarget);
     const salonName = String(form.get("salonName") ?? "");
     const password = String(form.get("password") ?? "");
-    const response = await fetch("/api/auth/signup", {
+    const response = await safeFetch("/api/auth/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

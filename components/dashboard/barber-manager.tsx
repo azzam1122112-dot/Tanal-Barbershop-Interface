@@ -7,6 +7,7 @@ import type { SafeBarber } from "@/lib/auth/sanitize";
 import { buildBarberLoginMessage, toWhatsAppPhone } from "@/lib/barbers/login-share";
 import { InlineEmpty } from "@/components/dashboard/ui";
 import { RIYADH_TIME_ZONE } from "@/lib/datetime/riyadh";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 type BarberResponse = {
   barber?: SafeBarber;
@@ -96,7 +97,7 @@ export function BarberManager({
     const commissionRate = String(form.get("commissionRate") ?? "").trim();
     const pin = String(form.get("pin") ?? "");
 
-    const response = await fetch("/api/dashboard/barbers", {
+    const response = await safeFetch("/api/dashboard/barbers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -166,7 +167,7 @@ export function BarberManager({
   }
 
   async function patchBarber(id: string, body: Record<string, unknown>) {
-    const response = await fetch(`/api/dashboard/barbers/${id}`, {
+    const response = await safeFetch(`/api/dashboard/barbers/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -183,7 +184,7 @@ export function BarberManager({
   }
 
   async function resetPin(id: string, pin: string) {
-    const response = await fetch(`/api/dashboard/barbers/${id}/reset-pin`, {
+    const response = await safeFetch(`/api/dashboard/barbers/${id}/reset-pin`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pin }),
@@ -284,7 +285,15 @@ export function BarberManager({
   async function toggleStatus(barber: SafeBarber) {
     setPendingId(barber.id);
     setToast(null);
-    await patchBarber(barber.id, { isActive: !barber.isActive });
+    const next = !barber.isActive;
+    if (await patchBarber(barber.id, { isActive: next })) {
+      setToast({
+        message: next
+          ? `فُعّل ${barber.name} — يستطيع تسجيل الدخول وفتح جلسة صندوق`
+          : `عُطّل ${barber.name} — لن يستطيع تسجيل الدخول ولا تسجيل زيارة`,
+        tone: "success",
+      });
+    }
     setPendingId(null);
   }
 
@@ -324,7 +333,7 @@ export function BarberManager({
     setPendingId(barber.id);
     setToast(null);
 
-    const response = await fetch(`/api/dashboard/barbers/${barber.id}`, { method: "DELETE" });
+    const response = await safeFetch(`/api/dashboard/barbers/${barber.id}`, { method: "DELETE" });
     const data = (await response.json().catch(() => ({}))) as BarberResponse;
 
     if (response.ok) {

@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 export function OrgDelete({ orgId, name, slug }: { orgId: string; name: string; slug: string }) {
   const router = useRouter();
@@ -26,7 +27,7 @@ export function OrgDelete({ orgId, name, slug }: { orgId: string; name: string; 
     if (!matches || busy) return;
     setBusy(true);
     try {
-      const response = await fetch(`/api/platform/organizations/${orgId}`, {
+      const response = await safeFetch(`/api/platform/organizations/${orgId}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ confirmSlug: value.trim() }),

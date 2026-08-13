@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 type PlanOption = { id: string; name: string; priceMonthly: number; maxSalons: number; maxBarbers: number | null };
 
@@ -57,7 +58,7 @@ export function OrgSubscriptionManager({
   async function patch(body: Record<string, unknown>, successMessage: string) {
     setBusy(true);
     try {
-      const response = await fetch(`/api/platform/organizations/${orgId}`, {
+      const response = await safeFetch(`/api/platform/organizations/${orgId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

@@ -90,6 +90,51 @@ export async function getEligibleCampaignOrThrow({
   };
 }
 
+/**
+ * **الشقّ الذي لا يعتمد على المبلغ** من الأهلية: فعّالة، داخل النافذة،
+ * الاستهداف مطابق، ولم تُستنفد `maxUsesPerCustomer`.
+ *
+ * **لماذا انفصل عن الأهلية الكاملة:** بوابة العميل تعرض تبويبًا اسمه «العروض»
+ * ولم تكن تعرض أي حملة، لأن `evaluateCampaignEligibility` تطلب `grossAmount`
+ * لحساب خصم النسبة وفحص السقف — ووقتَ فتح البوابة لا زيارة ولا مبلغ. فكان
+ * الصالون يُعدّ حملةً ولا يعلم بها صاحبُ الشأن إلا إن ذكرها له الحلاق مصادفةً
+ * عند الدفع. **ولا يجوز اختلاق مبلغ وهمي** لتمرير الفحص: حملةُ نسبة على مبلغ
+ * مفترض تُظهر للعميل خصمًا برقم لن يحصل عليه.
+ *
+ * الزيارة تبقى على الشقّين معًا — هذه الدالة لا تُجيز خصمًا، بل تقول «هذه
+ * الحملة تخصّك» فقط.
+ */
+export async function qualifiesForCampaign({
+  prisma,
+  campaign,
+  customer,
+  now = new Date(),
+}: {
+  prisma: CampaignPrisma;
+  campaign: Campaign;
+  customer: CampaignCustomer;
+  now?: Date;
+}): Promise<{ qualified: true } | { qualified: false; reason: string }> {
+  if (!campaign.isActive) {
+    return { qualified: false, reason: "الحملة غير فعالة" };
+  }
+  if (campaign.startAt > now || campaign.endAt < now) {
+    return { qualified: false, reason: "الحملة خارج الفترة المحددة" };
+  }
+  if (!isTargetMatch(campaign.targetType, campaign, customer, now)) {
+    return { qualified: false, reason: "العميل غير مؤهل لهذه الحملة" };
+  }
+
+  const redemptionCount = await prisma.campaignRedemption.count({
+    where: { campaignId: campaign.id, customerId: customer.id },
+  });
+  if (redemptionCount >= campaign.maxUsesPerCustomer) {
+    return { qualified: false, reason: "تم استخدام هذه الحملة للعميل بالحد المسموح" };
+  }
+
+  return { qualified: true };
+}
+
 async function evaluateCampaignEligibility({
   prisma,
   campaign,
@@ -103,21 +148,9 @@ async function evaluateCampaignEligibility({
   grossAmount: number;
   now: Date;
 }): Promise<{ eligible: true; discountAmount: number } | { eligible: false; reason: string }> {
-  if (!campaign.isActive) {
-    return { eligible: false, reason: "الحملة غير فعالة" };
-  }
-  if (campaign.startAt > now || campaign.endAt < now) {
-    return { eligible: false, reason: "الحملة خارج الفترة المحددة" };
-  }
-  if (!isTargetMatch(campaign.targetType, campaign, customer, now)) {
-    return { eligible: false, reason: "العميل غير مؤهل لهذه الحملة" };
-  }
-
-  const redemptionCount = await prisma.campaignRedemption.count({
-    where: { campaignId: campaign.id, customerId: customer.id },
-  });
-  if (redemptionCount >= campaign.maxUsesPerCustomer) {
-    return { eligible: false, reason: "تم استخدام هذه الحملة للعميل بالحد المسموح" };
+  const qualification = await qualifiesForCampaign({ prisma, campaign, customer, now });
+  if (!qualification.qualified) {
+    return { eligible: false, reason: qualification.reason };
   }
 
   const discountAmount = computeCampaignDiscount(campaign, grossAmount);

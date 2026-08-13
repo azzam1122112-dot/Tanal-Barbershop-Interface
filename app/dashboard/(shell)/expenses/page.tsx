@@ -1,14 +1,15 @@
 import { redirect } from "next/navigation";
 import { ExpenseCategory, ExpensePaymentSource } from "@prisma/client";
 import { ExpenseCreateForm, ExpenseDeleteButton } from "@/components/dashboard/expense-manager";
-import { Badge, DashboardShell, Field, FilterBar, InlineEmpty, SectionPanel, StatCard, TablePanel } from "@/components/dashboard/ui";
+import { Badge, DashboardShell, Field, FilterBar, InlineEmpty, ReportPrintMeta, SectionPanel, StatCard, TablePanel } from "@/components/dashboard/ui";
+import { PrintButton } from "@/components/ui/print-button";
 import { canAccessDashboard } from "@/lib/auth/access";
 import { dashboardScope } from "@/lib/auth/salon-scope";
 import { getRequestSession } from "@/lib/auth/http";
 import { prisma } from "@/lib/db/prisma";
 import { EXPENSE_CATEGORY_LABELS, getExpensesReport } from "@/lib/expenses/expense-service";
 import { organizationContribution } from "@/lib/finance/contribution";
-import { formatDate, formatDateTime, formatMoney, formatNumber } from "@/lib/format";
+import { formatDate, formatDateTime, formatMoney, formatNumber, formatReportPeriod } from "@/lib/format";
 import { getPresetRange, getRevenueReport } from "@/lib/reports/dashboard-reports";
 import { addRiyadhDays, parseRiyadhDateKey, toRiyadhDateKey } from "@/lib/datetime/riyadh";
 
@@ -74,7 +75,10 @@ export default async function ExpensesPage({
     <DashboardShell
       title="الإيرادات والمصروفات"
       description="سجل واضح لمصروفات الفروع، ومقارنة مباشرة بين صافي المبيعات والمصروفات وصافي التشغيل."
+      actions={<PrintButton label="طباعة التقرير" />}
     >
+      <ReportPrintMeta period={formatReportPeriod(from, to)} printedAt={formatDate(new Date())} />
+
       <FilterBar className="lg:grid-cols-[150px_150px_150px_1fr_1fr_120px]">
         <Field label="الفترة">
           <select name="preset" defaultValue={preset} className="dashboard-field">

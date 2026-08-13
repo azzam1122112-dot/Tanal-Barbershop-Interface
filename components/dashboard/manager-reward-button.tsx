@@ -1,20 +1,25 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { FeedbackNote, useFeedback } from "@/components/ui/toast";
+import { handOffNotice } from "@/lib/ui/handoff-notice";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 export function ManagerRewardButton({ customerId, customerName }: { customerId: string; customerName: string }) {
   const [open, setOpen] = useState(false);
-  const [message, setMessage] = useState("");
+  // النجاح والفشل كانا يُرسمان في الصندوق الرمادي نفسه — «تعذر إصدار المكافأة»
+  // بشكل «تم إصدار المكافأة» حرفيًا.
+  const { feedback, fail, clear } = useFeedback();
   const [submitting, setSubmitting] = useState(false);
 
   async function submitReward(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setMessage("");
+    clear();
     setSubmitting(true);
 
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
-    const response = await fetch(`/api/dashboard/customers/${customerId}/manager-rewards`, {
+    const response = await safeFetch(`/api/dashboard/customers/${customerId}/manager-rewards`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -27,15 +32,14 @@ export function ManagerRewardButton({ customerId, customerName }: { customerId: 
     const data = (await response.json().catch(() => ({}))) as { message?: string };
 
     if (response.ok) {
-      setMessage("تم إصدار المكافأة");
+      // التأكيد يعبر إعادة التحميل بدل أن يومض 700 مللي ثم يُمحى معها.
       formElement.reset();
-      window.setTimeout(() => {
-        setOpen(false);
-        window.location.reload();
-      }, 700);
-    } else {
-      setMessage(data.message ?? "تعذر إصدار المكافأة");
+      handOffNotice("تم إصدار المكافأة وأصبحت متاحة للعميل في زيارته القادمة");
+      window.location.reload();
+      return;
     }
+
+    fail(data.message ?? "تعذر إصدار المكافأة");
     setSubmitting(false);
   }
 
@@ -63,7 +67,7 @@ export function ManagerRewardButton({ customerId, customerName }: { customerId: 
               <input dir="ltr" lang="en" name="expiresAt" type="datetime-local" className="dashboard-field" />
               <textarea name="description" rows={3} placeholder="سبب المكافأة أو ملاحظة للحلاق" className="dashboard-field" />
             </div>
-            {message ? <p className="mt-3 rounded-xl border border-salon-line bg-salon-mist px-3 py-2 text-sm font-bold">{message}</p> : null}
+            <FeedbackNote feedback={feedback} className="mt-3" />
             <button disabled={submitting} className="dashboard-button-gold mt-4 w-full">
               {submitting ? "جاري الإصدار..." : "إصدار المكافأة"}
             </button>

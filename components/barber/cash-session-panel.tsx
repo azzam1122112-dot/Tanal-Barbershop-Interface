@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { formatAmount as formatMoney, formatDateTime, formatNumber } from "@/lib/format";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { FeedbackNote, useFeedback } from "@/components/ui/toast";
+import { handOffNotice } from "@/lib/ui/handoff-notice";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 /**
  * لوحة الكاش عند الحلاق — مكوّنان لا واحد.
@@ -73,7 +76,9 @@ export function CashSessionPanel({
   const [loading, setLoading] = useState(false);
   const [openingCashAmount, setOpeningCashAmount] = useState(String(custodyBalance));
   const [closing, setClosing] = useState(false);
-  const [message, setMessage] = useState("");
+  // النتيجة بنبرة لا نصًّا مجرّدًا: «تعذر تسجيل المصروف» كانت تُرسم في صندوق
+  // أخضر و«تعذر فتح جلسة الصندوق» في صندوق كهرماني — الرفض يُقرأ قبولًا.
+  const { feedback, succeed, fail, clear } = useFeedback();
   const [expenses, setExpenses] = useState<Expense[]>(initialExpenses);
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [savingExpense, setSavingExpense] = useState(false);
@@ -92,11 +97,11 @@ export function CashSessionPanel({
   async function addExpense(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSavingExpense(true);
-    setMessage("");
+    clear();
     const formEl = event.currentTarget;
     const form = new FormData(formEl);
 
-    const response = await fetch("/api/barber/expenses", {
+    const response = await safeFetch("/api/barber/expenses", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -114,9 +119,9 @@ export function CashSessionPanel({
       setExpenses((current) => [data.expense!, ...current]);
       formEl.reset();
       setExpenseOpen(false);
-      setMessage("تم تسجيل المصروف");
+      succeed("تم تسجيل المصروف");
     } else {
-      setMessage(data.message ?? "تعذر تسجيل المصروف");
+      fail(data.message ?? "تعذر تسجيل المصروف");
     }
     setSavingExpense(false);
   }
@@ -133,23 +138,23 @@ export function CashSessionPanel({
     if (!confirmed) return;
 
     setRemovingExpenseId(expense.id);
-    setMessage("");
-    const response = await fetch(`/api/barber/expenses/${expense.id}`, { method: "DELETE" });
+    clear();
+    const response = await safeFetch(`/api/barber/expenses/${expense.id}`, { method: "DELETE" });
     const data = (await response.json().catch(() => ({}))) as { id?: string; message?: string };
 
     if (response.ok) {
       setExpenses((current) => current.filter((row) => row.id !== expense.id));
-      setMessage("تم حذف المصروف");
+      succeed("تم حذف المصروف");
     } else {
-      setMessage(data.message ?? "تعذر حذف المصروف");
+      fail(data.message ?? "تعذر حذف المصروف");
     }
     setRemovingExpenseId(null);
   }
 
   async function openSession() {
     setLoading(true);
-    setMessage("");
-    const response = await fetch("/api/barber/cash-session/open", {
+    clear();
+    const response = await safeFetch("/api/barber/cash-session/open", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ openingCashAmount }),
@@ -179,10 +184,12 @@ export function CashSessionPanel({
         netTotal: data.cashSession.netTotal,
         collectionsTotal: data.cashSession.collectionsTotal ?? 0,
       });
-      setMessage("تم فتح جلسة الصندوق");
+      // التأكيد يُنقل عبر التخزين المؤقت: إعادة التحميل تمحو أي حالة في الذاكرة،
+      // فكان «تم فتح جلسة الصندوق» يُكتب ثم يُمحى قبل أن يراه أحد.
+      handOffNotice("تم فتح جلسة الصندوق — يمكنك تسجيل الزيارات الآن");
       window.location.reload();
     } else {
-      setMessage(data.message ?? "تعذر فتح جلسة الصندوق");
+      fail(data.message ?? "تعذر فتح جلسة الصندوق");
     }
     setLoading(false);
   }
@@ -199,16 +206,16 @@ export function CashSessionPanel({
     });
     if (!confirmed) return;
     setClosing(true);
-    setMessage("");
-    const response = await fetch("/api/barber/cash-session/close", { method: "POST" });
+    clear();
+    const response = await safeFetch("/api/barber/cash-session/close", { method: "POST" });
     const data = (await response.json().catch(() => ({}))) as { message?: string };
 
     if (response.ok) {
       setCashSession(null);
-      setMessage("تم إنهاء جلسة الصندوق");
+      handOffNotice(`تم إنهاء جلسة الصندوق — سلّم ${formatMoney(expectedCash)} لمدير الفرع`);
       window.location.reload();
     } else {
-      setMessage(data.message ?? "تعذر إنهاء جلسة الصندوق");
+      fail(data.message ?? "تعذر إنهاء جلسة الصندوق");
       setClosing(false);
     }
   }
@@ -370,9 +377,7 @@ export function CashSessionPanel({
             <p className="mt-2 text-center text-xs font-semibold text-salon-charcoal/65">
               سلّم {formatMoney(expectedCash)} لمدير الفرع بعد الإنهاء.
             </p>
-            {message ? (
-              <p role="status" className="mt-3 rounded-xl bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900">{message}</p>
-            ) : null}
+            <FeedbackNote feedback={feedback} className="mt-3" />
           </div>
         </section>
       ) : (
@@ -385,9 +390,7 @@ export function CashSessionPanel({
             <span className="h-3 w-3 shrink-0 rounded-full bg-amber-500 shadow-[0_0_0_6px_rgba(245,158,11,0.15)]" />
           </div>
           <div className="p-4">
-            {message ? (
-              <p role="status" className="mb-3 rounded-xl bg-white/70 px-3 py-2 text-sm font-semibold text-amber-900">{message}</p>
-            ) : null}
+            <FeedbackNote feedback={feedback} className="mb-3" />
             <label className="mb-3 block text-sm font-bold text-amber-950">
               عهدة بداية الدرج
               <span className="mt-1 block text-xs font-semibold leading-5 text-amber-800/75">

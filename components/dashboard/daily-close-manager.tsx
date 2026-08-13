@@ -2,10 +2,10 @@
 
 import { FormEvent, useState } from "react";
 import { formatDateTime, formatMoney, formatNumber } from "@/lib/format";
+import { safeFetch } from "@/lib/http/safe-fetch";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { InlineEmpty } from "@/components/dashboard/ui";
-
 type SummaryRow = {
   barberId: string;
   barberName: string;
@@ -66,7 +66,7 @@ export function DailyCloseManager({ initialSummary }: { initialSummary: SummaryR
     setToast(null);
     setLoadingSessionId(row.openSession.id);
     const form = new FormData(formElement);
-    const response = await fetch("/api/dashboard/cash-sessions/close", {
+    const response = await safeFetch("/api/dashboard/cash-sessions/close", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

@@ -3,8 +3,8 @@
 import { FormEvent, useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 import { formatDate } from "@/lib/format";
+import { safeFetch } from "@/lib/http/safe-fetch";
 import { InlineEmpty } from "@/components/dashboard/ui";
-
 type Campaign = {
   id: string;
   name: string;
@@ -36,7 +36,7 @@ export function CampaignManager({ initialCampaigns }: { initialCampaigns: Campai
     setToast(null);
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
-    const response = await fetch("/api/dashboard/campaigns", {
+    const response = await safeFetch("/api/dashboard/campaigns", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -66,7 +66,7 @@ export function CampaignManager({ initialCampaigns }: { initialCampaigns: Campai
 
   async function updateCampaign(id: string, body: Record<string, unknown>) {
     setToast(null);
-    const response = await fetch(`/api/dashboard/campaigns/${id}`, {
+    const response = await safeFetch(`/api/dashboard/campaigns/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

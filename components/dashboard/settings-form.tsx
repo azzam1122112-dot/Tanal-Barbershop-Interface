@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 type Settings = {
   salonName: string;
@@ -84,7 +85,7 @@ export function SettingsForm({ initialSettings }: { initialSettings: Settings })
     setLoading(true);
     setToast(null);
     const form = new FormData(event.currentTarget);
-    const response = await fetch("/api/dashboard/settings", {
+    const response = await safeFetch("/api/dashboard/settings", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

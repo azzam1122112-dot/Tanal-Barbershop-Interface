@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 type RewardRule = {
   id: string;
@@ -28,7 +29,7 @@ export function RewardRuleManager({ initialRules, readOnly = false }: { initialR
     setToast(null);
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
-    const response = await fetch("/api/dashboard/loyalty/reward-rules", {
+    const response = await safeFetch("/api/dashboard/loyalty/reward-rules", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -51,7 +52,7 @@ export function RewardRuleManager({ initialRules, readOnly = false }: { initialR
 
   async function updateRule(id: string, body: Record<string, unknown>) {
     setToast(null);
-    const response = await fetch(`/api/dashboard/loyalty/reward-rules/${id}`, {
+    const response = await safeFetch(`/api/dashboard/loyalty/reward-rules/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

@@ -38,6 +38,21 @@ export function formatDate(value: Date | string | null | undefined) {
 }
 
 /**
+ * تسمية فترة التقرير من مدى نهايته مفتوحة (`to` أول لحظة **خارج** المدى).
+ *
+ * كل تقارير اللوحة تستعلم بـ `lt: to`، فعرض `to` كما هو يُعلن يومًا لم تُحتسب
+ * أرقامه ضمن الفترة — ولهذا يُطرح يوم رياض واحد قبل العرض. ويوم واحد يُعرض
+ * تاريخًا مفردًا لا مدى من يوم إلى نفسه.
+ */
+export function formatReportPeriod(from: Date | string, toExclusive: Date | string) {
+  const start = new Date(from);
+  const lastIncludedDay = addRiyadhDays(new Date(toExclusive), -1);
+  return isSameRiyadhDay(start, lastIncludedDay)
+    ? formatDate(start)
+    : `${formatDate(start)} إلى ${formatDate(lastIncludedDay)}`;
+}
+
+/**
  * تاريخ قريب بصيغة يقرأها الإنسان: «اليوم» و«أمس» ثم التاريخ الكامل.
  *
  * **الحدّ يوم رياض لا يوم UTC.** الطرح الحسابي على `getTime()/86400000` يقسّم

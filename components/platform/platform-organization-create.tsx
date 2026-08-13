@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useState } from "react";
 import { Icon } from "@/components/icons";
 import { useModalDismiss } from "@/components/use-modal-dismiss";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 export function PlatformOrganizationCreate() {
   const [open, setOpen] = useState(false);
@@ -16,7 +17,7 @@ export function PlatformOrganizationCreate() {
     setPending(true);
     setError("");
     const form = new FormData(event.currentTarget);
-    const response = await fetch("/api/platform/organizations", {
+    const response = await safeFetch("/api/platform/organizations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

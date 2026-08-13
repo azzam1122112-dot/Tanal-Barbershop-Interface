@@ -5,6 +5,8 @@ import { formatDateTime } from "@/lib/format";
 import { FormEvent, useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { handOffNotice } from "@/lib/ui/handoff-notice";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 type VisitRow = {
   id: string;
@@ -58,7 +60,7 @@ export function VisitAdminActions({ visit }: { visit: VisitRow }) {
           ? { grossAmount: form.get("grossAmount"), reason }
           : { reason };
 
-    const response = await fetch(endpoint, {
+    const response = await safeFetch(endpoint, {
       method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -66,8 +68,14 @@ export function VisitAdminActions({ visit }: { visit: VisitRow }) {
     const data = (await response.json().catch(() => ({}))) as ActionResponse;
 
     if (response.ok) {
-      setToast({ message: "تم تنفيذ التصحيح، سيتم تحديث السجل الآن", tone: "success" });
-      window.setTimeout(() => window.location.reload(), 650);
+      // كان التأكيد يومض 650 مللي ثم تمحوه إعادة التحميل، فيصحّح المدير مبلغًا
+      // ولا يبقى له أثر يقرأه. الآن يعبر التأكيد التحميلَ ويُعرض بعده مكتملًا.
+      handOffNotice(
+        action === "cancel"
+          ? "أُلغيت الزيارة وعُكس أثرها المالي والنقاطي"
+          : "تم تنفيذ التصحيح وحُدّث السجل",
+      );
+      window.location.reload();
       return;
     }
 

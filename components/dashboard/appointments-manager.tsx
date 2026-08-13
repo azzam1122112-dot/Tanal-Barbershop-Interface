@@ -6,6 +6,7 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
 import { InlineEmpty } from "@/components/dashboard/ui";
 import { parseRiyadhDateKey, RIYADH_TIME_ZONE } from "@/lib/datetime/riyadh";
 import { formatDurationLabel } from "@/lib/appointments/duration-format";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 type Appointment = {
   id: string;
@@ -92,7 +93,7 @@ export function AppointmentsManager({
     const riyadhMidnight = parseRiyadhDateKey(date);
     const startAt = new Date(riyadhMidnight.getTime() + (hour * 60 + minute) * 60_000);
 
-    const response = await fetch("/api/dashboard/appointments", {
+    const response = await safeFetch("/api/dashboard/appointments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -126,7 +127,7 @@ export function AppointmentsManager({
   async function setStatus(appointment: Appointment, status: Appointment["status"], reason?: string) {
     setPendingId(appointment.id);
     setToast(null);
-    const response = await fetch(`/api/dashboard/appointments/${appointment.id}`, {
+    const response = await safeFetch(`/api/dashboard/appointments/${appointment.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status, reason }),

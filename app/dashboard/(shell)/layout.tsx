@@ -5,6 +5,7 @@ import { DashboardMobileBar } from "@/components/dashboard/dashboard-mobile-bar"
 import { DashboardNav } from "@/components/dashboard/dashboard-nav";
 import { SalonSwitcher } from "@/components/dashboard/salon-switcher";
 import { LogoutButton } from "@/components/logout-button";
+import { NoticeRelay } from "@/components/ui/notice-relay";
 import { canAccessDashboard } from "@/lib/auth/access";
 import { getRequestSession } from "@/lib/auth/http";
 import { prisma } from "@/lib/db/prisma";
@@ -90,6 +91,7 @@ export default async function DashboardShellLayout({ children }: { children: Rea
           <SubscriptionBanner organizationId={organizationId} isOwner={role === "OWNER"} />
           {children}
         </section>
+        <NoticeRelay />
       </div>
     </main>
   );
@@ -108,7 +110,7 @@ async function SubscriptionBanner({ organizationId, isOwner }: { organizationId:
 
   return (
     <div
-      className={`mb-4 flex flex-col gap-3 rounded-xl border px-5 py-4 sm:flex-row sm:items-center sm:justify-between ${
+      className={`mb-4 flex flex-col gap-3 rounded-xl border px-5 py-4 print:hidden sm:flex-row sm:items-center sm:justify-between ${
         blocked ? "border-red-200 bg-red-50 text-red-900" : "border-amber-200 bg-amber-50 text-amber-900"
       }`}
     >

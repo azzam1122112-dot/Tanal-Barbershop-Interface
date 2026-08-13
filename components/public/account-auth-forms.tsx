@@ -3,6 +3,7 @@
 import { FormEvent, type ReactNode, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 /**
  * نماذج مصادقة العميل.
@@ -106,7 +107,7 @@ function useSubmit(endpoint: string, join?: string | null) {
     const payload = { ...(transform ? transform(form) : Object.fromEntries(form.entries())), ...(join ? { join } : {}) };
 
     try {
-      const response = await fetch(endpoint, {
+      const response = await safeFetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -186,7 +187,7 @@ export function AccountVerifyForm({ email, join }: { email: string; join?: strin
     setResending(true);
     setFeedback(null);
     try {
-      const response = await fetch("/api/account/resend-verification", {
+      const response = await safeFetch("/api/account/resend-verification", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
@@ -261,7 +262,7 @@ export function AccountLogoutButton() {
       disabled={loading}
       onClick={async () => {
         setLoading(true);
-        await fetch("/api/account/logout", { method: "POST" }).catch(() => undefined);
+        await safeFetch("/api/account/logout", { method: "POST" }).catch(() => undefined);
         router.push("/account/login");
         router.refresh();
       }}

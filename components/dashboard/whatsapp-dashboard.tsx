@@ -1,12 +1,12 @@
 "use client";
 
 import { formatDateTime } from "@/lib/format";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 import { FormEvent, useMemo, useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 import { MessageBubble } from "@/components/dashboard/message-bubble";
 import { ManagerRewardButton } from "@/components/dashboard/manager-reward-button";
-
 type TemplateType = "POST_VISIT" | "REWARD_READY" | "CAMPAIGN" | "INACTIVE_CUSTOMER" | "CUSTOM";
 type MessageStatus = "DRAFTED" | "OPENED" | "MARKED_SENT" | "SKIPPED" | "FAILED";
 type MessageCategory = "TRANSACTIONAL" | "MARKETING" | "SERVICE";
@@ -164,7 +164,7 @@ export function WhatsAppDashboard({
     setToast(null);
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
-    const response = await fetch("/api/dashboard/whatsapp/templates", {
+    const response = await safeFetch("/api/dashboard/whatsapp/templates", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -184,7 +184,7 @@ export function WhatsAppDashboard({
   }
 
   async function updateTemplate(id: string, body: Record<string, unknown>) {
-    const response = await fetch(`/api/dashboard/whatsapp/templates/${id}`, {
+    const response = await safeFetch(`/api/dashboard/whatsapp/templates/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -215,7 +215,7 @@ export function WhatsAppDashboard({
   async function restoreDefaults() {
     setRestoring(true);
     setToast(null);
-    const response = await fetch("/api/dashboard/whatsapp/templates/restore-defaults", { method: "POST" });
+    const response = await safeFetch("/api/dashboard/whatsapp/templates/restore-defaults", { method: "POST" });
     const data = (await response.json().catch(() => ({}))) as { created?: number; templates?: Template[]; message?: string };
     if (response.ok && data.templates) {
       setTemplates(data.templates);
@@ -241,7 +241,7 @@ export function WhatsAppDashboard({
       customMessage: form.get("customMessage") || undefined,
       messageCategory: form.get("messageCategory") || undefined,
     };
-    const response = await fetch("/api/dashboard/whatsapp/generate", {
+    const response = await safeFetch("/api/dashboard/whatsapp/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -257,7 +257,7 @@ export function WhatsAppDashboard({
   }
 
   async function openWhatsApp(message: Pick<GeneratedMessage, "messageLogId">) {
-    const response = await fetch(`/api/dashboard/whatsapp/messages/${message.messageLogId}/opened`, { method: "POST" });
+    const response = await safeFetch(`/api/dashboard/whatsapp/messages/${message.messageLogId}/opened`, { method: "POST" });
     const data = (await response.json().catch(() => ({}))) as { waUrl?: string; message?: MessageLog | string };
     if (response.ok && data.waUrl) {
       window.open(data.waUrl, "_blank", "noopener,noreferrer");
@@ -268,7 +268,7 @@ export function WhatsAppDashboard({
   }
 
   async function markSent(id: string) {
-    const response = await fetch(`/api/dashboard/whatsapp/messages/${id}/mark-sent`, { method: "POST" });
+    const response = await safeFetch(`/api/dashboard/whatsapp/messages/${id}/mark-sent`, { method: "POST" });
     if (response.ok) {
       setToast({ message: "تم تعليم الرسالة كمرسلة يدويًا", tone: "success" });
       await refreshMessages();
@@ -278,7 +278,7 @@ export function WhatsAppDashboard({
   }
 
   async function toggleWhatsapp(customerId: string, marketingOptIn: boolean) {
-    const response = await fetch(`/api/dashboard/customers/${customerId}/whatsapp-preference`, {
+    const response = await safeFetch(`/api/dashboard/customers/${customerId}/whatsapp-preference`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ marketingOptIn, consentSource: "IN_PERSON" }),
@@ -299,7 +299,7 @@ export function WhatsAppDashboard({
       setCampaignAudience([]);
       return;
     }
-    const response = await fetch(`/api/dashboard/whatsapp/audiences/campaign/${campaignId}`);
+    const response = await safeFetch(`/api/dashboard/whatsapp/audiences/campaign/${campaignId}`);
     const data = (await response.json().catch(() => ({}))) as { customers?: AudienceCustomer[]; message?: string };
     if (response.ok) {
       setCampaignAudience(data.customers ?? []);
@@ -309,7 +309,7 @@ export function WhatsAppDashboard({
   }
 
   async function refreshMessages() {
-    const response = await fetch("/api/dashboard/whatsapp/messages");
+    const response = await safeFetch("/api/dashboard/whatsapp/messages");
     const data = (await response.json().catch(() => ({}))) as { messages?: MessageLog[] };
     if (response.ok) setMessages(data.messages ?? []);
   }

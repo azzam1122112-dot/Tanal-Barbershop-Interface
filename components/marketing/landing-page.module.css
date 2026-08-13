@@ -490,40 +490,8 @@
   color: #c4b5fd;
 }
 
-.workflow {
-  position: relative;
-}
-
-.workflow::before {
-  content: "";
-  position: absolute;
-  top: 2.1rem;
-  right: 12.5%;
-  left: 12.5%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, #8b5cf6, transparent);
-}
-
-.workflowStep {
-  position: relative;
-  padding-top: 5.5rem;
-}
-
-.workflowMarker {
-  position: absolute;
-  top: 0;
-  right: 50%;
-  display: grid;
-  width: 4.2rem;
-  height: 4.2rem;
-  place-items: center;
-  border: 1px solid rgba(124, 58, 237, 0.28);
-  border-radius: 50%;
-  color: #7c3aed;
-  background: #f7f5fb;
-  box-shadow: 0 0 0 0.75rem #f7f5fb;
-  transform: translateX(50%);
-}
+/* حُذفت أصناف `.workflow*` مع قسم «رحلة التشغيل»: محطاته الأربع كانت
+   تكرارًا لما تقوله أقسام الوجع والإمكانات والأدوار بصيغة «كيف تعمل» عامة. */
 
 .roleStrip {
   display: grid;
@@ -707,9 +675,6 @@
   .storyArrow { grid-column: 1; grid-row: 2; }
   .featureRow { grid-template-columns: 3.25rem 1fr; gap: 1rem; }
   .featureRow > :nth-child(3) { grid-column: 2; }
-  .workflow::before { display: none; }
-  .workflowStep { padding: 0 0 2rem 4.25rem; }
-  .workflowMarker { top: 0; right: auto; left: 0; width: 3.25rem; height: 3.25rem; transform: none; box-shadow: none; }
   .roleStrip, .legalRail { grid-template-columns: 1fr; }
   .role { min-height: auto; border-left: 0; border-bottom: 1px solid #ddd6ee; }
   .role:nth-child(-n + 3), .legalItem:nth-child(-n + 3) { border-bottom: 1px solid #ddd6ee; }

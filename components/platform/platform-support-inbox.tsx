@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 type Status = "OPEN" | "PENDING" | "RESOLVED" | "SPAM";
 type Priority = "NORMAL" | "HIGH" | "URGENT";
@@ -93,7 +94,7 @@ export function PlatformSupportInbox({ initialData }: { initialData: InboxData }
     setBusy(true);
     setError(null);
     try {
-      const response = await fetch(`/api/platform/support/conversations/${id}`, {
+      const response = await safeFetch(`/api/platform/support/conversations/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(patch),
@@ -115,7 +116,7 @@ export function PlatformSupportInbox({ initialData }: { initialData: InboxData }
     setError(null);
     setNotice(null);
     try {
-      const response = await fetch(`/api/platform/support/conversations/${selected.id}/reply`, {
+      const response = await safeFetch(`/api/platform/support/conversations/${selected.id}/reply`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: reply }),

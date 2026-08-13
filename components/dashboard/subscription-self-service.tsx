@@ -6,6 +6,7 @@ import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { formatDate, formatMoney } from "@/lib/format";
 import type { PlanSummary } from "@/lib/plans/subscription-service";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 type SubscriptionStatus = "TRIALING" | "ACTIVE" | "PAST_DUE" | "CANCELED";
 type Invoice = {
@@ -73,7 +74,7 @@ export function SubscriptionSelfService({
     setLoading(true);
     setToast(null);
     const form = new FormData(formEl);
-    const response = await fetch("/api/dashboard/subscription/payment-request", {
+    const response = await safeFetch("/api/dashboard/subscription/payment-request", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ planId: selectedPlan.id, periodMonths: cycle, reference: form.get("reference") }),
@@ -103,7 +104,7 @@ export function SubscriptionSelfService({
     });
     if (!approved) return;
     setLoading(true);
-    const response = await fetch("/api/dashboard/subscription/renewal", {
+    const response = await safeFetch("/api/dashboard/subscription/renewal", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action }),
