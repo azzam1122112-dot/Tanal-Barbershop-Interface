@@ -7,6 +7,7 @@ import { LogoutButton } from "@/components/logout-button";
 import { CustomerSearch } from "@/components/barber/customer-search";
 import { BarberCustodyCard, CashSessionPanel } from "@/components/barber/cash-session-panel";
 import { BarberHomeTabs, type BarberTab } from "@/components/barber/home-tabs";
+import { BarberInstallCard } from "@/components/barber/install-card";
 import { getBarberTodaySummary } from "@/lib/barber/barber-summary";
 import { getSubscriptionState } from "@/lib/plans/subscription-guard";
 import { getSessionExpenses } from "@/lib/expenses/expense-service";
@@ -376,6 +377,9 @@ export default async function BarberHomePage() {
           collections={summary.collections}
         />
         {moneyPanels}
+        {/* مدخل التثبيت هنا لا في تبويب العمل: دعوةٌ تعترض شاشة البيع تؤخّر
+            الحلاق، وهذا تبويب لا يُفتح أثناء الخدمة. ويختفي متى كان مثبّتًا. */}
+        <BarberInstallCard />
       </>
     ),
   });

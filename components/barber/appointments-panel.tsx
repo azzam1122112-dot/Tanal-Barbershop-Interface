@@ -10,6 +10,7 @@ import { BarberRescheduleDialog } from "@/components/barber/reschedule-dialog";
 import { RIYADH_TIME_ZONE } from "@/lib/datetime/riyadh";
 import { barberDayBuckets, barberDayOffset } from "@/lib/appointments/barber-window";
 import { formatAppointmentSpan, formatDurationLabel } from "@/lib/appointments/duration-format";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 type AppointmentStatus = "BOOKED" | "ARRIVED" | "CANCELLED" | "NO_SHOW";
 
@@ -60,7 +61,7 @@ export function BarberAppointmentsPanel({
   const refreshAppointments = useCallback(async () => {
     if (document.visibilityState === "hidden" || pendingIdRef.current) return;
     try {
-      const response = await fetch("/api/barber/appointments", { cache: "no-store" });
+      const response = await safeFetch("/api/barber/appointments", { cache: "no-store" });
       const data = (await response.json().catch(() => ({}))) as {
         appointments?: BarberAppointment[];
       };
@@ -120,7 +121,7 @@ export function BarberAppointmentsPanel({
     pendingIdRef.current = appointment.id;
     setToast(null);
     try {
-      const response = await fetch(`/api/barber/appointments/${appointment.id}`, {
+      const response = await safeFetch(`/api/barber/appointments/${appointment.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),

@@ -52,7 +52,9 @@ const trustBar: { value: string; label: string; ltr?: boolean }[] = [
   { value: "تجربة مجانية", label: "تبدأ فور التسجيل بدون بطاقة بنكية" },
   { value: "0%", label: "عمولة على مبيعاتك — اشتراك فقط", ltr: true },
   { value: "سجل كامل", label: "إيصال واضح لكل زيارة" },
-  { value: "4 واجهات", label: "مالك · مدير · حلاق · زبون" },
+  // خمسة لا أربعة: `UserRole` فيه OWNER و ADMIN و SUPERVISOR، والمشرف صلاحية
+  // حقيقية مقيّدة بفروعه — وهي أقوى ما يُقال لمالك عدة فروع لا تفصيلة تُطوى.
+  { value: "5 واجهات", label: "مالك · مدير · مشرف فرع · حلاق · زبون" },
 ];
 
 /** الوجع الحقيقي في صالون رجالي، لا «تحدّيات الأعمال» العامة. */
@@ -105,8 +107,18 @@ const platformFeatures: { icon: IconName; title: string; description: string; ta
   {
     icon: "customers",
     title: "الزبائن والحجوزات",
-    description: "ملف موحّد لكل زبون، وبوابة خاصة به يحجز منها ويتابع ويلغي من جواله بلا تطبيق ولا تسجيل.",
+    // كانت تقول «بلا تطبيق **ولا تسجيل**» — وهو نقيض ما تفعله المنصّة اليوم:
+    // العضوية لا تُفتح إلا بيد صاحبها بحساب بريده موثَّق. الادعاء الخاطئ يكلّف
+    // ثقة، والحقيقة هنا أقوى منه تسويقيًا فلا معنى لإخفائها.
+    description: "ملف موحّد لكل زبون، وبوابة يحجز منها ويتابع ويلغي من جواله — بلا متجر تطبيقات ولا جهاز خاص.",
     tag: "تجربة الزبون",
+  },
+  {
+    icon: "staff",
+    title: "حساب الزبون وخصوصيته",
+    description:
+      "حساب واحد يحمله الزبون بين كل صالوناتك، يدخله ببصمته أو بوجهه أو برمز يصل بريده. ولا يُسجَّل أحد في الولاء نيابةً عنه.",
+    tag: "ثقة تُبنى",
   },
   {
     icon: "loyalty",
@@ -127,10 +139,17 @@ const platformFeatures: { icon: IconName; title: string; description: string; ta
     tag: "سيطرة كاملة",
   },
   {
-    icon: "reports",
+    icon: "adjustments",
     title: "التقارير والفروع",
     description: "الإيراد والخصومات وأداء الخدمات والحلاقين، ومقارنة مباشرة بين الفروع في شاشة واحدة.",
     tag: "قرار بالأرقام",
+  },
+  {
+    icon: "reports",
+    title: "البيان المالي الشهري",
+    description:
+      "ربح شهرك بمعادلة واحدة: صافي المبيعات ناقص تكلفة المنتجات المباعة وعمولات الحلاقين والمصروفات — بشهر الزيارة لا بشهر الصرف.",
+    tag: "ملكية الأرقام",
   },
 ];
 
@@ -161,33 +180,6 @@ const fieldReality: { icon: IconName; title: string; description: string }[] = [
   },
 ];
 
-const journey: { number: string; icon: IconName; title: string; description: string }[] = [
-  {
-    number: "01",
-    icon: "settings",
-    title: "جهّز صالونك",
-    description: "أضف الفرع والخدمات وأسعارها والحلاقين ونِسَبهم وقواعد النقاط، واضبط صلاحية كل مستخدم.",
-  },
-  {
-    number: "02",
-    icon: "visits",
-    title: "شغّل يومك",
-    description: "الحلاق يسجّل حضوره، يفتح الصندوق، يستقبل الحجز، يسجّل الخدمة والمبلغ، ويصدر إيصال الزيارة.",
-  },
-  {
-    number: "03",
-    icon: "reports",
-    title: "أقفل بثقة",
-    description: "مطابقة الكاش والشبكة، مصروفات اليوم، مستحقات الحلاقين، وإغلاق يومي محفوظ كمرجع.",
-  },
-  {
-    number: "04",
-    icon: "campaigns",
-    title: "أرجع زبائنك",
-    description: "شرائح جاهزة للمنقطعين وأصحاب المكافآت الجاهزة، ورسالة واتساب تُرسل بيدك لا تلقائيًا.",
-  },
-];
-
 const audiences: { icon: IconName; label: string; title: string; description: string }[] = [
   {
     icon: "staff",
@@ -210,8 +202,9 @@ const audiences: { icon: IconName; label: string; title: string; description: st
   {
     icon: "customers",
     label: "للزبون",
-    title: "يحجز ويتابع من جواله",
-    description: "رابط خاص به يحجز منه ويلغي ويرى نقاطه ومكافآته وسجل زياراته عبر كل الفروع.",
+    title: "صالونك في جيبه",
+    description:
+      "بطاقة يفتحها ببصمته: يحجز ويلغي، ويرى نقاطه ومكافآته وعروضك وأسعار خدماتك وسجل زياراته عبر كل فروعك.",
   },
 ];
 
@@ -234,6 +227,12 @@ const faqs: { question: string; answer: string }[] = [
     question: "هل يستطيع الحلاق رؤية الأرباح أو تعديل زيارة قديمة؟",
     answer:
       "لا. الحلاق يدخل بواجهته فقط ولا يصل إلى لوحة الإدارة ولا إلى تقارير الإيراد. تعديل أو إلغاء أي زيارة صلاحية إدارية، ويُسجَّل في سجل تدقيق يحفظ من نفّذ العملية ومتى وما القيمة قبلها وبعدها.",
+  },
+  {
+    // سؤال يطرحه المالك فعلًا، وجوابه موقف يميّز المنصّة لا تفصيلة تقنية.
+    question: "من يسجّل الزبون في برنامج الولاء؟",
+    answer:
+      "الزبون نفسه، لا الحلاق ولا المدير. يمسح رمز الصالون من جواله فيُنشئ حسابه ويوثّق بريده ثم ينضم — فلا يفتح أحدٌ رصيدًا باسم شخص لم يطلبه، ولا يمرّ رابط بياناته بيد موظف. أما الحلاق فيسجّل الزيارة والمبلغ لأي زبون بالاسم والجوال بصورة طبيعية، بنقاط أو بدونها.",
   },
   {
     question: "هل تناسب أكثر من فرع؟",
@@ -262,11 +261,49 @@ const faqs: { question: string; answer: string }[] = [
   },
 ];
 
-const securityPoints: { icon: IconName; text: string }[] = [
-  { icon: "staff", text: "صلاحيات حسب الدور والفرع" },
-  { icon: "reports", text: "سجل تدقيق لكل عملية حسّاسة" },
-  { icon: "billing", text: "مطابقة مالية قابلة للمراجعة" },
-  { icon: "settings", text: "عزل كامل بين حسابات الأنشطة" },
+/**
+ * مرساة المصداقية.
+ *
+ * لا شعارات عملاء ولا تقييمات ولا «آلاف الصالونات» — لا نختلق ما لا نملك.
+ * لكن الامتناع عن الاختلاق لا يعني الصمت: هذه ستّ حقائق **قابلة للتحقق**، لكل
+ * واحدة ملف ينفّذها. البدائل السابقة («مطابقة مالية قابلة للمراجعة») كانت
+ * صياغات عامة لا تُثبت شيئًا ولا تُكذَّب.
+ */
+const securityPoints: { icon: IconName; title: string; text: string }[] = [
+  {
+    icon: "staff",
+    title: "نظام حماية البيانات السعودي",
+    text: "الصالون جهة التحكم ونحن جهة المعالجة، باتفاقية وسياسة خصوصية منشورتين.",
+  },
+  {
+    icon: "settings",
+    title: "عزل المستأجرين في قاعدة البيانات",
+    text: "قيود ومحفّزات على مستوى الجداول لا في الكود وحده — لا يعبر صفٌّ بين حسابين.",
+  },
+  {
+    icon: "reports",
+    title: "سجل تدقيق بالقيمة قبل وبعد",
+    text: "كل عملية حسّاسة باسم منفّذها ووقته وعنوانه وما تغيّر بالضبط.",
+  },
+  {
+    icon: "billing",
+    title: "نسخ احتياطية مشفّرة ومختومة",
+    // الدقة هنا ليست تزيّدًا: `pg_restore --list` يتحقق من سلامة الملف، وتمرين
+    // الاستعادة الكامل سكربت منفصل. «تُفحص باستعادة تجريبية» كانت ستخلط بينهما.
+    text: "يُتحقَّق من سلامة كل نسخة قبل تشفيرها، وتُختم ببصمة SHA-256، ولها تمرين استعادة منفصل.",
+  },
+  {
+    icon: "check",
+    title: "فحص أمني آلي لكل تغيير",
+    // ما يُقال هو ما يحدث فعلًا (فحص على كل push و PR وأسبوعيًا)، لا وعدٌ بمنعٍ
+    // لا يفرضه شيء — النشر يدوي ولا تحرسه حماية فرع.
+    text: "كل تغيير يُفحص آليًا: أسرار مسرّبة، وثغرات معروفة، وتحليل ثابت للكود — ومسح أسبوعي متجدد.",
+  },
+  {
+    icon: "customers",
+    title: "بيانات زبونك لا تُفتح بيد موظف",
+    text: "لا الحلاق ولا المدير يُنشئ عضوية باسم زبون — هو من يسجّل ويوثّق بريده.",
+  },
 ];
 
 const preContractFacts: { icon: IconName; title: string; description: string; href: string; linkLabel: string }[] = [
@@ -660,38 +697,11 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ===== رحلة التشغيل ===== */}
-      <section id="journey" className="relative scroll-mt-24 overflow-hidden bg-[#f7f5fb] py-16 sm:py-24 lg:py-28">
-        <div className="x-shell">
-          <div className="grid gap-6 lg:grid-cols-[.55fr_1.45fr] lg:items-end">
-            <span className={landing.sectionNumber} dir="ltr">04</span>
-            <SectionHeading
-              align="start"
-              eyebrow="يوم عمل كامل"
-              title="من أول كرسي إلى آخر قرار."
-              description="أربع محطات تتبع ما يحدث فعلًا في الصالون، وتحوّل الحركة اليومية إلى معرفة قابلة للتصرف."
-            />
-          </div>
-          <div className={`${landing.workflow} mt-14 grid gap-6 md:grid-cols-2 lg:grid-cols-4 lg:gap-10`}>
-            {journey.map((step, index) => (
-              <Reveal key={step.number} delay={index * 70} className={`${landing.workflowStep} text-center md:text-right lg:text-center`}>
-                <span className={landing.workflowMarker}>
-                  <Icon name={step.icon} className="h-5 w-5" aria-hidden="true" />
-                </span>
-                <span className="text-xs font-bold text-violet-600" dir="ltr">{step.number}</span>
-                <h3 className="mt-3 text-xl font-bold">{step.title}</h3>
-                <p className="x-body mt-3 text-slate-600">{step.description}</p>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* ===== الأدوار ===== */}
       <section className="py-16 sm:py-24 lg:py-28">
         <div className="x-shell">
           <div className="grid gap-6 lg:grid-cols-[.55fr_1.45fr] lg:items-end">
-            <span className={landing.sectionNumber} dir="ltr">05</span>
+            <span className={landing.sectionNumber} dir="ltr">04</span>
             <SectionHeading
               align="start"
               eyebrow="لكل دور واجهته"
@@ -725,17 +735,26 @@ export default async function HomePage() {
             <div className="x-grid absolute inset-0 opacity-20" aria-hidden="true" />
             <div className="relative max-w-2xl">
               <p className="text-[11px] font-bold text-salon-goldlight">إكس مانس إكس XMANSX · SOFTWARE SERVICE</p>
-              <h2 className="x-h2 x-balance mt-4 font-bold">من يرى الأرقام، ومن يستطيع تغييرها.</h2>
+              <h2 className="x-h2 x-balance mt-4 font-bold">لا نطلب ثقتك. نعطيك ما تتحقّق منه.</h2>
               <p className="x-lead mt-4 text-violet-100/85">
-                صلاحيات حسب الدور والفرع، وسجل تدقيق يحفظ من نفّذ كل عملية حسّاسة ومتى وما القيمة قبلها وبعدها. أنت تعرف
-                دائمًا من فعل ماذا.
+                لن تجد هنا شعارات عملاء ولا تقييمات نجوم — لا نعرض ما لا نملك إثباته. ما نعرضه ستّ حقائق تشغيلية
+                تخصّ مالك بياناتك وحدودها، ولكل واحدة أثر تقرؤه بنفسك داخل حسابك.
               </p>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <Link href="/privacy" className="x-button-ghost min-h-11 px-5 text-sm">
+                  سياسة الخصوصية
+                </Link>
+                <Link href="/data-processing-agreement" className="x-button-ghost min-h-11 px-5 text-sm">
+                  اتفاقية معالجة البيانات
+                </Link>
+              </div>
             </div>
-            <div className="relative mt-8 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-white/15 bg-white/15 lg:mt-0 lg:min-w-[21rem]">
+            <div className="relative mt-8 grid gap-px overflow-hidden rounded-2xl border border-white/15 bg-white/15 sm:grid-cols-2 lg:mt-0 lg:min-w-[24rem]">
               {securityPoints.map((point) => (
-                <div key={point.text} className="bg-[#211236]/80 p-4">
+                <div key={point.title} className="bg-[#211236]/80 p-4">
                   <Icon name={point.icon} className="h-5 w-5 text-salon-goldlight" aria-hidden="true" />
-                  <p className="mt-3 text-xs font-bold leading-5">{point.text}</p>
+                  <p className="mt-3 text-xs font-bold leading-5">{point.title}</p>
+                  <p className="mt-1.5 text-[11px] font-medium leading-5 text-violet-100/70">{point.text}</p>
                 </div>
               ))}
             </div>

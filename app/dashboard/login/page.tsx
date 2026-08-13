@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { BrandLogo } from "@/components/brand-logo";
 import { useHydrated } from "@/components/use-hydrated";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 export default function DashboardLoginPage() {
   const [error, setError] = useState("");
@@ -21,7 +22,7 @@ export default function DashboardLoginPage() {
     setLoading(true);
 
     const form = new FormData(event.currentTarget);
-    const response = await fetch("/api/auth/dashboard/login", {
+    const response = await safeFetch("/api/auth/dashboard/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

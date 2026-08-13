@@ -6,6 +6,7 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
 import type { SafeAdminUser } from "@/lib/auth/sanitize";
 import { InlineEmpty } from "@/components/dashboard/ui";
 import { RIYADH_TIME_ZONE } from "@/lib/datetime/riyadh";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 type StaffResponse = {
   user?: SafeAdminUser;
@@ -88,7 +89,7 @@ export function StaffManager({ initialUsers, salons, currentUserId }: { initialU
       return;
     }
 
-    const response = await fetch("/api/dashboard/staff", {
+    const response = await safeFetch("/api/dashboard/staff", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -155,7 +156,7 @@ export function StaffManager({ initialUsers, salons, currentUserId }: { initialU
   }
 
   async function patchStaff(id: string, body: Record<string, unknown>) {
-    const response = await fetch(`/api/dashboard/staff/${id}`, {
+    const response = await safeFetch(`/api/dashboard/staff/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -214,7 +215,15 @@ export function StaffManager({ initialUsers, salons, currentUserId }: { initialU
   async function toggleStatus(user: SafeAdminUser) {
     setPendingId(user.id);
     setToast(null);
-    await patchStaff(user.id, { isActive: !user.isActive });
+    const next = !user.isActive;
+    if (await patchStaff(user.id, { isActive: next })) {
+      setToast({
+        message: next
+          ? `فُعّل حساب ${user.name} — يستطيع الدخول إلى اللوحة الآن`
+          : `عُطّل حساب ${user.name} — لن يستطيع الدخول إلى اللوحة`,
+        tone: "success",
+      });
+    }
     setPendingId(null);
   }
 
@@ -230,7 +239,7 @@ export function StaffManager({ initialUsers, salons, currentUserId }: { initialU
 
     setPendingId(user.id);
     setToast(null);
-    const response = await fetch(`/api/dashboard/staff/${user.id}`, { method: "DELETE" });
+    const response = await safeFetch(`/api/dashboard/staff/${user.id}`, { method: "DELETE" });
     const data = (await response.json().catch(() => ({}))) as { message?: string };
 
     if (response.ok) {

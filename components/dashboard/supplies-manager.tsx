@@ -2,10 +2,10 @@
 
 import { FormEvent, useState } from "react";
 import { formatDateTime } from "@/lib/format";
+import { safeFetch } from "@/lib/http/safe-fetch";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/dashboard/ui";
-
 /**
  * إدارة المستلزمات التشغيلية.
  *
@@ -53,7 +53,7 @@ export function SuppliesManager({
   const needsRestock = items.filter((item) => item.isActive && item.status !== "AVAILABLE");
 
   async function reload() {
-    const response = await fetch("/api/dashboard/supplies", { cache: "no-store" });
+    const response = await safeFetch("/api/dashboard/supplies", { cache: "no-store" });
     const data = (await response.json().catch(() => ({}))) as { items?: SupplyItemRow[] };
     if (response.ok && data.items) setItems(data.items);
   }
@@ -65,7 +65,7 @@ export function SuppliesManager({
     const formEl = event.currentTarget;
     const form = new FormData(formEl);
 
-    const response = await fetch("/api/dashboard/supplies", {
+    const response = await safeFetch("/api/dashboard/supplies", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -101,7 +101,7 @@ export function SuppliesManager({
 
     setPendingId(item.id);
     setToast(null);
-    const response = await fetch(`/api/dashboard/supply-reports/${item.openReport.id}`, {
+    const response = await safeFetch(`/api/dashboard/supply-reports/${item.openReport.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ decision }),

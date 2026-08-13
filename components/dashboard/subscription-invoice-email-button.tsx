@@ -1,20 +1,26 @@
 "use client";
 
 import { useState } from "react";
+import { FeedbackNote, useFeedback } from "@/components/ui/toast";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 export function SubscriptionInvoiceEmailButton({ invoiceId }: { invoiceId: string }) {
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
+  // كان رد الخادم يُعرض بلون واحد سواء أرسل البريد أو رفض.
+  const { feedback, setFeedback, clear } = useFeedback();
 
   async function send() {
     setLoading(true);
-    setMessage("");
+    clear();
     try {
-      const response = await fetch(`/api/dashboard/subscription/invoices/${invoiceId}/email`, { method: "POST" });
+      const response = await safeFetch(`/api/dashboard/subscription/invoices/${invoiceId}/email`, { method: "POST" });
       const data = (await response.json().catch(() => ({}))) as { message?: string };
-      setMessage(data.message ?? (response.ok ? "تم إرسال الفاتورة" : "تعذر إرسال الفاتورة"));
+      setFeedback({
+        message: data.message ?? (response.ok ? "تم إرسال الفاتورة إلى بريدك" : "تعذر إرسال الفاتورة"),
+        tone: response.ok ? "success" : "error",
+      });
     } catch {
-      setMessage("تعذر الاتصال بخدمة البريد");
+      setFeedback({ message: "تعذر الاتصال بخدمة البريد", tone: "error" });
     } finally {
       setLoading(false);
     }
@@ -25,7 +31,7 @@ export function SubscriptionInvoiceEmailButton({ invoiceId }: { invoiceId: strin
       <button type="button" disabled={loading} onClick={() => void send()} className="dashboard-button-soft px-4 py-2 text-sm">
         {loading ? "جاري الإرسال..." : "إرسال إلى البريد"}
       </button>
-      {message ? <p className="mt-2 max-w-52 text-xs font-semibold text-salon-charcoal">{message}</p> : null}
+      <FeedbackNote feedback={feedback} className="mt-2 max-w-64 text-xs" />
     </div>
   );
 }

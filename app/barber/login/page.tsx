@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { BrandLogo } from "@/components/brand-logo";
 import { useHydrated } from "@/components/use-hydrated";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 // دعوة التثبيت انتقلت إلى `components/barber/pwa.tsx` المركّب في تخطيط `/barber`:
 // شريط سفلي يمكن تجاهله بدل نافذة تعترض شاشة الدخول قبل أن يكتب الحلاق رقمه.
@@ -35,7 +36,7 @@ export default function BarberLoginPage() {
     setLoading(true);
 
     const form = new FormData(event.currentTarget);
-    const response = await fetch("/api/auth/barber/login", {
+    const response = await safeFetch("/api/auth/barber/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

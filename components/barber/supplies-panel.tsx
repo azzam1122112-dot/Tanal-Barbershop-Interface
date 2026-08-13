@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { formatDateTime } from "@/lib/format";
+import { safeFetch } from "@/lib/http/safe-fetch";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
-
 /**
  * مستلزمات الفرع في يد الحلاق.
  *
@@ -43,7 +43,7 @@ export function BarberSuppliesPanel({ initialItems }: { initialItems: SupplyItem
   const refresh = useCallback(async () => {
     if (document.visibilityState === "hidden" || pendingId) return;
     try {
-      const response = await fetch("/api/barber/supplies", { cache: "no-store" });
+      const response = await safeFetch("/api/barber/supplies", { cache: "no-store" });
       const data = (await response.json().catch(() => ({}))) as { items?: SupplyItemView[] };
       if (response.ok && data.items) setItems(data.items);
     } catch {
@@ -66,7 +66,7 @@ export function BarberSuppliesPanel({ initialItems }: { initialItems: SupplyItem
   async function report(item: SupplyItemView, status: "LOW" | "OUT") {
     setPendingId(item.id);
     setToast(null);
-    const response = await fetch("/api/barber/supplies", {
+    const response = await safeFetch("/api/barber/supplies", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ itemId: item.id, status }),

@@ -4,6 +4,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 type SalonOption = { id: string; name: string };
 type CashSessionOption = {
@@ -54,7 +55,7 @@ export function ExpenseCreateForm({
     setToast(null);
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
-    const response = await fetch("/api/dashboard/expenses", {
+    const response = await safeFetch("/api/dashboard/expenses", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -210,7 +211,7 @@ export function ExpenseDeleteButton({ expenseId, locked }: { expenseId: string; 
     }))) return;
 
     setLoading(true);
-    const response = await fetch(`/api/dashboard/expenses/${expenseId}`, { method: "DELETE" });
+    const response = await safeFetch(`/api/dashboard/expenses/${expenseId}`, { method: "DELETE" });
     const data = (await response.json().catch(() => ({}))) as { message?: string };
     if (response.ok) {
       setToast({ message: "تم حذف المصروف", tone: "success" });

@@ -5,6 +5,8 @@ import { hashPortalToken } from "@/lib/customers/customer-portal";
 import { toCustomerBookingPolicy } from "@/lib/appointments/booking-discipline";
 import { listBookableSalons, listCustomerAppointments } from "@/lib/appointments/customer-booking";
 import { onlyActiveServices } from "@/lib/services/service-summary";
+import { qualifiesForCampaign } from "@/lib/campaigns/campaign-eligibility";
+import { toCustomerCampaignOffer } from "@/lib/campaigns/campaign-offer";
 
 /**
  * محمّلات بوابة العميل، **واحد لكل تبويب**.
@@ -105,21 +107,76 @@ export async function getNextAppointment(identity: PortalIdentity) {
   };
 }
 
+/**
+ * الحملات التي تخصّ هذا العميل — الشقّ غير المعتمد على المبلغ من الأهلية.
+ *
+ * تبويب «العروض» كان يَعِد بعروض ويعرض المكافآت وقائمة الأسعار فقط: يُعدّ
+ * الصالون حملةً ولا يعلم بها صاحبُ الشأن إلا إن ذكرها الحلاق مصادفةً عند
+ * الدفع. انظر `qualifiesForCampaign` لسبب انفصال الشقّين.
+ *
+ * تُستدعى من تبويبَي «بطاقتي» و«العروض»: عرضٌ ينتهي بعد يومين لا يُكتشف إن لم
+ * تُشِر إليه الشاشةُ الأولى. الكلفة استعلامٌ واحد + عدّ استبدال لكل حملة سارية،
+ * والحملات السارية في المؤسسة الواحدة قليلة بطبيعتها.
+ */
+async function listQualifiedCampaigns(identity: PortalIdentity, now: Date) {
+  const campaigns = await prisma.campaign.findMany({
+    where: {
+      organizationId: identity.organizationId,
+      isActive: true,
+      startAt: { lte: now },
+      endAt: { gte: now },
+    },
+    orderBy: [{ endAt: "asc" }, { createdAt: "asc" }],
+  });
+  if (campaigns.length === 0) return [];
+
+  const customer = {
+    id: identity.customer.id,
+    visitCount: identity.visitCount,
+    lastVisitAt: identity.lastVisitAt ? new Date(identity.lastVisitAt) : null,
+    loyaltyAccount: { points: identity.points },
+  };
+
+  const offers = await Promise.all(
+    campaigns.map(async (campaign) => {
+      const result = await qualifiesForCampaign({ prisma, campaign, customer, now });
+      return result.qualified ? toCustomerCampaignOffer(campaign) : null;
+    }),
+  );
+  return offers.filter((offer): offer is NonNullable<typeof offer> => offer !== null);
+}
+
 /** تبويب «بطاقتي»: الرصيد والمكافأة القادمة والموعد الأقرب. */
 export async function getPortalCard(identity: PortalIdentity) {
-  const [rewardRules, nextAppointment] = await Promise.all([
+  const now = new Date();
+  const [rewardRules, nextAppointment, giftCount, campaigns] = await Promise.all([
     prisma.rewardRule.findMany({
       where: { organizationId: identity.organizationId, isActive: true },
       orderBy: { requiredPoints: "asc" },
     }),
     getNextAppointment(identity),
+    prisma.managerReward.count({
+      where: {
+        customerId: identity.customer.id,
+        redeemedAt: null,
+        revokedAt: null,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+      },
+    }),
+    listQualifiedCampaigns(identity, now),
   ]);
 
   const nextReward = rewardRules.find((rule) => rule.requiredPoints > identity.points) ?? null;
+  const unlockedRules = rewardRules.filter((rule) => rule.requiredPoints <= identity.points).length;
+  // أقرب انتهاء بين العروض السارية: «ينتهي بعد يومين» هو ما يحرّك العميل، لا
+  // وجود عرضٍ ما. القائمة مرتّبة بـ `endAt` تصاعديًا فالأول هو الأقرب.
+  const soonestCampaignEndsAt = campaigns[0]?.endsAt ?? null;
 
   return {
     nextAppointment,
-    unlockedCount: rewardRules.filter((rule) => rule.requiredPoints <= identity.points).length,
+    unlockedCount: unlockedRules + giftCount + campaigns.length,
+    campaignCount: campaigns.length,
+    soonestCampaignEndsAt,
     nextReward: nextReward
       ? {
           name: nextReward.name,
@@ -155,7 +212,7 @@ export type PortalOffers = Awaited<ReturnType<typeof getPortalOffers>>;
  */
 export async function getPortalOffers(identity: PortalIdentity) {
   const now = new Date();
-  const [salons, rewardRules, managerRewards] = await Promise.all([
+  const [salons, rewardRules, managerRewards, qualifiedCampaigns] = await Promise.all([
     prisma.salon.findMany({
       where: { organizationId: identity.organizationId, isActive: true },
       orderBy: { name: "asc" },
@@ -176,6 +233,9 @@ export async function getPortalOffers(identity: PortalIdentity) {
       where: { customerId: identity.customer.id, redeemedAt: null, revokedAt: null },
       orderBy: { createdAt: "desc" },
     }),
+    // ضمن `Promise.all` لا بعدها: انتظارها على حدة يضيف رحلتها إلى زمن الصفحة
+    // كاملًا بدل أن تجري بمحاذاة البقية.
+    listQualifiedCampaigns(identity, now),
   ]);
 
   return {
@@ -209,6 +269,7 @@ export async function getPortalOffers(identity: PortalIdentity) {
         discountAmount: Number(reward.discountAmount),
         expiresAt: reward.expiresAt?.toISOString() ?? null,
       })),
+    campaigns: qualifiedCampaigns,
   };
 }
 

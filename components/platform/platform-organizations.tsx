@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 type PlanOption = { id: string; name: string; maxSalons: number; maxBarbers: number | null; maxCustomers: number | null };
 
@@ -43,7 +44,7 @@ export function PlatformOrganizations({
   const { confirm, confirmDialog } = useConfirm();
 
   async function patch(id: string, body: Record<string, unknown>, successMessage: string) {
-    const response = await fetch(`/api/platform/organizations/${id}`, {
+    const response = await safeFetch(`/api/platform/organizations/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

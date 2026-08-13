@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { parseDateKeyParts, RIYADH_TIME_ZONE } from "@/lib/datetime/riyadh";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { FeedbackNote, type FeedbackState } from "@/components/ui/toast";
 import { formatAppointmentSpan, formatDurationLabel } from "@/lib/appointments/duration-format";
+import { safeFetch } from "@/lib/http/safe-fetch";
 import { arriveByLabel } from "@/components/public/next-appointment-card";
-
 /**
  * حجز موعد من بوابة العميل.
  *
@@ -315,6 +316,9 @@ export function PortalBooking({
   // في نفس الدورة، ويضغط العميل «تأكيد» فلا يرى شيئًا يشرح الرفض.
   const [error, setError] = useState<string>("");
   const [slotsError, setSlotsError] = useState<string>("");
+  // ملاحظة قائمة المواعيد منفصلة عن خطأ نموذج الحجز: `error` يُرسم في تذييل
+  // النموذج أسفل الصفحة، ومن ضغط «إلغاء الموعد» في القائمة أعلاها لا يراه.
+  const [appointmentNotice, setAppointmentNotice] = useState<FeedbackState>(null);
   /**
    * الحجز الناجح يحلّ محلّ النموذج بدل سطر نصّي أسفله.
    *
@@ -337,7 +341,7 @@ export function PortalBooking({
       // الشبكة تُحسب بمدة الخدمات المختارة: خانةٌ حُسبت بنصف ساعة تعرض وقتًا
       // يُرفض عند الضغط لأن الحجز الفعلي يمتد ساعة ونصفًا.
       for (const serviceId of serviceIds) query.append("serviceId", serviceId);
-      const response = await fetch(`/api/public/portal/${token}/slots?${query.toString()}`);
+      const response = await safeFetch(`/api/public/portal/${token}/slots?${query.toString()}`);
       const data = (await response.json().catch(() => ({}))) as {
         days?: BookingDay[];
         leadMinutes?: number;
@@ -392,7 +396,7 @@ export function PortalBooking({
     setError("");
 
     try {
-      const response = await fetch(`/api/public/portal/${token}/appointments`, {
+      const response = await safeFetch(`/api/public/portal/${token}/appointments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ salonId, barberId, startAt: selected, serviceIds }),
@@ -430,24 +434,31 @@ export function PortalBooking({
     }))) return;
 
     setError("");
+    setAppointmentNotice(null);
     // إلغاء موعد آخر لا يمحو تأكيد حجزٍ نجح للتوّ.
     try {
-      const response = await fetch(`/api/public/portal/${token}/appointments/${id}/cancel`, { method: "POST" });
+      const response = await safeFetch(`/api/public/portal/${token}/appointments/${id}/cancel`, { method: "POST" });
       const data = (await response.json().catch(() => ({}))) as {
         appointment?: AppointmentRow;
         message?: string;
       };
       if (!response.ok || !data.appointment) {
-        setError(data.message ?? "تعذر إلغاء الموعد");
+        setAppointmentNotice({ message: data.message ?? "تعذر إلغاء الموعد", tone: "error" });
         return;
       }
       setAppointments((current) =>
         current.map((item) => (item.id === id ? data.appointment! : item)),
       );
       if (justBooked?.id === id) setJustBooked(null);
+      // النجاح كان صامتًا: يختفي الموعد من القائمة وحسب. واختفاءُ صفٍّ لا يقول
+      // «أُلغي» — يقوله بوضوح لمن يخشى أنه ضغط على الموعد الخطأ.
+      setAppointmentNotice({
+        message: `أُلغي موعد ${formatAppointment(appointment.startAt)} — الوقت متاح للحجز من جديد`,
+        tone: "success",
+      });
       void loadSlots();
     } catch {
-      setError("تعذر الاتصال. تحقق من اتصالك وحاول مجددًا.");
+      setAppointmentNotice({ message: "تعذر الاتصال. تحقق من اتصالك وحاول مجددًا.", tone: "error" });
     }
   }
 
@@ -494,6 +505,8 @@ export function PortalBooking({
             {upcoming.length}
           </span>
         </div>
+        <FeedbackNote feedback={appointmentNotice} className="mt-3" />
+
         {upcoming.length > 0 ? (
           <ul className="mt-3 space-y-3">
             {upcoming.map((appointment) => (

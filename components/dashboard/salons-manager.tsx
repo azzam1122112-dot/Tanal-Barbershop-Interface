@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { InlineEmpty } from "@/components/dashboard/ui";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 type Salon = {
   id: string;
@@ -26,7 +27,7 @@ export function SalonsManager({ initialSalons }: { initialSalons: Salon[] }) {
     setToast(null);
     const formEl = event.currentTarget;
     const form = new FormData(formEl);
-    const response = await fetch("/api/dashboard/salons", {
+    const response = await safeFetch("/api/dashboard/salons", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: form.get("name"), slug: form.get("slug") }),
@@ -43,7 +44,7 @@ export function SalonsManager({ initialSalons }: { initialSalons: Salon[] }) {
   }
 
   async function toggleActive(salon: Salon) {
-    const response = await fetch(`/api/dashboard/salons/${salon.id}`, {
+    const response = await safeFetch(`/api/dashboard/salons/${salon.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ isActive: !salon.isActive }),
@@ -69,7 +70,7 @@ export function SalonsManager({ initialSalons }: { initialSalons: Salon[] }) {
 
     setPendingId(salon.id);
     setToast(null);
-    const response = await fetch(`/api/dashboard/salons/${salon.id}`, { method: "DELETE" });
+    const response = await safeFetch(`/api/dashboard/salons/${salon.id}`, { method: "DELETE" });
     const data = (await response.json().catch(() => ({}))) as { message?: string };
 
     if (response.ok) {

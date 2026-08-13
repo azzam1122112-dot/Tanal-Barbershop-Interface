@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
-import { formatMoney, formatNumber } from "@/lib/format";
-import { DashboardShell, EmptyState, Field, FilterBar, Notice, StatCard, TablePanel } from "@/components/dashboard/ui";
+import { formatDate, formatMoney, formatNumber, formatReportPeriod } from "@/lib/format";
+import { DashboardShell, EmptyState, Field, FilterBar, Notice, ReportPrintMeta, StatCard, TablePanel } from "@/components/dashboard/ui";
+import { PrintButton } from "@/components/ui/print-button";
 import { canAccessDashboard, canViewFinancials } from "@/lib/auth/access";
 import { dashboardScope } from "@/lib/auth/salon-scope";
 import { getRequestSession } from "@/lib/auth/http";
@@ -36,7 +37,10 @@ export default async function SalonComparisonPage({
     <DashboardShell
       title="مقارنة الفروع"
       description="أداء الفروع جنبًا إلى جنب: الدخل، متوسط الفاتورة، العمولات، المصروفات، وما يتبقى للمؤسسة."
+      actions={<PrintButton label="طباعة المقارنة" />}
     >
+      <ReportPrintMeta period={formatReportPeriod(report.from, report.to)} printedAt={formatDate(new Date())} />
+
       <FilterBar className="md:grid-cols-[160px_160px_1fr_120px]">
         <Field label="من تاريخ"><input dir="ltr" lang="en" name="from" type="date" defaultValue={params.from ?? ""} className="dashboard-field" /></Field>
         <Field label="إلى تاريخ"><input dir="ltr" lang="en" name="to" type="date" defaultValue={params.to ?? ""} className="dashboard-field" /></Field>

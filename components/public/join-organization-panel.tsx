@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 /**
  * لوح الانضمام لمؤسسة.
@@ -33,7 +34,7 @@ export function JoinOrganizationPanel({
     setLoading(true);
     setFeedback(null);
     try {
-      const response = await fetch("/api/account/enroll", {
+      const response = await safeFetch("/api/account/enroll", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ state }),

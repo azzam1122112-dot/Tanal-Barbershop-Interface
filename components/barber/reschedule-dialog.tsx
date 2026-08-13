@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Icon } from "@/components/icons";
 import type { BarberAppointment } from "@/components/barber/appointments-panel";
 import { parseDateKeyParts, RIYADH_TIME_ZONE } from "@/lib/datetime/riyadh";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 type SlotStatus = "AVAILABLE" | "BOOKED" | "TOO_SOON" | "OFF_DUTY";
 type RescheduleSlot = {
@@ -58,7 +59,7 @@ export function BarberRescheduleDialog({
       setLoading(true);
       setError("");
       try {
-        const response = await fetch(`/api/barber/appointments/${appointment.id}/reschedule`, {
+        const response = await safeFetch(`/api/barber/appointments/${appointment.id}/reschedule`, {
           signal: controller.signal,
         });
         const data = (await response.json().catch(() => ({}))) as {
@@ -111,7 +112,7 @@ export function BarberRescheduleDialog({
     setSaving(true);
     setError("");
     try {
-      const response = await fetch(`/api/barber/appointments/${appointment.id}/reschedule`, {
+      const response = await safeFetch(`/api/barber/appointments/${appointment.id}/reschedule`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ startAt: selectedStartAt }),

@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { BrandLogo } from "@/components/brand-logo";
 import { useHydrated } from "@/components/use-hydrated";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 export default function PlatformLoginPage() {
   const [error, setError] = useState("");
@@ -16,7 +17,7 @@ export default function PlatformLoginPage() {
     setError("");
     setLoading(true);
     const form = new FormData(event.currentTarget);
-    const response = await fetch(challengeToken ? "/api/platform/auth/mfa/verify" : "/api/platform/auth/login", {
+    const response = await safeFetch(challengeToken ? "/api/platform/auth/mfa/verify" : "/api/platform/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(challengeToken

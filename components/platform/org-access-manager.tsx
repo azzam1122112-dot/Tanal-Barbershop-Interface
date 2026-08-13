@@ -4,6 +4,7 @@ import { useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { formatDate } from "@/lib/format";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 type Member = { id: string; name: string; email: string | null; phone: string | null; role: string; isActive: boolean; lastLoginAt: string | null };
 type Barber = { id: string; name: string; phone: string; salonName: string | null; isActive: boolean; lastLoginAt: string | null };
@@ -34,7 +35,7 @@ export function OrgAccessManager({ orgId, members, barbers }: { orgId: string; m
     if (!confirmed) return;
     setBusyId(targetId);
     try {
-      const response = await fetch(`/api/platform/organizations/${orgId}/credentials`, {
+      const response = await safeFetch(`/api/platform/organizations/${orgId}/credentials`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type, targetId }),

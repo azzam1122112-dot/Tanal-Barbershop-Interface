@@ -2,9 +2,11 @@
 
 import { FormEvent, useCallback, useState } from "react";
 import { ShareReceiptPdfButton } from "@/components/receipt/share-pdf-button";
+import { FeedbackNote, useFeedback } from "@/components/ui/toast";
 import { useModalDismiss } from "@/components/use-modal-dismiss";
 import { calculateVisitTotals } from "@/lib/loyalty/calculations";
 import { formatDate } from "@/lib/format";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 type ServiceOption = {
   id: string;
@@ -75,7 +77,9 @@ export function VisitForm({
   const [joinName, setJoinName] = useState("");
   const [transactionalConsent, setTransactionalConsent] = useState(false);
   const [marketingConsent, setMarketingConsent] = useState(false);
-  const [customerMessage, setCustomerMessage] = useState("");
+  // ربط العميل يعلن نتيجته بنبرة: «تم ربط أحمد — 40 نقطة» و«تعذر البحث عن
+  // العميل» كانتا تُرسمان في الشريحة الرمادية نفسها.
+  const { feedback: customerFeedback, setFeedback: setCustomerFeedback } = useFeedback();
   const [loadingCustomer, setLoadingCustomer] = useState(false);
   // كمية كل منتج مباع مع الزيارة؛ الأسعار تُحسب في الخادم لا هنا.
   const [productQuantities, setProductQuantities] = useState<Record<string, number>>({});
@@ -83,7 +87,8 @@ export function VisitForm({
   const [preview, setPreview] = useState<VisitPreview | null>(null);
   const [selectedDiscount, setSelectedDiscount] = useState("NONE");
   const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
-  const [message, setMessage] = useState("");
+  // `feedback` بنبرة لا نصًّا مجرّدًا: كان الفشل والنجاح يُرسمان بالصندوق الرمادي نفسه.
+  const { feedback, fail: failFeedback, clear: clearFeedback } = useFeedback();
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [loadingConfirm, setLoadingConfirm] = useState(false);
   const [confirmedVisitId, setConfirmedVisitId] = useState<string | null>(null);
@@ -120,12 +125,12 @@ export function VisitForm({
 
   async function lookupCustomer() {
     if (!/^05\d{8}$/.test(customerPhone)) {
-      setCustomerMessage("أدخل رقمًا يبدأ بـ 05 ويتكون من 10 أرقام");
+      setCustomerFeedback({ message: "أدخل رقمًا يبدأ بـ 05 ويتكون من 10 أرقام", tone: "warning" });
       return;
     }
     setLoadingCustomer(true);
-    setCustomerMessage("");
-    const response = await fetch(`/api/barber/customers/search?phone=${encodeURIComponent(customerPhone)}`);
+    setCustomerFeedback(null);
+    const response = await safeFetch(`/api/barber/customers/search?phone=${encodeURIComponent(customerPhone)}`);
     const data = (await response.json().catch(() => ({}))) as {
       found?: boolean;
       customer?: { id: string; name: string; phone: string; loyaltyEnabled: boolean; pointsBalance: number };
@@ -135,15 +140,20 @@ export function VisitForm({
       setLinkedCustomer(data.customer);
       setLinkedCustomerId(data.customer.id);
       setCustomerLookupState("idle");
-      setCustomerMessage(data.customer.loyaltyEnabled ? `تم ربط ${data.customer.name} — ${data.customer.pointsBalance} نقطة` : `تم ربط ${data.customer.name} كعميل عادي`);
+      setCustomerFeedback({
+        message: data.customer.loyaltyEnabled
+          ? `تم ربط ${data.customer.name} — ${data.customer.pointsBalance} نقطة`
+          : `تم ربط ${data.customer.name} كعميل عادي`,
+        tone: "success",
+      });
       setPreview(null);
     } else if (response.ok) {
       setLinkedCustomer(null);
       setLinkedCustomerId(null);
       setCustomerLookupState("missing");
-      setCustomerMessage("الرقم غير مسجل. احفظ العميل باسمه أو تابع كزائر دون حفظه.");
+      setCustomerFeedback({ message: "الرقم غير مسجل. احفظ العميل باسمه أو تابع كزائر دون حفظه.", tone: "info" });
     } else {
-      setCustomerMessage(data.message ?? "تعذر البحث عن العميل");
+      setCustomerFeedback({ message: data.message ?? "تعذر البحث عن العميل", tone: "error" });
     }
     setLoadingCustomer(false);
   }
@@ -152,11 +162,11 @@ export function VisitForm({
   // رمز الصالون بحساب بريده موثَّق، فلا تُفتح باسمه بيد غيره.
   async function saveCustomer() {
     if (joinName.trim().length < 2) {
-      setCustomerMessage("اكتب اسم العميل لحفظه");
+      setCustomerFeedback({ message: "اكتب اسم العميل لحفظه", tone: "warning" });
       return;
     }
     setLoadingCustomer(true);
-    const response = await fetch("/api/barber/customers", {
+    const response = await safeFetch("/api/barber/customers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -174,10 +184,10 @@ export function VisitForm({
       setLinkedCustomer(data.customer);
       setLinkedCustomerId(data.customer.id);
       setCustomerLookupState("idle");
-      setCustomerMessage("تم حفظ العميل وربطه بالعملية");
+      setCustomerFeedback({ message: "تم حفظ العميل وربطه بالعملية", tone: "success" });
       setPreview(null);
     } else {
-      setCustomerMessage(data.message ?? "تعذر حفظ العميل");
+      setCustomerFeedback({ message: data.message ?? "تعذر حفظ العميل", tone: "error" });
     }
     setLoadingCustomer(false);
   }
@@ -188,72 +198,85 @@ export function VisitForm({
     setCustomerPhone("");
     setJoinName("");
     setCustomerLookupState("idle");
-    setCustomerMessage("ستُحفظ العملية كزائر بلا اسم أو رقم جوال أو نقاط");
+    setCustomerFeedback({ message: "ستُحفظ العملية كزائر بلا اسم أو رقم جوال أو نقاط", tone: "info" });
     setPreview(null);
   }
 
   async function submitPreview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setMessage("");
+    clearFeedback();
     setLoadingPreview(true);
 
-    const response = await fetch("/api/barber/visits/preview", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        customerId: linkedCustomerId,
-        serviceIds: selectedServices,
-        products: selectedProducts,
-        grossAmount,
-        paymentMethod,
-      }),
-    });
-    const data = (await response.json().catch(() => ({}))) as { preview?: VisitPreview; message?: string };
+    // بلا `try` كان انقطاع الشبكة — وهو أكثر ما يحدث بيد الحلاق — يرمي الوعد
+    // فلا يُطفأ `loading` ولا تظهر رسالة: الزر يبقى «جاري المعاينة...» إلى الأبد.
+    try {
+      const response = await safeFetch("/api/barber/visits/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerId: linkedCustomerId,
+          serviceIds: selectedServices,
+          products: selectedProducts,
+          grossAmount,
+          paymentMethod,
+        }),
+      });
+      const data = (await response.json().catch(() => ({}))) as { preview?: VisitPreview; message?: string };
 
-    if (response.ok && data.preview) {
-      setPreview(data.preview);
-      setCashTenderedAmount(String(data.preview.netAmount));
-      setNetworkAccepted(false);
-      setSelectedDiscount("NONE");
-      setIdempotencyKey(crypto.randomUUID());
-    } else {
-      setMessage(data.message ?? "تعذر حساب المعاينة");
+      if (response.ok && data.preview) {
+        setPreview(data.preview);
+        setCashTenderedAmount(String(data.preview.netAmount));
+        setNetworkAccepted(false);
+        setSelectedDiscount("NONE");
+        setIdempotencyKey(crypto.randomUUID());
+      } else {
+        failFeedback(data.message ?? "تعذر حساب المعاينة");
+      }
+    } catch {
+      failFeedback("انقطع الاتصال قبل حساب المعاينة — تحقق من الشبكة وأعد المحاولة");
+    } finally {
+      setLoadingPreview(false);
     }
-    setLoadingPreview(false);
   }
 
   async function confirmVisit() {
-    setMessage("");
+    clearFeedback();
     setLoadingConfirm(true);
 
-    const response = await fetch("/api/barber/visits/confirm", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        customerId: linkedCustomerId,
-        serviceIds: selectedServices,
-        products: selectedProducts,
-        grossAmount,
-        paymentMethod,
-        rewardRuleId: selectedDiscount.startsWith("REWARD:") ? selectedDiscount.replace("REWARD:", "") : undefined,
-        managerRewardId: selectedDiscount.startsWith("MANAGER_REWARD:") ? selectedDiscount.replace("MANAGER_REWARD:", "") : undefined,
-        campaignId: selectedDiscount.startsWith("CAMPAIGN:") ? selectedDiscount.replace("CAMPAIGN:", "") : undefined,
-        idempotencyKey,
-        paymentConfirmed: true,
-        cashTenderedAmount: paymentMethod === "CASH" ? cashTenderedAmount : undefined,
-      }),
-    });
-    const data = (await response.json().catch(() => ({}))) as { visit?: { id: string; customer: { id: string } | null }; message?: string };
+    try {
+      const response = await safeFetch("/api/barber/visits/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerId: linkedCustomerId,
+          serviceIds: selectedServices,
+          products: selectedProducts,
+          grossAmount,
+          paymentMethod,
+          rewardRuleId: selectedDiscount.startsWith("REWARD:") ? selectedDiscount.replace("REWARD:", "") : undefined,
+          managerRewardId: selectedDiscount.startsWith("MANAGER_REWARD:") ? selectedDiscount.replace("MANAGER_REWARD:", "") : undefined,
+          campaignId: selectedDiscount.startsWith("CAMPAIGN:") ? selectedDiscount.replace("CAMPAIGN:", "") : undefined,
+          idempotencyKey,
+          paymentConfirmed: true,
+          cashTenderedAmount: paymentMethod === "CASH" ? cashTenderedAmount : undefined,
+        }),
+      });
+      const data = (await response.json().catch(() => ({}))) as { visit?: { id: string; customer: { id: string } | null }; message?: string };
 
-    if (response.ok && data.visit) {
-      // لا نعود للرئيسية مباشرة: الحلاق يحتاج خيار تسليم الإيصال للعميل أولًا.
-      setConfirmedVisitId(data.visit.id);
+      if (response.ok && data.visit) {
+        // لا نعود للرئيسية مباشرة: الحلاق يحتاج خيار تسليم الإيصال للعميل أولًا.
+        setConfirmedVisitId(data.visit.id);
+        return;
+      }
+
+      failFeedback(data.message ?? "تعذر حفظ الزيارة");
+    } catch {
+      // المفتاح `idempotencyKey` باقٍ كما هو، فإعادة المحاولة لا تكرّر الزيارة
+      // إن كانت قد وصلت الخادم فعلًا. نقول ذلك صراحةً حتى لا يتردد الحلاق.
+      failFeedback("انقطع الاتصال قبل تأكيد العملية — تحقق من الشبكة وأعد المحاولة، ولن تتكرر الزيارة");
+    } finally {
       setLoadingConfirm(false);
-      return;
     }
-
-    setMessage(data.message ?? "تعذر حفظ الزيارة");
-    setLoadingConfirm(false);
   }
 
   const selectedReward = selectedDiscount.startsWith("REWARD:")
@@ -472,7 +495,7 @@ export function VisitForm({
                   onChange={(event) => {
                     setCustomerPhone(event.target.value.replace(/\D/g, "").slice(0, 10));
                     setCustomerLookupState("idle");
-                    setCustomerMessage("");
+                    setCustomerFeedback(null);
                   }}
                   inputMode="numeric"
                   placeholder="05xxxxxxxx"
@@ -505,7 +528,7 @@ export function VisitForm({
             </div>
           ) : null}
 
-          {customerMessage ? <p className="rounded-xl bg-salon-mist px-3 py-2 text-xs font-bold text-salon-charcoal">{customerMessage}</p> : null}
+          <FeedbackNote feedback={customerFeedback} />
         </div>
       </section>
 
@@ -541,7 +564,9 @@ export function VisitForm({
         </div>
       </div>
 
-      {message ? <p className="rounded-2xl border border-salon-line bg-white px-4 py-3 text-sm font-bold text-salon-charcoal shadow-sm">{message}</p> : null}
+      {/* ملاحظة النموذج تخصّ المعاينة وحدها. خطأ التأكيد يُرسم داخل النافذة
+          نفسها — انظر التذييل أدناه — لأن هذه الفقرة تقع خلف طبقتها. */}
+      {!preview ? <FeedbackNote feedback={feedback} /> : null}
 
       {/* الزر لاصق أسفل الشاشة: قائمة الخدمات والمنتجات قد تطول، وكان الحلاق
           يمرّر للأسفل بعد كل تعديل ليصل إلى «معاينة». الآن يبقى تحت إبهامه دائمًا. */}
@@ -713,6 +738,12 @@ export function VisitForm({
               <p className="mt-3 rounded-2xl bg-salon-mist px-3 py-3 text-sm font-semibold text-salon-charcoal">{preview.services.map((service) => service.name).join("، ")}</p>
             </div>
             <div className="shrink-0 border-t border-salon-line bg-white p-4">
+              {/* **سبب وجود هذه الفقرة هنا:** رسالة الفشل كانت تُرسم في جسم
+                  النموذج، والنافذة `z-[100]` فوقه تغطّيها. فيضغط الحلاق «إتمام
+                  العملية»، ترجع الزيارة مرفوضة، ولا يظهر شيء إطلاقًا — يسلّم
+                  الباقي ويمضي وهو يظنّ العملية محفوظة. الرسالة الآن فوق الزر
+                  الذي ضغطه مباشرة. */}
+              <FeedbackNote feedback={feedback} className="mb-3" />
               <button
                 type="button"
                 onClick={confirmVisit}

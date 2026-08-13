@@ -2,13 +2,22 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Icon } from "@/components/icons";
+import { INSTALL_SNOOZE_KEY, isInstallSnoozed, nextInstallSnooze } from "@/lib/pwa/install-snooze";
 
 type InstallPromptEvent = Event & {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 };
 
-const DISMISS_KEY = "tanal-install-dismissed";
+type InstallWindow = Window & { __xInstallPrompt?: InstallPromptEvent | null };
+
+function isSnoozed() {
+  return isInstallSnoozed(window.localStorage.getItem(INSTALL_SNOOZE_KEY));
+}
+
+function snooze() {
+  window.localStorage.setItem(INSTALL_SNOOZE_KEY, nextInstallSnooze());
+}
 
 /**
  * طبقة التطبيق المثبّت لواجهة الحلاق: تسجيل عامل الخدمة، وعرض التحديث،
@@ -64,24 +73,40 @@ export function BarberPwa() {
   // ===== دعوة التثبيت =====
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (window.localStorage.getItem(DISMISS_KEY) === "1") return;
+    if (isSnoozed()) return;
 
     const standalone =
       window.matchMedia("(display-mode: standalone)").matches ||
       (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
     if (standalone) return;
 
+    // الحدث غالبًا وقع **قبل** هذا السطر والتقطه سكربت التخطيط المضمّن، فنقرؤه
+    // من مخزنه أولًا. الاستماع بعده يغطّي حالتين: أن يتأخّر الحدث، أو ألا يعمل
+    // السكربت المضمّن أصلًا.
+    function adopt(event: InstallPromptEvent | null | undefined) {
+      if (event) setInstallEvent(event);
+    }
+
+    adopt((window as InstallWindow).__xInstallPrompt);
+
+    function onStashed() {
+      adopt((window as InstallWindow).__xInstallPrompt);
+    }
+
     function onBeforeInstall(event: Event) {
       event.preventDefault();
       setInstallEvent(event as InstallPromptEvent);
     }
 
+    // التثبيت لا يُسكت الدعوة بطابع زمني: المتصفح يتوقف عن إطلاق الحدث للتطبيق
+    // المثبَّت، وفحص `standalone` أعلاه يغطّي الباقي. تسجيلُ إسكاتٍ هنا كان يعني
+    // ألا تعود الدعوة أبدًا لمن أزال التطبيق ثم أراده مجددًا.
     function onInstalled() {
-      window.localStorage.setItem(DISMISS_KEY, "1");
       setInstallEvent(null);
       setShowIosHint(false);
     }
 
+    window.addEventListener("x:installprompt", onStashed);
     window.addEventListener("beforeinstallprompt", onBeforeInstall);
     window.addEventListener("appinstalled", onInstalled);
 
@@ -91,6 +116,7 @@ export function BarberPwa() {
     if (isIos) setShowIosHint(true);
 
     return () => {
+      window.removeEventListener("x:installprompt", onStashed);
       window.removeEventListener("beforeinstallprompt", onBeforeInstall);
       window.removeEventListener("appinstalled", onInstalled);
     };
@@ -110,7 +136,7 @@ export function BarberPwa() {
   }, []);
 
   const dismiss = useCallback(() => {
-    window.localStorage.setItem(DISMISS_KEY, "1");
+    snooze();
     setInstallEvent(null);
     setShowIosHint(false);
   }, []);
@@ -118,8 +144,13 @@ export function BarberPwa() {
   const install = useCallback(async () => {
     if (!installEvent) return;
     await installEvent.prompt();
-    await installEvent.userChoice;
+    const choice = await installEvent.userChoice;
+    // الحدث يُستهلك بنداء واحد ولا يصلح لثانٍ — نُفرغ المخزن معه حتى لا يعرض
+    // شريطٌ لاحق زرًّا ينادي حدثًا ميتًا.
+    (window as InstallWindow).__xInstallPrompt = null;
     setInstallEvent(null);
+    // رفضُ نافذة المتصفح ليس رفضًا للفكرة: نؤجّل الدعوة بدل تكرارها فورًا.
+    if (choice.outcome === "dismissed") snooze();
   }, [installEvent]);
 
   const applyUpdate = useCallback(() => {

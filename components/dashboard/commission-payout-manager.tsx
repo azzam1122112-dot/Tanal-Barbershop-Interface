@@ -2,10 +2,10 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { formatMoney, formatDateTime } from "@/lib/format";
+import { safeFetch } from "@/lib/http/safe-fetch";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Badge, EmptyState, TablePanel } from "@/components/dashboard/ui";
-
 /**
  * صرف العمولات من لوحة الإدارة.
  *
@@ -103,7 +103,7 @@ export function CommissionPayoutManager({
     setToast(null);
     const form = new FormData(event.currentTarget);
 
-    const response = await fetch("/api/dashboard/commission-payouts", {
+    const response = await safeFetch("/api/dashboard/commission-payouts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -162,7 +162,7 @@ export function CommissionPayoutManager({
     }
 
     setPending(true);
-    const response = await fetch(`/api/dashboard/commission-payouts/${payout.id}/reverse`, {
+    const response = await safeFetch(`/api/dashboard/commission-payouts/${payout.id}/reverse`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ reason }),

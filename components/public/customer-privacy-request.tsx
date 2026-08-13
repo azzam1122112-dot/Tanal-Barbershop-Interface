@@ -2,6 +2,8 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
+import { FeedbackNote, useFeedback } from "@/components/ui/toast";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 type RequestRow = {
   id: string;
@@ -29,17 +31,19 @@ const statusLabels: Record<string, string> = {
 
 export function CustomerPrivacyRequest({ token, initialRequests }: { token: string; initialRequests: RequestRow[] }) {
   const [requests, setRequests] = useState(initialRequests);
-  const [message, setMessage] = useState("");
+  // العميل يرسل طلبًا قانونيًا مرة في العمر: أن يخرج «تعذر إرسال الطلب» بلون
+  // «تم استلام طلبك» يجعله ينتظر ردًّا على طلب لم يُسجَّل أصلًا.
+  const { feedback, succeed, fail, clear } = useFeedback();
   const [loading, setLoading] = useState(false);
   const [requestType, setRequestType] = useState("ACCESS");
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
-    setMessage("");
+    clear();
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
-    const response = await fetch(`/api/public/portal/${encodeURIComponent(token)}/privacy-requests`, {
+    const response = await safeFetch(`/api/public/portal/${encodeURIComponent(token)}/privacy-requests`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -53,10 +57,10 @@ export function CustomerPrivacyRequest({ token, initialRequests }: { token: stri
     const data = (await response.json().catch(() => ({}))) as { request?: RequestRow; message?: string };
     if (response.ok && data.request) {
       setRequests((current) => [data.request!, ...current]);
-      setMessage("تم استلام طلبك، وستتم معالجته خلال 30 يومًا.");
+      succeed("تم استلام طلبك، وستتم معالجته خلال 30 يومًا.");
       formElement.reset();
     } else {
-      setMessage(data.message ?? "تعذر إرسال الطلب");
+      fail(data.message ?? "تعذر إرسال الطلب");
     }
     setLoading(false);
   }
@@ -148,11 +152,7 @@ export function CustomerPrivacyRequest({ token, initialRequests }: { token: stri
             </button>
           </form>
 
-          {message ? (
-            <p className="mt-3 rounded-xl bg-salon-mist px-3 py-2 text-xs font-bold" role="status">
-              {message}
-            </p>
-          ) : null}
+          <FeedbackNote feedback={feedback} className="mt-3 text-xs" />
         </div>
       </details>
 

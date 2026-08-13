@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Icon } from "@/components/icons";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { FeedbackNote, type FeedbackState } from "@/components/ui/toast";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 type PushConfig = {
   enabled: boolean;
@@ -80,8 +83,10 @@ export function BarberNotificationCenter() {
   const [state, setState] = useState<PushState>("loading");
   const [config, setConfig] = useState<PushConfig | null>(null);
   const [busy, setBusy] = useState(false);
-  const [feedback, setFeedback] = useState<string | null>(null);
+  // النتيجة بنبرة: «تعذر إرسال التجربة» كانت تظهر بالأخضر كـ«تم الربط بنجاح».
+  const [feedback, setFeedback] = useState<FeedbackState>(null);
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const { confirm, confirmDialog } = useConfirm();
 
   const inspect = useCallback(async () => {
     if (typeof window === "undefined") return;
@@ -103,7 +108,7 @@ export function BarberNotificationCenter() {
     }
 
     try {
-      const response = await fetch("/api/barber/push", { cache: "no-store" });
+      const response = await safeFetch("/api/barber/push", { cache: "no-store" });
       if (!response.ok) throw new Error("push config unavailable");
       const nextConfig = (await response.json()) as PushConfig;
       setConfig(nextConfig);
@@ -157,7 +162,7 @@ export function BarberNotificationCenter() {
           applicationServerKey: urlBase64ToUint8Array(config.publicKey),
         }));
 
-      const response = await fetch("/api/barber/push", {
+      const response = await safeFetch("/api/barber/push", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(subscription.toJSON()),
@@ -170,10 +175,10 @@ export function BarberNotificationCenter() {
 
       setState("active");
       setConfig((current) => (current ? { ...current, subscribed: true } : current));
-      setFeedback("تم ربط هذا الجهاز بنجاح");
+      setFeedback({ message: "تم ربط هذا الجهاز بنجاح", tone: "success" });
     } catch (error) {
       setState("error");
-      setFeedback(error instanceof Error ? error.message : "تعذر تفعيل التنبيهات");
+      setFeedback({ message: error instanceof Error ? error.message : "تعذر تفعيل التنبيهات", tone: "error" });
     } finally {
       setBusy(false);
     }
@@ -181,12 +186,21 @@ export function BarberNotificationCenter() {
 
   async function disable() {
     if (busy) return;
+    // الأثر لا يظهر لحظة الضغط بل حين يفوت الحلاقَ حجزٌ لم يصله إشعاره.
+    const confirmed = await confirm({
+      title: "إيقاف تنبيهات المواعيد؟",
+      description: "لن يصلك إشعار بأي حجز جديد يُسند إليك على هذا الجهاز حتى تعيد تفعيلها.",
+      confirmLabel: "إيقاف التنبيهات",
+      tone: "danger",
+    });
+    if (!confirmed) return;
+
     setBusy(true);
     setFeedback(null);
     try {
       const registration = await navigator.serviceWorker.getRegistration("/barber");
       const subscription = await registration?.pushManager.getSubscription();
-      const response = await fetch("/api/barber/push", {
+      const response = await safeFetch("/api/barber/push", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ endpoint: subscription?.endpoint }),
@@ -195,9 +209,9 @@ export function BarberNotificationCenter() {
       await subscription?.unsubscribe();
       setState("inactive");
       setConfig((current) => (current ? { ...current, subscribed: false } : current));
-      setFeedback("تم إيقاف التنبيهات على هذا الجهاز");
+      setFeedback({ message: "تم إيقاف التنبيهات على هذا الجهاز", tone: "success" });
     } catch (error) {
-      setFeedback(error instanceof Error ? error.message : "تعذر إيقاف التنبيهات");
+      setFeedback({ message: error instanceof Error ? error.message : "تعذر إيقاف التنبيهات", tone: "error" });
     } finally {
       setBusy(false);
     }
@@ -208,12 +222,12 @@ export function BarberNotificationCenter() {
     setBusy(true);
     setFeedback(null);
     try {
-      const response = await fetch("/api/barber/push/test", { method: "POST" });
+      const response = await safeFetch("/api/barber/push/test", { method: "POST" });
       const data = (await response.json().catch(() => ({}))) as { message?: string };
       if (!response.ok) throw new Error(data.message || "تعذر إرسال التجربة");
-      setFeedback("أرسلنا تنبيهًا تجريبيًا إلى جهازك");
+      setFeedback({ message: "أرسلنا تنبيهًا تجريبيًا إلى جهازك — يصل خلال ثوانٍ", tone: "success" });
     } catch (error) {
-      setFeedback(error instanceof Error ? error.message : "تعذر إرسال التجربة");
+      setFeedback({ message: error instanceof Error ? error.message : "تعذر إرسال التجربة", tone: "error" });
     } finally {
       setBusy(false);
     }
@@ -227,6 +241,7 @@ export function BarberNotificationCenter() {
 
   return (
     <section className="barber-card p-3" aria-labelledby="push-title">
+      {confirmDialog}
       <div className="flex items-center gap-3">
         <span className="barber-notification-icon" aria-hidden="true">
           <Icon name="bell" className="h-4 w-4" />
@@ -289,11 +304,7 @@ export function BarberNotificationCenter() {
         </div>
       ) : null}
 
-      {feedback ? (
-        <p className="mt-2 text-xs font-bold text-salon-forest" role="status" aria-live="polite">
-          {feedback}
-        </p>
-      ) : null}
+      <FeedbackNote feedback={feedback} className="mt-2 text-xs" />
     </section>
   );
 }

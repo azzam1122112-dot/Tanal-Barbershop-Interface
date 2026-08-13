@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { Icon } from "@/components/icons";
+import { handOffNotice } from "@/lib/ui/handoff-notice";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 type SalonOption = { id: string; name: string };
 
@@ -16,6 +18,9 @@ export function SalonSwitcher({
   allLabel?: string;
 }) {
   const [pending, setPending] = useState(false);
+  // الفشل كان يُطفئ `pending` ويصمت: يختار المدير فرعًا، ترتدّ القائمة إلى
+  // الفرع السابق بلا كلمة، فيظنّ أنه يقرأ أرقام فرع وهو يقرأ أرقام آخر.
+  const [error, setError] = useState("");
 
   if (salons.length === 0) return null;
 
@@ -32,14 +37,25 @@ export function SalonSwitcher({
   async function switchSalon(salonId: string) {
     if (pending) return;
     setPending(true);
-    const response = await fetch("/api/dashboard/salon", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ salonId: salonId || null }),
-    });
-    if (response.ok) {
-      window.location.reload();
-      return;
+    setError("");
+    try {
+      const response = await safeFetch("/api/dashboard/salon", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ salonId: salonId || null }),
+      });
+      if (response.ok) {
+        // التأكيد يعبر إعادة التحميل: بدونه يتبدّل النطاق بلا إعلان، وتغيّرُ
+        // الأرقام وحده لا يقول أي فرع يُعرض الآن.
+        const target = salons.find((salon) => salon.id === salonId);
+        handOffNotice(`العرض الآن: ${target ? target.name : allLabel}`);
+        window.location.reload();
+        return;
+      }
+      const data = (await response.json().catch(() => ({}))) as { message?: string };
+      setError(data.message ?? "تعذر تبديل الفرع — لم يتغيّر العرض");
+    } catch {
+      setError("انقطع الاتصال — لم يتغيّر الفرع المعروض");
     }
     setPending(false);
   }
@@ -60,6 +76,11 @@ export function SalonSwitcher({
           </option>
         ))}
       </select>
+      {error ? (
+        <span role="alert" className="mt-1.5 block rounded-lg bg-rose-500/15 px-2.5 py-1.5 text-[11px] font-bold text-rose-200">
+          {error}
+        </span>
+      ) : null}
     </label>
   );
 }

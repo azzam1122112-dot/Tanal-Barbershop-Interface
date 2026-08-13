@@ -239,7 +239,25 @@ export function EmptyState({ title, description }: { title: string; description?
 }
 
 export function FilterBar({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <form className={`dashboard-panel mt-6 grid items-end gap-3 p-4 ${className}`}>{children}</form>;
+  // `print:hidden` هنا لا في كل صفحة: شريط التصفية أداةُ اختيارٍ لا نتيجة، وورقة
+  // مطبوعة فيها قوائم منسدلة فارغة تبدو نموذجًا لم يُملأ.
+  return <form className={`dashboard-panel mt-6 grid items-end gap-3 p-4 print:hidden ${className}`}>{children}</form>;
+}
+
+/**
+ * ترويسة الورقة المطبوعة.
+ *
+ * الشريط الجانبي وشريط التصفية يختفيان عند الطباعة، فبدون هذا السطر تخرج ورقة
+ * أرقام لا تقول عن أي فترة ولا أي نطاق هي — وورقةٌ كهذه لا تصلح لملف ولا لاجتماع.
+ */
+export function ReportPrintMeta({ period, scope, printedAt }: { period: string; scope?: string; printedAt?: string }) {
+  return (
+    <div className="mt-4 hidden text-sm font-semibold text-salon-charcoal print:block">
+      <p>الفترة: {period}</p>
+      {scope ? <p>النطاق: {scope}</p> : null}
+      {printedAt ? <p>تاريخ الطباعة: {printedAt}</p> : null}
+    </div>
+  );
 }
 
 /**

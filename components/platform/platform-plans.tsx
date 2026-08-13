@@ -3,6 +3,7 @@
 import { FormEvent, useMemo, useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 import { formatMoney, formatNumber } from "@/lib/format";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 type PlanRow = {
   id: string;
@@ -70,7 +71,7 @@ export function PlatformPlans({ initialPlans }: { initialPlans: PlanRow[] }) {
     setToast(null);
     const formEl = event.currentTarget;
     const form = new FormData(formEl);
-    const response = await fetch("/api/platform/plans", {
+    const response = await safeFetch("/api/platform/plans", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ slug: form.get("slug"), ...planBody(form) }),
@@ -88,7 +89,7 @@ export function PlatformPlans({ initialPlans }: { initialPlans: PlanRow[] }) {
   }
 
   async function patchPlan(id: string, body: Record<string, unknown>, successMessage: string) {
-    const response = await fetch(`/api/platform/plans/${id}`, {
+    const response = await safeFetch(`/api/platform/plans/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

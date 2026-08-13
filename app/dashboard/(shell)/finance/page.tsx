@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Badge, DashboardShell, Field, FilterBar, InlineEmpty, Notice, SectionPanel, StatCard, TablePanel } from "@/components/dashboard/ui";
+import { Badge, DashboardShell, Field, FilterBar, InlineEmpty, Notice, ReportPrintMeta, SectionPanel, StatCard, TablePanel } from "@/components/dashboard/ui";
+import { PrintButton } from "@/components/ui/print-button";
 import { canViewFinancials } from "@/lib/auth/access";
 import { getRequestSession } from "@/lib/auth/http";
 import { dashboardScope } from "@/lib/auth/salon-scope";
@@ -8,7 +9,7 @@ import { addRiyadhMonths, toRiyadhMonthKey } from "@/lib/datetime/riyadh";
 import { prisma } from "@/lib/db/prisma";
 import { getCommissionMovement } from "@/lib/finance/commission-movement";
 import { getFinancialPeriodReport, MAX_FINANCIAL_MONTHS, resolveMonthSpan } from "@/lib/finance/financial-period";
-import { formatMoney, formatMonthLabel, formatNumber, formatPercent } from "@/lib/format";
+import { formatDate, formatMoney, formatMonthLabel, formatNumber, formatPercent } from "@/lib/format";
 
 /**
  * البيان المالي الشهري.
@@ -52,7 +53,10 @@ export default async function FinancePage({
     <DashboardShell
       title="البيان المالي الشهري"
       description="الدخل والعمولات والمصروفات والمتبقي للمؤسسة، شهرًا بشهر. اختر شهرًا واحدًا أو عدة أشهر."
+      actions={<PrintButton label="طباعة البيان" />}
     >
+      <ReportPrintMeta period={heading} printedAt={formatDate(new Date())} />
+
       <FilterBar className="lg:grid-cols-[200px_170px_170px_1fr_120px]">
         <Field label="مدى جاهز">
           <select name="preset" defaultValue={requested.preset} className="dashboard-field">

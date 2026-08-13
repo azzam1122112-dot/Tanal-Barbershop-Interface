@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 import { InlineEmpty } from "@/components/dashboard/ui";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 type ManagedService = {
   id: string;
@@ -41,7 +42,7 @@ export function ServiceManager({ initialServices }: { initialServices: ManagedSe
         return;
       }
 
-      const response = await fetch("/api/dashboard/services", {
+      const response = await safeFetch("/api/dashboard/services", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, defaultPrice, sortOrder }),
@@ -64,7 +65,7 @@ export function ServiceManager({ initialServices }: { initialServices: ManagedSe
 
   async function updateService(id: string, body: Record<string, unknown>) {
     setToast(null);
-    const response = await fetch(`/api/dashboard/services/${id}`, {
+    const response = await safeFetch(`/api/dashboard/services/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

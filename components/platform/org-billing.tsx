@@ -2,8 +2,8 @@
 
 import { FormEvent, useState } from "react";
 import { formatDate, formatMoney } from "@/lib/format";
+import { safeFetch } from "@/lib/http/safe-fetch";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-
 type Invoice = {
   id: string;
   status: "PENDING" | "PAID" | "FAILED" | "REFUNDED" | "CANCELLED";
@@ -62,7 +62,7 @@ export function OrgBilling({
     const formEl = event.currentTarget;
     const form = new FormData(formEl);
 
-    const response = await fetch(`/api/platform/organizations/${organizationId}/payments`, {
+    const response = await safeFetch(`/api/platform/organizations/${organizationId}/payments`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -97,7 +97,7 @@ export function OrgBilling({
 
     setPendingId(invoice.id);
     setMessage(null);
-    const response = await fetch(`/api/platform/organizations/${organizationId}/payments/${invoice.id}`, {
+    const response = await safeFetch(`/api/platform/organizations/${organizationId}/payments/${invoice.id}`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ reason: "تصحيح إدخال" }),
@@ -128,7 +128,7 @@ export function OrgBilling({
     if (!confirmed) return;
 
     setPendingId(invoice.id);
-    const response = await fetch(`/api/platform/organizations/${organizationId}/payments/${invoice.id}`, {
+    const response = await safeFetch(`/api/platform/organizations/${organizationId}/payments/${invoice.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action, reason: action === "REJECT" ? "تعذر التحقق من التحويل" : null }),
@@ -152,7 +152,7 @@ export function OrgBilling({
   async function resendInvoice(invoice: Invoice) {
     setPendingId(invoice.id);
     setMessage(null);
-    const response = await fetch(`/api/platform/organizations/${organizationId}/payments/${invoice.id}/email`, {
+    const response = await safeFetch(`/api/platform/organizations/${organizationId}/payments/${invoice.id}/email`, {
       method: "POST",
     });
     const data = (await response.json().catch(() => ({}))) as {

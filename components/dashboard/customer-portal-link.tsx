@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 import { buildCustomerPortalShareMessage } from "@/lib/customers/portal-share";
+import { safeFetch } from "@/lib/http/safe-fetch";
 import { toSaudiWhatsAppPhone } from "@/lib/phone/saudi-phone";
-
 /**
  * زر يولّد رابط بوابة العميل ويجهّز رسالة واتساب جاهزة للإرسال يدويًا.
  * لا إرسال تلقائي — النظام يفتح wa.me فقط، كما هي سياسة الواتساب في المشروع.
@@ -25,7 +25,7 @@ export function CustomerPortalLink({
   async function buildLink() {
     setLoading(true);
     setToast(null);
-    const response = await fetch(`/api/dashboard/customers/${customerId}/portal-link`, { method: "POST" });
+    const response = await safeFetch(`/api/dashboard/customers/${customerId}/portal-link`, { method: "POST" });
     const data = (await response.json().catch(() => ({}))) as { path?: string; message?: string };
 
     if (response.ok && data.path) {

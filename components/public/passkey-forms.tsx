@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { browserSupportsWebAuthn, startAuthentication, startRegistration } from "@simplewebauthn/browser";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 /**
  * واجهات مفاتيح المرور.
@@ -64,13 +66,13 @@ export function PasskeyLoginButton({ join }: { join?: string | null }) {
     setLoading(true);
     setFeedback(null);
     try {
-      const optionsResponse = await fetch("/api/account/passkeys/authenticate/options", { method: "POST" });
+      const optionsResponse = await safeFetch("/api/account/passkeys/authenticate/options", { method: "POST" });
       if (!optionsResponse.ok) throw new Error("options");
       const options = await optionsResponse.json();
 
       const assertion = await startAuthentication({ optionsJSON: options });
 
-      const verifyResponse = await fetch("/api/account/passkeys/authenticate/verify", {
+      const verifyResponse = await safeFetch("/api/account/passkeys/authenticate/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ response: assertion, join: join ?? undefined }),
@@ -125,7 +127,7 @@ export function PasskeyEnrollButton({
     setLoading(true);
     setFeedback(null);
     try {
-      const optionsResponse = await fetch("/api/account/passkeys/register/options", { method: "POST" });
+      const optionsResponse = await safeFetch("/api/account/passkeys/register/options", { method: "POST" });
       const options = await optionsResponse.json();
       if (!optionsResponse.ok) {
         setFeedback({ tone: "error", message: (options as { message?: string }).message ?? "تعذر تفعيل الدخول السريع." });
@@ -134,7 +136,7 @@ export function PasskeyEnrollButton({
 
       const attestation = await startRegistration({ optionsJSON: options });
 
-      const verifyResponse = await fetch("/api/account/passkeys/register/verify", {
+      const verifyResponse = await safeFetch("/api/account/passkeys/register/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ response: attestation }),
@@ -207,12 +209,24 @@ export function PasskeyManager({
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Feedback>(null);
+  const { confirm, confirmDialog } = useConfirm();
 
-  async function revoke(id: string) {
+  async function revoke(id: string, name: string) {
+    if (
+      !(await confirm({
+        title: `إلغاء «${name}»؟`,
+        description: "لن يعمل هذا المفتاح بعدها، ويبقى رمز البريد طريقك للدخول. يمكنك إضافة مفتاح جديد في أي وقت.",
+        confirmLabel: "إلغاء المفتاح",
+        tone: "danger",
+      }))
+    ) {
+      return;
+    }
+
     setBusyId(id);
     setFeedback(null);
     try {
-      const response = await fetch(`/api/account/passkeys/${id}`, { method: "DELETE" });
+      const response = await safeFetch(`/api/account/passkeys/${id}`, { method: "DELETE" });
       const data = (await response.json().catch(() => ({}))) as { message?: string };
       setFeedback({ tone: response.ok ? "success" : "error", message: data.message ?? "تعذر الإلغاء" });
       if (response.ok) router.refresh();
@@ -225,6 +239,7 @@ export function PasskeyManager({
 
   return (
     <section className="barber-card p-5">
+      {confirmDialog}
       <h2 className="text-base font-bold text-salon-ink">طرق الدخول</h2>
 
       {passkeys.length === 0 ? (
@@ -243,7 +258,7 @@ export function PasskeyManager({
               </div>
               <button
                 type="button"
-                onClick={() => revoke(passkey.id)}
+                onClick={() => void revoke(passkey.id, passkey.name ?? "مفتاح دخول")}
                 disabled={busyId === passkey.id}
                 className="shrink-0 rounded-xl border border-salon-line px-3 py-2 text-xs font-bold text-salon-ruby transition hover:border-salon-ruby disabled:opacity-60"
               >

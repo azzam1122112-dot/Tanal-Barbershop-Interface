@@ -1,11 +1,12 @@
 "use client";
 
 import { formatDate, formatNumber } from "@/lib/format";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { FeedbackNote, useFeedback } from "@/components/ui/toast";
 import { useModalDismiss } from "@/components/use-modal-dismiss";
-
 type CustomerSummary = {
   id: string;
   name: string;
@@ -25,7 +26,9 @@ export function CustomerSearch() {
   const [newName, setNewName] = useState("");
   const [transactionalConsent, setTransactionalConsent] = useState(false);
   const [marketingConsent, setMarketingConsent] = useState(false);
-  const [message, setMessage] = useState("");
+  // «العميل غير موجود» إرشاد، و«تعذر البحث» فشل، و«تم» تأكيد — وكانت الثلاثة
+  // تُرسم في الشريحة الرمادية نفسها.
+  const { feedback, setFeedback, clear: clearFeedback } = useFeedback();
   const [loading, setLoading] = useState(false);
   const sheetOpen = Boolean(customer || notFoundPhone);
   const phoneInputRef = useRef<HTMLInputElement>(null);
@@ -44,16 +47,16 @@ export function CustomerSearch() {
     const localPhone = phone;
 
     if (!/^05\d{8}$/.test(localPhone)) {
-      setMessage("رقم جوال العميل يجب أن يبدأ بـ 05 ويتكون من 10 أرقام");
+      setFeedback({ message: "رقم جوال العميل يجب أن يبدأ بـ 05 ويتكون من 10 أرقام", tone: "warning" });
       return;
     }
 
     setLoading(true);
-    setMessage("");
+    clearFeedback();
     setCustomer(null);
     setNotFoundPhone("");
 
-    const response = await fetch(`/api/barber/customers/search?phone=${encodeURIComponent(localPhone)}`);
+    const response = await safeFetch(`/api/barber/customers/search?phone=${encodeURIComponent(localPhone)}`);
     const data = (await response.json().catch(() => ({}))) as {
       found?: boolean;
       phone?: string;
@@ -62,12 +65,12 @@ export function CustomerSearch() {
     };
 
     if (!response.ok) {
-      setMessage(data.message ?? "تعذر البحث عن العميل");
+      setFeedback({ message: data.message ?? "تعذر البحث عن العميل", tone: "error" });
     } else if (data.found && data.customer) {
       setCustomer(data.customer);
     } else {
       setNotFoundPhone(data.phone ?? localPhone);
-      setMessage("العميل غير موجود، يمكنك إضافته الآن");
+      setFeedback({ message: "العميل غير موجود، يمكنك إضافته الآن", tone: "info" });
     }
     setLoading(false);
   }
@@ -75,14 +78,14 @@ export function CustomerSearch() {
   async function createCustomer(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!/^05\d{8}$/.test(notFoundPhone)) {
-      setMessage("رقم جوال العميل يجب أن يبدأ بـ 05 ويتكون من 10 أرقام");
+      setFeedback({ message: "رقم جوال العميل يجب أن يبدأ بـ 05 ويتكون من 10 أرقام", tone: "warning" });
       return;
     }
 
     setLoading(true);
-    setMessage("");
+    clearFeedback();
 
-    const response = await fetch("/api/barber/customers", {
+    const response = await safeFetch("/api/barber/customers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -99,7 +102,7 @@ export function CustomerSearch() {
       return;
     }
 
-    setMessage(data.message ?? "تعذر إنشاء العميل");
+    setFeedback({ message: data.message ?? "تعذر إنشاء العميل", tone: "error" });
     setLoading(false);
   }
 
@@ -109,8 +112,8 @@ export function CustomerSearch() {
     setNewName("");
     setTransactionalConsent(false);
     setMarketingConsent(false);
-    setMessage("");
-  }, []);
+    clearFeedback();
+  }, [clearFeedback]);
 
   useModalDismiss(sheetOpen, closeSheet);
 
@@ -134,7 +137,7 @@ export function CustomerSearch() {
               value={phone}
               onChange={(event) => {
                 setPhone(event.target.value.replace(/\D/g, "").slice(0, 10));
-                setMessage("");
+                clearFeedback();
               }}
               inputMode="numeric"
               required
@@ -145,7 +148,7 @@ export function CustomerSearch() {
               className="barber-field mt-2 h-16 bg-salon-pearl text-center text-2xl"
             />
           </label>
-          {message && !sheetOpen ? <p className="rounded-2xl border border-salon-line bg-salon-mist px-4 py-3 text-sm font-bold text-salon-charcoal">{message}</p> : null}
+          {!sheetOpen ? <FeedbackNote feedback={feedback} /> : null}
           <button disabled={loading} aria-busy={loading} className="barber-primary-button h-14 w-full text-lg">
             {loading ? "جاري البحث..." : "بحث وفتح الإجراء"}
           </button>
@@ -166,7 +169,7 @@ export function CustomerSearch() {
               </button>
             </div>
 
-            {message ? <p className="mx-4 mt-4 rounded-2xl border border-salon-line bg-salon-mist px-4 py-3 text-sm font-bold text-salon-charcoal">{message}</p> : null}
+            <FeedbackNote feedback={feedback} className="mx-4 mt-4" />
 
             {customer ? (
               <div className="p-4">

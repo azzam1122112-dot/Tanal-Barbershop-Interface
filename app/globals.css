@@ -463,6 +463,53 @@ select {
   }
 }
 
+@keyframes toast-progress {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+/* جذر الإشعارات: عنصر واحد في `body` تُبَوَّب إليه كل البطاقات.
+
+   `z-index: 200` فوق النوافذ المنزلقة (`z-[100]`) عمدًا — الإشعار الذي يظهر
+   خلف النافذة التي أطلقته لا وجود له. و`pointer-events` مُطفأة على الجذر حتى
+   لا يبتلع عمودٌ شفاف عرضه الشاشة نقراتِ ما تحته، وتُعاد على البطاقة وحدها. */
+.x-toast-root {
+  position: fixed;
+  top: max(0.75rem, env(safe-area-inset-top));
+  left: 0;
+  right: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding-inline: 1rem;
+  pointer-events: none;
+}
+
+.x-toast {
+  position: relative;
+  animation: toast-in 180ms ease-out;
+}
+
+.x-toast-progress {
+  animation: toast-progress linear forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .x-toast {
+    animation: none;
+  }
+  .x-toast-progress {
+    animation: none;
+    transform: scaleX(1);
+  }
+}
+
 /* هيكل تحميل (skeleton) بلمعة ذهبية هادئة */
 @keyframes skeleton-sweep {
   100% {
@@ -1022,6 +1069,71 @@ html:has(.x-site) {
     border: none !important;
     transform: scale(1.6);
     transform-origin: top center;
+  }
+}
+
+/* ===== طباعة تقارير اللوحة =====
+   التقرير يُطبع من الشاشة نفسها لا من نسخة ثانية تُبنى للطباعة: نسخةٌ منفصلة
+   تعني رقمين يُصانان في مكانين، وأولهما يتخلّف عن الآخر. فالطباعة هنا تُخفي
+   هيكل التنقّل وأدوات التصفية وتترك الترويسة والبطاقات والجداول. */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm;
+  }
+
+  body:has(.dashboard-page) {
+    background: #fff !important;
+  }
+
+  /* شريط الجوال والشريط الجانبي: تنقّل لا محتوى. الاختيار بالابن المباشر حتى
+     لا تُخفى معه بطاقاتُ العرض المخصصة للجوال داخل الألواح. */
+  .dashboard-page > .lg\:hidden,
+  .dashboard-page aside,
+  .x-toast-root {
+    display: none !important;
+  }
+
+  /* شبكة الشريط الجانبي + المحتوى تصير عمودًا واحدًا بعرض الورقة. */
+  .dashboard-page > div {
+    display: block !important;
+    max-width: none !important;
+  }
+
+  .dashboard-page > div > section {
+    padding: 0 !important;
+  }
+
+  .dashboard-panel {
+    background: #fff !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+
+  /* الجدول على الشاشة يُسحب أفقيًا؛ على الورق لا سحب، فيُفكّ الحد الأدنى للعرض
+     حتى لا تُقصّ الأعمدة عند حافة الصفحة، ويختفي تلاشي الحافة الدال على السحب. */
+  .table-scroll {
+    overflow: visible !important;
+  }
+
+  .table-scroll-wrap::after {
+    content: none !important;
+  }
+
+  .table-scroll table {
+    min-width: 0 !important;
+    width: 100% !important;
+    font-size: 11px;
+  }
+
+  /* جدول يمتد على أكثر من ورقة يحتاج ترويسته على كل ورقة، وإلا صارت الأعمدة
+     أرقامًا بلا عناوين بعد الصفحة الأولى. */
+  .dashboard-table thead {
+    display: table-header-group;
+  }
+
+  .dashboard-table tr {
+    break-inside: avoid;
   }
 }
 

@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { formatNumber } from "@/lib/format";
+import { safeFetch } from "@/lib/http/safe-fetch";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
-
 /**
  * مخزون الفرع في يد الحلاق.
  *
@@ -73,7 +73,7 @@ export function BarberStockPanel({
     setPending(true);
     setToast(null);
 
-    const response = await fetch("/api/barber/stock-reports", {
+    const response = await safeFetch("/api/barber/stock-reports", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

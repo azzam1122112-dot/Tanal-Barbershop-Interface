@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useMemo, useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 import { Icon } from "@/components/icons";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 type SafetyMode = "STRICT" | "BALANCED" | "CUSTOM";
 type AlertTone = "success" | "info" | "warning" | "danger";
@@ -100,7 +101,7 @@ export function WhatsAppSafetyCenter({ initialOverview }: { initialOverview: Wha
     setLoading(true);
     setToast(null);
     try {
-      const response = await fetch("/api/dashboard/whatsapp/safety", {
+      const response = await safeFetch("/api/dashboard/whatsapp/safety", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(settings),
@@ -111,7 +112,7 @@ export function WhatsAppSafetyCenter({ initialOverview }: { initialOverview: Wha
         return;
       }
 
-      const refreshed = await fetch("/api/dashboard/whatsapp/safety");
+      const refreshed = await safeFetch("/api/dashboard/whatsapp/safety");
       const next = (await refreshed.json().catch(() => null)) as WhatsAppSafetyOverview | null;
       if (refreshed.ok && next) {
         setOverview(next);

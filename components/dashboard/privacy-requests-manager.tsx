@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { FeedbackNote, useFeedback } from "@/components/ui/toast";
 import { formatDate } from "@/lib/format";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 type Row = {
   id: string;
@@ -33,16 +35,18 @@ const statusLabels: Record<string, string> = {
 
 export function PrivacyRequestsManager({ initialRows }: { initialRows: Row[] }) {
   const [rows, setRows] = useState(initialRows);
-  const [message, setMessage] = useState("");
+  // «تم تحديث الطلب» و«تعذر تحديث الطلب» كانتا شريحة رمادية واحدة — وهذه شاشة
+  // يُحذف فيها سجل عميل نهائيًا، فالفرق بين تنفيذ ورفض لا يحتمل التباسًا.
+  const { feedback, succeed, fail, clear } = useFeedback();
   const [pendingId, setPendingId] = useState<string | null>(null);
 
   async function update(event: FormEvent<HTMLFormElement>, id: string) {
     event.preventDefault();
     setPendingId(id);
-    setMessage("");
+    clear();
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
-    const response = await fetch(`/api/dashboard/privacy-requests/${id}`, {
+    const response = await safeFetch(`/api/dashboard/privacy-requests/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: form.get("status"), resolutionNote: form.get("resolutionNote") }),
@@ -50,16 +54,16 @@ export function PrivacyRequestsManager({ initialRows }: { initialRows: Row[] }) 
     const data = (await response.json().catch(() => ({}))) as { request?: Partial<Row>; message?: string };
     if (response.ok && data.request) {
       setRows((current) => current.map((row) => row.id === id ? { ...row, ...data.request } : row));
-      setMessage("تم تحديث الطلب");
+      succeed("تم تحديث الطلب");
     } else {
-      setMessage(data.message ?? "تعذر تحديث الطلب");
+      fail(data.message ?? "تعذر تحديث الطلب");
     }
     setPendingId(null);
   }
 
   return (
     <div className="mt-6 space-y-4">
-      {message ? <p role="status" className="rounded-xl bg-salon-mist px-4 py-3 text-sm font-bold">{message}</p> : null}
+      <FeedbackNote feedback={feedback} />
       {rows.length === 0 ? (
         <p className="dashboard-panel p-6 text-sm font-semibold text-salon-charcoal">لا توجد طلبات خصوصية.</p>
       ) : rows.map((row) => {

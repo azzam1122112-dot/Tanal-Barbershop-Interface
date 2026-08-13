@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { formatDateTime, formatNumber } from "@/lib/format";
+import { safeFetch } from "@/lib/http/safe-fetch";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Badge, EmptyState } from "@/components/dashboard/ui";
-
 /**
  * بلاغات الحلاقين عن المخزون.
  *
@@ -63,7 +63,7 @@ export function StockReportsInbox({ initialReports }: { initialReports: StockRep
 
     setPendingId(report.id);
     setToast(null);
-    const response = await fetch(`/api/dashboard/stock-reports/${report.id}`, {
+    const response = await safeFetch(`/api/dashboard/stock-reports/${report.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ decision, note }),

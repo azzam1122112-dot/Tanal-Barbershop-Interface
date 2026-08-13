@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 /**
  * الإجراء الأساسي في بطاقة المحفظة: افتح بوابة الصالون.
@@ -21,7 +22,7 @@ export function OpenPortalButton({ reference }: { reference: string }) {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch(`/api/account/loyalty/${encodeURIComponent(reference)}/portal`, {
+      const response = await safeFetch(`/api/account/loyalty/${encodeURIComponent(reference)}/portal`, {
         method: "POST",
       });
       const data = (await response.json().catch(() => ({}))) as { url?: string; message?: string };

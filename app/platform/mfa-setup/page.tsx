@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import qrcode from "qrcode-generator";
 import { BrandLogo } from "@/components/brand-logo";
+import { safeFetch } from "@/lib/http/safe-fetch";
 
 type Setup = { secret: string; otpauthUri: string };
 
@@ -13,7 +14,7 @@ export default function PlatformMfaSetupPage() {
   const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
 
   useEffect(() => {
-    fetch("/api/platform/auth/mfa/setup", { method: "POST" })
+    safeFetch("/api/platform/auth/mfa/setup", { method: "POST" })
       .then(async (response) => {
         const data = await response.json();
         if (!response.ok) throw new Error(data.message ?? "تعذر بدء الإعداد");
@@ -36,7 +37,7 @@ export default function PlatformMfaSetupPage() {
     setError("");
     setLoading(true);
     const form = new FormData(event.currentTarget);
-    const response = await fetch("/api/platform/auth/mfa/confirm", {
+    const response = await safeFetch("/api/platform/auth/mfa/confirm", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code: form.get("code") }),
