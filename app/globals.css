@@ -1049,7 +1049,75 @@ html:has(.x-site) {
   }
 }
 
-/* ===== ملصق التسجيل في برنامج الولاء ===== */
+/* ===== ملصق التسجيل في برنامج الولاء =====
+   ورقة A4 تُعلَّق أمام الزبون: خلفياتها الداكنة هوية لا زينة، فتُطبع كما تُعرض
+   (`print-color-adjust: exact`). والشاشة تعرض هذه الورقة نفسها مصغّرة بـ
+   `transform` — لا نسخة شاشة وأخرى للطباعة تتخلّف إحداهما عن الأخرى. */
+.join-poster-sheet {
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+.join-poster-hero {
+  background:
+    radial-gradient(520px 300px at 88% -12%, rgba(124, 58, 237, 0.42), transparent 62%),
+    radial-gradient(420px 260px at 4% 112%, rgba(91, 33, 182, 0.32), transparent 60%),
+    linear-gradient(158deg, #171020 0%, #0d0914 58%, #09070f 100%);
+}
+
+.join-poster-body {
+  background: linear-gradient(180deg, #ffffff 0%, #fbfaff 100%);
+}
+
+.join-poster-footer {
+  background: linear-gradient(180deg, #15111f 0%, #09070f 100%);
+}
+
+/* الخط الذهبي/البنفسجي يفصل هوية المنصّة عن عرض الصالون بمستوى بصري لا بمسافة. */
+.join-poster-rule {
+  height: 1px;
+  background: linear-gradient(90deg, rgba(196, 181, 253, 0.85), rgba(124, 58, 237, 0.3), transparent);
+}
+
+/* بطاقة الرمز بيضاء دائمًا: منطقة الهدوء حول الرمز شرط قراءته بالكاميرا،
+   ورمزٌ على سطح ملوّن أو مزخرف يفشل مسحه في إضاءة الصالون. */
+.join-poster-qr-card {
+  background: #ffffff;
+  border: 1px solid #ddd6ee;
+  box-shadow: var(--shadow-md);
+}
+
+.join-poster-corner {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  border: 2px solid rgba(124, 58, 237, 0.55);
+}
+.join-poster-corner-tr {
+  top: 10px;
+  right: 10px;
+  border-left: 0;
+  border-bottom: 0;
+  border-top-right-radius: 10px;
+}
+.join-poster-corner-bl {
+  bottom: 10px;
+  left: 10px;
+  border-right: 0;
+  border-top: 0;
+  border-bottom-left-radius: 10px;
+}
+
+.join-poster-step-badge {
+  background: linear-gradient(180deg, #8b5cf6 0%, #7c3aed 55%, #5b21b6 100%);
+  box-shadow: 0 6px 14px -8px rgba(124, 58, 237, 0.9);
+}
+
+.join-poster-fact {
+  background: linear-gradient(180deg, #ffffff 0%, #f7f4fd 100%);
+  border: 1px solid #e6e0f5;
+}
+
 .join-poster-qr svg {
   width: 100%;
   height: 100%;
@@ -1057,18 +1125,44 @@ html:has(.x-site) {
 }
 
 @media print {
-  /* الطباعة تُخرج الملصق وحده: نخفي كل ما عداه بدل بناء صفحة طباعة منفصلة. */
-  body:has(.join-poster) .dashboard-page > div > aside,
-  body:has(.join-poster) .dashboard-panel:not(:has(.join-poster)),
-  body:has(.join-poster) .lg\:hidden {
+  /* على الورق: الملصق وحده.
+     القاعدة تُخفي كل عنصر ليس الملصق، ولا جدًّا له، ولا جزءًا منه — بدل تعداد
+     ألواح الشاشة واحدًا واحدًا. التعداد كان يتخلّف عن الشاشة، فيخرج مع الملصق
+     سطرٌ مقصوص من شرحٍ مكتوب للمدير لا للزبون. */
+  body:has(.join-poster-sheet) *:not(:has(.join-poster-sheet)):not(.join-poster-sheet, .join-poster-sheet *) {
     display: none !important;
   }
 
-  .join-poster {
+  /* أجداد الملصق تبقى ظاهرة لكنها تتخلّى عن هوامشها وحدودها وقصّها وارتفاعها
+     المحسوب للمعاينة، وإلا طُبعت الورقة داخل إطار المعاينة مقصوصة. */
+  body:has(.join-poster-sheet) :has(.join-poster-sheet) {
+    display: block !important;
+    width: auto !important;
     max-width: none !important;
-    border: none !important;
-    transform: scale(1.6);
-    transform-origin: top center;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: none !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+  }
+
+  body:has(.join-poster-sheet) {
+    background: #fff !important;
+  }
+
+  /* الورقة بمقاسها الحقيقي (700×1000 بكسل = 185×265 مم عند 96dpi) داخل منطقة
+     طباعة A4 بهوامش 12 مم. لا `@page` هنا عمدًا: القاعدة العامة في قسم تقارير
+     اللوحة تحكم الطباعة كلها، وتغييرها هنا يغيّر معها الإيصال والتقرير. */
+  .join-poster-sheet {
+    position: static !important;
+    transform: none !important;
+    opacity: 1 !important;
+    box-shadow: none !important;
+    break-inside: avoid;
   }
 }
 
