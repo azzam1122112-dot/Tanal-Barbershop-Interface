@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand-logo";
 import { Icon, type IconName } from "@/components/icons";
-import { HeroProductShowcase } from "@/components/marketing/hero-product-showcase";
+import { HeroProductFrame } from "@/components/marketing/hero-product-frame";
+import { ProductShot } from "@/components/marketing/product-shot";
 import { LandingMotion } from "@/components/marketing/landing-motion";
 import landing from "@/components/marketing/landing-page.module.css";
 import { Reveal } from "@/components/reveal";
@@ -472,53 +473,57 @@ export default async function HomePage() {
           aria-hidden="true"
         />
 
-        <div className="x-shell relative grid items-center gap-12 pb-16 pt-12 sm:gap-14 sm:pb-24 sm:pt-20 lg:grid-cols-[1.05fr_.95fr] lg:py-28">
-          <div>
-            <Reveal as="p" className={landing.heroKicker}>
-              تشغيل الصالون، لكن بمشهد أوضح
-            </Reveal>
+        {/* **المنتج أولًا، والجملة تعليقٌ عليه.**
 
-            <Reveal as="h1" delay={70} className={`${landing.heroTitle} mt-7 font-bold`}>
-              كل كرسي يتحرّك.
-              <br />
-              <span className={landing.heroTitleAccent}>ولا رقم يضيع.</span>
-            </Reveal>
+            كان التخطيط عمودين: نصٌّ يمينًا وصورة يسارًا — وهو القالب الافتراضي
+            لكل صفحة هبوط تُبنى اليوم، فيقرأه الزائر كقالب لا كمنتج. وعمودان
+            متجاوران يتنافسان على العين: لا النص يُقرأ كاملًا ولا الصورة تُرى.
 
-            <Reveal as="p" delay={140} className={`${landing.heroCopy} mt-7`}>
-              منصة تشغيل عربية تربط الزيارة بالصندوق والعمولة والمخزون والولاء لحظةً بلحظة؛ لتعرف ماذا حدث، ومن نفّذه، وما الذي يحتاج قرارك الآن.
-            </Reveal>
+            الآن مسرح واحد بعرض الشاشة تحته الجملة: يرى ما اشتراه قبل أن يقرأ
+            وعدًا به. لقطة فعلية من حساب العرض — لا واجهات ولا أرقام متخيَّلة. */}
+        <div className="x-shell relative flex flex-col items-center pb-16 pt-10 sm:pb-24 sm:pt-14 lg:pb-28 lg:pt-16">
+          <Reveal className={landing.heroStage}>
+            <HeroProductFrame />
+          </Reveal>
 
-            <Reveal delay={210} className="mt-7 flex flex-col gap-3 sm:mt-8 sm:flex-row">
-              <Link href="/signup" className="x-button-primary min-h-[3.25rem] px-6 text-[0.95rem] sm:min-h-14 sm:px-7 sm:text-base">
-                شغّل تجربتك {trialDays} يومًا <span aria-hidden="true">←</span>
-              </Link>
-              <a
-                href={WHATSAPP_LINK}
-                target="_blank"
-                rel="noreferrer"
-                className="x-button-ghost min-h-[3.25rem] px-6 text-[0.95rem] sm:min-h-14 sm:px-7 sm:text-base"
-              >
-                <Icon name="whatsapp" className="h-5 w-5" aria-hidden="true" />
-                تحدّث معنا في واتساب
-              </a>
-            </Reveal>
+          <Reveal as="p" delay={90} className={`${landing.heroKicker} ${landing.heroKickerCentered} mt-12 sm:mt-16`}>
+            تشغيل الصالون، لكن بمشهد أوضح
+          </Reveal>
 
-            <Reveal delay={280} className="mt-7 flex flex-wrap gap-x-5 gap-y-2.5 text-[13px] text-slate-400 sm:mt-8 sm:text-sm">
-              {["عربي RTL بالكامل", "إيصال وسجل لكل زيارة", "يعمل من أي جوال", "متعدد الفروع"].map((item) => (
-                <span key={item} className="inline-flex items-center gap-2">
-                  <Icon name="check" className="h-4 w-4 shrink-0 text-violet-400" aria-hidden="true" />
-                  {item}
-                </span>
-              ))}
-            </Reveal>
-            <Reveal as="p" delay={330} className="mt-4 max-w-xl text-xs font-semibold leading-6 text-slate-500">
-              التسجيل يفعّل التجربة بعد قبول الشروط وسياسة الخصوصية واتفاقية معالجة البيانات. لا يوجد خصم بنكي تلقائي.
-            </Reveal>
-          </div>
+          <Reveal as="h1" delay={140} className={`${landing.heroTitle} mt-6 text-center font-bold`}>
+            كل كرسي يتحرّك. <span className={landing.heroTitleAccent}>ولا رقم يضيع.</span>
+          </Reveal>
 
-          {/* لقطات فعلية التُقطت من حساب العرض المحلي؛ لا واجهات أو أرقام متخيَّلة. */}
-          <Reveal delay={150} className={`${landing.heroFrame} relative mx-auto w-full max-w-[36rem] lg:max-w-none`}>
-            <HeroProductShowcase />
+          <Reveal as="p" delay={190} className={`${landing.heroCopy} mt-6 text-center`}>
+            منصة تشغيل عربية تربط الزيارة بالصندوق والعمولة والمخزون والولاء لحظةً بلحظة؛ لتعرف ماذا حدث، ومن نفّذه، وما الذي يحتاج قرارك الآن.
+          </Reveal>
+
+          <Reveal delay={240} className="mt-8 flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+            <Link href="/signup" className="x-button-primary min-h-[3.25rem] px-6 text-[0.95rem] sm:min-h-14 sm:px-7 sm:text-base">
+              شغّل تجربتك {trialDays} يومًا <span aria-hidden="true">←</span>
+            </Link>
+            <a
+              href={WHATSAPP_LINK}
+              target="_blank"
+              rel="noreferrer"
+              className="x-button-ghost min-h-[3.25rem] px-6 text-[0.95rem] sm:min-h-14 sm:px-7 sm:text-base"
+            >
+              <Icon name="whatsapp" className="h-5 w-5" aria-hidden="true" />
+              تحدّث معنا في واتساب
+            </a>
+          </Reveal>
+
+          <Reveal delay={290} className="mt-8 flex flex-wrap justify-center gap-x-5 gap-y-2.5 text-[13px] text-slate-400 sm:text-sm">
+            {["عربي RTL بالكامل", "إيصال وسجل لكل زيارة", "يعمل من أي جوال", "متعدد الفروع"].map((item) => (
+              <span key={item} className="inline-flex items-center gap-2">
+                <Icon name="check" className="h-4 w-4 shrink-0 text-violet-400" aria-hidden="true" />
+                {item}
+              </span>
+            ))}
+          </Reveal>
+
+          <Reveal as="p" delay={330} className="mt-5 max-w-2xl text-center text-xs font-semibold leading-6 text-slate-500">
+            التسجيل يفعّل التجربة بعد قبول الشروط وسياسة الخصوصية واتفاقية معالجة البيانات. لا يوجد خصم بنكي تلقائي.
           </Reveal>
         </div>
       </section>
@@ -590,6 +595,17 @@ export default async function HomePage() {
               </Reveal>
             ))}
           </div>
+
+          {/* عشرة صفوف نصّية متتالية أطول امتداد في الصفحة بلا صورة. لقطة واحدة
+              تُغلقه بدليل: «الزيارة تحرّك كل شيء» ادعاءٌ يُصدَّق حين يُرى جدولٌ
+              حقيقي مرتبط بالفرع والحلاق. */}
+          <Reveal delay={120} className="mx-auto mt-14 w-full max-w-3xl sm:mt-16">
+            <ProductShot
+              src="/marketing/platform-appointments.png"
+              alt="شاشة المواعيد في لوحة إكس مانس إكس XMANSX — الحجوزات والحضور مرتبطة بالفرع والحلاق"
+              caption="المواعيد والحضور والحجز الجديد — مرتبطة مباشرة بالفرع والحلاق"
+            />
+          </Reveal>
         </div>
       </section>
 
@@ -655,8 +671,17 @@ export default async function HomePage() {
               </ul>
             </div>
 
-            <div className="relative flex items-center justify-center bg-[#110c1c] p-8 sm:p-10">
+            {/* شقّا العنوان مرئيّان: **السجل** لقطة فعلية، و**الإيصال** نموذجه.
+                كان الشقّ الأول بلا أي دليل بصري رغم أنه نصف الادعاء. */}
+            <div className="relative flex flex-col items-center justify-center gap-8 bg-[#110c1c] p-8 sm:p-10">
               <div className="x-grid absolute inset-0 opacity-20" aria-hidden="true" />
+              <div className="relative w-full">
+                <ProductShot
+                  src="/marketing/platform-visits.png"
+                  alt="سجل الزيارات في لوحة إكس مانس إكس XMANSX — الخدمة والحلاق والدفع والإيصال لكل زيارة"
+                  caption="سجل الزيارات كما يظهر في لوحتك"
+                />
+              </div>
               <div className="relative w-full max-w-[17rem] rounded-2xl bg-white p-5 text-salon-ink shadow-2xl">
                 <div className="flex items-center justify-between border-b border-dashed border-salon-line pb-3">
                   <p className="text-xs font-bold">إيصال زيارة</p>

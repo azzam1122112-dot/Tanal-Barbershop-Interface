@@ -7,6 +7,7 @@ import { DashboardShell, EmptyState, FilterBar, SectionPanel, TablePanel } from 
 import { LoyaltyJoinPoster } from "@/components/dashboard/loyalty-join-poster";
 import { getEffectiveSettings } from "@/lib/settings/system-settings";
 import { buildQrSvg } from "@/lib/qr";
+import { absoluteUrl } from "@/lib/site";
 import { CustomerWhatsAppToggle } from "@/components/dashboard/customer-whatsapp-toggle";
 import { ManagerRewardButton } from "@/components/dashboard/manager-reward-button";
 import { CustomerPortalLink } from "@/components/dashboard/customer-portal-link";
@@ -64,15 +65,36 @@ export default async function DashboardCustomersPage({
     ? await prisma.organization.findUnique({ where: { id: organizationId }, select: { name: true, slug: true } })
     : null;
   const settings = await getEffectiveSettings(prisma, { organizationId });
-  const brandName = settings?.legalName?.trim() || settings?.salonName || organization?.name || "";
+  // ملصق يقرأه الزبون: الاسم التجاري للصالون أولًا لا الاسم النظامي — «مؤسسة
+  // فلان للتجارة» على جدار الصالون لا تعني للزبون شيئًا.
+  const salonName = settings?.salonName?.trim() || settings?.legalName?.trim() || organization?.name || "";
+  // مكافآت المؤسسة: ما يُعرض على الملصق هو عرض هذا الصالون فعلًا لا وعد عام.
+  const rewardRules = organizationId
+    ? await prisma.rewardRule.findMany({
+        where: { organizationId, isActive: true },
+        orderBy: { requiredPoints: "asc" },
+        select: { requiredPoints: true },
+      })
+    : [];
   // نمرّر المعرّف صراحةً ليعمل الرابط محليًا وعلى نطاق موحّد بلا نطاق فرعي.
   const joinPath = organization?.slug ? `/join?org=${organization.slug}` : "/join";
-  const joinQrSvg = buildQrSvg(`${process.env.PUBLIC_APP_URL ?? ""}${joinPath}`, { cellSize: 4 });
+  // الرابط المطلق من `PUBLIC_APP_URL` لا من مضيف الطلب: اللوحة تُفتح أيضًا من
+  // نطاق المستأجر الفرعي، والملصق يُطبع مرة ويبقى معلّقًا سنة.
+  const joinUrl = absoluteUrl(joinPath);
+  const joinQrSvg = buildQrSvg(joinUrl, { cellSize: 4 });
 
   return (
     <DashboardShell title="العملاء" description="بحث سريع في العملاء، متابعة النقاط والزيارات، والتحكم بتفضيل رسائل واتساب.">
         <SectionPanel title="انضمام العملاء لبرنامج الولاء" className="mt-6">
-          <LoyaltyJoinPoster joinPath={joinPath} qrSvg={joinQrSvg} brandName={brandName} />
+          <LoyaltyJoinPoster
+            joinPath={joinPath}
+            joinUrl={joinUrl}
+            qrSvg={joinQrSvg}
+            salonName={salonName}
+            pointsPerRiyal={settings ? Number(settings.pointsPerCurrencyUnit) : 1}
+            rewardsCount={rewardRules.length}
+            lowestRewardPoints={rewardRules[0]?.requiredPoints ?? null}
+          />
         </SectionPanel>
 
         <FilterBar className="md:grid-cols-[1fr_190px_130px]">
