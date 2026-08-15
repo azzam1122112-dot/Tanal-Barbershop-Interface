@@ -3,6 +3,19 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand-logo";
 
+/**
+ * كل مسار داخل `middleware.ts` يُصيَّر عند الطلب.
+ *
+ * السياسة هناك تحمل `nonce` جديدًا لكل طلب، وصفحةٌ مبنية وقت `next build` تحمل
+ * سكربتات Next بلا توقيع فيحجبها المتصفح وتُشلّ الصفحة. التوجيه في **التخطيط**
+ * لا في الصفحات: مكوّنات العميل لا تُحترم فيها إعدادات المقطع، وصفحةٌ جديدة
+ * تُضاف لاحقًا ترث الحكم بلا أن يتذكّره أحد. ولا كلفة — هذه المسارات تُقدَّم
+ * أصلًا بـ`Cache-Control: private, no-store`.
+ *
+ * يحرسه `tests/security-regressions.test.ts`.
+ */
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "حسابي",
   // صفحات حساب شخصية — لا مكان لها في نتائج البحث.

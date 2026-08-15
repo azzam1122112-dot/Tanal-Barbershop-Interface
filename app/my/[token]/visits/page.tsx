@@ -1,7 +1,11 @@
+import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 import { getPortalIdentity, getPortalVisits } from "@/lib/customers/portal-view";
 import { LOYALTY_MOVEMENT_LABEL } from "@/lib/customers/loyalty-wallet";
+
+export const metadata: Metadata = { title: "زياراتي" };
 
 export default async function PortalVisitsPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
@@ -30,11 +34,26 @@ export default async function PortalVisitsPage({ params }: { params: Promise<{ t
                   {visit.services.join("، ") || "زيارة"}
                   {visit.salonName ? ` · ${visit.salonName}` : ""}
                 </p>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-bold text-salon-charcoal/65">
+                  <span>{visit.paymentMethod === "CASH" ? "دفع كاش" : "دفع شبكة"}</span>
+                  {visit.discountAmount > 0 ? (
+                    <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-800">
+                      وفّرت {formatMoney(visit.discountAmount)}
+                    </span>
+                  ) : null}
+                  {visit.invoiceNumber ? <span dir="ltr">{visit.invoiceNumber}</span> : null}
+                </div>
                 {visit.pointsEarned > 0 ? (
                   <p className="mt-1.5 inline-flex rounded-full bg-salon-mist px-2.5 py-1 text-[11px] font-bold text-salon-forest">
                     +{formatNumber(visit.pointsEarned)} نقطة
                   </p>
                 ) : null}
+                <Link
+                  href={`/my/${token}/visits/${visit.id}`}
+                  className="mt-3 inline-flex min-h-11 items-center rounded-xl border border-salon-line bg-white px-3.5 text-xs font-black text-salon-ink transition hover:border-salon-gold"
+                >
+                  عرض الإيصال الكامل
+                </Link>
               </li>
             ))}
           </ul>

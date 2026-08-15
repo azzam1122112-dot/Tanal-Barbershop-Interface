@@ -9,6 +9,7 @@ import { getEffectiveSettings } from "@/lib/settings/system-settings";
 import { issueInvoiceNumber } from "@/lib/invoicing/invoice-number";
 import { assertSubscriptionActive } from "@/lib/plans/subscription-guard";
 import { calculateVisitCommission } from "@/lib/commissions/commission";
+import { completeAppointmentWithVisit } from "@/lib/appointments/appointment-service";
 import { recordStockMovement } from "@/lib/products/product-service";
 import { roundMoney } from "@/lib/visits/visit-totals";
 import { recordBarberCashDelta } from "@/lib/cash-custody/cash-custody-service";
@@ -89,6 +90,8 @@ type VisitInput = {
   serviceIds: string[];
   /** منتجات تُباع مع الزيارة. أسعارها من الكتالوج وتُضاف فوق مبلغ الخدمات. */
   products?: { productId: string; quantity: number }[];
+  /** إجمالي الفاتورة الذي اعتمده الحلاق قبل الدفع، شاملًا المنتجات. */
+  invoiceTotal?: number;
   grossAmount: number;
   paymentMethod: PaymentMethod;
   paymentConfirmed?: boolean;
@@ -96,6 +99,12 @@ type VisitInput = {
   rewardRuleId?: string;
   managerRewardId?: string;
   campaignId?: string;
+  /**
+   * الموعد الذي نتجت عنه هذه الزيارة، إن جاء الحلاق من شاشة المواعيد.
+   * اختياري دائمًا: الزيارة المباشرة (walk-in) هي الأصل ولا يجوز أن يشترط
+   * تسجيلُها حجزًا سابقًا. يُقفل الموعد داخل معاملة الزيارة نفسها.
+   */
+  appointmentId?: string | null;
   idempotencyKey?: string;
   auditMeta?: {
     ipAddress?: string | null;
@@ -142,18 +151,40 @@ export async function buildVisitPreview(prisma: VisitPrisma, input: VisitInput) 
 
   // السعر مرجعه كتالوج المنشأة فقط. قيمة الواجهة لا تُستخدم في الحساب،
   // وتُرفض إن عُبث بها حتى لا يستطيع حساب الحلاق تخفيض قيمة الخدمة.
-  const servicesAmount = roundMoney(services.reduce((total, service) => total + Number(service.defaultPrice), 0));
-  if (servicesAmount <= 0) throw new BusinessError("أسعار الخدمات المختارة غير صالحة؛ راجع مدير الصالون");
-  if (roundMoney(input.grossAmount) !== servicesAmount) {
+  const catalogServicesAmount = roundMoney(services.reduce((total, service) => total + Number(service.defaultPrice), 0));
+  if (catalogServicesAmount <= 0) throw new BusinessError("أسعار الخدمات المختارة غير صالحة؛ راجع مدير الصالون");
+  if (roundMoney(input.grossAmount) !== catalogServicesAmount) {
     throw new BusinessError("تغيّر سعر إحدى الخدمات. حدّث الصفحة وأعد المحاولة", 409);
   }
 
   const productLines = await resolveProductLines(prisma, input);
   const productsTotal = roundMoney(productLines.reduce((total, line) => total + line.lineTotal, 0));
+  const catalogGrossAmount = roundMoney(catalogServicesAmount + productsTotal);
+  const requestedInvoiceTotal = input.invoiceTotal == null ? catalogGrossAmount : roundMoney(input.invoiceTotal);
+  if (!Number.isFinite(requestedInvoiceTotal) || requestedInvoiceTotal <= productsTotal) {
+    throw new BusinessError(`إجمالي الفاتورة يجب أن يكون أكبر من قيمة المنتجات (${productsTotal} ريال)`);
+  }
+  if (requestedInvoiceTotal > 1_000_000) {
+    throw new BusinessError("إجمالي الفاتورة يتجاوز الحد المسموح");
+  }
+
+  // المنتجات تظل بسعر الكتالوج حتى لا يتشوّه تقرير هامش ربحها. فرق الإجمالي
+  // يُوزّع بدقة السنت على الخدمات المختارة (وهي مطلوبة دائمًا)، وبذلك يساوي
+  // مجموع سطور الإيصال إجمالي الزيارة دون سطر مالي وهمي أو فروق تقريب.
+  const servicesAmount = roundMoney(requestedInvoiceTotal - productsTotal);
+  const allocatedServiceAmounts = allocateMoneyProportionally(
+    services.map((service) => Number(service.defaultPrice)),
+    servicesAmount,
+  );
+  const pricedServices = services.map((service, index) => ({
+    ...toSafeService(service),
+    catalogUnitPrice: Number(service.defaultPrice),
+    unitPrice: allocatedServiceAmounts[index] ?? 0,
+    lineTotal: allocatedServiceAmounts[index] ?? 0,
+  }));
 
   const totals = calculateVisitTotals({
-    // المنتجات تُضاف فوق مبلغ الخدمات بأسعار الكتالوج، فلا يُخطئ الحلاق في جمعها.
-    grossAmount: roundMoney(servicesAmount + productsTotal),
+    grossAmount: requestedInvoiceTotal,
     discountAmount: 0,
     pointsPerCurrencyUnit: settings ? Number(settings.pointsPerCurrencyUnit) : 1,
     pointsCalculatedAfterDiscount: settings?.pointsCalculatedAfterDiscount ?? true,
@@ -184,7 +215,7 @@ export async function buildVisitPreview(prisma: VisitPrisma, input: VisitInput) 
       id: barber.id,
       name: barber.name,
     },
-    services: services.map((service) => toSafeService(service)),
+    services: pricedServices,
     products: productLines.map((line) => ({
       id: line.productId,
       name: line.productName,
@@ -194,6 +225,8 @@ export async function buildVisitPreview(prisma: VisitPrisma, input: VisitInput) 
     })),
     productsTotal,
     servicesAmount,
+    catalogGrossAmount,
+    pricingAdjustmentAmount: roundMoney(requestedInvoiceTotal - catalogGrossAmount),
     grossAmount: totals.grossAmount,
     discountAmount: 0,
     netAmount: totals.netAmount,
@@ -221,6 +254,25 @@ export async function buildVisitPreview(prisma: VisitPrisma, input: VisitInput) 
     })),
     availableCampaigns: campaigns,
   };
+}
+
+/** يوزّع مبلغًا على أوزان موجبة بالسنت مع ضمان أن يساوي المجموع الهدف تمامًا. */
+function allocateMoneyProportionally(weights: number[], targetAmount: number) {
+  const targetCents = Math.round(targetAmount * 100);
+  const weightTotal = weights.reduce((total, weight) => total + weight, 0);
+  if (weights.length === 0 || weightTotal <= 0 || targetCents < 0) return weights.map(() => 0);
+
+  const allocations = weights.map((weight, index) => {
+    const exact = (targetCents * weight) / weightTotal;
+    return { index, cents: Math.floor(exact), fraction: exact - Math.floor(exact) };
+  });
+  let remainder = targetCents - allocations.reduce((total, row) => total + row.cents, 0);
+  for (const row of [...allocations].sort((a, b) => b.fraction - a.fraction || a.index - b.index)) {
+    if (remainder <= 0) break;
+    row.cents += 1;
+    remainder -= 1;
+  }
+  return allocations.sort((a, b) => a.index - b.index).map((row) => row.cents / 100);
 }
 
 export async function confirmVisit(prisma: PrismaClient, input: VisitInput) {
@@ -384,9 +436,9 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
         ...preview.services.map((service) => ({
           serviceId: service.id,
           serviceName: service.name,
-          unitPrice: service.defaultPrice,
+          unitPrice: service.unitPrice,
           quantity: 1,
-          lineTotal: service.defaultPrice,
+          lineTotal: service.lineTotal,
           kind: "SERVICE" as const,
           serviceRate: numberOrNull(rateByService.get(service.id)),
         })),
@@ -469,6 +521,20 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
         campaignRedemption: true,
       },
     });
+
+    // قفل الموعد داخل المعاملة نفسها: الزيارة وإقفال موعدها يقعان معًا أو لا يقع
+    // أحدهما. هذا هو المسار الوحيد الذي يبلغ به الموعد `COMPLETED` — ولذلك يرفض
+    // `updateAppointmentStatus` ضبطها يدويًا ويحيل إلى تسجيل الزيارة.
+    const completedAppointment = input.appointmentId
+      ? await completeAppointmentWithVisit(tx, {
+          appointmentId: input.appointmentId,
+          visitId: visit.id,
+          organizationId: input.organizationId,
+          salonId: input.salonId,
+          barberId: input.barberId,
+          customerId: customer?.id ?? null,
+        })
+      : null;
 
     // البيع النقدي يزيد عهدة الحلاق فقط؛ لا ينشئ إيرادًا ثانيًا ولا يغيّر تقرير المبيعات.
     if (visit.paymentMethod === "CASH" && Number(visit.netAmount) > 0) {
@@ -582,6 +648,9 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
           visitId: visit.id,
           cashSessionId: cashSession.id,
           grossAmount: totals.grossAmount,
+          catalogGrossAmount: preview.catalogGrossAmount,
+          pricingAdjustmentAmount: preview.pricingAdjustmentAmount,
+          requestedInvoiceTotal: input.invoiceTotal ?? null,
           discountAmount: totals.discountAmount,
           netAmount: totals.netAmount,
           commissionAmount: commission.totalCommission,
@@ -593,6 +662,11 @@ async function confirmVisitOnce(prisma: PrismaClient, input: VisitInput) {
           campaignId: campaignSelection?.campaign.id ?? null,
           redeemedPoints,
           pointsEarned: earnedPoints,
+          // الموعد المطلوب قفله والموعد المقفول فعلًا حقلان لا حقل: طلبٌ يحمل
+          // موعدًا لم يُقبل (فرع آخر، أو حلاق آخر، أو مقفول سلفًا) يظهر هنا
+          // بفارقٍ بينهما بدل أن يمرّ بلا أثر.
+          requestedAppointmentId: input.appointmentId ?? null,
+          completedAppointmentId: completedAppointment?.id ?? null,
         },
         ipAddress: input.auditMeta?.ipAddress,
         userAgent: input.auditMeta?.userAgent,

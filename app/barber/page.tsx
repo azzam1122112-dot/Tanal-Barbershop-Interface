@@ -113,13 +113,13 @@ export default async function BarberHomePage() {
             <h1 className="text-lg font-bold leading-tight text-salon-ink sm:text-xl">مرحبًا {session.barber.name}</h1>
           </div>
         </div>
-        <LogoutButton className="shrink-0 border-salon-line bg-white text-salon-charcoal shadow-sm hover:border-salon-forest/40" />
+        <LogoutButton className="min-h-11 shrink-0 border-salon-line bg-white text-salon-charcoal shadow-sm hover:border-salon-forest/40" />
       </div>
 
       {subscription.blockReason ? null : (
         <div className="mt-2.5 flex items-center gap-2">
           <span className="barber-status-chip">
-            عهدتك <span className="lux-number text-sm text-salon-ink">{formatMoney(summary.custodyBalance)}</span>
+            عهدتك <span className="lux-number text-sm text-salon-ink">{formatSar(summary.custodyBalance)}</span>
           </span>
           <span className={`barber-status-chip ${summary.cashSession ? "is-open" : "is-closed"}`}>
             <span aria-hidden="true" />
@@ -147,14 +147,14 @@ export default async function BarberHomePage() {
           <div className="p-4">
             {/* الرقم البطولي هو المتبقي له لا ما اكتسبه: بعد أول صرف يصير
                 المكتسب الخام رقمًا مضلّلًا يظن الحلاق أنه ما زال يستحقه. */}
-            <p className="lux-number text-4xl text-salon-forest">{formatMoney(commissionBalance.outstanding)}</p>
+            <p className="lux-number text-4xl text-salon-forest">{formatSar(commissionBalance.outstanding)}</p>
             <p className="mt-1 text-xs font-semibold text-salon-charcoal/65">
               المتبقي لك بعد ما استلمته · عمولة {monthlyCommission.monthLabel}{" "}
-              {formatMoney(monthlyCommission.commissionAmount)}
+              {formatSar(monthlyCommission.commissionAmount)}
             </p>
             <div className="mt-4 grid grid-cols-3 gap-2 border-t border-salon-line pt-4 text-center">
-              <CommissionTile label="مستحق تراكمي" value={formatMoney(commissionBalance.accrued)} />
-              <CommissionTile label="استلمته" value={formatMoney(commissionBalance.paid)} />
+              <CommissionTile label="مستحق تراكمي" value={formatSar(commissionBalance.accrued)} />
+              <CommissionTile label="استلمته" value={formatSar(commissionBalance.paid)} />
               <CommissionTile label="النسبة الفعلية" value={`${monthlyCommission.effectiveRate}%`} />
             </div>
             {commissionBalance.payouts.length > 0 ? (
@@ -169,7 +169,7 @@ export default async function BarberHomePage() {
                       {payout.methodLabel}
                       {payout.paidByName ? ` · ${payout.paidByName}` : ""}
                     </span>
-                    <span className="lux-number shrink-0 text-salon-forest">{formatMoney(payout.amount)}</span>
+                    <span className="lux-number shrink-0 text-salon-forest">{formatSar(payout.amount)}</span>
                   </li>
                 ))}
               </ul>
@@ -189,7 +189,7 @@ export default async function BarberHomePage() {
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-xs font-bold text-salon-charcoal/70">صافي عملياتك اليوم</p>
-              <p className="lux-number mt-1 text-4xl text-salon-forest">{formatMoney(summary.netTotal)}</p>
+              <p className="lux-number mt-1 text-4xl text-salon-forest">{formatSar(summary.netTotal)}</p>
             </div>
             <div className="shrink-0 rounded-xl border border-salon-line bg-white px-5 py-3 text-center">
               <p className="lux-number text-2xl text-salon-ink">{summary.visitsCount}</p>
@@ -197,8 +197,8 @@ export default async function BarberHomePage() {
             </div>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2">
-            <SummaryTile label="كاش اليوم" value={formatMoney(summary.cashTotal)} tone="gold" />
-            <SummaryTile label="شبكة اليوم" value={formatMoney(summary.networkTotal)} tone="steel" />
+            <SummaryTile label="كاش اليوم" value={formatSar(summary.cashTotal)} tone="gold" />
+            <SummaryTile label="شبكة اليوم" value={formatSar(summary.networkTotal)} tone="steel" />
           </div>
         </div>
         <div className="space-y-2 p-4">
@@ -206,7 +206,7 @@ export default async function BarberHomePage() {
             <div key={visit.id} className="rounded-xl border border-salon-line bg-salon-pearl px-3 py-3 text-sm">
               <div className="flex items-center justify-between gap-2">
                 <span className="font-bold">{visit.customer.name}</span>
-                <span className="lux-number text-salon-forest">{formatMoney(visit.netAmount)}</span>
+                <span className="lux-number text-salon-forest">{formatSar(visit.netAmount)}</span>
               </div>
               <p className="mt-1 text-xs font-semibold text-salon-charcoal/75">
                 {visit.paymentMethod === "CASH" ? "كاش" : "شبكة"} ·{" "}
@@ -417,4 +417,8 @@ function SummaryTile({ label, value, tone }: { label: string; value: string; ton
       <p className="mt-1 text-lg font-bold text-salon-ink">{value}</p>
     </div>
   );
+}
+
+function formatSar(amount: number) {
+  return `${formatMoney(amount)} ر.س`;
 }

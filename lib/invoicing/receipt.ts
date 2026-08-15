@@ -21,7 +21,7 @@ const receiptInclude = {
 export async function buildReceipt(
   prisma: PrismaClient,
   visitId: string,
-  scope: { organizationId: string; salonIds?: string[] | null; barberId?: string },
+  scope: { organizationId: string; salonIds?: string[] | null; barberId?: string; customerId?: string },
 ) {
   const visit = await prisma.visit.findFirst({
     where: {
@@ -29,6 +29,7 @@ export async function buildReceipt(
       organizationId: scope.organizationId,
       ...(scope.salonIds && scope.salonIds.length > 0 ? { salonId: { in: scope.salonIds } } : {}),
       ...(scope.barberId ? { barberId: scope.barberId } : {}),
+      ...(scope.customerId ? { customerId: scope.customerId } : {}),
     },
     include: receiptInclude,
   });

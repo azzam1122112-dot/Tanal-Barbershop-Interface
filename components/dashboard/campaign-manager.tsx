@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
-import { formatDate } from "@/lib/format";
+import { formatDateTime } from "@/lib/format";
 import { safeFetch } from "@/lib/http/safe-fetch";
 import { InlineEmpty } from "@/components/dashboard/ui";
 type Campaign = {
@@ -150,7 +150,8 @@ export function CampaignManager({ initialCampaigns }: { initialCampaigns: Campai
               </CampaignCell>
               <CampaignCell label="الاستهداف">{targetLabel(campaign)}</CampaignCell>
               <CampaignCell label="الفترة">
-                {formatDate(campaign.startAt)} - {formatDate(campaign.endAt)}
+                <span className="block">من {formatDateTime(campaign.startAt)}</span>
+                <span className="mt-0.5 block text-xs text-salon-charcoal/65">حتى {formatDateTime(campaign.endAt)}</span>
               </CampaignCell>
               <CampaignCell label="لكل عميل">{campaign.maxUsesPerCustomer}</CampaignCell>
               <div className="grid gap-1 lg:block">
@@ -158,9 +159,9 @@ export function CampaignManager({ initialCampaigns }: { initialCampaigns: Campai
                 <button
                   type="button"
                   onClick={() => updateCampaign(campaign.id, { isActive: !campaign.isActive })}
-                  className={`w-full rounded-lg px-3 py-2 font-bold lg:w-auto ${campaign.isActive ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}
+                  className={`w-full rounded-lg px-3 py-2 font-bold lg:w-auto ${campaignStatus(campaign).className}`}
                 >
-                  {campaign.isActive ? "فعالة" : "معطلة"}
+                  {campaignStatus(campaign).label}
                 </button>
               </div>
             </div>
@@ -170,6 +171,18 @@ export function CampaignManager({ initialCampaigns }: { initialCampaigns: Campai
       </div>
     </div>
   );
+}
+
+function campaignStatus(campaign: Campaign) {
+  if (!campaign.isActive) return { label: "معطلة", className: "bg-red-50 text-red-700" };
+  const now = Date.now();
+  if (new Date(campaign.startAt).getTime() > now) {
+    return { label: "مجدولة", className: "bg-sky-50 text-sky-700" };
+  }
+  if (new Date(campaign.endAt).getTime() < now) {
+    return { label: "منتهية", className: "bg-salon-mist text-salon-charcoal" };
+  }
+  return { label: "فعالة الآن", className: "bg-green-50 text-green-700" };
 }
 
 function CampaignCell({ label, children }: { label: string; children: React.ReactNode }) {

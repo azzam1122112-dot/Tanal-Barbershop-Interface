@@ -5,9 +5,13 @@ import { safeFetch } from "@/lib/http/safe-fetch";
 
 export function ShareReceiptPdfButton({
   visitId,
+  pdfPath = `/api/receipt/${visitId}/pdf`,
+  receiptHref = `/receipt/${visitId}`,
   className = "dashboard-button-gold px-4 py-2 text-sm",
 }: {
   visitId: string;
+  pdfPath?: string;
+  receiptHref?: string;
   className?: string;
 }) {
   const [file, setFile] = useState<File | null>(null);
@@ -18,7 +22,7 @@ export function ShareReceiptPdfButton({
     setLoading(true);
     setMessage("");
 
-    const response = await safeFetch(`/api/receipt/${visitId}/pdf`, {
+    const response = await safeFetch(pdfPath, {
       credentials: "same-origin",
       signal,
     });
@@ -33,7 +37,7 @@ export function ShareReceiptPdfButton({
     const preparedFile = new File([blob], filename, { type: "application/pdf" });
     setFile(preparedFile);
     return preparedFile;
-  }, [visitId]);
+  }, [pdfPath, visitId]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -49,34 +53,36 @@ export function ShareReceiptPdfButton({
   }, [preparePdf]);
 
   async function sharePdf() {
-    if (!file) {
-      try {
-        await preparePdf();
-        setMessage("تم تجهيز الملف. اضغط مرة أخرى لفتح خيارات المشاركة.");
-      } catch (error) {
-        setMessage(error instanceof Error ? error.message : "تعذر تجهيز ملف الإيصال");
-      } finally {
-        setLoading(false);
-      }
-      return;
-    }
-
     setMessage("");
+    setLoading(true);
     try {
-      if (navigator.share && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: "إيصال المبيعات",
-          text: "إيصال زيارتك من الصالون",
-        });
-        setMessage("تم فتح خيارات المشاركة");
+      // أول ضغطة تُجهّز الملف وتفتحه مباشرة؛ التدفق السابق كان يطلب من المستخدم
+      // الضغط مرتين إذا فشل التجهيز الاستباقي أو كان الاتصال بطيئًا.
+      const preparedFile = file ?? await preparePdf();
+      if (navigator.share && navigator.canShare?.({ files: [preparedFile] })) {
+        try {
+          await navigator.share({
+            files: [preparedFile],
+            title: "إيصال المبيعات",
+            text: "إيصال زيارتك من الصالون",
+          });
+          setMessage("تم فتح خيارات المشاركة");
+        } catch (error) {
+          // إغلاق المستخدم لنافذة المشاركة ليس طلبًا للتنزيل، أما منع المتصفح
+          // أو نظام التشغيل لها فيجب ألا يتركه بلا إيصال.
+          if (error instanceof DOMException && error.name === "AbortError") return;
+          downloadBlob(preparedFile, preparedFile.name);
+          setMessage("لم يفتح النظام نافذة المشاركة، لذلك نُزّل ملف PDF بدلًا منها.");
+        }
       } else {
-        downloadBlob(file, file.name);
+        downloadBlob(preparedFile, preparedFile.name);
         setMessage("تم تنزيل ملف PDF. يمكنك إرساله من تطبيق الملفات أو واتساب.");
       }
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
       setMessage(error instanceof Error ? error.message : "تعذر مشاركة ملف الإيصال");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -85,7 +91,12 @@ export function ShareReceiptPdfButton({
       <button type="button" disabled={loading} onClick={() => void sharePdf()} className={className}>
         {loading ? "جاري تجهيز PDF..." : "مشاركة الإيصال PDF"}
       </button>
-      {message ? <p className="mt-2 text-xs font-semibold text-salon-charcoal print:hidden">{message}</p> : null}
+      {message ? (
+        <div className="mt-2 print:hidden" role="status" aria-live="polite">
+          <p className="text-xs font-semibold text-salon-charcoal">{message}</p>
+          {!file ? <a href={receiptHref} className="mt-1 inline-block text-xs font-bold text-violet-800 underline">فتح نسخة الطباعة</a> : null}
+        </div>
+      ) : null}
     </div>
   );
 }

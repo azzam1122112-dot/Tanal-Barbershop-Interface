@@ -104,15 +104,6 @@ function clamp(value: number, min: number, max: number, fallback: number) {
   return Math.min(max, Math.max(min, Math.trunc(value)));
 }
 
-export function startOfLocalDay(value: Date) {
-  return startOfRiyadhDay(value);
-}
-
-/** @deprecated استخدم الاسم الأدق `toRiyadhDateKey`. */
-export function toLocalDateKey(value: Date) {
-  return toRiyadhDateKey(value);
-}
-
 /** @deprecated استخدم الاسم الأدق `parseRiyadhDateKey`. */
 export function parseLocalDateKey(value: string): Date {
   try {

@@ -5,7 +5,7 @@ import { getRequestMeta, parseJsonBody } from "@/lib/auth/http";
 import { requireCustomerApi } from "@/lib/customers/account-http";
 import { decodeJoinContext } from "@/lib/customers/join-context";
 import { enrollAccountInOrganization } from "@/lib/customers/organization-enrollment";
-import { ensurePortalToken } from "@/lib/customers/customer-portal";
+import { issueCustomerPortalToken } from "@/lib/customers/customer-portal";
 import { consumeCustomerRateLimit } from "@/lib/customers/account-rate-limit";
 import { toErrorResponse } from "@/lib/http/error-response";
 
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     const walletHref = `/account/loyalty/${encodeURIComponent(result.reference)}`;
     let redirectTo = walletHref;
     try {
-      const portalToken = await ensurePortalToken(prisma, result.customerId, result.organizationId);
+      const portalToken = await issueCustomerPortalToken(prisma, result.customerId, result.organizationId);
       redirectTo = `/my/${portalToken}`;
     } catch {
       // نُبقي وجهة المحفظة.

@@ -91,11 +91,10 @@ export default async function DashboardPage() {
           )}
         </div>
 
-        <aside className="dashboard-panel relative overflow-hidden bg-salon-ink p-5 text-white">
-          <div className="absolute -left-16 -top-16 h-48 w-48 rounded-full bg-salon-gold/20 blur-3xl" aria-hidden="true" />
-          <p className="relative text-xs font-bold text-salon-goldlight">المتبقي للمؤسسة اليوم</p>
-          <p className="relative mt-3 text-4xl font-black tabular-nums tracking-tight sm:text-5xl">{formatMoney(operatingNet)}</p>
-          <div className="relative mt-6 grid grid-cols-2 gap-3 border-t border-white/10 pt-4 text-sm">
+        <aside className="dashboard-panel dashboard-net-card relative overflow-hidden p-5 text-white">
+          <p className="text-xs font-bold text-salon-goldlight">المتبقي للمؤسسة اليوم</p>
+          <p className="mt-3 text-4xl font-black tabular-nums tracking-tight sm:text-5xl">{formatMoney(operatingNet)}</p>
+          <div className="mt-6 grid grid-cols-2 gap-3 border-t border-white/10 pt-4 text-sm">
             <MetricMini label="إيرادات المبيعات" value={formatMoney(summary.netAmount)} />
             <MetricMini label="عمولات مستحقة" value={formatMoney(summary.commissionAmount)} />
             <MetricMini label="مصروفات اليوم" value={formatMoney(expenses.total)} />

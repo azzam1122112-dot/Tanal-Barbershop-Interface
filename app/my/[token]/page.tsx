@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { countAr, formatDate, formatMoney, formatNumber } from "@/lib/format";
 import { getPortalCard, getPortalIdentity } from "@/lib/customers/portal-view";
 import { rewardNameMentionsAmount } from "@/lib/loyalty/reward-summary";
 import { NextAppointmentCard } from "@/components/public/next-appointment-card";
+
+export const metadata: Metadata = { title: "بطاقتي" };
 
 /**
  * تبويب «بطاقتي» — أربعة عناصر لا سبعة.

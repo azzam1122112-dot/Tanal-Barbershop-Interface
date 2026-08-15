@@ -144,7 +144,7 @@ export function CashCustodyManager({
         </div>
       ) : null}
 
-      <TablePanel>
+      <TablePanel label="سجل تحصيلات عهدة الكاش">
         <div className="border-b border-salon-line px-5 py-4"><h2 className="lux-section-title">سجل التحصيلات</h2><p className="dashboard-muted mt-1 text-sm">إيصالات ثابتة؛ التصحيح يتم بعكس موثق يعيد المبلغ للعهدة.</p></div>
         {data.collections.length ? (
           <table className="dashboard-table min-w-[1180px]">
@@ -167,7 +167,7 @@ export function CashCustodyManager({
       {reverseId ? <ReversePanel busy={busy} onClose={() => setReverseId(null)} onSubmit={(reason) => submitJson(`/api/dashboard/cash-collections/${reverseId}/reverse`, "POST", { reason }, "تم عكس التحصيل")} /> : null}
 
       {data.safeWithdrawals.length ? (
-        <TablePanel>
+        <TablePanel label="حركات خروج خزنة الفرع">
           <div className="border-b border-salon-line px-5 py-4"><h2 className="lux-section-title">حركات خروج خزنة الفرع</h2></div>
           <table className="dashboard-table min-w-[760px]"><thead><tr><th>التاريخ</th><th>الفرع</th><th>الحركة</th><th>المبلغ</th><th>الرصيد بعدها</th><th>المرجع</th></tr></thead><tbody>
             {data.safeWithdrawals.map((row) => <tr key={row.id}><td>{formatDateTime(row.occurredAt)}</td><td>{row.salonName}</td><td>{row.label}</td><td className="font-bold">{formatMoney(row.amount)}</td><td>{formatMoney(row.branchBalanceAfter ?? 0)}</td><td>{row.note}</td></tr>)}

@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { countAr, formatDate, formatMoney, formatNumber } from "@/lib/format";
 import { getPortalIdentity, getPortalOffers } from "@/lib/customers/portal-view";
 import { formatDurationLabel } from "@/lib/appointments/duration-format";
 import { rewardNameMentionsAmount } from "@/lib/loyalty/reward-summary";
+
+export const metadata: Metadata = { title: "العروض" };
 
 export default async function PortalOffersPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
@@ -43,6 +46,9 @@ export default async function PortalOffersPage({ params }: { params: Promise<{ t
           <ul className="mt-3.5 space-y-2">
             {campaigns.map((campaign) => (
               <li key={campaign.id} className="rounded-xl border border-salon-forest/25 bg-salon-forest/[0.06] px-3.5 py-3">
+                {campaign.title ? (
+                  <p className="mb-1 text-base font-black text-salon-ink [overflow-wrap:anywhere]">{campaign.title}</p>
+                ) : null}
                 <div className="flex items-baseline justify-between gap-3">
                   <span className="min-w-0 text-sm font-bold text-salon-forest [overflow-wrap:anywhere]">
                     {campaign.headline}

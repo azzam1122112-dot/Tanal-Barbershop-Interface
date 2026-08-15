@@ -101,6 +101,17 @@ select {
     box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255, 255, 255, 0.85);
   }
 
+  /* بطاقة الصافي كانت تعتمد على كرة `blur-3xl` كطبقة تركيب مستقلة. بعض نسخ
+     Chrome لم ترسم الطبقة الداكنة والنص معها في اللقطة/التمرير، فبدت البطاقة
+     فارغة رغم وجود الأرقام في DOM. التدرج الشعاعي هنا طلاء واحد ثابت وأخف. */
+  .dashboard-net-card {
+    background:
+      radial-gradient(circle at 8% 0%, rgba(179, 132, 60, 0.3), transparent 38%),
+      linear-gradient(145deg, #21172f 0%, #15111f 58%, #0d1713 100%);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  }
+
   .dashboard-soft-panel {
     @apply rounded-2xl border border-salon-line/60;
     background: var(--surface-raised);
@@ -261,6 +272,15 @@ select {
     @apply overflow-x-auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-x: contain;
+  }
+
+  .table-scroll:focus-visible {
+    outline: 3px solid rgba(139, 92, 246, 0.42);
+    outline-offset: -3px;
+  }
+
+  .table-scroll-hint {
+    @apply border-b border-salon-line/70 bg-salon-pearl/80 px-4 py-2 text-xs font-bold text-salon-charcoal/70;
   }
 
   /* ===== Barber (mobile-first) ===== */
@@ -1202,6 +1222,11 @@ html:has(.x-site) {
     background: #fff !important;
     box-shadow: none !important;
     break-inside: avoid;
+  }
+
+  .dashboard-net-card,
+  .dashboard-net-card * {
+    color: #15111f !important;
   }
 
   /* الجدول على الشاشة يُسحب أفقيًا؛ على الورق لا سحب، فيُفكّ الحد الأدنى للعرض

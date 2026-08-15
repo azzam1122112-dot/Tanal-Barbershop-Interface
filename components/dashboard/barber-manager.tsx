@@ -457,6 +457,7 @@ export function BarberManager({
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
+                  aria-label="بحث في قائمة الحلاقين بالاسم أو الجوال"
                   placeholder="بحث بالاسم أو الجوال"
                   className="dashboard-field py-2.5"
                 />

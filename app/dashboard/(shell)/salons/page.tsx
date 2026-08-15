@@ -15,13 +15,20 @@ export default async function DashboardSalonsPage() {
 
   const [salons, organization] = await Promise.all([
     listSalons(prisma, session.organizationId),
-    prisma.organization.findUnique({ where: { id: session.organizationId }, select: { slug: true } }),
+    prisma.organization.findUnique({
+      where: { id: session.organizationId },
+      select: { slug: true, plan: { select: { name: true, maxSalons: true } } },
+    }),
   ]);
 
   return (
     <DashboardShell title="فروع المؤسسة" description="أضف وأدِر صالونات مؤسستك، وشارك روابط الدخول مع فريقك.">
       {organization ? <TeamLoginLinks slug={organization.slug} /> : null}
-      <SalonsManager initialSalons={salons} />
+      <SalonsManager
+        initialSalons={salons}
+        planName={organization?.plan?.name ?? "التجربة"}
+        maxSalons={organization?.plan?.maxSalons ?? 1}
+      />
     </DashboardShell>
   );
 }

@@ -2,7 +2,7 @@ import { formatNumber } from "@/lib/format";
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { redirect } from "next/navigation";
-import { DashboardShell, EmptyState, FilterBar } from "@/components/dashboard/ui";
+import { DashboardShell, EmptyState, Field, FilterBar } from "@/components/dashboard/ui";
 import { VisitsLedger } from "@/components/dashboard/visits-ledger";
 import { canAccessDashboard } from "@/lib/auth/access";
 import { dashboardScope } from "@/lib/auth/salon-scope";
@@ -72,21 +72,27 @@ export default async function DashboardVisitsPage({
   return (
     <DashboardShell title="الزيارات" description="سجل سريع قابل للتصفية والتصحيح.">
         <FilterBar className="md:grid-cols-[minmax(220px,1fr)_150px_150px_180px_110px]">
-          <input name="q" defaultValue={q} placeholder="بحث باسم أو جوال العميل" className="dashboard-field" />
+          <Field label="بحث العميل"><input name="q" defaultValue={q} placeholder="الاسم أو رقم الجوال" className="dashboard-field" /></Field>
+          <Field label="طريقة الدفع">
           <select name="paymentMethod" defaultValue={paymentMethod ?? ""} className="dashboard-field">
             <option value="">كل طرق الدفع</option>
             <option value="CASH">كاش</option>
             <option value="NETWORK">شبكة</option>
           </select>
+          </Field>
+          <Field label="حالة الزيارة">
           <select name="status" defaultValue={status ?? ""} className="dashboard-field">
             <option value="">كل الحالات</option>
             <option value="COMPLETED">مؤكدة</option>
             <option value="CANCELLED">ملغاة</option>
           </select>
+          </Field>
+          <Field label="الحلاق">
           <select name="barberId" defaultValue={params.barberId ?? ""} className="dashboard-field">
             <option value="">كل الحلاقين</option>
             {barbers.map((barber) => <option key={barber.id} value={barber.id}>{barber.name}</option>)}
           </select>
+          </Field>
           <button className="dashboard-button">تصفية</button>
         </FilterBar>
 

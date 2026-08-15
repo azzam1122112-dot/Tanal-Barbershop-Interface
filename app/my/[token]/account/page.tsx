@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPortalAccount, getPortalIdentity } from "@/lib/customers/portal-view";
 import { PortalInstall } from "@/components/public/portal-install";
 import { CustomerPrivacyRequest } from "@/components/public/customer-privacy-request";
+
+export const metadata: Metadata = { title: "حسابي" };
 
 /**
  * تبويب «حسابي».

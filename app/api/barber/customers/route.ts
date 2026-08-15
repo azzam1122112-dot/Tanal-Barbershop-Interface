@@ -1,12 +1,7 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
-import { customerCreateSchema } from "@/lib/auth/validation";
-import { getRequestMeta, parseJsonBody, requireBarberApi } from "@/lib/auth/http";
-import { createCustomerWithLoyalty } from "@/lib/customers/customer-service";
-import { toCustomerSummary } from "@/lib/customers/customer-summary";
-import { writeAuditLog } from "@/lib/audit/audit-log";
+import { requireBarberApi } from "@/lib/auth/http";
 
-export async function POST(request: Request) {
+export async function POST() {
   const auth = await requireBarberApi();
   if (auth.response) return auth.response;
   const session = auth.session;
@@ -14,47 +9,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "غير مصرح" }, { status: 401 });
   }
 
-  const body = await parseJsonBody(request);
-  const parsed = customerCreateSchema.safeParse(body);
-
-  if (!parsed.success) {
-    return NextResponse.json({ message: "بيانات العميل غير صحيحة" }, { status: 400 });
-  }
-
-  // **الحلاق لا يمنح عضوية ولاء أبدًا.** ما يُنشأ هنا سجل تشغيلي (اسم وجوال)
-  // تُسجَّل عليه الزيارات والفواتير. العضوية رصيدٌ باسم شخص وسجلٌّ يتراكم عليه،
-  // ولا تُفتح إلا بيد صاحبه من `/join` بحساب بريده موثَّق — فلا يقف بين العميل
-  // وبياناته أحد. القيمة صريحة لا اتكالًا على الافتراضي: هذا سطر أمني يُقرأ.
-  const result = await createCustomerWithLoyalty({
-    prisma,
-    organizationId: session.organizationId,
-    name: parsed.data.name,
-    phone: parsed.data.phone,
-    createdByBarberId: session.barber.id,
-    enrollInLoyalty: false,
-    whatsappTransactionalOptIn: parsed.data.whatsappTransactionalOptIn,
-    whatsappMarketingOptIn: parsed.data.whatsappMarketingOptIn,
-    whatsappConsentSource: "IN_PERSON",
-  });
-  const meta = await getRequestMeta();
-
-  await writeAuditLog({
-    prisma,
-    actorType: "BARBER",
-    actorBarberId: session.barber.id,
-    action: result.created ? "customer.created" : "customer.create_duplicate",
-    entityType: "Customer",
-    entityId: result.customer.id,
-    after: toCustomerSummary(result.customer),
-    ...meta,
-  });
-
   return NextResponse.json(
-    {
-      created: result.created,
-      customer: toCustomerSummary(result.customer),
-      message: result.created ? "تم حفظ العميل" : "العميل موجود مسبقًا",
-    },
-    { status: result.created ? 201 : 200 },
+    { message: "لا يملك الحلاق صلاحية إنشاء العملاء. يسجّل العميل نفسه عبر رمز QR المطبوع في المحل." },
+    { status: 403 },
   );
 }

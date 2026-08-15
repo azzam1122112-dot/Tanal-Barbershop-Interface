@@ -29,6 +29,7 @@ export async function POST(request: Request) {
       serviceIds: parsed.data.serviceIds,
       products: parsed.data.products,
       grossAmount: parsed.data.grossAmount,
+      invoiceTotal: parsed.data.invoiceTotal,
       paymentMethod: parsed.data.paymentMethod,
       campaignId: parsed.data.campaignId,
     });

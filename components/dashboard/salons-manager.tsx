@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Link from "next/link";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
+import { FeedbackNote, type FeedbackState } from "@/components/ui/toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { InlineEmpty } from "@/components/dashboard/ui";
 import { safeFetch } from "@/lib/http/safe-fetch";
@@ -14,17 +16,31 @@ type Salon = {
   barbersCount?: number;
 };
 
-export function SalonsManager({ initialSalons }: { initialSalons: Salon[] }) {
+export function SalonsManager({
+  initialSalons,
+  maxSalons,
+  planName,
+}: {
+  initialSalons: Salon[];
+  maxSalons: number;
+  planName: string;
+}) {
   const [salons, setSalons] = useState(initialSalons);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [pending, setPending] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [formFeedback, setFormFeedback] = useState<FeedbackState>(null);
   const { confirm, confirmDialog } = useConfirm();
 
   async function createSalon(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (salons.length >= maxSalons) {
+      setFormFeedback({ message: `وصلت إلى حد باقة ${planName}: ${maxSalons} ${maxSalons === 1 ? "فرع" : "فروع"}. اختر باقة أعلى لإضافة فرع جديد.`, tone: "warning" });
+      return;
+    }
     setPending(true);
     setToast(null);
+    setFormFeedback(null);
     const formEl = event.currentTarget;
     const form = new FormData(formEl);
     const response = await safeFetch("/api/dashboard/salons", {
@@ -38,7 +54,9 @@ export function SalonsManager({ initialSalons }: { initialSalons: Salon[] }) {
       formEl.reset();
       setToast({ message: "تم إنشاء الصالون", tone: "success" });
     } else {
-      setToast({ message: data.message ?? "تعذر إنشاء الصالون", tone: "error" });
+      const message = data.message ?? "تعذر إنشاء الصالون";
+      setFormFeedback({ message, tone: "error" });
+      setToast({ message, tone: "error" });
     }
     setPending(false);
   }
@@ -88,19 +106,29 @@ export function SalonsManager({ initialSalons }: { initialSalons: Salon[] }) {
       <DashboardToast toast={toast} onClose={() => setToast(null)} />
 
       <form onSubmit={createSalon} className="dashboard-panel space-y-3 p-5">
-        <h2 className="text-lg font-bold tracking-tight">إضافة صالون</h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-lg font-bold tracking-tight">إضافة صالون</h2>
+          <span className={`rounded-full px-3 py-1 text-xs font-bold ${salons.length >= maxSalons ? "bg-amber-100 text-amber-900" : "bg-violet-100 text-violet-900"}`}>
+            {salons.length} من {maxSalons}
+          </span>
+        </div>
         <p className="dashboard-muted">أضف فرعًا جديدًا تحت مؤسستك. كل صالون له حلاقوه وصندوقه وإعداداته.</p>
         <label className="block text-sm font-semibold">
           اسم الصالون
-          <input name="name" required className="dashboard-field mt-2" placeholder="مثال: فرع العليا" />
+          <input name="name" required disabled={pending || salons.length >= maxSalons} className="dashboard-field mt-2" placeholder="مثال: فرع العليا" />
         </label>
         <label className="block text-sm font-semibold">
           معرّف الصالون
-          <input name="slug" required dir="ltr" className="dashboard-field mt-2" placeholder="al-olaya" />
+          <input name="slug" required disabled={pending || salons.length >= maxSalons} dir="ltr" className="dashboard-field mt-2" placeholder="al-olaya" />
         </label>
+        <FeedbackNote feedback={formFeedback} />
+        {salons.length >= maxSalons ? (
+          <Link href="/dashboard/subscription" className="dashboard-button-gold w-full">عرض الباقات وإضافة فروع</Link>
+        ) : (
         <button disabled={pending} aria-busy={pending} className="dashboard-button-gold w-full">
           {pending ? "جاري الإضافة..." : "إضافة الصالون"}
         </button>
+        )}
       </form>
 
       <div className="dashboard-panel overflow-hidden">

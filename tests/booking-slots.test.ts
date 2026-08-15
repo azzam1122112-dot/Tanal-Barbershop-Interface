@@ -4,9 +4,9 @@ import {
   bookingConfigFromSettings,
   listAvailableSlots,
   resolveBookableSlot,
-  toLocalDateKey,
   type BookingConfig,
 } from "../lib/appointments/booking-slots";
+import { toRiyadhDateKey } from "../lib/datetime/riyadh";
 
 const config: BookingConfig = {
   enabled: true,
@@ -80,7 +80,7 @@ describe("customer booking availability", () => {
       from: now,
       days: 1,
     });
-    const today = days.find((day) => day.date === toLocalDateKey(now));
+    const today = days.find((day) => day.date === toRiyadhDateKey(now));
     expect(today).toBeDefined();
 
     const tooSoon = today?.slots.find((slot) => slot.minuteOfDay === 16 * 60 + 30);

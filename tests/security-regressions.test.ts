@@ -3,9 +3,9 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import nextConfig from "../next.config";
 import { adminPasswordSchema } from "../lib/auth/password";
-import { customerCreateSchema } from "../lib/auth/validation";
 import { redactForLog } from "../lib/logger";
 import { isTrustedPushEndpoint } from "../lib/push/barber-push";
+import { buildContentSecurityPolicy, createCspNonce } from "../lib/security/csp";
 import { serializeJsonForHtml } from "../lib/security/serialization";
 
 describe("security regression controls", () => {
@@ -22,18 +22,25 @@ describe("security regression controls", () => {
 
   /**
    * الحلاق لا يمنح عضوية ولاء لأحد — العضوية يفتحها العميل بنفسه بحساب بريده
-   * موثَّق. الفرض في ثلاث طبقات؛ هذه تحرس أولاها: المخطط **يُسقط** الحقل من أي
-   * طلب معدَّل يدويًا بدل أن يقبله. وتحرس معه بقاء الحلاق بلا مسار يُصدر رابط
-   * بوابة عميل — الرابط مفتاحٌ يفتح سجل الزيارات والرصيد بلا كلمة مرور.
+   * موثَّق.
+   *
+   * كان هذا الاختبار يفحص `customerCreateSchema` ويتأكد أنه **يُسقط** حقل
+   * `enrollInLoyalty`. لكن المسار تشدّد بعدها: صار `POST /api/barber/customers`
+   * يرفض الإنشاء كليًا بـ403 ولم يعد يستورد ذلك المخطط أصلًا — فبقي الاختبار
+   * أخضر فوق كود لا يمرّ به أحد، وهو أسوأ من غياب الاختبار. حُذف المخطط، وصار
+   * الفحص على الضابط القائم فعلًا.
    */
-  it("strips loyalty enrollment from barber-side customer creation", () => {
-    const parsed = customerCreateSchema.parse({
-      name: "عميل",
-      phone: "0501234567",
-      enrollInLoyalty: true,
-    });
+  it("refuses barber-side customer creation outright", () => {
+    const route = readFileSync(join(process.cwd(), "app", "api", "barber", "customers", "route.ts"), "utf8");
 
-    expect(parsed).not.toHaveProperty("enrollInLoyalty");
+    expect(route).toContain("status: 403");
+    // لا إنشاء ولا كتابة في أي جدول من هذا المسار.
+    expect(route).not.toContain("createCustomerWithLoyalty");
+    expect(route).not.toContain("prisma.customer.create");
+
+    // والطبقة الأعمق: الخدمة نفسها تفشل مغلقةً — من ينسى التمرير لا يمنح عضوية.
+    const service = readFileSync(join(process.cwd(), "lib", "customers", "customer-service.ts"), "utf8");
+    expect(service).toMatch(/enrollInLoyalty[^\n]*=\s*false|enrollInLoyalty\s*\?\?\s*false/);
   });
 
   it("keeps portal-link issuance out of the barber API surface", () => {
@@ -99,6 +106,46 @@ describe("security regression controls", () => {
     expect(api.find((header) => header.key === "Cache-Control")?.value).toContain("no-store");
   });
 
+  /**
+   * `'unsafe-inline'` في `script-src` يُبطل مفعول CSP كدفاع ضد XSS: أي حقن HTML
+   * يصير تنفيذ سكربت. النسخة الموقّعة بـnonce تُرسل من `middleware.ts` لكل مسار
+   * يعرض بيانات، والنسخة الثابتة تبقى للصفحات العامة المُصيَّرة مسبقًا وحدها.
+   */
+  it("signs scripts with a per-request nonce instead of allowing every inline script", () => {
+    const guarded = buildContentSecurityPolicy({ nonce: "test-nonce", isProduction: true });
+    const scriptSrc = guarded.split("; ").find((directive) => directive.startsWith("script-src")) ?? "";
+
+    expect(scriptSrc).toContain("'nonce-test-nonce'");
+    expect(scriptSrc).toContain("'strict-dynamic'");
+    expect(scriptSrc).not.toContain("'unsafe-inline'");
+    // عامل خدمة الحلاق يرث `script-src` ما لم يُعلن؛ و`strict-dynamic` يحجب تسجيله.
+    expect(guarded).toContain("worker-src 'self'");
+    // ورقم عشوائي حقيقي لكل طلب لا قيمة ثابتة يمكن توقّعها.
+    expect(createCspNonce()).not.toBe(createCspNonce());
+  });
+
+  /**
+   * سياسة الـnonce تُعطب أي صفحة مُصيَّرة مسبقًا: HTML المبني وقت `next build`
+   * يحمل سكربتات Next بلا توقيع فيحجبها المتصفح. لذلك كل تخطيط يغطّي بادئة
+   * داخل `middleware.matcher` يُلزم التصيير عند الطلب — والتوجيه في التخطيط لا
+   * في الصفحات لأن مكوّنات العميل لا تُحترم فيها إعدادات المقطع.
+   */
+  it("forces on-demand rendering for every layout the nonce policy covers", () => {
+    const layouts = [
+      ["dashboard"],
+      ["barber"],
+      ["platform"],
+      ["receipt"],
+      ["account"],
+      ["my", "[token]"],
+    ];
+
+    for (const segments of layouts) {
+      const source = readFileSync(join(process.cwd(), "app", ...segments, "layout.tsx"), "utf8");
+      expect(source, `app/${segments.join("/")}/layout.tsx`).toContain('export const dynamic = "force-dynamic"');
+    }
+  });
+
   it("keeps global maintenance outside tenant-admin authorization", () => {
     const route = readFileSync(join(process.cwd(), "app", "api", "maintenance", "cleanup", "route.ts"), "utf8");
     expect(route).toContain("requirePlatformApi");
@@ -121,6 +168,11 @@ describe("security regression controls", () => {
     expect(migration).not.toContain("CONCURRENTLY");
     expect(nginx).toContain("proxy_set_header X-Forwarded-For $remote_addr");
     expect(nginx).not.toContain("$proxy_add_x_forwarded_for");
+    // ترويسة يتركها البروكسي تمرّ هي ترويسة يكتبها الزائر: منها يُبنى أصل
+    // التحويل وقائمة أصول CSRF، فتُضبط في كل كتلة تمرير بلا استثناء.
+    const proxyLocations = nginx.match(/proxy_pass http:\/\/tanal_app;/g)?.length ?? 0;
+    expect(proxyLocations).toBeGreaterThan(0);
+    expect(nginx.match(/proxy_set_header X-Forwarded-Host \$host;/g)).toHaveLength(proxyLocations);
   });
 
   it("keeps database tenant guards, backup restore guards, and CI scanners enabled", () => {

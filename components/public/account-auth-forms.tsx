@@ -95,7 +95,6 @@ function Submit({ loading, children }: { loading: boolean; children: ReactNode }
  * مؤسسة يحمل، والخادم وحده يتحقق منه ويحلّه ويقرر وجهة العودة.
  */
 function useSubmit(endpoint: string, join?: string | null) {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
 
@@ -117,13 +116,14 @@ function useSubmit(endpoint: string, join?: string | null) {
       if (response.ok) {
         if (data.message) setFeedback({ tone: "success", message: data.message });
         if (data.redirectTo) {
-          router.push(data.redirectTo);
-          router.refresh();
+          // انتقال مصادقة كامل: يضمن أن الصفحة التالية تقرأ كوكي الجلسة أو
+          // حالة التحقق الجديدة، ولا يبقى المستخدم في النموذج بسبب RSC قديم.
+          window.location.assign(data.redirectTo);
           return;
         }
       } else {
         setFeedback({ tone: "error", message: data.message ?? "تعذر إتمام الطلب" });
-        if (data.redirectTo) router.push(data.redirectTo);
+        if (data.redirectTo) window.location.assign(data.redirectTo);
       }
     } catch {
       setFeedback({ tone: "error", message: "تعذر الاتصال بالخادم" });

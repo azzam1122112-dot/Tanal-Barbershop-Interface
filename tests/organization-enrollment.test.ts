@@ -2,6 +2,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PrismaClient } from "@prisma/client";
 import { decodeJoinContext, encodeJoinContext, joinReturnPath, safeInternalPath } from "../lib/customers/join-context";
 import { enrollAccountInOrganization, resolveEnrollableOrganization } from "../lib/customers/organization-enrollment";
+import { issueCustomerPortalToken } from "../lib/customers/customer-portal";
+import { getPortalIdentity, getPortalVisits } from "../lib/customers/portal-view";
 import { recordLoyaltyMovement } from "../lib/loyalty/ledger";
 import { toSaudiE164, toSaudiLocalPhone } from "../lib/phone/saudi-phone";
 import { normalizeEmail } from "../lib/email/normalize-email";
@@ -60,6 +62,39 @@ describe("unified organization enrollment", () => {
     expect(customer.loyaltyAccount).not.toBeNull();
     expect(customer.loyaltyAccount?.organizationId).toBe(orgA.id);
     expect(customer.loyaltyAccount?.points).toBe(0);
+  });
+
+  /**
+   * الجسر من الانضمام إلى بوابة العميل.
+   *
+   * هذه التغطية كانت تعيش في `tests/loyalty-signup.test.ts` فوق
+   * `selfRegisterForLoyalty` — دالةٌ بلا مستدعٍ إنتاجي واحد، استُبدلت بـ
+   * `enrollAccountInOrganization`. فكان المسار الأمني الحسّاس (الانضمام ثم فتح
+   * البوابة) يحمل اختبارًا أخضر يغطّي **الدالة الخاطئة**: أي تراجع في المسار
+   * الحيّ يمرّ بلا أن يكشفه أحد. نُقلت هنا فوق ما يُستدعى فعلًا من
+   * `/api/account/enroll`.
+   */
+  it("يفتح رابط البوابة الصادر بعد الانضمام صفحةَ صاحبه وحده", async () => {
+    const account = await createVerifiedAccount();
+    const result = await enrollAccountInOrganization(prisma, { accountId: account.id, organizationSlug: orgA.slug });
+    if (result.outcome === "PHONE_CONFLICT") throw new Error("expected enrollment");
+    await track(await prisma.customer.findFirstOrThrow({ where: { id: result.customerId } }));
+
+    // نفس النداء الذي يجريه `/api/account/enroll` بعد نجاح الانضمام.
+    const token = await issueCustomerPortalToken(prisma, result.customerId, result.organizationId);
+    const identity = await getPortalIdentity(token);
+
+    expect(identity).not.toBeNull();
+    expect(identity?.customer.name).toBe(account.name);
+    expect(identity?.points).toBe(0);
+    expect((await getPortalVisits(identity!)).recentVisits).toHaveLength(0);
+  });
+
+  it("يرفض رمز بوابة غير صحيح أو قصير أو فارغ", async () => {
+    expect(await getPortalIdentity("invalid-token-value-123")).toBeNull();
+    expect(await getPortalIdentity("")).toBeNull();
+    // الرمز القصير يُرفض قبل الوصول لقاعدة البيانات أصلًا.
+    expect(await getPortalIdentity("short")).toBeNull();
   });
 
   it("copies the phone into the legacy local shape without claiming ownership", async () => {

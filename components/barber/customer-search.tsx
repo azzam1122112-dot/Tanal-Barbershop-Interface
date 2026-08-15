@@ -23,9 +23,6 @@ export function CustomerSearch() {
   const [phone, setPhone] = useState("");
   const [customer, setCustomer] = useState<CustomerSummary | null>(null);
   const [notFoundPhone, setNotFoundPhone] = useState("");
-  const [newName, setNewName] = useState("");
-  const [transactionalConsent, setTransactionalConsent] = useState(false);
-  const [marketingConsent, setMarketingConsent] = useState(false);
   // «العميل غير موجود» إرشاد، و«تعذر البحث» فشل، و«تم» تأكيد — وكانت الثلاثة
   // تُرسم في الشريحة الرمادية نفسها.
   const { feedback, setFeedback, clear: clearFeedback } = useFeedback();
@@ -70,48 +67,14 @@ export function CustomerSearch() {
       setCustomer(data.customer);
     } else {
       setNotFoundPhone(data.phone ?? localPhone);
-      setFeedback({ message: "العميل غير موجود، يمكنك إضافته الآن", tone: "info" });
+      setFeedback({ message: "الرقم غير مسجل. تسجيل العملاء يتم ذاتيًا عبر رمز QR المطبوع في المحل.", tone: "info" });
     }
-    setLoading(false);
-  }
-
-  async function createCustomer(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!/^05\d{8}$/.test(notFoundPhone)) {
-      setFeedback({ message: "رقم جوال العميل يجب أن يبدأ بـ 05 ويتكون من 10 أرقام", tone: "warning" });
-      return;
-    }
-
-    setLoading(true);
-    clearFeedback();
-
-    const response = await safeFetch("/api/barber/customers", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: newName,
-        phone: notFoundPhone,
-        whatsappTransactionalOptIn: transactionalConsent,
-        whatsappMarketingOptIn: marketingConsent,
-      }),
-    });
-    const data = (await response.json().catch(() => ({}))) as { customer?: CustomerSummary; message?: string };
-
-    if (response.ok && data.customer) {
-      window.location.href = `/barber/customers/${data.customer.id}/visits/new`;
-      return;
-    }
-
-    setFeedback({ message: data.message ?? "تعذر إنشاء العميل", tone: "error" });
     setLoading(false);
   }
 
   const closeSheet = useCallback(() => {
     setCustomer(null);
     setNotFoundPhone("");
-    setNewName("");
-    setTransactionalConsent(false);
-    setMarketingConsent(false);
     clearFeedback();
   }, [clearFeedback]);
 
@@ -209,44 +172,24 @@ export function CustomerSearch() {
             ) : null}
 
             {notFoundPhone ? (
-              <form onSubmit={createCustomer} className="space-y-3 p-4">
-                <div>
-                  <p className="text-xs font-bold text-salon-forest">عميل جديد</p>
-                  <h2 className="mt-1 text-2xl font-bold">تسجيل العملية لعميل جديد</h2>
-                  <p className="mt-1 text-sm font-semibold leading-6 text-salon-charcoal/70">
-                    أضف الاسم ثم تابع للعملية مباشرة.
+              <div className="space-y-4 p-4">
+                <div className="rounded-3xl border border-salon-gold/40 bg-gradient-to-br from-salon-gold/15 via-white to-salon-pearl p-5 text-center">
+                  <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-salon-ink text-2xl text-salon-goldlight" aria-hidden="true">⌗</span>
+                  <p className="mt-4 text-xs font-black text-salon-forest">التسجيل بيد العميل</p>
+                  <h2 className="mt-1 text-2xl font-black text-salon-ink">وجّه العميل إلى رمز QR</h2>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-salon-charcoal/70">
+                    لا ينشئ الحلاق حسابات عملاء. يمسح العميل الرمز المطبوع في المحل ويسجّل بياناته وموافقاته بنفسه، ثم يمكنك البحث عنه مجددًا.
                   </p>
+                  <p dir="ltr" className="mt-3 rounded-xl border border-salon-line bg-white px-3 py-2 font-bold text-salon-charcoal">{notFoundPhone}</p>
                 </div>
-                <input value={notFoundPhone} readOnly className="barber-field h-12 bg-salon-mist" />
-                <input
-                  value={newName}
-                  onChange={(event) => setNewName(event.target.value)}
-                  required
-                  placeholder="اسم العميل"
-                  className="barber-field h-14 text-lg"
-                />
-                {/* لا خيار «إضافة إلى الولاء» هنا: العضوية يفتحها العميل بنفسه
-                    من رمز الصالون بحساب بريده موثَّق، فلا تُفتح باسمه بيد غيره. */}
-                <p className="rounded-2xl border border-salon-line bg-salon-mist px-3.5 py-3 text-[11px] font-semibold leading-5 text-salon-charcoal/75">
-                  هذا سجل تشغيلي لتسجيل الزيارة. للانضمام لبرنامج الولاء يمسح العميل رمز الصالون
-                  ويسجّل نفسه بنفسه.
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" onClick={closeSheet} className="barber-primary-button h-14">بحث مجددًا</button>
+                  <Link href="/barber/visits/new" className="barber-ghost-button h-14 py-4 text-center">متابعة كزائر</Link>
+                </div>
+                <p className="text-center text-[11px] font-semibold leading-5 text-salon-charcoal/60">
+                  عملية الزائر لا تحفظ الاسم أو الجوال ولا تمنح نقاط ولاء.
                 </p>
-                <div className="space-y-2 rounded-2xl border border-violet-200 bg-violet-50/70 p-3">
-                  <p className="text-xs font-bold text-violet-900">اسأل العميل وحدد موافقته</p>
-                  <label className="flex cursor-pointer items-center gap-3 rounded-xl bg-white px-3 py-2.5 text-sm font-bold">
-                    <input type="checkbox" checked={transactionalConsent} onChange={(event) => setTransactionalConsent(event.target.checked)} className="h-4 w-4 accent-violet-600" />
-                    رسائل المواعيد والخدمة
-                  </label>
-                  <label className="flex cursor-pointer items-center gap-3 rounded-xl bg-white px-3 py-2.5 text-sm font-bold">
-                    <input type="checkbox" checked={marketingConsent} onChange={(event) => setMarketingConsent(event.target.checked)} className="h-4 w-4 accent-violet-600" />
-                    العروض التسويقية والمكافآت
-                  </label>
-                  <p className="text-[11px] leading-5 text-slate-500">لا تفعّل أي خيار دون موافقة العميل الصريحة.</p>
-                </div>
-                <button disabled={loading} aria-busy={loading} className="barber-gold-button h-14 w-full text-lg">
-                  {loading ? "جاري الحفظ..." : "حفظ العميل وفتح العملية"}
-                </button>
-              </form>
+              </div>
             ) : null}
           </div>
         </div>

@@ -1,7 +1,7 @@
 import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { DashboardShell, EmptyState, FilterBar, TablePanel } from "@/components/dashboard/ui";
+import { DashboardShell, EmptyState, Field, FilterBar, TablePanel } from "@/components/dashboard/ui";
 import { DailyCloseManager } from "@/components/dashboard/daily-close-manager";
 import { canAccessDashboard } from "@/lib/auth/access";
 import { dashboardScope } from "@/lib/auth/salon-scope";
@@ -56,16 +56,18 @@ export default async function DashboardDailyClosePage({
         <section className="mt-8">
           <h2 className="text-2xl font-bold">سجل جلسات الصندوق المغلقة</h2>
           <FilterBar className="mt-4 md:grid-cols-[150px_150px_1fr_120px]">
-            <input dir="ltr" lang="en" name="from" type="date" defaultValue={params.from ?? selectedDateKey} className="dashboard-field" />
-            <input dir="ltr" lang="en" name="to" type="date" defaultValue={params.to ?? selectedDateKey} className="dashboard-field" />
+            <Field label="من تاريخ"><input dir="ltr" lang="en" name="from" type="date" defaultValue={params.from ?? selectedDateKey} className="dashboard-field" /></Field>
+            <Field label="إلى تاريخ"><input dir="ltr" lang="en" name="to" type="date" defaultValue={params.to ?? selectedDateKey} className="dashboard-field" /></Field>
+            <Field label="الحلاق">
             <select name="barberId" defaultValue={params.barberId ?? ""} className="dashboard-field">
               <option value="">كل الحلاقين</option>
               {barbers.map((barber) => <option key={barber.id} value={barber.id}>{barber.name}</option>)}
             </select>
+            </Field>
             <button className="dashboard-button">تصفية</button>
           </FilterBar>
 
-          <TablePanel className="mt-4">
+          <TablePanel className="mt-4" label="سجل جلسات الصندوق المغلقة">
             <table className="dashboard-table min-w-[960px]">
               <thead>
                 <tr>

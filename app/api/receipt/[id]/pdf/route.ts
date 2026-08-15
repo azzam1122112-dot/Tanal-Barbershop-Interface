@@ -24,6 +24,9 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   try {
     const receipt = await buildReceipt(prisma, id, scope);
     const pdf = await generateReceiptPdf(receipt);
+    if (pdf.byteLength < 5 || pdf.subarray(0, 5).toString() !== "%PDF-") {
+      throw new Error("Generated receipt is not a valid PDF document");
+    }
     const filename = receiptPdfFilename(receipt);
 
     return new Response(new Uint8Array(pdf), {

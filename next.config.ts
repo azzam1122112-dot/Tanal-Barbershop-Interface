@@ -1,15 +1,20 @@
 import type { NextConfig } from "next";
+import { buildContentSecurityPolicy } from "./lib/security/csp";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   compress: true,
+  // PDFKit يعتمد وقت التشغيل على وحدات وبيانات يحمّلها ديناميكيًا. إبقاؤه
+  // حزمة خادم خارجية يمنع Webpack من إسقاط تلك الملفات في نشر الإنتاج.
+  serverExternalPackages: ["pdfkit"],
   // مولّد الإيصال يقرأ الخطين من القرص وقت التشغيل. تضمينهما صراحةً يحافظ
   // عليهما أيضًا عند نشر ناتج file tracing أو حزمة standalone مصغّرة.
   outputFileTracingIncludes: {
     "/*": [
       "./node_modules/@ibm/plex-sans-arabic/fonts/complete/woff/IBMPlexSansArabic-Regular.woff",
       "./node_modules/@ibm/plex-sans-arabic/fonts/complete/woff/IBMPlexSansArabic-Bold.woff",
+      "./public/icons/xmansx-icon-192.png",
     ],
   },
   async headers() {
@@ -23,21 +28,10 @@ const nextConfig: NextConfig = {
       },
       { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
       {
+        // الأساس للصفحات العامة المُصيَّرة مسبقًا. المسارات التي تعرض بيانات
+        // يستبدلها `middleware.ts` بنسخة nonce بلا `'unsafe-inline'`.
         key: "Content-Security-Policy",
-        value: [
-          "default-src 'self'",
-          "base-uri 'self'",
-          "object-src 'none'",
-          "frame-ancestors 'none'",
-          "form-action 'self'",
-          "script-src 'self' 'unsafe-inline'",
-          "style-src 'self' 'unsafe-inline'",
-          "img-src 'self' data: blob:",
-          "font-src 'self' data:",
-          "connect-src 'self'",
-          "manifest-src 'self'",
-          ...(process.env.NODE_ENV === "production" ? ["upgrade-insecure-requests"] : []),
-        ].join("; "),
+        value: buildContentSecurityPolicy({ isProduction: process.env.NODE_ENV === "production" }),
       },
       ...(process.env.NODE_ENV === "production"
         ? [{ key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" }]

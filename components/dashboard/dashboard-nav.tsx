@@ -95,7 +95,6 @@ export function DashboardNav({ role }: { role: DashboardRole | null }) {
                 <Link
                   key={item.href}
                   href={item.href}
-                  prefetch={false}
                   aria-current={isActive ? "page" : undefined}
                   className={`group relative flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm transition-[background-color,border-color,color,transform] duration-200 ${
                     isActive

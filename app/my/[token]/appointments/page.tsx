@@ -1,6 +1,9 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getPortalBooking, getPortalIdentity } from "@/lib/customers/portal-view";
 import { PortalBooking } from "@/components/public/portal-booking";
+
+export const metadata: Metadata = { title: "مواعيدي" };
 
 export default async function PortalAppointmentsPage({
   params,

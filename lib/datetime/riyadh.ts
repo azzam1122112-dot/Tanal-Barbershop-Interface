@@ -136,6 +136,51 @@ export function parseRiyadhDateKey(value: string) {
   return riyadhDateTime(parts.year, parts.month, parts.day, 0);
 }
 
+/**
+ * يحوّل قيمة حقل HTML من نوع `datetime-local` إلى لحظة UTC صحيحة للرياض.
+ *
+ * `new Date("2026-08-15T04:00")` يفسّر النص بحسب منطقة خادم Node؛ في الإنتاج
+ * تكون غالبًا UTC، فتبدأ الحملة السابعة صباحًا في الرياض ويظهر تاريخ النهاية
+ * يومًا مختلفًا. الحقل هنا يعبّر عن ساعة الصالون، لا ساعة الخادم ولا جهاز المدير.
+ */
+export function parseRiyadhDateTimeLocal(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(value.trim());
+  if (!match) throw new Error("Invalid Riyadh local date time");
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  const second = Number(match[6] ?? 0);
+  const validation = createUtcDate(year, month, day, hour * 60 + minute);
+
+  if (
+    validation.getUTCFullYear() !== year ||
+    validation.getUTCMonth() + 1 !== month ||
+    validation.getUTCDate() !== day ||
+    hour > 23 ||
+    minute > 59 ||
+    second > 59
+  ) {
+    throw new Error("Invalid Riyadh local date time");
+  }
+
+  return new Date(validation.getTime() + second * 1_000 - RIYADH_OFFSET_MS);
+}
+
+/**
+ * مُهيّئ لـ Zod: يخصّ نصوص `datetime-local` فقط، ويترك ISO الصريح وDate كما هما.
+ */
+export function normalizeRiyadhDateTimeInput(value: unknown) {
+  if (typeof value !== "string") return value;
+  try {
+    return parseRiyadhDateTimeLocal(value);
+  } catch {
+    return value;
+  }
+}
+
 export function parseDateKeyParts(value: string) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
   if (!match) throw new Error("Invalid date key");

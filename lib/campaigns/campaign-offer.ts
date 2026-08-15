@@ -14,6 +14,8 @@ import type { Campaign } from "@prisma/client";
  */
 export type CustomerCampaignOffer = {
   id: string;
+  /** اسم تسويقي آمن للحملات العامة فقط؛ أسماء الشرائح المستهدفة تبقى داخلية. */
+  title: string | null;
   /** «خصم ١٥٪» أو «خصم ٢٠ ريال» — مشتقّ من الخصم لا من الاسم الداخلي. */
   headline: string;
   /** شرح المدير للعميل إن كتبه. */
@@ -29,6 +31,7 @@ export function toCustomerCampaignOffer(campaign: Campaign): CustomerCampaignOff
 
   return {
     id: campaign.id,
+    title: campaign.targetType === "ALL_CUSTOMERS" ? campaign.name.trim() || null : null,
     headline: isPercentage ? `خصم ${formatPercentage(value)}٪` : `خصم ${formatPercentage(value)} ريال`,
     detail: campaign.description?.trim() || null,
     endsAt: campaign.endAt.toISOString(),

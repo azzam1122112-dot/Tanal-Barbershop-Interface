@@ -315,8 +315,12 @@ export async function getPortalVisits(identity: PortalIdentity) {
       take: 10,
       select: {
         id: true,
+        invoiceNumber: true,
         visitedAt: true,
+        grossAmount: true,
+        discountAmount: true,
         netAmount: true,
+        paymentMethod: true,
         pointsEarned: true,
         salon: { select: { name: true } },
         services: { select: { serviceName: true } },
@@ -346,10 +350,14 @@ export async function getPortalVisits(identity: PortalIdentity) {
     })),
     recentVisits: visits.map((visit) => ({
       id: visit.id,
+      invoiceNumber: visit.invoiceNumber,
       visitedAt: visit.visitedAt.toISOString(),
       salonName: visit.salon?.name ?? "",
       services: visit.services.map((service) => service.serviceName),
+      grossAmount: Number(visit.grossAmount),
+      discountAmount: Number(visit.discountAmount),
       netAmount: Number(visit.netAmount),
+      paymentMethod: visit.paymentMethod,
       pointsEarned: visit.pointsEarned,
     })),
     dataSubjectRequests: dataSubjectRequests.map((request) => ({

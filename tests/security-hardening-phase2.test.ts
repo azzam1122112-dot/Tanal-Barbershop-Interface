@@ -13,9 +13,12 @@ import {
   verifyPlatformMfaChallenge,
   verifyTotp,
 } from "../lib/auth/platform-mfa";
-import { ensurePortalToken, hashPortalToken, resolveCustomerByPortalToken } from "../lib/customers/customer-portal";
+import { hashPortalToken, issueCustomerPortalToken, resolveCustomerByPortalToken } from "../lib/customers/customer-portal";
 import { createCustomerWithLoyalty } from "../lib/customers/customer-service";
-import { sanitizeAuditValue } from "../lib/audit/audit-log";
+import { pseudonymizeIp, sanitizeAuditValue } from "../lib/audit/audit-log";
+
+/** بيئة مصطنعة للدوال التي تستقبل `env` — أضيق من `ProcessEnv` عمدًا. */
+const env = (values: Record<string, string>) => values as unknown as NodeJS.ProcessEnv;
 
 const prisma = new PrismaClient();
 const organizationIds: string[] = [];
@@ -76,7 +79,7 @@ describe("security hardening phase 2", () => {
     const organization = await prisma.organization.create({ data: { name: "Portal security", slug: `portal-security-${suffix}` } });
     organizationIds.push(organization.id);
     const customer = await prisma.customer.create({ data: { organizationId: organization.id, name: "Portal customer", phone: `9665${Date.now().toString().slice(-8)}` } });
-    const token = await ensurePortalToken(prisma, customer.id, organization.id);
+    const token = await issueCustomerPortalToken(prisma, customer.id, organization.id);
     const persisted = await prisma.customer.findUniqueOrThrow({ where: { id: customer.id } });
     expect(persisted.portalTokenHash).toBe(hashPortalToken(token));
     expect(JSON.stringify(persisted)).not.toContain(token);
@@ -97,6 +100,31 @@ describe("security hardening phase 2", () => {
     ]);
     expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
     expect(await prisma.customer.count({ where: { organizationId: organization.id } })).toBe(1);
+  });
+
+  it("keys the audit IP pseudonym so it cannot be brute-forced back", () => {
+    const key = "a".repeat(48);
+    const other = "b".repeat(48);
+    const ip = "203.0.113.42";
+
+    // ثابت مع نفس المفتاح: ربط سجلين لعنوان واحد يبقى ممكنًا.
+    const first = pseudonymizeIp(ip, env({ SESSION_SECRET: key }));
+    expect(pseudonymizeIp(ip, env({ SESSION_SECRET: key }))).toBe(first);
+
+    // مفتاح آخر ⇒ قيمة أخرى: بلا المفتاح لا يُعكس المدخل بجدول مسبق.
+    expect(pseudonymizeIp(ip, env({ SESSION_SECRET: other }))).not.toBe(first);
+
+    // ولا تساوي التجزئة العمياء التي كانت تُكتب سابقًا.
+    const unkeyed = crypto.createHash("sha256").update(ip).digest("hex").slice(0, 16);
+    expect(first).not.toContain(unkeyed);
+    expect(first?.startsWith("v2:")).toBe(true);
+    expect(pseudonymizeIp(null, env({ SESSION_SECRET: key }))).toBeNull();
+  });
+
+  it("marks the audit IP as unkeyed in production instead of writing a reversible hash", () => {
+    const value = pseudonymizeIp("203.0.113.42", env({ NODE_ENV: "production" }));
+    // علامة غياب صريحة — لا عنوان مكشوف ولا تجزئة تُعكس.
+    expect(value).toBe("v2:unkeyed");
   });
 
   it("redacts PII and free-form content from audit payloads", () => {

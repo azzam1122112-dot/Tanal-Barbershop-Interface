@@ -44,8 +44,7 @@ export async function getBarberRescheduleOptions(
     organizationId: scope.organizationId,
     salonId: scope.salonId,
   });
-  const config = bookingConfigFromSettings(settings);
-  if (!config.enabled) throw new BusinessError("الحجز الإلكتروني غير مفعّل في هذا الفرع", 409);
+  const config = internalRescheduleConfig(settings);
 
   const days = await listAvailableSlots(prisma, {
     organizationId: scope.organizationId,
@@ -82,8 +81,7 @@ export async function rescheduleBarberAppointment(
       organizationId: input.organizationId,
       salonId: input.salonId,
     });
-    const config = bookingConfigFromSettings(settings);
-    if (!config.enabled) throw new BusinessError("الحجز الإلكتروني غير مفعّل في هذا الفرع", 409);
+    const config = internalRescheduleConfig(settings);
 
     const slot = await resolveBookableSlot(tx, {
       organizationId: input.organizationId,
@@ -157,9 +155,23 @@ function toBarberAppointmentRow(
     statusLabel: APPOINTMENT_STATUS_LABELS[appointment.status],
     customerName: appointment.customerName,
     customerPhone: appointment.customerPhone,
+    customerId: appointment.customerId,
     services: toAppointmentServiceRows(appointment.services),
     notes: appointment.notes,
   };
+}
+
+/**
+ * إيقاف الحجز الذاتي يمنع العميل من إنشاء حجوزات جديدة، لكنه لا ينبغي أن
+ * يعطّل إدارة موعد موجود بيد الحلاق. نستخدم ساعات الفرع وقيود التوافر نفسها
+ * ونفتح المفتاح لهذا الإجراء الداخلي فقط.
+ */
+function internalRescheduleConfig(settings: Awaited<ReturnType<typeof getEffectiveSettings>>) {
+  const config = bookingConfigFromSettings(settings);
+  if (config.closeMinute - config.openMinute < config.slotMinutes) {
+    throw new BusinessError("ساعات الحجز في هذا الفرع غير مكتملة؛ راجع مدير الفرع", 409);
+  }
+  return { ...config, enabled: true };
 }
 
 async function runSerializableTransaction<T>(

@@ -2,7 +2,7 @@
 
 import { formatDateTime } from "@/lib/format";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useId, useState } from "react";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { handOffNotice } from "@/lib/ui/handoff-notice";
@@ -24,6 +24,7 @@ type ActionResponse = {
 };
 
 export function VisitAdminActions({ visit }: { visit: VisitRow }) {
+  const fieldId = useId();
   const [toast, setToast] = useState<ToastState | null>(null);
   const [loading, setLoading] = useState("");
   const { confirm, confirmDialog } = useConfirm();
@@ -98,25 +99,33 @@ export function VisitAdminActions({ visit }: { visit: VisitRow }) {
     <div className="grid min-w-[320px] gap-3">
       {confirmDialog}
       <DashboardToast toast={toast} onClose={() => setToast(null)} />
-      <form onSubmit={(event) => submit(event, "payment")} className="grid grid-cols-[1fr_1fr] gap-2">
-        <select name="paymentMethod" defaultValue={visit.paymentMethod === "CASH" ? "NETWORK" : "CASH"} className="dashboard-field py-2">
+      <form onSubmit={(event) => submit(event, "payment")} className="grid grid-cols-[1fr_1fr] gap-2" aria-label="تعديل طريقة دفع الزيارة">
+        <label htmlFor={`${fieldId}-payment`} className="sr-only">طريقة الدفع الجديدة</label>
+        <select id={`${fieldId}-payment`} name="paymentMethod" defaultValue={visit.paymentMethod === "CASH" ? "NETWORK" : "CASH"} className="dashboard-field py-2">
           <option value="CASH">كاش</option>
           <option value="NETWORK">شبكة</option>
         </select>
-        <input name="reason" required minLength={5} placeholder="سبب تعديل الدفع" className="dashboard-field py-2" />
+        <label htmlFor={`${fieldId}-payment-reason`} className="sr-only">سبب تعديل طريقة الدفع</label>
+        <input id={`${fieldId}-payment-reason`} name="reason" required minLength={5} placeholder="سبب تعديل الدفع" className="dashboard-field py-2" />
+        <p className="col-span-2 text-xs font-semibold leading-5 text-salon-charcoal/70">
+          التحويل من كاش إلى شبكة يحتاج بقاء قيمة الزيارة في عهدة الحلاق؛ إذا سبق تحصيلها فاعكس التحصيل أولًا.
+        </p>
         <button disabled={loading === "payment"} className="dashboard-button col-span-2 px-3 py-2">
           تعديل الدفع
         </button>
       </form>
-      <form onSubmit={(event) => submit(event, "amount")} className="grid grid-cols-[110px_1fr] gap-2">
-        <input lang="en" name="grossAmount" required type="number" min={0.01} step="0.01" defaultValue={visit.grossAmount} className="dashboard-field py-2" />
-        <input name="reason" required minLength={5} placeholder="سبب تعديل المبلغ" className="dashboard-field py-2" />
+      <form onSubmit={(event) => submit(event, "amount")} className="grid grid-cols-[110px_1fr] gap-2" aria-label="تعديل مبلغ الزيارة">
+        <label htmlFor={`${fieldId}-amount`} className="sr-only">مبلغ الزيارة الجديد</label>
+        <input id={`${fieldId}-amount`} lang="en" name="grossAmount" required type="number" min={0.01} step="0.01" defaultValue={visit.grossAmount} className="dashboard-field py-2" />
+        <label htmlFor={`${fieldId}-amount-reason`} className="sr-only">سبب تعديل مبلغ الزيارة</label>
+        <input id={`${fieldId}-amount-reason`} name="reason" required minLength={5} placeholder="سبب تعديل المبلغ" className="dashboard-field py-2" />
         <button disabled={loading === "amount"} className="dashboard-button-gold col-span-2 px-3 py-2">
           تعديل المبلغ
         </button>
       </form>
-      <form onSubmit={(event) => submit(event, "cancel")} className="grid gap-2">
-        <input name="reason" required minLength={5} placeholder="سبب الإلغاء" className="dashboard-field border-red-200 py-2 focus:border-red-500 focus:ring-red-100" />
+      <form onSubmit={(event) => submit(event, "cancel")} className="grid gap-2" aria-label="إلغاء الزيارة">
+        <label htmlFor={`${fieldId}-cancel-reason`} className="sr-only">سبب إلغاء الزيارة</label>
+        <input id={`${fieldId}-cancel-reason`} name="reason" required minLength={5} placeholder="سبب الإلغاء" className="dashboard-field border-red-200 py-2 focus:border-red-500 focus:ring-red-100" />
         <button disabled={loading === "cancel"} className="dashboard-danger-button px-3 py-2">
           إلغاء الزيارة
         </button>

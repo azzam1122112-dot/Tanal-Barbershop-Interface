@@ -120,6 +120,16 @@ describe("صياغة العرض للعميل", () => {
     expect(rendered).not.toContain("60");
     expect(offer).not.toHaveProperty("name");
     expect(offer).not.toHaveProperty("targetType");
+    expect(offer.title).toBeNull();
+  });
+
+  it("يعرض الاسم التسويقي للحملة العامة فقط", () => {
+    expect(toCustomerCampaignOffer(campaign({ name: "عرض العودة للمدارس", targetType: "ALL_CUSTOMERS" })).title).toBe(
+      "عرض العودة للمدارس",
+    );
+    expect(
+      toCustomerCampaignOffer(campaign({ name: "استرجاع المنقطعين", targetType: "INACTIVE_CUSTOMERS", inactiveDays: 60 })).title,
+    ).toBeNull();
   });
 
   it("العنوان مشتقّ من قيمة الخصم", () => {

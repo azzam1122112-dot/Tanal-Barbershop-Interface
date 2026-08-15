@@ -433,7 +433,7 @@ export function StaffManager({ initialUsers, salons, currentUserId }: { initialU
                           </span>
                         </div>
                         <dl className="mt-3 grid gap-2 text-sm font-bold text-salon-charcoal md:grid-cols-2">
-                          <Info label="البريد الإلكتروني" value={user.email ?? "-"} />
+                          <Info label="البريد الإلكتروني" value={user.email ?? "-"} ltr />
                           <Info label="رقم الجوال" value={user.phone ?? "-"} />
                           <Info label="آخر دخول" value={user.lastLoginAt ? dateFormatter.format(new Date(user.lastLoginAt)) : "لم يسجل دخولًا"} />
                           <Info label="آخر تحديث" value={user.updatedAt ? dateFormatter.format(new Date(user.updatedAt)) : "-"} />
@@ -584,11 +584,17 @@ function RoleBadge({ role }: { role: "OWNER" | "ADMIN" | "SUPERVISOR" }) {
   return <span className={`rounded-full px-3 py-1 text-xs font-bold ${tone}`}>{label}</span>;
 }
 
-function Info({ label, value }: { label: string; value: string }) {
+function Info({ label, value, ltr = false }: { label: string; value: string; ltr?: boolean }) {
   return (
-    <div>
+    <div className="min-w-0">
       <dt className="text-xs font-bold text-salon-charcoal/70">{label}</dt>
-      <dd className="mt-1 break-words text-salon-ink [overflow-wrap:anywhere]">{value}</dd>
+      <dd
+        dir={ltr ? "ltr" : undefined}
+        title={ltr ? value : undefined}
+        className={`mt-1 text-salon-ink ${ltr ? "truncate text-left" : "break-words [overflow-wrap:anywhere]"}`}
+      >
+        {value}
+      </dd>
     </div>
   );
 }

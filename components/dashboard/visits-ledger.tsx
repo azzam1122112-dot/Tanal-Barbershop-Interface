@@ -3,7 +3,7 @@
 import { Fragment, useState } from "react";
 import { formatDate, formatMoney, formatNumber, formatTime } from "@/lib/format";
 import Link from "next/link";
-import { Badge } from "@/components/dashboard/ui";
+import { Badge, TableScroller } from "@/components/dashboard/ui";
 import { VisitAdminActions } from "@/components/dashboard/visit-admin-actions";
 import type { VisitDashboardRow } from "@/lib/visits/visit-summary";
 
@@ -98,7 +98,7 @@ export function VisitsLedger({ visits, discounts }: { visits: VisitDashboardRow[
       {/* ===== جدول: lg فما فوق ===== */}
       <div className="hidden lg:block">
         <div className="table-scroll-wrap">
-          <div className="table-scroll">
+          <TableScroller label="سجل الزيارات">
             <table className="dashboard-table min-w-[1060px]">
               <thead className="sticky top-0 z-[1]">
                 <tr>
@@ -164,7 +164,7 @@ export function VisitsLedger({ visits, discounts }: { visits: VisitDashboardRow[
                 })}
               </tbody>
             </table>
-          </div>
+          </TableScroller>
         </div>
       </div>
     </>

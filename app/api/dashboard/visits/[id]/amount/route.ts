@@ -1,12 +1,15 @@
 import { toErrorResponse } from "@/lib/http/error-response";
 import { NextResponse } from "next/server";
-import { getRequestMeta, parseJsonBody, requireAdminApi } from "@/lib/auth/http";
+import { getRequestMeta, parseJsonBody, requireDashboardApi } from "@/lib/auth/http";
 import { visitAmountUpdateSchema } from "@/lib/auth/validation";
 import { prisma } from "@/lib/db/prisma";
 import { updateVisitAmount } from "@/lib/visits/visit-admin-service";
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
-  const auth = await requireAdminApi();
+  // تصحيح الزيارة من مهام تشغيل الفرع نفسها مثل تعديل طريقة الدفع والإلغاء.
+  // نطاق `salonIds` أدناه هو حاجز الأمان الحقيقي للمشرف، لا حجبه عن العملية
+  // التي تعرضها له الواجهة داخل فروعه المسندة.
+  const auth = await requireDashboardApi();
   if (auth.response) return auth.response;
   const session = auth.session;
   if (!session || session.type !== "dashboard") {

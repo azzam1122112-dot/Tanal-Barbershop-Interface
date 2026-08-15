@@ -63,7 +63,7 @@ export default async function PostCloseAdjustmentsPage({
           <StatCard label="فرق النقاط" value={formatNumber(report.summary.pointsDelta)} />
         </div>
 
-        <TablePanel>
+        <TablePanel label="تصحيحات ما بعد الإغلاق">
           <table className="dashboard-table min-w-[1320px]">
             <thead>
               <tr>
