@@ -450,10 +450,27 @@ export default async function HomePage() {
             >
               <Icon name="whatsapp" className="h-5 w-5" />
             </a>
-            <Link href="/dashboard/login" className="x-button-ghost px-3 text-xs sm:px-5 sm:text-sm">
-              <span className="sm:hidden">دخول</span>
-              <span className="hidden sm:inline">تسجيل الدخول</span>
-            </Link>
+            <details className="group relative">
+              <summary className="x-button-ghost cursor-pointer list-none px-3 text-xs marker:content-none sm:px-5 sm:text-sm">
+                <span className="sm:hidden">دخول</span>
+                <span className="hidden sm:inline">تسجيل الدخول</span>
+                <span className="mr-1 text-[10px] transition group-open:rotate-180" aria-hidden="true">▾</span>
+              </summary>
+              <div className="absolute left-0 top-[calc(100%+0.6rem)] z-50 w-56 overflow-hidden rounded-2xl border border-white/15 bg-[#120d1d]/95 p-2 text-right shadow-2xl backdrop-blur-xl">
+                <Link href="/account/login" className="block rounded-xl px-3 py-3 transition hover:bg-white/10">
+                  <span className="block text-sm font-black text-white">دخول العميل</span>
+                  <span className="mt-0.5 block text-[11px] font-semibold text-white/55">بطاقتك وعروضك ومواعيدك</span>
+                </Link>
+                <Link href="/dashboard/login" className="block rounded-xl px-3 py-3 transition hover:bg-white/10">
+                  <span className="block text-sm font-black text-white">دخول الإدارة</span>
+                  <span className="mt-0.5 block text-[11px] font-semibold text-white/55">المالك ومدير المؤسسة والفرع</span>
+                </Link>
+                <Link href="/barber/login" className="block rounded-xl px-3 py-3 transition hover:bg-white/10">
+                  <span className="block text-sm font-black text-white">دخول الحلاق</span>
+                  <span className="mt-0.5 block text-[11px] font-semibold text-white/55">المواعيد والزيارات والصندوق</span>
+                </Link>
+              </div>
+            </details>
             <Link href="/signup" className="x-button-primary px-3 text-xs sm:px-5 sm:text-sm">
               <span className="sm:hidden">ابدأ</span>
               <span className="hidden sm:inline">ابدأ مجانًا</span>
@@ -1020,6 +1037,11 @@ export default async function HomePage() {
             <nav aria-label="روابط الدخول">
               <p className="text-xs font-bold uppercase tracking-[.18em] text-salon-goldlight">الدخول</p>
               <ul className="mt-4 space-y-2.5 text-sm">
+                <li>
+                  <Link className="inline-flex min-h-8 items-center transition-colors hover:text-white" href="/account/login">
+                    حساب العميل
+                  </Link>
+                </li>
                 <li>
                   <Link className="inline-flex min-h-8 items-center transition-colors hover:text-white" href="/dashboard/login">
                     لوحة الإدارة

@@ -291,10 +291,42 @@ export function Field({
  * جداول اللوحة أعرض من شاشة الجوال بطبيعتها، فبدل قصّ الأعمدة نجعل السحب مرئيًا:
  * تلاشٍ عند الحافة اليسرى يشير إلى وجود تكملة، ويختفي على الشاشات الواسعة.
  */
-export function TablePanel({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+export function TableScroller({
+  children,
+  label = "جدول البيانات",
+}: {
+  children: React.ReactNode;
+  label?: string;
+}) {
+  return (
+    <>
+      <p className="table-scroll-hint print:hidden xl:hidden" aria-hidden="true">
+        مرّر أفقيًا لعرض بقية الأعمدة
+      </p>
+      <div
+        className="table-scroll"
+        role="region"
+        aria-label={`${label} — قابل للتمرير أفقيًا`}
+        tabIndex={0}
+      >
+        {children}
+      </div>
+    </>
+  );
+}
+
+export function TablePanel({
+  children,
+  className = "",
+  label,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  label?: string;
+}) {
   return (
     <div className={`dashboard-panel table-scroll-wrap mt-6 overflow-hidden p-0 ${className}`}>
-      <div className="table-scroll">{children}</div>
+      <TableScroller label={label}>{children}</TableScroller>
     </div>
   );
 }

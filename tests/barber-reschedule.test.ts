@@ -126,6 +126,22 @@ describe("barber appointment rescheduling", () => {
       getBarberRescheduleOptions(prisma, { ...scope(), barberId: "another-barber" }),
     ).rejects.toThrow("غير موجود أو لم يعد قابلًا للتعديل");
   });
+
+  it("keeps internal rescheduling available when public QR booking is disabled", async () => {
+    await prisma.systemSettings.update({
+      where: { salonId },
+      data: { bookingEnabled: false },
+    });
+
+    const options = await getBarberRescheduleOptions(prisma, scope());
+    expect(options.days.length).toBeGreaterThan(0);
+
+    const changed = await rescheduleBarberAppointment(prisma, {
+      ...scope(),
+      startAt: oldStart.toISOString(),
+    });
+    expect(changed.startAt).toBe(oldStart.toISOString());
+  });
 });
 
 function scope() {

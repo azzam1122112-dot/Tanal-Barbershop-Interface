@@ -83,6 +83,7 @@ export function WhatsAppSafetyCenter({ initialOverview }: { initialOverview: Wha
   const [settings, setSettings] = useState(initialOverview.settings);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
+  const [controlsOpen, setControlsOpen] = useState(false);
 
   const isDirty = useMemo(
     () => JSON.stringify(settings) !== JSON.stringify(overview.settings),
@@ -192,7 +193,13 @@ export function WhatsAppSafetyCenter({ initialOverview }: { initialOverview: Wha
             </div>
             <p className="mt-1 text-xs font-medium leading-6 text-white/65">{primaryAlert.detail}</p>
           </div>
-          {primaryAlert.href ? <Link href={primaryAlert.href} className="shrink-0 rounded-xl border border-white/10 bg-white/10 px-4 py-2.5 text-xs font-black transition hover:bg-white/15">{primaryAlert.action}</Link> : null}
+          {primaryAlert.href === "#whatsapp-safety-settings" ? (
+            <button type="button" onClick={() => setControlsOpen(true)} className="shrink-0 rounded-xl border border-white/10 bg-white/10 px-4 py-2.5 text-xs font-black transition hover:bg-white/15">
+              {primaryAlert.action}
+            </button>
+          ) : primaryAlert.href ? (
+            <Link href={primaryAlert.href} className="shrink-0 rounded-xl border border-white/10 bg-white/10 px-4 py-2.5 text-xs font-black transition hover:bg-white/15">{primaryAlert.action}</Link>
+          ) : null}
         </div>
       </div>
 
@@ -203,7 +210,24 @@ export function WhatsAppSafetyCenter({ initialOverview }: { initialOverview: Wha
         <MetricCard label="منع وقائي" value={overview.metrics.blocked30Days} note={`${overview.metrics.coolingCustomers} داخل التهدئة`} percent={Math.min(100, overview.metrics.blocked30Days * 10)} tone={overview.metrics.blocked30Days ? "rose" : "violet"} />
       </div>
 
-      <div className="relative grid gap-6 p-5 sm:p-8 xl:grid-cols-[minmax(0,1.35fr)_minmax(300px,.65fr)]">
+      <div className="relative flex flex-col gap-3 border-t border-white/10 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+        <div>
+          <p className="text-sm font-black">الضوابط والتنبيهات المتقدمة</p>
+          <p className="mt-1 text-xs font-medium text-slate-500">افتحها عند تعديل حدود الإرسال أو مراجعة توصيات الحماية.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setControlsOpen((current) => !current)}
+          aria-expanded={controlsOpen}
+          aria-controls="whatsapp-safety-controls"
+          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-violet-300/20 bg-violet-500/10 px-4 py-2.5 text-xs font-black text-violet-100 transition hover:bg-violet-500/20"
+        >
+          {controlsOpen ? "إخفاء التفاصيل" : "فتح الإعدادات"}
+          <span aria-hidden="true" className={`transition-transform ${controlsOpen ? "rotate-180" : ""}`}>⌄</span>
+        </button>
+      </div>
+
+      {controlsOpen ? <div id="whatsapp-safety-controls" className="relative grid gap-6 border-t border-white/10 p-5 sm:p-8 xl:grid-cols-[minmax(0,1.35fr)_minmax(300px,.65fr)]">
         <form id="whatsapp-safety-settings" onSubmit={save} className="scroll-mt-6 overflow-hidden rounded-3xl border border-white/10 bg-white/[.025]">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-4">
             <div><p className="font-black">إعدادات السياسة</p><p className="mt-1 text-xs text-slate-500">أي تعديل يظهر في درجة الحماية قبل اعتماده</p></div>
@@ -274,7 +298,7 @@ export function WhatsAppSafetyCenter({ initialOverview }: { initialOverview: Wha
             </div>
           </div>
         </aside>
-      </div>
+      </div> : null}
     </section>
   );
 }

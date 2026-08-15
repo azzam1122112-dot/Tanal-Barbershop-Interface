@@ -140,7 +140,7 @@ export default async function ExpensesPage({
         ) : <div className="p-5"><InlineEmpty title="لا توجد مصروفات في الفترة" hint="سجّل أول مصروف ليظهر توزيعه حسب البند." /></div>}
       </SectionPanel>
 
-      <TablePanel>
+      <TablePanel label="تفاصيل المصروفات">
         <div className="border-b border-salon-line/70 px-5 py-4">
           <h2 className="lux-section-title">تفاصيل المصروفات ({formatNumber(report.count)})</h2>
           {hasListFilters ? <p className="dashboard-muted mt-1 text-sm">القائمة مفلترة، بينما مؤشرات الأعلى تعرض إجمالي الفترة كاملة.</p> : null}

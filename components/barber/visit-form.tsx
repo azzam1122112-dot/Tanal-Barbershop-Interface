@@ -24,8 +24,17 @@ type ProductOption = {
 type VisitPreview = {
   customer: { id: string; name: string; phone: string } | null;
   barber: { id: string; name: string };
-  services: ServiceOption[];
+  services: Array<ServiceOption & { unitPrice: number; lineTotal: number; catalogUnitPrice: number }>;
+  products: Array<{
+    id: string;
+    name: string;
+    unitPrice: number;
+    quantity: number;
+    lineTotal: number;
+  }>;
   grossAmount: number;
+  catalogGrossAmount: number;
+  pricingAdjustmentAmount: number;
   discountAmount: number;
   netAmount: number;
   paymentMethod: "CASH" | "NETWORK";
@@ -64,19 +73,22 @@ export function VisitForm({
   customerId,
   services,
   products = [],
+  appointmentId = null,
 }: {
   customerId?: string | null;
   services: ServiceOption[];
   products?: ProductOption[];
+  /**
+   * الموعد الذي فُتحت منه الشاشة، إن جاء الحلاق من تبويب المواعيد.
+   * يُمرَّر كما هو إلى التأكيد فيقفل الموعد مع حفظ الزيارة في معاملة واحدة.
+   */
+  appointmentId?: string | null;
 }) {
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [linkedCustomerId, setLinkedCustomerId] = useState<string | null>(customerId ?? null);
   const [linkedCustomer, setLinkedCustomer] = useState<{ id: string; name: string; phone: string; loyaltyEnabled: boolean; pointsBalance: number } | null>(null);
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerLookupState, setCustomerLookupState] = useState<"idle" | "missing">("idle");
-  const [joinName, setJoinName] = useState("");
-  const [transactionalConsent, setTransactionalConsent] = useState(false);
-  const [marketingConsent, setMarketingConsent] = useState(false);
   // ربط العميل يعلن نتيجته بنبرة: «تم ربط أحمد — 40 نقطة» و«تعذر البحث عن
   // العميل» كانتا تُرسمان في الشريحة الرمادية نفسها.
   const { feedback: customerFeedback, setFeedback: setCustomerFeedback } = useFeedback();
@@ -94,6 +106,9 @@ export function VisitForm({
   const [confirmedVisitId, setConfirmedVisitId] = useState<string | null>(null);
   const [cashTenderedAmount, setCashTenderedAmount] = useState("");
   const [networkAccepted, setNetworkAccepted] = useState(false);
+  // null يعني أن الإجمالي يتبع أسعار الكتالوج تلقائيًا. عند التعديل نحفظ النص
+  // كما كتبه الحلاق، ثم يعيد الخادم توزيع فرق السعر على سطور الخدمات وتوثيقه.
+  const [manualInvoiceTotal, setManualInvoiceTotal] = useState<string | null>(null);
 
   const closePreview = useCallback(() => {
     setPreview(null);
@@ -105,12 +120,14 @@ export function VisitForm({
   function toggleService(id: string) {
     setPreview(null);
     setSelectedDiscount("NONE");
+    setManualInvoiceTotal(null);
     setSelectedServices((current) => (current.includes(id) ? current.filter((serviceId) => serviceId !== id) : [...current, id]));
   }
 
   function changeProductQuantity(product: ProductOption, delta: number) {
     setPreview(null);
     setSelectedDiscount("NONE");
+    setManualInvoiceTotal(null);
     setProductQuantities((current) => {
       const next = Math.max(0, Math.min(product.stockQuantity, (current[product.id] ?? 0) + delta));
       const updated = { ...current, [product.id]: next };
@@ -151,43 +168,9 @@ export function VisitForm({
       setLinkedCustomer(null);
       setLinkedCustomerId(null);
       setCustomerLookupState("missing");
-      setCustomerFeedback({ message: "الرقم غير مسجل. احفظ العميل باسمه أو تابع كزائر دون حفظه.", tone: "info" });
+      setCustomerFeedback({ message: "الرقم غير مسجل. يفتح العميل حسابه عبر رمز QR المطبوع في المحل، أو تابع كزائر دون حفظ بيانات.", tone: "info" });
     } else {
       setCustomerFeedback({ message: data.message ?? "تعذر البحث عن العميل", tone: "error" });
-    }
-    setLoadingCustomer(false);
-  }
-
-  // حفظ سجل تشغيلي فقط — **بلا عضوية ولاء**. العضوية يفتحها العميل بنفسه من
-  // رمز الصالون بحساب بريده موثَّق، فلا تُفتح باسمه بيد غيره.
-  async function saveCustomer() {
-    if (joinName.trim().length < 2) {
-      setCustomerFeedback({ message: "اكتب اسم العميل لحفظه", tone: "warning" });
-      return;
-    }
-    setLoadingCustomer(true);
-    const response = await safeFetch("/api/barber/customers", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: joinName,
-        phone: customerPhone,
-        whatsappTransactionalOptIn: transactionalConsent,
-        whatsappMarketingOptIn: marketingConsent,
-      }),
-    });
-    const data = (await response.json().catch(() => ({}))) as {
-      customer?: { id: string; name: string; phone: string; loyaltyEnabled: boolean; pointsBalance: number };
-      message?: string;
-    };
-    if (response.ok && data.customer) {
-      setLinkedCustomer(data.customer);
-      setLinkedCustomerId(data.customer.id);
-      setCustomerLookupState("idle");
-      setCustomerFeedback({ message: "تم حفظ العميل وربطه بالعملية", tone: "success" });
-      setPreview(null);
-    } else {
-      setCustomerFeedback({ message: data.message ?? "تعذر حفظ العميل", tone: "error" });
     }
     setLoadingCustomer(false);
   }
@@ -196,7 +179,6 @@ export function VisitForm({
     setLinkedCustomer(null);
     setLinkedCustomerId(null);
     setCustomerPhone("");
-    setJoinName("");
     setCustomerLookupState("idle");
     setCustomerFeedback({ message: "ستُحفظ العملية كزائر بلا اسم أو رقم جوال أو نقاط", tone: "info" });
     setPreview(null);
@@ -218,6 +200,7 @@ export function VisitForm({
           serviceIds: selectedServices,
           products: selectedProducts,
           grossAmount,
+          invoiceTotal,
           paymentMethod,
         }),
       });
@@ -252,10 +235,12 @@ export function VisitForm({
           serviceIds: selectedServices,
           products: selectedProducts,
           grossAmount,
+          invoiceTotal,
           paymentMethod,
           rewardRuleId: selectedDiscount.startsWith("REWARD:") ? selectedDiscount.replace("REWARD:", "") : undefined,
           managerRewardId: selectedDiscount.startsWith("MANAGER_REWARD:") ? selectedDiscount.replace("MANAGER_REWARD:", "") : undefined,
           campaignId: selectedDiscount.startsWith("CAMPAIGN:") ? selectedDiscount.replace("CAMPAIGN:", "") : undefined,
+          appointmentId: appointmentId ?? undefined,
           idempotencyKey,
           paymentConfirmed: true,
           cashTenderedAmount: paymentMethod === "CASH" ? cashTenderedAmount : undefined,
@@ -318,7 +303,11 @@ export function VisitForm({
     (total, product) => total + product.price * (productQuantities[product.id] ?? 0),
     0,
   );
-  const canPreview = selectedServices.length > 0 && grossAmount > 0 && !loadingPreview;
+  const catalogInvoiceTotal = Math.round((selectedServicesTotal + productsSubtotal) * 100) / 100;
+  const invoiceTotal = manualInvoiceTotal === null ? catalogInvoiceTotal : Number(manualInvoiceTotal);
+  const invoiceTotalValid = Number.isFinite(invoiceTotal) && invoiceTotal > productsSubtotal && invoiceTotal <= 1_000_000;
+  const invoiceTotalAdjusted = invoiceTotalValid && Math.round(invoiceTotal * 100) !== Math.round(catalogInvoiceTotal * 100);
+  const canPreview = selectedServices.length > 0 && grossAmount > 0 && invoiceTotalValid && !loadingPreview;
 
   if (confirmedVisitId) {
     return (
@@ -430,7 +419,7 @@ export function VisitForm({
                       aria-label={`إنقاص ${product.name}`}
                       onClick={() => changeProductQuantity(product, -1)}
                       disabled={quantity === 0}
-                      className="grid h-10 w-10 place-items-center rounded-xl border border-salon-line bg-white text-lg font-bold disabled:opacity-40"
+                      className="grid h-11 w-11 place-items-center rounded-xl border border-salon-line bg-white text-lg font-bold disabled:opacity-40"
                     >
                       −
                     </button>
@@ -440,7 +429,7 @@ export function VisitForm({
                       aria-label={`زيادة ${product.name}`}
                       onClick={() => changeProductQuantity(product, 1)}
                       disabled={quantity >= product.stockQuantity}
-                      className="grid h-10 w-10 place-items-center rounded-xl border border-salon-line bg-white text-lg font-bold disabled:opacity-40"
+                      className="grid h-11 w-11 place-items-center rounded-xl border border-salon-line bg-white text-lg font-bold disabled:opacity-40"
                     >
                       +
                     </button>
@@ -509,22 +498,17 @@ export function VisitForm({
           )}
 
           {customerLookupState === "missing" ? (
-            <div className="space-y-3 rounded-2xl border border-violet-200 bg-violet-50/70 p-3">
-              <input value={joinName} onChange={(event) => setJoinName(event.target.value)} placeholder="اسم العميل" className="barber-field bg-white" />
-              <div className="grid gap-2 text-xs font-semibold text-violet-950 sm:grid-cols-2">
-                <label className="flex items-center gap-2 rounded-xl bg-white px-3 py-2.5">
-                  <input type="checkbox" checked={transactionalConsent} onChange={(event) => setTransactionalConsent(event.target.checked)} />
-                  رسائل الخدمة والمواعيد
-                </label>
-                <label className="flex items-center gap-2 rounded-xl bg-white px-3 py-2.5">
-                  <input type="checkbox" checked={marketingConsent} onChange={(event) => setMarketingConsent(event.target.checked)} />
-                  العروض والمكافآت
-                </label>
+            <div className="space-y-3 rounded-2xl border border-salon-gold/45 bg-gradient-to-br from-salon-gold/15 to-white p-4">
+              <div className="flex items-start gap-3">
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-salon-ink text-lg text-salon-goldlight" aria-hidden="true">⌗</span>
+                <div>
+                  <p className="text-sm font-black text-salon-ink">التسجيل عبر رمز QR فقط</p>
+                  <p className="mt-1 text-xs font-semibold leading-5 text-salon-charcoal/70">
+                    اطلب من العميل مسح الرمز المطبوع في المحل وتسجيل نفسه، ثم أعد البحث عن رقمه. لا يستطيع حساب الحلاق إنشاء عميل جديد.
+                  </p>
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <button type="button" onClick={saveCustomer} disabled={loadingCustomer} className="barber-gold-button h-12">حفظ العميل</button>
-                <button type="button" onClick={continueAsGuest} className="barber-ghost-button h-12">متابعة كزائر</button>
-              </div>
+              <button type="button" onClick={continueAsGuest} className="barber-ghost-button h-12 w-full">متابعة العملية كزائر</button>
             </div>
           ) : null}
 
@@ -533,10 +517,47 @@ export function VisitForm({
       </section>
 
       <div className="barber-card p-4">
-        <div className="rounded-2xl border border-salon-forest/20 bg-salon-forest/5 px-4 py-4 text-center">
-          <p className="text-xs font-bold text-salon-charcoal/70">مبلغ الخدمات — محسوب آليًا من قائمة الأسعار</p>
-          <p className="mt-1 text-4xl font-black tabular-nums text-salon-forest">{grossAmount.toFixed(2)} <span className="text-base">ريال</span></p>
-          <p className="mt-2 text-xs font-semibold text-salon-charcoal/60">أي تصحيح استثنائي ينفذه المالك أو المدير فقط مع سبب موثق في سجل التدقيق.</p>
+        <div className="overflow-hidden rounded-3xl border border-salon-gold/45 bg-gradient-to-br from-salon-ink via-salon-forest to-salon-ink p-5 text-white shadow-[var(--shadow-md)]">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-black text-salon-goldlight">إجمالي الفاتورة قبل الخصم</p>
+              <p className="mt-1 text-xs font-semibold text-white/65">يشمل الخدمات والمنتجات، وينطبق على الكاش والشبكة.</p>
+            </div>
+            {invoiceTotalAdjusted ? (
+              <button type="button" onClick={() => setManualInvoiceTotal(null)} className="min-h-11 shrink-0 rounded-xl border border-white/20 bg-white/10 px-3 text-xs font-bold text-white">
+                استعادة {catalogInvoiceTotal.toFixed(2)}
+              </button>
+            ) : null}
+          </div>
+          <div className="mt-4 flex items-center gap-3 rounded-2xl border border-white/15 bg-white/10 px-4 py-3 focus-within:border-salon-goldlight/70 focus-within:bg-white/15">
+            <input
+              lang="en"
+              dir="ltr"
+              type="number"
+              min={Math.max(0.01, Math.round((productsSubtotal + 0.01) * 100) / 100)}
+              max={1_000_000}
+              step="0.01"
+              inputMode="decimal"
+              aria-label="إجمالي الفاتورة قبل الخصم"
+              value={manualInvoiceTotal ?? catalogInvoiceTotal.toFixed(2)}
+              onChange={(event) => {
+                setManualInvoiceTotal(event.target.value);
+                setPreview(null);
+                setSelectedDiscount("NONE");
+              }}
+              className="min-w-0 flex-1 bg-transparent text-left text-4xl font-black tabular-nums text-white outline-none placeholder:text-white/35"
+            />
+            <span className="shrink-0 text-sm font-black text-salon-goldlight">ريال</span>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold text-white/65">
+            <span>السعر المقترح من الكتالوج: {catalogInvoiceTotal.toFixed(2)} ريال</span>
+            {invoiceTotalAdjusted ? <span className="rounded-full bg-salon-gold/20 px-2.5 py-1 text-salon-goldlight">معدّل يدويًا</span> : <span>محسوب تلقائيًا</span>}
+          </div>
+          {!invoiceTotalValid && selectedServices.length > 0 ? (
+            <p role="alert" className="mt-3 rounded-xl border border-red-300/30 bg-red-950/35 px-3 py-2 text-xs font-bold text-red-100">
+              يجب أن يكون الإجمالي أكبر من قيمة المنتجات ({productsSubtotal.toFixed(2)} ريال) وألا يتجاوز 1,000,000 ريال.
+            </p>
+          ) : null}
         </div>
         <div className="mt-4 grid grid-cols-2 gap-2">
           <button
@@ -600,7 +621,7 @@ export function VisitForm({
                 <button
                   type="button"
                   onClick={closePreview}
-                  className="rounded-full border border-salon-line bg-white px-3 py-1 text-sm font-bold text-salon-charcoal"
+                  className="min-h-11 rounded-full border border-salon-line bg-white px-4 text-sm font-bold text-salon-charcoal"
                 >
                   تعديل
                 </button>
@@ -735,7 +756,40 @@ export function VisitForm({
                 <SummaryCell label="النقاط المستخدمة" value={`${selectedReward?.pointsRequired ?? 0}`} />
                 <SummaryCell label="مكافأة الإدارة" value={selectedManagerReward ? selectedManagerReward.title : "-"} />
               </dl>
-              <p className="mt-3 rounded-2xl bg-salon-mist px-3 py-3 text-sm font-semibold text-salon-charcoal">{preview.services.map((service) => service.name).join("، ")}</p>
+              <div className="mt-3 overflow-hidden rounded-2xl border border-salon-line bg-white">
+                <div className="flex items-center justify-between gap-3 border-b border-salon-line bg-salon-mist px-3 py-2.5">
+                  <p className="text-xs font-black text-salon-ink">تفاصيل الفاتورة</p>
+                  <span className="text-[11px] font-bold text-salon-charcoal/60">
+                    {preview.services.length + preview.products.length} بند
+                  </span>
+                </div>
+                <ul className="divide-y divide-salon-line/70">
+                  {preview.services.map((service) => (
+                    <li key={`service-${service.id}`} className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
+                      <span className="min-w-0">
+                        <span className="block truncate font-bold text-salon-ink">{service.name}</span>
+                        <span className="text-[10px] font-semibold text-salon-charcoal/55">خدمة</span>
+                      </span>
+                      <span className="shrink-0 font-black tabular-nums text-salon-forest">{service.lineTotal.toFixed(2)} ريال</span>
+                    </li>
+                  ))}
+                  {preview.products.map((product) => (
+                    <li key={`product-${product.id}`} className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
+                      <span className="min-w-0">
+                        <span className="block truncate font-bold text-salon-ink">{product.name}</span>
+                        <span className="text-[10px] font-semibold text-salon-charcoal/55">منتج · الكمية {product.quantity}</span>
+                      </span>
+                      <span className="shrink-0 font-black tabular-nums text-salon-forest">{product.lineTotal.toFixed(2)} ريال</span>
+                    </li>
+                  ))}
+                </ul>
+                {Math.abs(preview.pricingAdjustmentAmount) >= 0.01 ? (
+                  <div className="flex items-center justify-between gap-3 border-t border-salon-gold/30 bg-salon-gold/10 px-3 py-2.5 text-xs font-bold text-salon-ink">
+                    <span>تعديل الإجمالي عن سعر الكتالوج</span>
+                    <span dir="ltr" className="tabular-nums">{preview.pricingAdjustmentAmount > 0 ? "+" : ""}{preview.pricingAdjustmentAmount.toFixed(2)} ريال</span>
+                  </div>
+                ) : null}
+              </div>
             </div>
             <div className="shrink-0 border-t border-salon-line bg-white p-4">
               {/* **سبب وجود هذه الفقرة هنا:** رسالة الفشل كانت تُرسم في جسم

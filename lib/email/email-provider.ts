@@ -92,11 +92,6 @@ export function getEmailProvider(): EmailProvider {
   return new UnconfiguredEmailProvider();
 }
 
-/** هل البريد جاهز للإنتاج؟ تُستخدم للعرض الإداري لا للتحكّم في المسار. */
-export function isEmailConfigured() {
-  return getEmailProvider().name !== "unconfigured";
-}
-
 export async function sendEmail(message: EmailMessage) {
   await getEmailProvider().send(message);
 }

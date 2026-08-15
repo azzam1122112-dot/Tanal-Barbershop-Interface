@@ -63,7 +63,7 @@ export default async function AttendancePage({
         <StatCard label="دوام مفتوح الآن" value={formatNumber(openShifts)} subValue={openShifts > 0 ? "لم يسجّل انصرافًا" : undefined} />
       </div>
 
-      <TablePanel>
+      <TablePanel label="ملخص حضور الحلاقين">
         <table className="dashboard-table min-w-[760px]">
           <thead>
             <tr>
@@ -93,7 +93,7 @@ export default async function AttendancePage({
         ) : null}
       </TablePanel>
 
-      <TablePanel>
+      <TablePanel label="تفاصيل الحضور والانصراف">
         <table className="dashboard-table min-w-[860px]">
           <thead>
             <tr>

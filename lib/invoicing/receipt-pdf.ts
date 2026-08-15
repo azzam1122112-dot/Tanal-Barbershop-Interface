@@ -1,4 +1,5 @@
 import path from "node:path";
+import { existsSync } from "node:fs";
 import PDFDocument from "pdfkit";
 import type { ReceiptData } from "@/lib/invoicing/receipt";
 
@@ -21,7 +22,10 @@ const contentWidth = PAGE.width - PAGE.margin * 2;
 export async function generateReceiptPdf(receipt: ReceiptData) {
   const regularFont = resolveArabicFont("IBMPlexSansArabic-Regular.woff");
   const boldFont = resolveArabicFont("IBMPlexSansArabic-Bold.woff");
-  const logoPath = path.join(process.cwd(), "public", "icons", "xmansx-icon-192.png");
+  const resolvedLogoPath = path.join(process.cwd(), "public", "icons", "xmansx-icon-192.png");
+  // الشعار تجميلي، فلا ينبغي أن يُسقط الإيصال كله إذا لم تنسخه بيئة نشر
+  // standalone. الخطوط إلزامية للعربية، أما الشعار فله بديل رسومي آمن.
+  const logoPath = existsSync(resolvedLogoPath) ? resolvedLogoPath : null;
 
   const doc = new PDFDocument({
     size: "A4",
@@ -78,12 +82,12 @@ function resolveArabicFont(filename: string) {
   );
 }
 
-function drawHeader(doc: PDFKit.PDFDocument, receipt: ReceiptData, logoPath: string) {
+function drawHeader(doc: PDFKit.PDFDocument, receipt: ReceiptData, logoPath: string | null) {
   doc.save();
   doc.rect(0, 0, PAGE.width, 122).fill(COLORS.onyx);
   doc.polygon([0, 0], [210, 0], [145, 122], [0, 122]).fill(COLORS.purpleDark);
   doc.opacity(0.28).circle(40, 15, 95).fill(COLORS.purple).opacity(1);
-  doc.image(logoPath, 47, 27, { fit: [68, 68], align: "center", valign: "center" });
+  drawBrandMark(doc, logoPath, 47, 27, 68);
 
   const sellerName = receipt.seller.salonName || receipt.seller.name || receipt.seller.organizationName || "الصالون";
   arabicText(doc, sellerName, 245, 27, 302, { font: "ArabicBold", size: 21, color: COLORS.white });
@@ -154,7 +158,7 @@ function metadataRow(
   else arabicText(doc, value, x, y + 11, width, { font: "ArabicBold", size: 10, color: COLORS.ink });
 }
 
-function drawServicesTable(doc: PDFKit.PDFDocument, receipt: ReceiptData, startY: number, logoPath: string) {
+function drawServicesTable(doc: PDFKit.PDFDocument, receipt: ReceiptData, startY: number, logoPath: string | null) {
   let y = startY;
   y = drawTableHeader(doc, y);
 
@@ -192,7 +196,7 @@ function drawTableHeader(doc: PDFKit.PDFDocument, y: number) {
   return y + 32;
 }
 
-function drawTotalsAndPayment(doc: PDFKit.PDFDocument, receipt: ReceiptData, startY: number, logoPath: string) {
+function drawTotalsAndPayment(doc: PDFKit.PDFDocument, receipt: ReceiptData, startY: number, logoPath: string | null) {
   let y = startY;
   if (y + 220 > 760) {
     doc.addPage();
@@ -241,11 +245,28 @@ function summaryRow(
   latinText(doc, `${amount < 0 ? "- " : ""}${formatAmount(Math.abs(amount))} SAR`, x, y, 100, { size: 9, color, align: "left" });
 }
 
-function drawContinuationHeader(doc: PDFKit.PDFDocument, receipt: ReceiptData, logoPath: string) {
+function drawContinuationHeader(doc: PDFKit.PDFDocument, receipt: ReceiptData, logoPath: string | null) {
   doc.rect(0, 0, PAGE.width, 62).fill(COLORS.onyx);
-  doc.image(logoPath, PAGE.margin, 13, { fit: [36, 36] });
+  drawBrandMark(doc, logoPath, PAGE.margin, 13, 36);
   arabicText(doc, receipt.seller.salonName || receipt.seller.name, 258, 14, 289, { font: "ArabicBold", size: 13, color: COLORS.white });
   latinText(doc, receipt.invoiceNumber ?? "-", 112, 19, 130, { font: "Helvetica-Bold", size: 9, color: "#c4b5fd", align: "left" });
+}
+
+function drawBrandMark(doc: PDFKit.PDFDocument, logoPath: string | null, x: number, y: number, size: number) {
+  if (logoPath) {
+    doc.image(logoPath, x, y, { fit: [size, size], align: "center", valign: "center" });
+    return;
+  }
+
+  doc.save();
+  doc.roundedRect(x, y, size, size, Math.max(7, size * 0.18)).fill(COLORS.purple);
+  latinText(doc, "X", x, y + size * 0.19, size, {
+    font: "Helvetica-Bold",
+    size: size * 0.48,
+    color: COLORS.white,
+    align: "center",
+  });
+  doc.restore();
 }
 
 function drawPageFooters(doc: PDFKit.PDFDocument) {

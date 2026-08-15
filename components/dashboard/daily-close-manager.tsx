@@ -5,7 +5,7 @@ import { formatDateTime, formatMoney, formatNumber } from "@/lib/format";
 import { safeFetch } from "@/lib/http/safe-fetch";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { InlineEmpty } from "@/components/dashboard/ui";
+import { InlineEmpty, TableScroller } from "@/components/dashboard/ui";
 type SummaryRow = {
   barberId: string;
   barberName: string;
@@ -91,7 +91,7 @@ export function DailyCloseManager({ initialSummary }: { initialSummary: SummaryR
       {confirmDialog}
       <DashboardToast toast={toast} onClose={() => setToast(null)} />
       <div className="dashboard-panel table-scroll-wrap overflow-hidden">
-        <div className="table-scroll">
+        <TableScroller label="جلسات الصندوق المفتوحة">
         <table className="dashboard-table min-w-[1160px]">
           <thead>
             <tr>
@@ -136,8 +136,9 @@ export function DailyCloseManager({ initialSummary }: { initialSummary: SummaryR
                   <td className="px-3 py-3">
                     {session ? (
                       <form onSubmit={(event) => closeSession(event, row)} className="grid min-w-[280px] gap-2">
-                        <span className="text-xs font-bold text-salon-charcoal/65">الكاش المعدود عند الإغلاق</span>
+                        <label htmlFor={`cash-count-${session.id}`} className="text-xs font-bold text-salon-charcoal/65">الكاش المعدود عند الإغلاق</label>
                         <input lang="en"
+                          id={`cash-count-${session.id}`}
                           name="cashReceivedAmount"
                           type="number"
                           min={0}
@@ -145,7 +146,9 @@ export function DailyCloseManager({ initialSummary }: { initialSummary: SummaryR
                           defaultValue={session.expectedCash}
                           className="dashboard-field py-2"
                         />
+                        <label htmlFor={`cash-notes-${session.id}`} className="sr-only">ملاحظات إغلاق الجلسة</label>
                         <input
+                          id={`cash-notes-${session.id}`}
                           name="notes"
                           placeholder="ملاحظات"
                           className="dashboard-field py-2"
@@ -164,7 +167,7 @@ export function DailyCloseManager({ initialSummary }: { initialSummary: SummaryR
             {summary.length === 0 ? <tr><td colSpan={13} className="p-4"><InlineEmpty icon="💈" title="لا يوجد حلاقون نشطون" hint="فعّل حلاقًا من صفحة الحلاقين ليظهر هنا صندوقه." /></td></tr> : null}
           </tbody>
         </table>
-        </div>
+        </TableScroller>
       </div>
     </div>
   );

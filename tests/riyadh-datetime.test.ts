@@ -7,6 +7,7 @@ import {
   getRiyadhWeekday,
   isSameRiyadhDay,
   parseRiyadhDateKey,
+  parseRiyadhDateTimeLocal,
   riyadhDateTimeForDay,
   startOfRiyadhDay,
   toRiyadhDateKey,
@@ -31,6 +32,12 @@ describe("Riyadh operational dates", () => {
     expect(getRiyadhMinuteOfDay(fourPm)).toBe(16 * 60);
   });
 
+  it("interprets datetime-local campaign values as Riyadh wall time", () => {
+    expect(parseRiyadhDateTimeLocal("2026-08-15T04:00").toISOString()).toBe("2026-08-15T01:00:00.000Z");
+    expect(parseRiyadhDateTimeLocal("2026-08-29T23:00").toISOString()).toBe("2026-08-29T20:00:00.000Z");
+    expect(toRiyadhDateKey(parseRiyadhDateTimeLocal("2026-08-29T23:00"))).toBe("2026-08-29");
+  });
+
   it("adds civil Riyadh days without inheriting the host timezone", () => {
     const lateNight = new Date("2026-12-31T22:30:00.000Z");
     const nextDay = addRiyadhDays(lateNight, 1);
@@ -53,5 +60,7 @@ describe("Riyadh operational dates", () => {
 
   it("rejects impossible civil dates", () => {
     expect(() => parseRiyadhDateKey("2026-02-30")).toThrow("Invalid date key");
+    expect(() => parseRiyadhDateTimeLocal("2026-02-30T04:00")).toThrow("Invalid Riyadh local date time");
+    expect(() => parseRiyadhDateTimeLocal("2026-08-15T24:00")).toThrow("Invalid Riyadh local date time");
   });
 });

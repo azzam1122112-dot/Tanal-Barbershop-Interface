@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Icon } from "@/components/icons";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -22,6 +23,8 @@ export type BarberAppointment = {
   statusLabel: string;
   customerName: string;
   customerPhone: string;
+  /** `null` لموعد زائر سجّله الموظف بلا سجل عميل — يُقفل من شاشة نقطة البيع. */
+  customerId: string | null;
   services: { serviceId: string; serviceName: string; durationMinutes: number }[];
   notes: string | null;
 };
@@ -402,6 +405,21 @@ export function BarberAppointmentsPanel({
                     إلغاء الحجز
                   </button>
                 </div>
+                {arrived ? (
+                  // المخرج الوحيد من «حضر» إلى `COMPLETED`. بدونه كان الموعد
+                  // يقف عند الحضور إلى الأبد: الخادم يرفض ضبط الاكتمال يدويًا
+                  // ويحيل إلى تسجيل الزيارة، ولم يكن في الشاشة طريق إليه.
+                  <Link
+                    href={
+                      appointment.customerId
+                        ? `/barber/customers/${appointment.customerId}/visits/new?appointment=${appointment.id}`
+                        : `/barber/visits/new?appointment=${appointment.id}`
+                    }
+                    className="barber-gold-button mt-2 flex min-h-12 items-center justify-center text-sm"
+                  >
+                    تسجيل الزيارة وإقفال الموعد
+                  </Link>
+                ) : null}
                 {!isTodayAppointment ? (
                   <p className="mt-2 text-center text-[11px] font-bold text-salon-charcoal/55">
                     تسجيل الحضور يُفعَّل يوم الموعد. يمكنك الآن التواصل أو تغيير الموعد أو إلغاؤه.

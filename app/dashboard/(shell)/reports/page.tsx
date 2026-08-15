@@ -1,7 +1,7 @@
 import { formatDate, formatMoney, formatNumber, formatReportPeriod } from "@/lib/format";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { DashboardShell, Notice, ReportPrintMeta, SectionPanel, StatCard } from "@/components/dashboard/ui";
+import { DashboardShell, Field, Notice, ReportPrintMeta, SectionPanel, StatCard, TableScroller } from "@/components/dashboard/ui";
 import { PrintButton } from "@/components/ui/print-button";
 import { canAccessDashboard } from "@/lib/auth/access";
 import { dashboardScope } from "@/lib/auth/salon-scope";
@@ -66,7 +66,8 @@ export default async function DashboardReportsPage({
     >
         <ReportPrintMeta period={formatReportPeriod(filters.from, filters.to)} scope={scopeLabel} printedAt={formatDate(new Date())} />
 
-        <form className="dashboard-panel mt-6 grid gap-3 p-4 print:hidden lg:grid-cols-[150px_150px_150px_1fr_150px_120px]">
+        <form className="dashboard-panel mt-6 grid items-end gap-3 p-4 print:hidden lg:grid-cols-[150px_150px_150px_1fr_150px_120px]">
+          <Field label="الفترة">
           <select name="preset" defaultValue={params.preset ?? "today"} className="dashboard-field">
             <option value="today">اليوم</option>
             <option value="yesterday">أمس</option>
@@ -74,17 +75,22 @@ export default async function DashboardReportsPage({
             <option value="month">هذا الشهر</option>
             <option value="custom">فترة مخصصة</option>
           </select>
-          <input dir="ltr" lang="en" name="from" type="date" defaultValue={params.from ?? ""} className="dashboard-field" />
-          <input dir="ltr" lang="en" name="to" type="date" defaultValue={params.to ?? ""} className="dashboard-field" />
+          </Field>
+          <Field label="من تاريخ"><input dir="ltr" lang="en" name="from" type="date" defaultValue={params.from ?? ""} className="dashboard-field" /></Field>
+          <Field label="إلى تاريخ"><input dir="ltr" lang="en" name="to" type="date" defaultValue={params.to ?? ""} className="dashboard-field" /></Field>
+          <Field label="الحلاق">
           <select name="barberId" defaultValue={params.barberId ?? ""} className="dashboard-field">
             <option value="">كل الحلاقين</option>
             {barbers.map((barber) => <option key={barber.id} value={barber.id}>{barber.name}</option>)}
           </select>
+          </Field>
+          <Field label="طريقة الدفع">
           <select name="paymentMethod" defaultValue={params.paymentMethod ?? ""} className="dashboard-field">
             <option value="">كل طرق الدفع</option>
             <option value="CASH">كاش</option>
             <option value="NETWORK">شبكة</option>
           </select>
+          </Field>
           <button className="dashboard-button">تطبيق</button>
         </form>
 
@@ -242,7 +248,7 @@ function ReportSection({ title, children }: { title: string; children: React.Rea
   return (
     <SectionPanel title={title}>
       <div className="table-scroll-wrap">
-        <div className="table-scroll">{children}</div>
+        <TableScroller label={title}>{children}</TableScroller>
       </div>
     </SectionPanel>
   );

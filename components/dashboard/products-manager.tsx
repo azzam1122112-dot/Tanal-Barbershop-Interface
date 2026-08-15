@@ -254,16 +254,19 @@ export function ProductsManager({
                   </div>
 
                   {showStockForm ? (
-                    <form onSubmit={(event) => void submitStock(event, product)} className="mt-3 grid gap-2 rounded-xl bg-salon-pearl p-3 sm:grid-cols-[160px_120px_1fr_110px]">
-                      <select name="type" defaultValue="PURCHASE" className="dashboard-field py-2.5">
+                    <form onSubmit={(event) => void submitStock(event, product)} className="mt-3 grid gap-2 rounded-xl bg-salon-pearl p-3 sm:grid-cols-[160px_120px_1fr_110px]" aria-label={`تسجيل حركة مخزون ${product.name}`}>
+                      <label htmlFor={`stock-type-${product.id}`} className="sr-only">نوع حركة المخزون</label>
+                      <select id={`stock-type-${product.id}`} name="type" defaultValue="PURCHASE" className="dashboard-field py-2.5">
                         {MOVEMENT_TYPES.map((type) => (
                           <option key={type.value} value={type.value}>
                             {type.label}
                           </option>
                         ))}
                       </select>
-                      <input lang="en" name="quantity" type="number" step={1} required defaultValue={1} className="dashboard-field py-2.5" />
-                      <input name="reason" placeholder="السبب (اختياري)" className="dashboard-field py-2.5" />
+                      <label htmlFor={`stock-quantity-${product.id}`} className="sr-only">كمية الحركة</label>
+                      <input id={`stock-quantity-${product.id}`} lang="en" name="quantity" type="number" step={1} required defaultValue={1} className="dashboard-field py-2.5" />
+                      <label htmlFor={`stock-reason-${product.id}`} className="sr-only">سبب حركة المخزون</label>
+                      <input id={`stock-reason-${product.id}`} name="reason" placeholder="السبب (اختياري)" className="dashboard-field py-2.5" />
                       <button disabled={isPending} className="dashboard-button py-2.5 text-xs">
                         {isPending ? "..." : "تسجيل"}
                       </button>

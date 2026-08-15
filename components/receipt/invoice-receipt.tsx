@@ -7,11 +7,23 @@ import { ShareReceiptPdfButton } from "./share-pdf-button";
  * مستند الإيصال/الفاتورة. مصمّم بعرض إيصال حراري (80mm) فيطبع كما هو
  * على طابعة الكاشير، ويبقى مقروءًا على الشاشة وفي PDF المتصفح.
  */
-export function InvoiceReceipt({ receipt, backHref }: { receipt: ReceiptData; backHref?: string }) {
+export function InvoiceReceipt({
+  receipt,
+  backHref,
+  pdfPath,
+  receiptHref,
+  embedded = false,
+}: {
+  receipt: ReceiptData;
+  backHref?: string;
+  pdfPath?: string;
+  receiptHref?: string;
+  embedded?: boolean;
+}) {
   const { totals, seller } = receipt;
 
   return (
-    <div className="receipt-page min-h-screen bg-salon-mist px-4 py-6 print:bg-white print:p-0">
+    <div className={`receipt-page print:bg-white print:p-0 ${embedded ? "py-1" : "min-h-screen bg-salon-mist px-4 py-6"}`}>
       <div className="receipt-actions mx-auto mb-4 flex max-w-[520px] flex-wrap items-center justify-between gap-3 print:hidden">
         {backHref ? (
           <a href={backHref} className="dashboard-button-soft px-4 py-2 text-sm">
@@ -21,7 +33,7 @@ export function InvoiceReceipt({ receipt, backHref }: { receipt: ReceiptData; ba
           <span />
         )}
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <ShareReceiptPdfButton visitId={receipt.visitId} />
+          <ShareReceiptPdfButton visitId={receipt.visitId} pdfPath={pdfPath} receiptHref={receiptHref} />
           <PrintButton />
         </div>
       </div>

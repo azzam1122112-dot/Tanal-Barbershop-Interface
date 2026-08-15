@@ -260,7 +260,7 @@ export function CashSessionPanel({
                   type="button"
                   onClick={() => setExpenseOpen((current) => !current)}
                   aria-expanded={expenseOpen}
-                  className="shrink-0 rounded-xl border border-salon-line bg-white px-3 py-2.5 text-xs font-bold text-salon-charcoal transition active:scale-95"
+                  className="min-h-11 shrink-0 rounded-xl border border-salon-line bg-white px-3 text-xs font-bold text-salon-charcoal transition active:scale-95"
                 >
                   {expenseOpen ? "إغلاق" : "تسجيل مصروف"}
                 </button>

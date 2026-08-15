@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { AppointmentCloseNote } from "@/components/barber/appointment-close-note";
+import { findCloseableAppointment } from "@/lib/appointments/appointment-service";
 import { canAccessBarberApp } from "@/lib/auth/access";
 import { getRequestSession } from "@/lib/auth/http";
 import { prisma } from "@/lib/db/prisma";
@@ -7,12 +9,19 @@ import { onlyActiveServices, toSafeService } from "@/lib/services/service-summar
 import { VisitForm } from "@/components/barber/visit-form";
 import { listProducts } from "@/lib/products/product-service";
 
-export default async function NewVisitPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function NewVisitPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ appointment?: string }>;
+}) {
   const session = await getRequestSession();
   if (!session) redirect("/barber/login");
   if (!canAccessBarberApp(session)) redirect("/dashboard");
 
   const { id } = await params;
+  const { appointment: appointmentParam } = await searchParams;
   // مقيّد بمؤسسة الحلاق وفرعه: لا يُسجَّل عميل أو خدمة من مستأجر آخر.
   const [customer, services, products] = await Promise.all([
     prisma.customer.findFirst({
@@ -32,12 +41,29 @@ export default async function NewVisitPage({ params }: { params: Promise<{ id: s
 
   if (!customer) redirect("/barber");
 
+  // الموعد يجب أن يخصّ هذا العميل بعينه: `customerId` جزء من الشرط، فرابطٌ
+  // يحمل موعد عميل آخر لا يُعرض ولا يُقفل.
+  const appointment = appointmentParam
+    ? await findCloseableAppointment(prisma, {
+        appointmentId: appointmentParam,
+        organizationId: session.organizationId,
+        salonId: session.salonId,
+        barberId: session.barber.id,
+        customerId: customer.id,
+      })
+    : null;
+
   return (
     // شاشة تسجيل الزيارة تبقى عمودًا واحدًا حتى على التابلت: النموذج تسلسل خطوات
     // (خدمات ← مبلغ ← معاينة)، وتوزيعه على عمودين يكسر ترتيب القراءة.
     <main className="barber-shell">
       <section className="mx-auto w-full max-w-md space-y-5 md:max-w-xl">
-        <Link href={`/barber/customers/${customer.id}`} className="barber-ghost-button inline-flex min-h-11 py-2 text-sm">العودة للعميل</Link>
+        <Link
+          href={appointment ? "/barber#appointments" : `/barber/customers/${customer.id}`}
+          className="barber-ghost-button inline-flex min-h-11 py-2 text-sm"
+        >
+          {appointment ? "العودة للمواعيد" : "العودة للعميل"}
+        </Link>
         <div className="barber-card lux-edge p-5">
           <p className="text-xs font-bold tracking-[0.18em] text-salon-forest">تسجيل زيارة</p>
           <h1 className="mt-3 text-3xl font-bold text-salon-ink">{customer.name}</h1>
@@ -51,7 +77,9 @@ export default async function NewVisitPage({ params }: { params: Promise<{ id: s
             اختر الخدمات، أدخل المبلغ، ثم اعرض المعاينة قبل التأكيد.
           </div>
         </div>
+        <AppointmentCloseNote appointment={appointment} />
         <VisitForm
+          appointmentId={appointment?.id ?? null}
           customerId={customer.id}
           services={onlyActiveServices(services).map((service) => toSafeService(service))}
           products={products

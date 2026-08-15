@@ -1,7 +1,3 @@
-import { z } from "zod";
-
-export const commissionRateSchema = z.number().min(0).max(100);
-
 export type CommissionLineInput = {
   serviceId: string;
   /** إجمالي السطر قبل الخصم — يُستخدم لتوزيع الوعاء بين الخدمات. */

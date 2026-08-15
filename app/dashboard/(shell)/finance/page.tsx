@@ -25,7 +25,7 @@ export default async function FinancePage({
 }) {
   const session = await getRequestSession();
   if (!session) redirect("/dashboard/login");
-  if (!canViewFinancials(session)) redirect("/dashboard");
+  if (!canViewFinancials(session)) redirect("/dashboard/forbidden");
 
   const { organizationId, salonIds, isAggregate } = dashboardScope(session);
   if (!organizationId) redirect("/dashboard");

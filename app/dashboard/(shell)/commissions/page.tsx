@@ -90,7 +90,7 @@ export default async function CommissionsPage({
         />
       </div>
 
-      <TablePanel>
+      <TablePanel label="مستحقات عمولات الحلاقين">
         <table className="dashboard-table min-w-[900px]">
           <thead>
             <tr>

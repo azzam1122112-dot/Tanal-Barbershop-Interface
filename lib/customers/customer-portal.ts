@@ -36,14 +36,46 @@ async function issuePortalToken(prisma: PrismaClient, customerId: string) {
   return portalToken;
 }
 
-/** يصدر رابطًا جديدًا؛ لا يمكن إعادة عرض الرمز القديم لأن قاعدة البيانات لا تحفظه. */
-export async function ensurePortalToken(prisma: PrismaClient, customerId: string, organizationId: string) {
+/**
+ * يصدر رمز بوابة جديدًا للعميل — **ويُبطل رمزه السابق دائمًا**.
+ *
+ * كانت هذه الدالة تُسمّى `ensurePortalToken` وتوثّق نفسها بـ«ينشئ الرمز عند أول
+ * طلب»، بينما تُصدر رمزًا جديدًا في كل نداء بلا استثناء. الاسم القديم كان يَعِد
+ * بعملية بلا أثر جانبي، فاستُدعي من زرٍّ نصُّه «نسخ الرابط مجددًا» — وكل ضغطة
+ * تقتل الرابط الذي بيد العميل وقد يكون مفتوحًا على جهازه.
+ *
+ * لا يمكن أن توجد دالة `ensure` حقيقية هنا: القاعدة لا تحفظ إلا تجزئة الرمز،
+ * فالرمز القائم غير قابل للعرض مجددًا بحكم التصميم. الاختيار الوحيد المتاح هو
+ * **إصدار جديد أو لا شيء** — ولذلك صار الاسم يقول ما يفعل، وصار قرارُ إبطال
+ * الرابط القائم قرارًا صريحًا عند المستدعي لا أثرًا جانبيًا صامتًا
+ * (انظر `hasLivePortalToken`).
+ */
+export async function issueCustomerPortalToken(prisma: PrismaClient, customerId: string, organizationId: string) {
   const customer = await prisma.customer.findFirst({
     where: { id: customerId, organizationId },
     select: { id: true },
   });
   if (!customer) throw new BusinessError("العميل غير موجود", 404);
   return issuePortalToken(prisma, customer.id);
+}
+
+/**
+ * هل بيد هذا العميل رابط بوابة سارٍ الآن؟
+ *
+ * تقرأ ولا تكتب. تستدعيها شاشة الإدارة قبل الإصدار حتى لا يُبطَل رابطٌ قائم
+ * بضغطة عابرة: الإبطال فعل يُقصد لا يُكتشف بعد وقوعه.
+ */
+export async function hasLivePortalToken(prisma: PrismaClient, customerId: string, organizationId: string) {
+  const customer = await prisma.customer.findFirst({
+    where: {
+      id: customerId,
+      organizationId,
+      portalTokenHash: { not: null },
+      portalTokenExpiresAt: { gt: new Date() },
+    },
+    select: { id: true },
+  });
+  return customer !== null;
 }
 
 /**
@@ -81,16 +113,10 @@ export async function issueAccountPortalToken(
   return issuePortalToken(prisma, customer.id);
 }
 
-/** يبطل الرابط القديم ويصدر رمزًا جديدًا. */
-export async function rotatePortalToken(prisma: PrismaClient, customerId: string, organizationId: string) {
-  const customer = await prisma.customer.findFirst({
-    where: { id: customerId, organizationId },
-    select: { id: true },
-  });
-  if (!customer) throw new BusinessError("العميل غير موجود", 404);
-
-  return issuePortalToken(prisma, customer.id);
-}
+// `rotatePortalToken` حُذفت: كانت نسخة حرفية من `issueCustomerPortalToken`
+// باسم ثانٍ. اسمان لعملية واحدة أوهما أن بينهما فرقًا في الأثر، فكُتب مسار
+// «الإصدار» بلا تدقيق ومسار «التدوير» بتدقيق — والعمليتان تُبطلان الرابط
+// القائم سواءً. الفرق الحقيقي سياسةُ مسارٍ لا دالةٌ ثانية.
 
 /**
  * يحلّ العميل من رمز بوابته — **بوابة الهوية الوحيدة** لكل مسارات البوابة العامة.

@@ -203,6 +203,46 @@ describe("visit preview and confirm", () => {
     expect(preview.discountAmount).toBe(0);
   });
 
+  it("lets the barber set the final invoice total and keeps receipt lines reconciled", async () => {
+    const preview = await buildVisitPreview(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
+      customerId,
+      barberId,
+      serviceIds: [activeServiceId],
+      grossAmount: 70,
+      invoiceTotal: 85.5,
+      paymentMethod: "NETWORK",
+    });
+
+    expect(preview.catalogGrossAmount).toBe(70);
+    expect(preview.pricingAdjustmentAmount).toBe(15.5);
+    expect(preview.grossAmount).toBe(85.5);
+    expect(preview.services.reduce((sum, line) => sum + line.lineTotal, 0)).toBe(85.5);
+
+    const result = await confirmVisit(prisma, {
+      organizationId: "org_default",
+      salonId: "salon_default",
+      customerId,
+      barberId,
+      serviceIds: [activeServiceId],
+      grossAmount: 70,
+      invoiceTotal: 85.5,
+      paymentMethod: "NETWORK",
+      paymentConfirmed: true,
+      idempotencyKey: `manual-total-${Date.now()}`,
+    });
+    createdVisitIds.push(result.visit.id);
+
+    const visit = await prisma.visit.findUniqueOrThrow({
+      where: { id: result.visit.id },
+      include: { services: true },
+    });
+    expect(Number(visit.grossAmount)).toBe(85.5);
+    expect(Number(visit.netAmount)).toBe(85.5);
+    expect(visit.services.reduce((sum, line) => sum + Number(line.lineTotal), 0)).toBe(85.5);
+  });
+
   it("records a paid visit for a non-loyalty customer without creating points or membership", async () => {
     const preview = await buildVisitPreview(prisma, {
       organizationId: "org_default",

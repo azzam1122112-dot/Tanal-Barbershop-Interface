@@ -162,7 +162,7 @@ export function BarberRescheduleDialog({
               disabled={saving}
               onClick={onClose}
               aria-label="إغلاق"
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/10 text-white transition hover:bg-white/15 disabled:opacity-50"
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/10 text-white transition hover:bg-white/15 disabled:opacity-50"
             >
               <Icon name="close" className="h-5 w-5" />
             </button>
@@ -184,8 +184,9 @@ export function BarberRescheduleDialog({
               </div>
             </div>
           ) : error && days.length === 0 ? (
-            <div className="my-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-sm font-bold leading-6 text-red-800">
-              {error}
+            <div className="my-5 space-y-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-sm font-bold leading-6 text-red-800">
+              <p>{error}</p>
+              <button type="button" onClick={onClose} className="barber-ghost-button min-h-12 w-full bg-white">العودة للمواعيد</button>
             </div>
           ) : (
             <>
@@ -253,7 +254,9 @@ export function BarberRescheduleDialog({
                   </div>
                 ) : (
                   <p className="mt-3 rounded-2xl bg-salon-mist px-4 py-5 text-center text-sm font-bold text-salon-charcoal/65">
-                    لا توجد أوقات متاحة في هذا اليوم، اختر يومًا آخر.
+                    {days.some((day) => day.slots.some((slot) => slot.status === "AVAILABLE" && slot.startAt !== currentStartAt))
+                      ? "لا توجد أوقات متاحة في هذا اليوم، اختر يومًا آخر."
+                      : "لا توجد أوقات بديلة ضمن المدة المتاحة حاليًا. يمكنك العودة للمواعيد والمحاولة لاحقًا."}
                   </p>
                 )}
               </div>

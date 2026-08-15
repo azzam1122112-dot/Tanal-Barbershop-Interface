@@ -2,6 +2,7 @@ import { z } from "zod";
 import { barberPinSchema } from "./barber-pin";
 import { adminPasswordSchema } from "./password";
 import { normalizeSaudiPhone, SAUDI_LOCAL_MOBILE_MESSAGE } from "@/lib/phone/saudi-phone";
+import { normalizeRiyadhDateTimeInput } from "@/lib/datetime/riyadh";
 
 export const emailSchema = z
   .string()
@@ -142,21 +143,6 @@ export const updateStaffSchema = z.object({
   salonIds: staffSalonIdsSchema.optional(),
 });
 
-/**
- * إنشاء عميل من شاشة الحلاق — **سجل تشغيلي لا عضوية ولاء**.
- *
- * لا حقل `enrollInLoyalty` هنا بقصد: كان موجودًا بافتراضي `true`، فأي طلب لا
- * يذكره يمنح العضوية. والعضوية لا يفتحها إلا صاحبها من `/join` بحساب بريده
- * موثَّق. حذف الحقل من المخطط يجعل `z.object` **يُسقطه من أي طلب يرسله** بدل
- * أن يقبله — فلا تُفتح عضوية بطلب معدَّل يدويًا.
- */
-export const customerCreateSchema = z.object({
-  name: z.string().trim().min(2, "اسم العميل مطلوب"),
-  phone: phoneSchema,
-  whatsappTransactionalOptIn: z.boolean().optional().default(false),
-  whatsappMarketingOptIn: z.boolean().optional().default(false),
-});
-
 export const customerSearchSchema = z.object({
   phone: phoneSchema,
 });
@@ -193,6 +179,14 @@ export const visitRequestSchema = z.object({
     .max(20)
     .optional(),
   grossAmount: z.coerce.number().positive("المبلغ يجب أن يكون أكبر من صفر"),
+  // الإجمالي النهائي الذي أدخله الحلاق قبل الدفع. يبقى `grossAmount` لقيمة
+  // الخدمات المرجعية حتى يكتشف الخادم تغيّر الكتالوج، أما هذا الحقل فيشمل
+  // المنتجات ويُطبّق على الكاش والشبكة بعد التحقق وإعادة توزيع فرق السعر.
+  invoiceTotal: z.coerce
+    .number()
+    .positive("إجمالي الفاتورة يجب أن يكون أكبر من صفر")
+    .max(1_000_000, "إجمالي الفاتورة يتجاوز الحد المسموح")
+    .optional(),
   paymentMethod: visitPaymentMethodSchema,
   rewardRuleId: z.string().trim().min(1).optional(),
   managerRewardId: z.string().trim().min(1).optional(),
@@ -203,6 +197,10 @@ export const visitConfirmRequestSchema = visitRequestSchema.extend({
   idempotencyKey: z.string().trim().min(8, "مفتاح منع التكرار مطلوب").max(120),
   paymentConfirmed: z.literal(true, { errorMap: () => ({ message: "أكد استلام الدفع" }) }),
   cashTenderedAmount: z.coerce.number().nonnegative().optional().nullable(),
+  // الموعد الذي نتجت عنه الزيارة. مُعرّف فقط — الخادم يتحقق من فرعه وحلاقه
+  // وعميله قبل قفله، ولا يثق بأن مُرسِله يملكه. غيابه هو الحالة الطبيعية
+  // (زيارة مباشرة بلا حجز سابق).
+  appointmentId: z.string().trim().min(1).optional().nullable(),
 });
 
 export const rewardRuleCreateSchema = z.object({
@@ -225,7 +223,7 @@ export const managerRewardCreateSchema = z.object({
   title: z.string().trim().min(2, "عنوان المكافأة مطلوب").default("مكافأة من الإدارة"),
   description: z.string().trim().max(500).optional().nullable(),
   discountAmount: z.coerce.number().positive("قيمة الخصم يجب أن تكون أكبر من صفر"),
-  expiresAt: z.coerce.date().optional().nullable(),
+  expiresAt: z.preprocess(normalizeRiyadhDateTimeInput, z.coerce.date()).optional().nullable(),
 }).superRefine((data, ctx) => {
   if (data.expiresAt && data.expiresAt <= new Date()) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["expiresAt"], message: "تاريخ الانتهاء يجب أن يكون في المستقبل" });
@@ -249,8 +247,8 @@ const campaignFields = z.object({
   targetType: campaignTargetTypeSchema,
   inactiveDays: z.coerce.number().int().positive("عدد أيام الانقطاع يجب أن يكون أكبر من صفر").optional().nullable(),
   minPoints: z.coerce.number().int().positive("الحد الأدنى للنقاط يجب أن يكون أكبر من صفر").optional().nullable(),
-  startAt: z.coerce.date(),
-  endAt: z.coerce.date(),
+  startAt: z.preprocess(normalizeRiyadhDateTimeInput, z.coerce.date()),
+  endAt: z.preprocess(normalizeRiyadhDateTimeInput, z.coerce.date()),
   maxUsesPerCustomer: z.coerce.number().int().positive("عدد الاستخدامات يجب أن يكون أكبر من صفر").default(1),
   isActive: z.boolean().optional(),
 });

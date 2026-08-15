@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import type { AuditActorType, Prisma, PrismaClient } from "@prisma/client";
+import { logger } from "@/lib/logger";
 
 type AuditPrisma = PrismaClient | Prisma.TransactionClient;
 const SECRET_KEY = /(password|secret|token|authorization|cookie|session|otp|pin|api[-_]?key|private[-_]?key)/i;
@@ -28,9 +29,47 @@ export function sanitizeAuditValue(value: unknown, key = "", depth = 0): unknown
   ]));
 }
 
-function pseudonymizeIp(value?: string | null) {
+/**
+ * إخفاء هوية عنوان الشبكة في سجل التدقيق.
+ *
+ * **لماذا HMAC لا SHA-256:** فضاء IPv4 كامله 2³² عنوانًا — أي أن تجزئة عمياء
+ * بلا مفتاح تُعكس بجدول يُبنى في دقائق على جهاز عادي. الحقل كان يُسمّى
+ * «pseudonymize» ويَعِد بحماية لا يقدّمها، فيُقرأ سجل التدقيق كأن العناوين فيه
+ * مخفية بينما هي عمليًا نصّ ظاهر. المفتاح السرّي يقطع ذلك: بلا تسريبه لا يُعكس
+ * أي مدخل، ومع بقاء نفس المفتاح يبقى ربط سجلين لعنوان واحد ممكنًا كما كان.
+ *
+ * **البادئة نسخة لا زينة:** `v2:` تفصل المكتوب بالمفتاح عن قيم `sha256:`
+ * القديمة. القيمتان لنفس العنوان مختلفتان بالضرورة، فالبادئة تمنع أن يُقارَن
+ * سجلٌ قديم بجديد ويُستنتج أنهما جهازان مختلفان.
+ *
+ * **ولا تُسقط العملية أبدًا:** كتابة التدقيق تجري داخل معاملات مالية، ورمي خطأ
+ * هنا يُفشل زيارةً أو إقفال صندوق. غياب المفتاح في الإنتاج يُسجَّل ويُكتب
+ * `v2:unkeyed` — علامة غياب صريحة، لا عنوانًا مكشوفًا ولا تجزئة قابلة للعكس.
+ */
+const IP_PSEUDONYM_VERSION = "v2";
+const MIN_IP_KEY_LENGTH = 32;
+
+export function pseudonymizeIp(value?: string | null, env: NodeJS.ProcessEnv = process.env) {
   if (!value) return null;
-  return `sha256:${crypto.createHash("sha256").update(value).digest("hex").slice(0, 16)}`;
+
+  const secret = env.SESSION_SECRET?.trim();
+  if (!secret || secret.length < MIN_IP_KEY_LENGTH) {
+    if (env.NODE_ENV === "production") {
+      logger.error("audit.ip_pseudonym_key_missing", {
+        reason: `SESSION_SECRET أقصر من ${MIN_IP_KEY_LENGTH} محرفًا أو غير مضبوط`,
+      });
+      return `${IP_PSEUDONYM_VERSION}:unkeyed`;
+    }
+    // التطوير: مفتاح ثابت معلن حتى تبقى القيم مستقرة بين التشغيلات، والعناوين
+    // محليّة أصلًا. لا يُستخدم هذا الفرع في الإنتاج بحكم الشرط أعلاه.
+    return hmacIp(value, "xmansx-development-audit-ip-key-not-a-secret");
+  }
+
+  return hmacIp(value, secret);
+}
+
+function hmacIp(value: string, key: string) {
+  return `${IP_PSEUDONYM_VERSION}:${crypto.createHmac("sha256", key).update(value).digest("hex").slice(0, 32)}`;
 }
 
 export async function writeAuditLog({

@@ -4,6 +4,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { formatMoney, formatDateTime } from "@/lib/format";
 import { safeFetch } from "@/lib/http/safe-fetch";
 import { DashboardToast, type ToastState } from "@/components/dashboard/toast";
+import { FeedbackNote, type FeedbackState } from "@/components/ui/toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Badge, EmptyState, TablePanel } from "@/components/dashboard/ui";
 /**
@@ -71,6 +72,8 @@ export function CommissionPayoutManager({
   const [amount, setAmount] = useState("");
   const [pending, setPending] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
+  const [formFeedback, setFormFeedback] = useState<FeedbackState>(null);
+  const [idempotencyKey, setIdempotencyKey] = useState("");
   const { confirm, confirmDialog } = useConfirm();
 
   const totals = useMemo(
@@ -94,6 +97,8 @@ export function CommissionPayoutManager({
     setAmount(String(row.outstanding > 0 ? row.outstanding : ""));
     setMethod(row.custodyBalance > 0 ? "BARBER_CUSTODY_DEDUCTION" : "CASH_FROM_SAFE");
     setToast(null);
+    setFormFeedback(null);
+    setIdempotencyKey(createIdempotencyKey());
   }
 
   async function submitPayout(event: FormEvent<HTMLFormElement>) {
@@ -101,48 +106,59 @@ export function CommissionPayoutManager({
     if (!openRow) return;
     setPending(true);
     setToast(null);
+    setFormFeedback(null);
     const form = new FormData(event.currentTarget);
+    try {
+      const response = await safeFetch("/api/dashboard/commission-payouts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          barberId: openRow.barberId,
+          amount,
+          method,
+          periodFrom,
+          periodTo,
+          reference: form.get("reference") || undefined,
+          note: form.get("note") || undefined,
+          // يبقى المفتاح نفسه عند إعادة المحاولة بعد انقطاع الرد، فلا يُصرف
+          // السند مرتين إذا كان الخادم قد حفظ الطلب الأول فعلًا.
+          idempotencyKey: idempotencyKey || createIdempotencyKey(),
+        }),
+      });
+      const data = (await response.json().catch(() => ({}))) as { payout?: PayoutRow; message?: string };
 
-    const response = await safeFetch("/api/dashboard/commission-payouts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        barberId: openRow.barberId,
-        amount,
-        method,
-        periodFrom,
-        periodTo,
-        reference: form.get("reference") || undefined,
-        note: form.get("note") || undefined,
-        idempotencyKey: crypto.randomUUID(),
-      }),
-    });
-    const data = (await response.json().catch(() => ({}))) as { payout?: PayoutRow; message?: string };
-
-    if (response.ok && data.payout) {
-      const paidAmount = data.payout.amount;
-      setRows((current) =>
-        current.map((row) =>
-          row.barberId === openRow.barberId
-            ? {
-                ...row,
-                paid: round(row.paid + paidAmount),
-                outstanding: round(row.outstanding - paidAmount),
-                lastPaidAt: data.payout!.paidAt,
-                custodyBalance:
-                  method === "BARBER_CUSTODY_DEDUCTION" ? round(row.custodyBalance - paidAmount) : row.custodyBalance,
-              }
-            : row,
-        ),
-      );
-      setHistory((current) => [data.payout!, ...current]);
-      setOpenBarberId(null);
-      setAmount("");
-      setToast({ message: `تم صرف ${formatMoney(paidAmount)} لـ ${openRow.barberName}`, tone: "success" });
-    } else {
-      setToast({ message: data.message ?? "تعذر تسجيل الصرف", tone: "error" });
+      if (response.ok && data.payout) {
+        const paidAmount = data.payout.amount;
+        setRows((current) =>
+          current.map((row) =>
+            row.barberId === openRow.barberId
+              ? {
+                  ...row,
+                  paid: round(row.paid + paidAmount),
+                  outstanding: round(row.outstanding - paidAmount),
+                  lastPaidAt: data.payout!.paidAt,
+                  custodyBalance:
+                    method === "BARBER_CUSTODY_DEDUCTION" ? round(row.custodyBalance - paidAmount) : row.custodyBalance,
+                }
+              : row,
+          ),
+        );
+        setHistory((current) => [data.payout!, ...current]);
+        setOpenBarberId(null);
+        setAmount("");
+        setToast({ message: `تم صرف ${formatMoney(paidAmount)} لـ ${openRow.barberName}`, tone: "success" });
+      } else {
+        const message = data.message ?? "تعذر تسجيل الصرف";
+        setFormFeedback({ message, tone: "error" });
+        setToast({ message, tone: "error" });
+      }
+    } catch {
+      const message = "تعذر إكمال الصرف. لم يتغير الرصيد؛ أعد المحاولة بعد التحقق من الاتصال.";
+      setFormFeedback({ message, tone: "error" });
+      setToast({ message, tone: "error" });
+    } finally {
+      setPending(false);
     }
-    setPending(false);
   }
 
   async function reversePayout(payout: PayoutRow) {
@@ -267,7 +283,7 @@ export function CommissionPayoutManager({
 
       {openRow ? (
         <div className="fixed inset-0 z-[100] flex items-end justify-center bg-salon-ink/40 p-3 backdrop-blur-sm sm:items-center" role="dialog" aria-modal="true" aria-label={`صرف عمولة ${openRow.barberName}`}>
-          <button type="button" aria-label="إغلاق" className="absolute inset-0 cursor-default" onClick={() => setOpenBarberId(null)} />
+          <button type="button" aria-label="إغلاق" className="absolute inset-0 cursor-default" disabled={pending} onClick={() => setOpenBarberId(null)} />
           <form
             onSubmit={submitPayout}
             className="dashboard-panel relative z-10 w-full max-w-md overflow-hidden p-5"
@@ -357,11 +373,13 @@ export function CommissionPayoutManager({
               </p>
             ) : null}
 
+            <FeedbackNote feedback={formFeedback} className="mt-3" />
+
             <div className="mt-5 grid grid-cols-2 gap-2">
               <button type="submit" disabled={pending || overPay || overCustody} className="dashboard-button py-3 disabled:opacity-50">
                 {pending ? "جاري الصرف..." : "تأكيد الصرف"}
               </button>
-              <button type="button" onClick={() => setOpenBarberId(null)} className="dashboard-button-soft py-3">
+              <button type="button" disabled={pending} onClick={() => setOpenBarberId(null)} className="dashboard-button-soft py-3">
                 إلغاء
               </button>
             </div>
@@ -420,6 +438,10 @@ export function CommissionPayoutManager({
       </section>
     </div>
   );
+}
+
+function createIdempotencyKey() {
+  return globalThis.crypto?.randomUUID?.() ?? `payout-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 function SummaryTile({ label, value, tone = "plain" }: { label: string; value: string; tone?: "plain" | "due" }) {

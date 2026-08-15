@@ -245,10 +245,3 @@ export function useFeedback() {
  * إعلان لقارئ الشاشة بلا أثر بصري — لِما يُرى تغيّره ولا يُقرأ.
  * مثال: عدد نتائج البحث، أو تغيّر الرصيد بعد إجراء.
  */
-export function LiveAnnouncement({ message }: { message: string }) {
-  return (
-    <span role="status" aria-live="polite" className="sr-only">
-      {message}
-    </span>
-  );
-}

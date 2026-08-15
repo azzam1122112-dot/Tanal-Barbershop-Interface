@@ -350,24 +350,99 @@ export async function updateAppointmentStatus(
   return toAppointmentRow(updated);
 }
 
-/** يربط الموعد بالزيارة الناتجة عنه ويقفله كمكتمل. يُستدعى بعد تأكيد الزيارة. */
+/**
+ * يربط الموعد بالزيارة الناتجة عنه ويقفله كمكتمل.
+ *
+ * **تُستدعى داخل معاملة الزيارة نفسها** (`confirmVisit`)، فإمّا تُحفظ الزيارة
+ * ويُقفل موعدها معًا أو لا شيء. `COMPLETED` هي الحالة الوحيدة التي لا يضبطها
+ * `updateAppointmentStatus` — هناك تُرفض صراحةً برسالة «يكتمل الموعد تلقائيًا عند
+ * تسجيل زيارته»، وهذا هو الموضع الذي يفي بذلك الوعد.
+ *
+ * **النطاق مفروض داخل `where` لا بعده**، وبثلاثة قيود لا واحد:
+ * - **الفرع** مع المؤسسة: موعد فرع آخر لا يُجلب أصلًا (عزل المستأجرين والفروع).
+ * - **الحلاق**: موعدٌ مُسند لحلاق لا يقفله غيره. لولا هذا لأغلق حلاقٌ موعد زميله
+ *   بزيارته هو، فيظهر في تقرير الزملاء أن الموعد أُنجز ولم يُنجزه صاحبه.
+ * - **العميل**: موعد باسم عميل لا يُقفل بزيارة عميل آخر — وإلا حمل سجلُّ العميل
+ *   موعدًا مكتملًا لم يحضره، وحُسبت زيارةُ غيره إنجازًا له.
+ *
+ * والإرجاع `null` عند عدم وجود ما يُقفل: بلا موعد مطابق، أو مقفل سلفًا. الزيارة
+ * لا تفشل لأن موعدها أُلغي أو أُغلق في نافذة أخرى — النقد استُلم والخدمة قُدّمت،
+ * ورفضُ الزيارة عندها خسارةٌ حقيقية مقابل اتساقٍ شكلي.
+ */
+export type CloseableAppointmentScope = {
+  appointmentId: string;
+  organizationId: string;
+  salonId: string;
+  barberId: string;
+  customerId?: string | null;
+};
+
+/**
+ * شرط «هذا الموعد قابل لأن تقفله هذه الزيارة» — **مصدر حكم واحد**.
+ *
+ * تقرؤه شاشةُ تسجيل الزيارة لتعرض الموعد، ويقرؤه القفلُ نفسه وقت التأكيد. لو
+ * كُتب الشرطان منفصلين لانحرف أحدهما: تعرض الشاشة «موعد ٥:٢٠ — أحمد» ثم يرفض
+ * الخادم قفله بصمت، فيمضي الحلاق ظانًّا أن الموعد أُغلق.
+ */
+function closeableAppointmentWhere(scope: CloseableAppointmentScope): Prisma.AppointmentWhereInput {
+  return {
+    id: scope.appointmentId,
+    organizationId: scope.organizationId,
+    salonId: scope.salonId,
+    // لم يُقفل بعد: الحالة والزيارة معًا، فلا يُكتب فوق ربطٍ قائم.
+    status: { in: ["BOOKED", "ARRIVED"] },
+    visitId: null,
+    // موعد بلا حلاق مُسند (حجز عام) يقفله من قدّم الخدمة فعلًا.
+    OR: [{ barberId: null }, { barberId: scope.barberId }],
+    // زيارة زائر (بلا عميل) تقفل موعدًا بلا عميل فقط، والعكس بالعكس.
+    customerId: scope.customerId ?? null,
+  };
+}
+
+/**
+ * الموعد المفتوح الذي تصلح هذه الزيارة لقفله، أو `null`.
+ *
+ * تستدعيها شاشة تسجيل الزيارة لتعرض للحلاق أي موعد سيُقفل قبل أن يضغط «إتمام».
+ * قراءة محضة بلا أثر — الحكم النهائي يبقى داخل معاملة الزيارة.
+ */
+export async function findCloseableAppointment(prisma: AppointmentPrisma, scope: CloseableAppointmentScope) {
+  const appointment = await prisma.appointment.findFirst({
+    where: closeableAppointmentWhere(scope),
+    select: {
+      id: true,
+      startAt: true,
+      durationMinutes: true,
+      customerName: true,
+      status: true,
+      services: { select: { serviceId: true, serviceName: true }, orderBy: { serviceName: "asc" } },
+    },
+  });
+  if (!appointment) return null;
+
+  return {
+    id: appointment.id,
+    startAt: appointment.startAt.toISOString(),
+    durationMinutes: appointment.durationMinutes,
+    customerName: appointment.customerName,
+    statusLabel: APPOINTMENT_STATUS_LABELS[appointment.status],
+    serviceIds: appointment.services.map((service) => service.serviceId),
+    serviceNames: appointment.services.map((service) => service.serviceName),
+  };
+}
+
 export async function completeAppointmentWithVisit(
   prisma: AppointmentPrisma,
-  appointmentId: string,
-  visitId: string,
-  organizationId: string,
+  input: CloseableAppointmentScope & { visitId: string },
 ) {
-  const appointment = await prisma.appointment.findFirst({
-    where: { id: appointmentId, organizationId },
-    select: { id: true, status: true },
+  // `updateMany` لا `update`: الشرط كله — النطاق والحالة وغياب الزيارة — يُقيَّم
+  // ذرّيًا في عبارة واحدة، فلا نافذة بين القراءة والكتابة يسبقنا فيها طلب آخر.
+  const claimed = await prisma.appointment.updateMany({
+    where: closeableAppointmentWhere(input),
+    data: { status: "COMPLETED", visitId: input.visitId, cancelledAt: null, cancelReason: null },
   });
-  if (!appointment) throw new BusinessError("الموعد غير موجود", 404);
-  if (appointment.status === "COMPLETED") return null;
+  if (claimed.count !== 1) return null;
 
-  return prisma.appointment.update({
-    where: { id: appointment.id },
-    data: { status: "COMPLETED", visitId },
-  });
+  return prisma.appointment.findUnique({ where: { id: input.appointmentId } });
 }
 
 function toAppointmentRow(
