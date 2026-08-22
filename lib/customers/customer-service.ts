@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient, WhatsAppConsentSource } from "@prisma/client";
 import { BusinessError } from "@/lib/errors";
+import { runSerializable } from "@/lib/db/serializable-retry";
 import { lockTenantQuota } from "@/lib/db/tenant-lock";
 
 type CustomerWithOperationalSummary = Prisma.CustomerGetPayload<{
@@ -63,7 +64,7 @@ export async function createCustomerWithLoyalty({
   whatsappConsentSource?: WhatsAppConsentSource;
   privacyNotice?: { acknowledgedAt: Date; version: string; controllerName: string };
 }) {
-  return prisma.$transaction(async (tx) => {
+  return runSerializable(prisma, "customer.create_with_loyalty", async (tx) => {
     await lockTenantQuota(tx, organizationId, "customers");
     const existing = await tx.customer.findFirst({
       where: { organizationId, phone },
@@ -99,5 +100,5 @@ export async function createCustomerWithLoyalty({
       },
     });
     return { customer, created: true };
-  }, { isolationLevel: "Serializable" });
+  });
 }
