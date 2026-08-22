@@ -12,11 +12,20 @@ set -Eeuo pipefail
 
 readonly APP_DIR=/srv/tanal/app
 readonly RELEASES_DIR=/srv/tanal/releases
-readonly ENV_FILE=/etc/tanal/tanal.env
 readonly SERVICE=tanal.service
 readonly APP_USER=tanal
 readonly HEALTH_URL=http://127.0.0.1:3000/api/health/readiness
 readonly NODE_PATH_ENV=/usr/local/bin:/usr/bin:/bin
+
+# The production unit is the source of truth for the secret environment path.
+# Older installations used a different location, so hard-coding one path makes
+# an otherwise healthy server impossible to deploy. TANAL_ENV_FILE remains an
+# explicit emergency override, while systemd supplies the normal value.
+SYSTEMD_ENV_FILE="$(
+  systemctl show "$SERVICE" --property=EnvironmentFiles --value \
+    | awk '{ path=$1; sub(/^-/, "", path); print path; exit }'
+)"
+readonly ENV_FILE="${TANAL_ENV_FILE:-${SYSTEMD_ENV_FILE:-/etc/tanal/tanal.env}}"
 
 TARBALL="${1:-}"
 SHA="${2:-}"
