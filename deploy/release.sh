@@ -103,7 +103,15 @@ docker run --rm \
   --volume "$STAGE:/app" \
   --workdir /app \
   node:22-bookworm-slim \
-  sh -ceu 'apt-get update >/dev/null; apt-get install -y --no-install-recommends openssl >/dev/null; npm ci --include=dev --no-audit --no-fund; npm run prisma:generate; npm run build'
+  sh -ceu '
+    export NODE_ENV=development
+    apt-get update >/dev/null
+    apt-get install -y --no-install-recommends openssl >/dev/null
+    npm ci --include=dev --no-audit --no-fund
+    npm run prisma:generate
+    export NODE_ENV=production
+    npm run build
+  '
 
 echo "building candidate image while the current release stays online"
 docker build \
