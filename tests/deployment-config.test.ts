@@ -108,7 +108,9 @@ describe("إعداد النشر", () => {
     const backupPosition = release.indexOf("pg_dump --format=custom");
     const switchPosition = release.indexOf('mv -- "$APP_DIR" "$PREVIOUS"');
 
-    expect(release).toContain('--env-file "$BUILD_ENV_FILE"');
+    expect(release).toContain('. "$BUILD_ENV_FILE"');
+    expect(release).toContain('BUILD_ENV_ARGS+=(--env "$key")');
+    expect(release).not.toContain('--env-file "$BUILD_ENV_FILE"');
     expect(release).toContain("npm run prisma:generate");
     expect(release).toContain("npm run build");
     expect(dockerfile).not.toContain("tanal.env");

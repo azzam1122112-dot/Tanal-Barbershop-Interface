@@ -35,6 +35,7 @@ BACKUP="$BACKUPS_DIR/tanal-before-$SHA-$STAMP.dump"
 CANDIDATE_IMAGE="tanal-web:candidate-$SHA"
 ROLLBACK_IMAGE="tanal-web:rollback-$SHA"
 CURRENT_IMAGE_ID="$(docker inspect --format '{{.Image}}' "$WEB_CONTAINER")"
+BUILD_NETWORK="$(docker inspect --format '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' "$POSTGRES_CONTAINER" | head -1)"
 SWAPPED=0
 ACTIVATED=0
 
@@ -93,25 +94,42 @@ echo "preparing immutable release $SHA"
 tar -xzf "$TARBALL" -C "$STAGE"
 [[ -f "$STAGE/Dockerfile" ]] || { echo "release Dockerfile missing" >&2; exit 2; }
 printf '%s\n' "$SHA" > "$STAGE/.release-sha"
+[[ -n "$BUILD_NETWORK" ]] || { echo "PostgreSQL build network not found" >&2; exit 2; }
 
 echo "compiling the candidate in an ephemeral container"
-docker run --rm \
-  --network host \
-  --env-file "$BUILD_ENV_FILE" \
-  --env NODE_ENV=development \
-  --env NEXT_TELEMETRY_DISABLED=1 \
-  --volume "$STAGE:/app" \
-  --workdir /app \
-  node:22-bookworm-slim \
-  sh -ceu '
-    export NODE_ENV=development
-    apt-get update >/dev/null
-    apt-get install -y --no-install-recommends openssl >/dev/null
-    npm ci --include=dev --no-audit --no-fund
-    npm run prisma:generate
-    export NODE_ENV=production
-    npm run build
-  '
+(
+  set -a
+  # The root-owned file is shell-compatible and may quote values. Sourcing it
+  # strips those quotes; Docker's --env-file parser would keep them literally.
+  . "$BUILD_ENV_FILE"
+  set +a
+
+  BUILD_ENV_ARGS=()
+  while IFS= read -r key; do
+    [[ -v "$key" ]] && BUILD_ENV_ARGS+=(--env "$key")
+  done < <(
+    sed -nE 's/^[[:space:]]*(export[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)=.*/\2/p' \
+      "$BUILD_ENV_FILE"
+  )
+
+  docker run --rm \
+    --network "$BUILD_NETWORK" \
+    "${BUILD_ENV_ARGS[@]}" \
+    --env NODE_ENV=development \
+    --env NEXT_TELEMETRY_DISABLED=1 \
+    --volume "$STAGE:/app" \
+    --workdir /app \
+    node:22-bookworm-slim \
+    sh -ceu '
+      export NODE_ENV=development
+      apt-get update >/dev/null
+      apt-get install -y --no-install-recommends openssl >/dev/null
+      npm ci --include=dev --no-audit --no-fund
+      npm run prisma:generate
+      export NODE_ENV=production
+      npm run build
+    '
+)
 
 echo "building candidate image while the current release stays online"
 docker build \
