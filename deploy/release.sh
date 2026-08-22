@@ -35,7 +35,6 @@ BACKUP="$BACKUPS_DIR/tanal-before-$SHA-$STAMP.dump"
 CANDIDATE_IMAGE="tanal-web:candidate-$SHA"
 ROLLBACK_IMAGE="tanal-web:rollback-$SHA"
 CURRENT_IMAGE_ID="$(docker inspect --format '{{.Image}}' "$WEB_CONTAINER")"
-BUILD_NETWORK="$(docker inspect --format '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' "$POSTGRES_CONTAINER" | head -1)"
 BUILD_CONTAINER="tanal-build-${SHA:0:12}"
 SWAPPED=0
 ACTIVATED=0
@@ -97,7 +96,6 @@ echo "preparing immutable release $SHA"
 tar -xzf "$TARBALL" -C "$STAGE"
 [[ -f "$STAGE/Dockerfile" ]] || { echo "release Dockerfile missing" >&2; exit 2; }
 printf '%s\n' "$SHA" > "$STAGE/.release-sha"
-[[ -n "$BUILD_NETWORK" ]] || { echo "PostgreSQL build network not found" >&2; exit 2; }
 
 echo "compiling the candidate in an ephemeral container"
 (
@@ -118,7 +116,7 @@ echo "compiling the candidate in an ephemeral container"
 
   docker run --detach --rm \
     --name "$BUILD_CONTAINER" \
-    --network bridge \
+    --network host \
     "${BUILD_ENV_ARGS[@]}" \
     --env NODE_ENV=development \
     --env NEXT_TELEMETRY_DISABLED=1 \
@@ -126,7 +124,6 @@ echo "compiling the candidate in an ephemeral container"
     --workdir /app \
     "$CURRENT_IMAGE_ID" \
     sleep infinity >/dev/null
-  docker network connect "$BUILD_NETWORK" "$BUILD_CONTAINER"
   docker exec "$BUILD_CONTAINER" sh -ceu '
       export NODE_ENV=development
       npm ci --include=dev --no-audit --no-fund
