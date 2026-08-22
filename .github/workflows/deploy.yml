@@ -52,6 +52,7 @@ jobs:
           umask 077
           printf '%s' "$DEPLOY_SSH_KEY_B64" | base64 --decode > ~/.ssh/id_deploy
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh-keygen -lf ~/.ssh/id_deploy
 
       - name: Build and upload immutable release archive
         run: |
