@@ -59,15 +59,15 @@ jobs:
           archive="$RUNNER_TEMP/tanal-$SOURCE_SHA.tar.gz"
           git archive --format=tar.gz -o "$archive" "$SOURCE_SHA"
           scp -o IdentitiesOnly=yes -i ~/.ssh/id_deploy -P "$SSH_PORT" \
-            "$archive" "$SSH_TARGET:/tmp/tanal-$SOURCE_SHA.tar.gz"
+            "$archive" "$SSH_TARGET:/tmp/tanal-$SOURCE_SHA-$GITHUB_RUN_ID.tar.gz"
           scp -o IdentitiesOnly=yes -i ~/.ssh/id_deploy -P "$SSH_PORT" \
-            deploy/release.sh "$SSH_TARGET:/tmp/tanal-release-$SOURCE_SHA.sh"
+            deploy/release.sh "$SSH_TARGET:/tmp/tanal-release-$SOURCE_SHA-$GITHUB_RUN_ID.sh"
 
       - name: Back up, deploy, migrate, and verify
         run: |
           ssh -o IdentitiesOnly=yes -i ~/.ssh/id_deploy -p "$SSH_PORT" "$SSH_TARGET" \
-            "sudo -n bash '/tmp/tanal-release-$SOURCE_SHA.sh' \
-             '/tmp/tanal-$SOURCE_SHA.tar.gz' '$SOURCE_SHA'"
+            "sudo -n bash '/tmp/tanal-release-$SOURCE_SHA-$GITHUB_RUN_ID.sh' \
+             '/tmp/tanal-$SOURCE_SHA-$GITHUB_RUN_ID.tar.gz' '$SOURCE_SHA'"
           curl --fail --silent --show-error --max-time 20 \
             https://xmansx.com/api/health/readiness > /dev/null
 
