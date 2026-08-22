@@ -35,17 +35,12 @@ export default async function LoyaltyJoinPage({
 
   if (!organization || organization.status !== "ACTIVE") notFound();
 
-  const [settings, rewardRules, owner, session] = await Promise.all([
+  const [settings, rewardRules, session] = await Promise.all([
     getEffectiveSettings(prisma, { organizationId: organization.id }),
     prisma.rewardRule.findMany({
       where: { organizationId: organization.id, isActive: true },
       orderBy: { requiredPoints: "asc" },
       take: 3,
-    }),
-    prisma.user.findFirst({
-      where: { organizationId: organization.id, role: "OWNER", isActive: true },
-      select: { email: true, phone: true },
-      orderBy: { createdAt: "asc" },
     }),
     getRequestCustomerSession(),
   ]);
@@ -122,8 +117,6 @@ export default async function LoyaltyJoinPage({
               state={state}
               brandName={brandName}
               accountName={session?.account.name ?? null}
-              controllerEmail={owner?.email ?? null}
-              controllerPhone={owner?.phone ?? null}
             />
           </aside>
         </div>

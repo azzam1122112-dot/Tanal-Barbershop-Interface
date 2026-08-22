@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Icon } from "@/components/icons";
 import { INSTALL_SNOOZE_KEY, isInstallSnoozed, nextInstallSnooze } from "@/lib/pwa/install-snooze";
 
@@ -27,6 +28,7 @@ function snooze() {
  * ولا تظهر أكثر من واحد في الوقت نفسه (الأولوية: انقطاع ← تحديث ← تثبيت).
  */
 export function BarberPwa() {
+  const pathname = usePathname();
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
   const [installEvent, setInstallEvent] = useState<InstallPromptEvent | null>(null);
   const [showIosHint, setShowIosHint] = useState(false);
@@ -181,7 +183,12 @@ export function BarberPwa() {
     );
   }
 
-  if (installEvent) {
+  // دعوة التثبيت التلقائية مناسبة في شاشة الدخول فقط. داخل شاشة العمل توجد
+  // بطاقة دائمة في تبويب «يومي»، وعرض الشريط فوق نموذج الزيارة أو الصندوق
+  // يحجب أزرار التحصيل ويكرّر الدعوة داخل التبويب نفسه.
+  const canOfferInstall = pathname === "/barber/login";
+
+  if (canOfferInstall && installEvent) {
     return (
       <PwaBar tone="onyx" icon="scissors" action={{ label: "تثبيت", onClick: install }} onDismiss={dismiss}>
         <p className="text-sm font-bold">ثبّت إكس مانس إكس XMANSX كتطبيق</p>
@@ -190,7 +197,7 @@ export function BarberPwa() {
     );
   }
 
-  if (showIosHint) {
+  if (canOfferInstall && showIosHint) {
     return (
       <PwaBar tone="onyx" icon="scissors" onDismiss={dismiss}>
         <p className="text-sm font-bold">ثبّت إكس مانس إكس XMANSX كتطبيق</p>

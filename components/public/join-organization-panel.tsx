@@ -16,14 +16,10 @@ export function JoinOrganizationPanel({
   state,
   brandName,
   accountName,
-  controllerEmail,
-  controllerPhone,
 }: {
   state: string;
   brandName: string;
   accountName: string | null;
-  controllerEmail: string | null;
-  controllerPhone: string | null;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -107,13 +103,12 @@ export function JoinOrganizationPanel({
         </p>
       ) : null}
 
-      {controllerEmail || controllerPhone ? (
-        <p className="mt-5 border-t border-white/[0.08] pt-4 text-[11px] font-medium leading-5 text-white/35">
-          يعالج {brandName} بيانات عضويتك بصفته المسؤول عنها
-          {controllerEmail ? ` — ${controllerEmail}` : ""}
-          {controllerPhone ? ` — ${controllerPhone}` : ""}.
-        </p>
-      ) : null}
+      {/* اسم المنشأة يكفي لتعريف المتحكم. بيانات دخول المالك قد تكون شخصية،
+          وعرضها لكل من يمسح رمز الصالون كان يحوّل ملصق الولاء إلى دليل اتصال
+          غير مقصود. قنوات الحقوق الرسمية تبقى في سياسة الخصوصية وداخل الحساب. */}
+      <p className="mt-5 border-t border-white/[0.08] pt-4 text-[11px] font-medium leading-5 text-white/35">
+        يعالج {brandName} بيانات عضويتك بصفته المسؤول عنها، وتعمل إكس مانس إكس XMANSX مزوّدًا تقنيًا للخدمة.
+      </p>
     </section>
   );
 }

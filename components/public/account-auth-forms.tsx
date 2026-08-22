@@ -157,7 +157,13 @@ export function AccountRegisterForm({ join }: { join?: string | null }) {
   );
 }
 
-export function AccountLoginForm({ join }: { join?: string | null }) {
+export function AccountLoginForm({
+  join,
+  showRegisterLink = true,
+}: {
+  join?: string | null;
+  showRegisterLink?: boolean;
+}) {
   const { submit, loading, feedback } = useSubmit("/api/account/login", join);
 
   return (
@@ -167,13 +173,15 @@ export function AccountLoginForm({ join }: { join?: string | null }) {
       <Field label="كلمة المرور" name="password" type="password" autoComplete="current-password" />
       <Alert feedback={feedback} />
       <Submit loading={loading}>تسجيل الدخول</Submit>
-      <div className="flex items-center justify-between text-sm font-medium text-salon-charcoal/70">
+      <div className={`flex items-center text-sm font-medium text-salon-charcoal/70 ${showRegisterLink ? "justify-between" : "justify-center"}`}>
         <Link href="/account/forgot-password" className="font-bold text-salon-ink underline">
           نسيت كلمة المرور؟
         </Link>
-        <Link href={join ? `/account/register?join=${encodeURIComponent(join)}` : "/account/register"} className="font-bold text-salon-ink underline">
-          حساب جديد
-        </Link>
+        {showRegisterLink ? (
+          <Link href={join ? `/account/register?join=${encodeURIComponent(join)}` : "/account/register"} className="font-bold text-salon-ink underline">
+            حساب جديد
+          </Link>
+        ) : null}
       </div>
     </form>
   );

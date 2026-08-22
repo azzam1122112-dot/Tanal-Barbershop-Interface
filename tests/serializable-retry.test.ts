@@ -122,6 +122,24 @@ describe("serializable retry policy", () => {
     expect(isSerializationConflict(new BusinessError("x"))).toBe(false);
     expect(isSerializationConflict(new Error("x"))).toBe(false);
   });
+
+  it("gives queued transactions enough time to start without retrying P2028", async () => {
+    let receivedOptions: { maxWait?: number; timeout?: number } | undefined;
+    const client = {
+      async $transaction<T>(
+        fn: (tx: Prisma.TransactionClient) => Promise<T>,
+        options: { maxWait?: number; timeout?: number },
+      ) {
+        receivedOptions = options;
+        return fn({} as Prisma.TransactionClient);
+      },
+    };
+
+    await runSerializable(client, "test.wait_budget", async () => "done");
+
+    expect(receivedOptions?.maxWait).toBeGreaterThan(2_000);
+    expect(receivedOptions?.timeout).toBeGreaterThan(receivedOptions?.maxWait ?? 0);
+  });
 });
 
 describe("cash session concurrency on the real database", () => {
