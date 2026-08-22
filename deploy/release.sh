@@ -55,6 +55,7 @@ discover_env_file() {
 }
 
 readonly ENV_FILE="${TANAL_ENV_FILE:-${SYSTEMD_ENV_FILE:-$(discover_env_file || true)}}"
+RUNTIME_ENV_PID=""
 
 TARBALL="${1:-}"
 SHA="${2:-}"
@@ -65,10 +66,23 @@ if [[ -z "$TARBALL" || -z "$SHA" ]]; then
 fi
 [[ $EUID -eq 0 ]] || { echo "must run as root" >&2; exit 2; }
 [[ -f "$TARBALL" ]] || { echo "tarball not found: $TARBALL" >&2; exit 2; }
-[[ -n "$ENV_FILE" ]] || { echo "production env file could not be discovered" >&2; exit 2; }
-[[ -r "$ENV_FILE" ]] || { echo "env file not found: $ENV_FILE" >&2; exit 2; }
-
-set -a; . "$ENV_FILE"; set +a
+if [[ -n "$ENV_FILE" ]]; then
+  [[ -r "$ENV_FILE" ]] || { echo "env file not found: $ENV_FILE" >&2; exit 2; }
+  set -a; . "$ENV_FILE"; set +a
+else
+  # Legacy production injects secrets directly into the systemd process and
+  # has no EnvironmentFile. Read the already-running service environment in
+  # memory only; never print it or persist a second plaintext secret file.
+  RUNTIME_ENV_PID="$(systemctl show "$SERVICE" --property=MainPID --value)"
+  [[ "$RUNTIME_ENV_PID" =~ ^[1-9][0-9]*$ ]] \
+    && [[ -r "/proc/$RUNTIME_ENV_PID/environ" ]] \
+    || { echo "production environment could not be discovered" >&2; exit 2; }
+  while IFS= read -r -d '' entry; do
+    key="${entry%%=*}"
+    [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+    export "$entry"
+  done < "/proc/$RUNTIME_ENV_PID/environ"
+fi
 
 require_env() {
   local name="$1"
