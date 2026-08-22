@@ -65,7 +65,12 @@ rollback() {
     done
   fi
 
-  echo "previous TANAL release restored; database backup: $BACKUP" >&2
+  if [[ "$SWAPPED" -eq 1 ]]; then
+    echo "previous TANAL release restored" >&2
+  else
+    echo "current TANAL release was never replaced" >&2
+  fi
+  [[ -f "$BACKUP" ]] && echo "database backup: $BACKUP" >&2
   exit 1
 }
 
@@ -89,10 +94,20 @@ tar -xzf "$TARBALL" -C "$STAGE"
 [[ -f "$STAGE/Dockerfile" ]] || { echo "release Dockerfile missing" >&2; exit 2; }
 printf '%s\n' "$SHA" > "$STAGE/.release-sha"
 
+echo "compiling the candidate in an ephemeral container"
+docker run --rm \
+  --network host \
+  --env-file "$BUILD_ENV_FILE" \
+  --env NODE_ENV=development \
+  --env NEXT_TELEMETRY_DISABLED=1 \
+  --volume "$STAGE:/app" \
+  --workdir /app \
+  node:22-bookworm-slim \
+  sh -ceu 'apt-get update >/dev/null; apt-get install -y --no-install-recommends openssl >/dev/null; npm ci --include=dev --no-audit --no-fund; npm run prisma:generate; npm run build'
+
 echo "building candidate image while the current release stays online"
 docker build \
   --network host \
-  --secret "id=tanal_env_build,src=$BUILD_ENV_FILE" \
   --label "org.opencontainers.image.revision=$SHA" \
   --tag "$CANDIDATE_IMAGE" \
   "$STAGE"

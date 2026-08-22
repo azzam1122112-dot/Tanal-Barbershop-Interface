@@ -104,13 +104,15 @@ describe("إعداد النشر", () => {
   it("يبني إصدار Docker معزولًا ثم ينسخ البيانات ويبدّل مع استرجاع وفحص صحة", () => {
     const release = readFileSync(join(process.cwd(), "deploy", "release.sh"), "utf8");
     const dockerfile = readFileSync(join(process.cwd(), "Dockerfile"), "utf8");
-    const buildPosition = release.indexOf("docker build");
+    const buildPosition = release.indexOf("npm run build");
     const backupPosition = release.indexOf("pg_dump --format=custom");
     const switchPosition = release.indexOf('mv -- "$APP_DIR" "$PREVIOUS"');
 
-    expect(dockerfile).toContain("--mount=type=secret,id=tanal_env_build");
-    expect(dockerfile).toContain("npm run prisma:generate");
-    expect(dockerfile).toContain("npm run build");
+    expect(release).toContain('--env-file "$BUILD_ENV_FILE"');
+    expect(release).toContain("npm run prisma:generate");
+    expect(release).toContain("npm run build");
+    expect(dockerfile).not.toContain("tanal.env");
+    expect(dockerfile).not.toContain("tanal_env_build");
     expect(dockerfile).toContain("npm run prisma:deploy");
     expect(release).toContain("tanal-web:candidate-$SHA");
     expect(release).toContain("tanal-web:rollback-$SHA");
