@@ -25,7 +25,36 @@ SYSTEMD_ENV_FILE="$(
   systemctl show "$SERVICE" --property=EnvironmentFiles --value \
     | awk '{ path=$1; sub(/^-/, "", path); print path; exit }'
 )"
-readonly ENV_FILE="${TANAL_ENV_FILE:-${SYSTEMD_ENV_FILE:-/etc/tanal/tanal.env}}"
+
+discover_env_file() {
+  local candidate session_value
+  while IFS= read -r candidate; do
+    [[ -r "$candidate" ]] || continue
+    grep -q '^DATABASE_URL=.' "$candidate" || continue
+    session_value="$(sed -n 's/^SESSION_SECRET=//p' "$candidate" | head -1)"
+    [[ ${#session_value} -ge 32 ]] || continue
+    printf '%s\n' "$candidate"
+    return 0
+  done < <(
+    {
+      printf '%s\n' \
+        /etc/tanal/tanal.env \
+        /etc/tanal.env \
+        /etc/xmansx/tanal.env \
+        /etc/xmansx/xmansx.env \
+        /srv/tanal/.env \
+        /srv/tanal/.env.production \
+        /srv/tanal/app/.env \
+        /srv/tanal/app/.env.production
+      find /etc/tanal /etc/xmansx /srv/tanal -maxdepth 3 -type f \
+        \( -name '*.env' -o -name '.env' -o -name '.env.production' \) \
+        2>/dev/null || true
+    } | awk '!seen[$0]++'
+  )
+  return 1
+}
+
+readonly ENV_FILE="${TANAL_ENV_FILE:-${SYSTEMD_ENV_FILE:-$(discover_env_file || true)}}"
 
 TARBALL="${1:-}"
 SHA="${2:-}"
@@ -36,6 +65,7 @@ if [[ -z "$TARBALL" || -z "$SHA" ]]; then
 fi
 [[ $EUID -eq 0 ]] || { echo "must run as root" >&2; exit 2; }
 [[ -f "$TARBALL" ]] || { echo "tarball not found: $TARBALL" >&2; exit 2; }
+[[ -n "$ENV_FILE" ]] || { echo "production env file could not be discovered" >&2; exit 2; }
 [[ -r "$ENV_FILE" ]] || { echo "env file not found: $ENV_FILE" >&2; exit 2; }
 
 set -a; . "$ENV_FILE"; set +a
@@ -92,6 +122,10 @@ rm -rf "$STAGE"
 mkdir -p "$STAGE"
 tar -xzf "$TARBALL" -C "$STAGE"
 echo "$SHA" > "$STAGE/.release-sha"
+if [[ "$ENV_FILE" == "$APP_DIR/"* ]]; then
+  ENV_RELATIVE_PATH="${ENV_FILE#"$APP_DIR/"}"
+  install -D -m 0600 "$ENV_FILE" "$STAGE/$ENV_RELATIVE_PATH"
+fi
 chown -R "$APP_USER:$APP_USER" "$STAGE"
 
 # لا تضبط NODE_ENV=production هنا: npm يتخطّى عندها devDependencies، فيسقط
