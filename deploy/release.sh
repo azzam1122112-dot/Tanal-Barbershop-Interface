@@ -73,9 +73,17 @@ else
   # Legacy production injects secrets directly into the systemd process and
   # has no EnvironmentFile. Read the already-running service environment in
   # memory only; never print it or persist a second plaintext secret file.
-  RUNTIME_ENV_PID="$(systemctl show "$SERVICE" --property=MainPID --value)"
-  [[ "$RUNTIME_ENV_PID" =~ ^[1-9][0-9]*$ ]] \
-    && [[ -r "/proc/$RUNTIME_ENV_PID/environ" ]] \
+  for candidate_pid in \
+    "$(systemctl show "$SERVICE" --property=MainPID --value)" \
+    $(pgrep -u "$APP_USER" 2>/dev/null || true); do
+    [[ "$candidate_pid" =~ ^[1-9][0-9]*$ ]] || continue
+    [[ -r "/proc/$candidate_pid/environ" ]] || continue
+    grep -zq '^DATABASE_URL=.' "/proc/$candidate_pid/environ" || continue
+    grep -zq '^SESSION_SECRET=.' "/proc/$candidate_pid/environ" || continue
+    RUNTIME_ENV_PID="$candidate_pid"
+    break
+  done
+  [[ -n "$RUNTIME_ENV_PID" ]] \
     || { echo "production environment could not be discovered" >&2; exit 2; }
   while IFS= read -r -d '' entry; do
     key="${entry%%=*}"
