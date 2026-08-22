@@ -1,61 +1,16 @@
 #!/usr/bin/env bash
-# نشر إصدار جديد على خادم الإنتاج (tanal-prod).
-#
-# يُنفَّذ على الخادم بصلاحية root:
-#     tar -czf /tmp/tanal-<sha>.tar.gz ...   # أو: git archive من جهاز التطوير ثم scp
-#     deploy/release.sh /tmp/tanal-<sha>.tar.gz <sha>
-#
-# يبني الإصدار الجديد في مجلد مستقل بينما الإصدار الحالي ما زال يخدم الطلبات،
-# فلا يتوقف الموقع إلا لحظة التبديل وإعادة التشغيل. وإن فشل فحص الصحة بعد
-# التبديل يرجع تلقائيًا إلى الإصدار السابق بدل ترك الإنتاج معطّلًا.
+# Atomic Docker Compose production release for TANAL.
 set -Eeuo pipefail
 
-readonly APP_DIR=/srv/tanal/app
-readonly RELEASES_DIR=/srv/tanal/releases
-readonly SERVICE=tanal.service
-readonly APP_USER=tanal
-readonly HEALTH_URL=http://127.0.0.1:3000/api/health/readiness
-readonly NODE_PATH_ENV=/usr/local/bin:/usr/bin:/bin
-
-# The production unit is the source of truth for the secret environment path.
-# Older installations used a different location, so hard-coding one path makes
-# an otherwise healthy server impossible to deploy. TANAL_ENV_FILE remains an
-# explicit emergency override, while systemd supplies the normal value.
-SYSTEMD_ENV_FILE="$(
-  systemctl show "$SERVICE" --property=EnvironmentFiles --value \
-    | awk '{ path=$1; sub(/^-/, "", path); print path; exit }'
-)"
-
-discover_env_file() {
-  local candidate session_value
-  while IFS= read -r candidate; do
-    [[ -r "$candidate" ]] || continue
-    grep -q '^DATABASE_URL=.' "$candidate" || continue
-    session_value="$(sed -n 's/^SESSION_SECRET=//p' "$candidate" | head -1)"
-    [[ ${#session_value} -ge 32 ]] || continue
-    printf '%s\n' "$candidate"
-    return 0
-  done < <(
-    {
-      printf '%s\n' \
-        /etc/tanal/tanal.env \
-        /etc/tanal.env \
-        /etc/xmansx/tanal.env \
-        /etc/xmansx/xmansx.env \
-        /srv/tanal/.env \
-        /srv/tanal/.env.production \
-        /srv/tanal/app/.env \
-        /srv/tanal/app/.env.production
-      find /etc/tanal /etc/xmansx /srv/tanal -maxdepth 3 -type f \
-        \( -name '*.env' -o -name '.env' -o -name '.env.production' \) \
-        2>/dev/null || true
-    } | awk '!seen[$0]++'
-  )
-  return 1
-}
-
-readonly ENV_FILE="${TANAL_ENV_FILE:-${SYSTEMD_ENV_FILE:-$(discover_env_file || true)}}"
-RUNTIME_ENV_PID=""
+readonly DEPLOY_ROOT=/opt/tanal
+readonly APP_DIR="$DEPLOY_ROOT/app"
+readonly RELEASES_DIR="$DEPLOY_ROOT/releases"
+readonly BACKUPS_DIR="$DEPLOY_ROOT/backups"
+readonly COMPOSE_FILE="$DEPLOY_ROOT/compose.yaml"
+readonly BUILD_ENV_FILE="$DEPLOY_ROOT/env/tanal.env.build"
+readonly POSTGRES_CONTAINER=tanal-postgres-1
+readonly WEB_CONTAINER=tanal-web-1
+readonly HEALTH_URL=http://127.0.0.1:13000/api/health/readiness
 
 TARBALL="${1:-}"
 SHA="${2:-}"
@@ -64,146 +19,116 @@ if [[ -z "$TARBALL" || -z "$SHA" ]]; then
   echo "usage: $0 <source-tarball> <git-sha>" >&2
   exit 2
 fi
+
 [[ $EUID -eq 0 ]] || { echo "must run as root" >&2; exit 2; }
-[[ -f "$TARBALL" ]] || { echo "tarball not found: $TARBALL" >&2; exit 2; }
-if [[ -n "$ENV_FILE" ]]; then
-  [[ -r "$ENV_FILE" ]] || { echo "env file not found: $ENV_FILE" >&2; exit 2; }
-  set -a; . "$ENV_FILE"; set +a
-else
-  # Legacy production injects secrets directly into the systemd process and
-  # has no EnvironmentFile. Read the already-running service environment in
-  # memory only; never print it or persist a second plaintext secret file.
-  for candidate_pid in \
-    "$(systemctl show "$SERVICE" --property=MainPID --value)" \
-    $(pgrep -u "$APP_USER" 2>/dev/null || true); do
-    [[ "$candidate_pid" =~ ^[1-9][0-9]*$ ]] || continue
-    [[ -r "/proc/$candidate_pid/environ" ]] || continue
-    grep -zq '^DATABASE_URL=.' "/proc/$candidate_pid/environ" || continue
-    grep -zq '^SESSION_SECRET=.' "/proc/$candidate_pid/environ" || continue
-    RUNTIME_ENV_PID="$candidate_pid"
-    break
-  done
-  [[ -n "$RUNTIME_ENV_PID" ]] \
-    || { echo "production environment could not be discovered" >&2; exit 2; }
-  while IFS= read -r -d '' entry; do
-    key="${entry%%=*}"
-    [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
-    export "$entry"
-  done < "/proc/$RUNTIME_ENV_PID/environ"
-fi
-
-require_env() {
-  local name="$1"
-  [[ -n "${!name:-}" ]] || { echo "production environment is missing: $name" >&2; exit 2; }
-}
-
-for name in \
-  DATABASE_URL REDIS_URL SESSION_SECRET CUSTOMER_OTP_PEPPER \
-  RESEND_API_KEY EMAIL_FROM EMAIL_REPLY_TO RESEND_INBOUND_API_KEY \
-  RESEND_WEBHOOK_SECRET SUPPORT_EMAIL_ADDRESS \
-  PLATFORM_MFA_ENCRYPTION_KEY MAINTENANCE_TOKEN \
-  PUBLIC_APP_URL ROOT_DOMAIN ALLOWED_ORIGINS \
-  WEBAUTHN_RP_NAME WEBAUTHN_RP_ID WEBAUTHN_ORIGIN \
-  BACKUP_AGE_RECIPIENT MONITOR_ALERT_EMAIL MONITOR_EMAIL_FROM; do
-  require_env "$name"
-done
-
-[[ "${#SESSION_SECRET}" -ge 32 ]] || { echo "SESSION_SECRET is invalid" >&2; exit 2; }
-[[ "${#CUSTOMER_OTP_PEPPER}" -ge 32 ]] || { echo "CUSTOMER_OTP_PEPPER is invalid" >&2; exit 2; }
-[[ "${REDIS_REQUIRED:-}" == "true" ]] || { echo "REDIS_REQUIRED must be true" >&2; exit 2; }
-[[ "${EMAIL_REQUIRED:-}" == "true" ]] || { echo "EMAIL_REQUIRED must be true" >&2; exit 2; }
-[[ "${INBOUND_EMAIL_REQUIRED:-}" == "true" ]] || { echo "INBOUND_EMAIL_REQUIRED must be true" >&2; exit 2; }
-[[ "${EMAIL_PROVIDER:-}" == "resend" ]] || { echo "EMAIL_PROVIDER must be resend" >&2; exit 2; }
-[[ "${REQUIRE_EXPLICIT_SEED_CREDENTIALS:-}" == "true" ]] || {
-  echo "REQUIRE_EXPLICIT_SEED_CREDENTIALS must be true" >&2; exit 2;
-}
-[[ "$WEBAUTHN_RP_NAME" == "XMANSX" ]] || { echo "WEBAUTHN_RP_NAME is invalid" >&2; exit 2; }
-[[ "$WEBAUTHN_RP_ID" == "xmansx.com" ]] || { echo "WEBAUTHN_RP_ID is invalid" >&2; exit 2; }
-[[ "${WEBAUTHN_ORIGIN%/}" == "https://xmansx.com" ]] || { echo "WEBAUTHN_ORIGIN is invalid" >&2; exit 2; }
-[[ "${PUBLIC_APP_URL%/}" == "https://xmansx.com" ]] || { echo "PUBLIC_APP_URL is invalid" >&2; exit 2; }
-[[ "$ROOT_DOMAIN" == "xmansx.com" ]] || { echo "ROOT_DOMAIN is invalid" >&2; exit 2; }
-ALLOWED_ORIGINS_COMPACT="${ALLOWED_ORIGINS//[[:space:]]/}"
-[[ ",$ALLOWED_ORIGINS_COMPACT," == *",https://xmansx.com,"* ]] || { echo "ALLOWED_ORIGINS must include https://xmansx.com" >&2; exit 2; }
-[[ "$EMAIL_REPLY_TO" == "support@xmansx.com" ]] || { echo "EMAIL_REPLY_TO is invalid" >&2; exit 2; }
-[[ "$SUPPORT_EMAIL_ADDRESS" == "support@xmansx.com" ]] || { echo "SUPPORT_EMAIL_ADDRESS is invalid" >&2; exit 2; }
-[[ "$MONITOR_ALERT_EMAIL" == "support@xmansx.com" ]] || { echo "MONITOR_ALERT_EMAIL is invalid" >&2; exit 2; }
-[[ "$EMAIL_FROM" == *"@xmansx.com"* ]] || { echo "EMAIL_FROM is invalid" >&2; exit 2; }
-[[ "$MONITOR_EMAIL_FROM" == *"@xmansx.com"* ]] || { echo "MONITOR_EMAIL_FROM is invalid" >&2; exit 2; }
+[[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "invalid source sha" >&2; exit 2; }
+[[ -f "$TARBALL" ]] || { echo "tarball not found" >&2; exit 2; }
+[[ -f "$COMPOSE_FILE" ]] || { echo "compose file not found" >&2; exit 2; }
+[[ -r "$BUILD_ENV_FILE" ]] || { echo "build environment not found" >&2; exit 2; }
+docker inspect "$POSTGRES_CONTAINER" "$WEB_CONTAINER" >/dev/null
 
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 STAGE="$RELEASES_DIR/staging-$SHA"
 PREVIOUS="$RELEASES_DIR/app-before-$SHA-$STAMP"
+BACKUP_TMP="$BACKUPS_DIR/.tanal-before-$SHA-$STAMP.dump.tmp"
+BACKUP="$BACKUPS_DIR/tanal-before-$SHA-$STAMP.dump"
+CANDIDATE_IMAGE="tanal-web:candidate-$SHA"
+ROLLBACK_IMAGE="tanal-web:rollback-$SHA"
+CURRENT_IMAGE_ID="$(docker inspect --format '{{.Image}}' "$WEB_CONTAINER")"
+SWAPPED=0
+ACTIVATED=0
 
-echo "==> نسخة احتياطية لقاعدة البيانات"
-# تستخدم نفس خدمة الإنتاج: pg_dump مخصص، تحقق بنيوي، تشفير age، checksum،
-# وصلاحيات 0600. فشل أي خطوة يمنع النشر قبل لمس الإصدار أو المخطط.
-systemctl start tanal-backup.service
-
-echo "==> تجهيز الإصدار في $STAGE"
-rm -rf "$STAGE"
-mkdir -p "$STAGE"
-tar -xzf "$TARBALL" -C "$STAGE"
-echo "$SHA" > "$STAGE/.release-sha"
-if [[ "$ENV_FILE" == "$APP_DIR/"* ]]; then
-  ENV_RELATIVE_PATH="${ENV_FILE#"$APP_DIR/"}"
-  install -D -m 0600 "$ENV_FILE" "$STAGE/$ENV_RELATIVE_PATH"
-fi
-chown -R "$APP_USER:$APP_USER" "$STAGE"
-
-# لا تضبط NODE_ENV=production هنا: npm يتخطّى عندها devDependencies، فيسقط
-# TypeScript وTailwind ويفشل البناء. والأهم أن ExecStartPre في وحدة systemd
-# يشغّل `prisma migrate deploy` وحزمة prisma نفسها devDependency — أي أن تقليم
-# حزم التطوير بعد البناء يمنع الخدمة من الإقلاع أصلًا. تبقى كاملة عن قصد.
-# ‏`runuser` يرث مجلد عمل المُشغِّل لا مجلد السكربت، و`npm ci` يقرأ
-# package-lock.json من مجلد العمل. بلا هذا الانتقال يفشل بـ EUSAGE.
-cd "$STAGE"
-
-EXPECTED_NODE="$(tr -d '\r\n' < .node-version)"
-ACTUAL_NODE="$(node -p 'process.versions.node')"
-[[ "$ACTUAL_NODE" == "$EXPECTED_NODE" ]] || {
-  echo "Node version mismatch: expected $EXPECTED_NODE" >&2
-  exit 2
+cleanup() {
+  rm -f -- "$BACKUP_TMP" "$TARBALL" "$0"
 }
 
-echo "==> تثبيت الحزم (مع حزم التطوير — لازمة للبناء وللهجرات)"
-runuser -u "$APP_USER" -- env --chdir="$STAGE" PATH="$NODE_PATH_ENV" NODE_ENV=development \
-  npm ci --include=dev --no-audit --no-fund
+rollback() {
+  local line="$1"
+  trap - ERR
+  set +e
+  echo "deployment failed at line $line; restoring the previous release" >&2
 
-echo "==> توليد عميل Prisma والبناء"
-runuser -u "$APP_USER" -- env --chdir="$STAGE" PATH="$NODE_PATH_ENV" DATABASE_URL="$DATABASE_URL" \
-  npm run prisma:generate
-# البناء لا يملك صلاحية تغيير Production. إذا احتاجت صفحة مخططًا لم يُطبّق بعد
-# فهذه مشكلة build-time data access ويجب إصلاحها، لا تجاوزها بترحيل مبكر.
-runuser -u "$APP_USER" -- env --chdir="$STAGE" PATH="$NODE_PATH_ENV" NODE_ENV=production DATABASE_URL="$DATABASE_URL" \
-  npm run build
+  if [[ "$ACTIVATED" -eq 1 ]]; then
+    docker tag "$CURRENT_IMAGE_ID" tanal-web:latest
+  fi
 
-echo "==> التبديل وإعادة التشغيل"
-# اخرج من المجلد قبل نقله: البقاء داخله يجعل مجلد العمل يتبع inode المنقول،
-# فيصبح الرجوع (rm -rf على المجلد الحالي) عملية على أرض تتحرك تحت القدمين.
-cd /
-systemctl stop "$SERVICE"
-mv "$APP_DIR" "$PREVIOUS"
-mv "$STAGE" "$APP_DIR"
-chown -R "$APP_USER:$APP_USER" "$APP_DIR"
-# ExecStartPre في tanal.service يطبّق `prisma migrate deploy` بعد التبديل وقبل
-# أن تبدأ العملية الجديدة في قبول الطلبات.
-systemctl start "$SERVICE"
+  if [[ "$SWAPPED" -eq 1 && -d "$PREVIOUS" ]]; then
+    rm -rf -- "$APP_DIR"
+    mv -- "$PREVIOUS" "$APP_DIR"
+  fi
 
-echo "==> فحص الصحة"
-for attempt in $(seq 1 20); do
-  if curl -sf --max-time 5 "$HEALTH_URL" > /dev/null; then
-    echo "الإصدار $SHA يعمل. الإصدار السابق محفوظ في $PREVIOUS"
+  if [[ "$ACTIVATED" -eq 1 ]]; then
+    docker compose -f "$COMPOSE_FILE" up -d --no-deps --no-build --force-recreate web
+    for _ in $(seq 1 24); do
+      curl --fail --silent --show-error --max-time 5 "$HEALTH_URL" >/dev/null && break
+      sleep 5
+    done
+  fi
+
+  echo "previous TANAL release restored; database backup: $BACKUP" >&2
+  exit 1
+}
+
+trap cleanup EXIT
+trap 'rollback $LINENO' ERR
+
+mkdir -p "$RELEASES_DIR" "$BACKUPS_DIR"
+rm -rf -- "$STAGE"
+mkdir -p "$STAGE"
+
+# GitHub creates this with git archive. Reject path traversal before extraction
+# so even an accidentally replaced archive cannot write outside the stage.
+while IFS= read -r entry; do
+  case "/$entry/" in
+    */../*|//* ) echo "unsafe archive entry" >&2; exit 2 ;;
+  esac
+done < <(tar -tzf "$TARBALL")
+
+echo "preparing immutable release $SHA"
+tar -xzf "$TARBALL" -C "$STAGE"
+[[ -f "$STAGE/Dockerfile" ]] || { echo "release Dockerfile missing" >&2; exit 2; }
+printf '%s\n' "$SHA" > "$STAGE/.release-sha"
+
+echo "building candidate image while the current release stays online"
+docker build \
+  --network host \
+  --secret "id=tanal_env_build,src=$BUILD_ENV_FILE" \
+  --label "org.opencontainers.image.revision=$SHA" \
+  --tag "$CANDIDATE_IMAGE" \
+  "$STAGE"
+
+echo "backing up PostgreSQL before migrations"
+umask 077
+docker exec "$POSTGRES_CONTAINER" sh -ceu \
+  'pg_dump --format=custom --no-owner --no-acl --username="$POSTGRES_USER" --dbname="$POSTGRES_DB"' \
+  > "$BACKUP_TMP"
+[[ -s "$BACKUP_TMP" ]] || { echo "database backup is empty" >&2; exit 2; }
+docker exec -i "$POSTGRES_CONTAINER" sh -ceu 'pg_restore --list >/dev/null' < "$BACKUP_TMP"
+mv -- "$BACKUP_TMP" "$BACKUP"
+chmod 600 "$BACKUP"
+
+echo "activating release $SHA"
+mv -- "$APP_DIR" "$PREVIOUS"
+mv -- "$STAGE" "$APP_DIR"
+SWAPPED=1
+docker tag "$CURRENT_IMAGE_ID" "$ROLLBACK_IMAGE"
+docker tag "$CANDIDATE_IMAGE" tanal-web:latest
+ACTIVATED=1
+docker compose -f "$COMPOSE_FILE" up -d --no-deps --no-build --force-recreate web
+
+for _ in $(seq 1 36); do
+  if curl --fail --silent --show-error --max-time 5 "$HEALTH_URL" >/dev/null; then
+    RUNNING_IMAGE_ID="$(docker inspect --format '{{.Image}}' "$WEB_CONTAINER")"
+    CANDIDATE_IMAGE_ID="$(docker image inspect --format '{{.Id}}' "$CANDIDATE_IMAGE")"
+    [[ "$RUNNING_IMAGE_ID" == "$CANDIDATE_IMAGE_ID" ]] || {
+      echo "healthy container is not running the requested image" >&2
+      exit 1
+    }
+    echo "TANAL release $SHA is healthy; backup: $BACKUP"
     exit 0
   fi
-  sleep 3
+  sleep 5
 done
 
-echo "!! فشل فحص الصحة — رجوع تلقائي إلى الإصدار السابق" >&2
-# لا يمكن الرجوع آليًا عن مخطط PostgreSQL. لذلك لا يدخل هذا المسار إلا migrations
-# متوافقة رجعيًا؛ أما migration هادم فيحتاج خطة forward-fix وموافقة مستقلة.
-systemctl stop "$SERVICE"
-rm -rf "$APP_DIR"
-mv "$PREVIOUS" "$APP_DIR"
-systemctl start "$SERVICE"
-echo "!! تم الرجوع. راجع: journalctl -u $SERVICE -n 50" >&2
+echo "new TANAL container did not become healthy" >&2
 exit 1
