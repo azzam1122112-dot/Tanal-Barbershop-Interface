@@ -72,7 +72,7 @@ describe("إعداد النشر", () => {
     expect(timer).toContain("Persistent=true");
   });
 
-  it("يحدد دورة حذف آمنة للنسخ الاحتياطية المشفرة", () => {
+  it("يحدد دورة حذف آمنة ويمنع النشر بلا نسخة PostgreSQL قابلة للتحقق", () => {
     const backup = readFileSync(join(process.cwd(), "deploy", "backup", "tanal-backup.sh"), "utf8");
     const release = readFileSync(join(process.cwd(), "deploy", "release.sh"), "utf8");
     const envExample = readFileSync(join(process.cwd(), ".env.example"), "utf8");
@@ -81,8 +81,9 @@ describe("إعداد النشر", () => {
     expect(backup).toContain("-name 'xmansx_*.dump.age'");
     expect(envExample).toContain('BACKUP_RETENTION_DAYS="30"');
     expect(envExample).toContain('BACKUP_AGE_RECIPIENT=""');
-    expect(release).toContain("systemctl start tanal-backup.service");
-    expect(release).not.toContain("pg_dump --format=custom");
+    expect(release).toContain("pg_dump --format=custom");
+    expect(release).toContain("pg_restore --list");
+    expect(release).toContain('chmod 600 "$BACKUP"');
   });
 
   it("يراقب readiness دوريًا وينبّه دون تسجيل الأسرار", () => {
@@ -100,18 +101,24 @@ describe("إعداد النشر", () => {
     expect(timer).toContain("Persistent=true");
   });
 
-  it("يفشل النشر مغلقًا قبل لمس Production ويبني قبل migration", () => {
+  it("يبني إصدار Docker معزولًا ثم ينسخ البيانات ويبدّل مع استرجاع وفحص صحة", () => {
     const release = readFileSync(join(process.cwd(), "deploy", "release.sh"), "utf8");
-    const buildPosition = release.indexOf("npm run build");
-    const switchPosition = release.indexOf('systemctl stop "$SERVICE"');
+    const dockerfile = readFileSync(join(process.cwd(), "Dockerfile"), "utf8");
+    const buildPosition = release.indexOf("docker build");
+    const backupPosition = release.indexOf("pg_dump --format=custom");
+    const switchPosition = release.indexOf('mv -- "$APP_DIR" "$PREVIOUS"');
 
-    expect(release).toContain("REQUIRE_EXPLICIT_SEED_CREDENTIALS must be true");
-    expect(release).toContain("WEBAUTHN_RP_ID is invalid");
-    expect(release).toContain("INBOUND_EMAIL_REQUIRED must be true");
-    expect(release).toContain('SUPPORT_EMAIL_ADDRESS" == "support@xmansx.com"');
-    expect(release).toContain("Node version mismatch");
-    expect(release).not.toContain("npm run prisma:deploy");
+    expect(dockerfile).toContain("--mount=type=secret,id=tanal_env_build");
+    expect(dockerfile).toContain("npm run prisma:generate");
+    expect(dockerfile).toContain("npm run build");
+    expect(dockerfile).toContain("npm run prisma:deploy");
+    expect(release).toContain("tanal-web:candidate-$SHA");
+    expect(release).toContain("tanal-web:rollback-$SHA");
+    expect(release).toContain("restoring the previous release");
+    expect(release).toContain("/api/health/readiness");
     expect(buildPosition).toBeGreaterThan(-1);
+    expect(backupPosition).toBeGreaterThan(buildPosition);
     expect(switchPosition).toBeGreaterThan(buildPosition);
+    expect(switchPosition).toBeGreaterThan(backupPosition);
   });
 });
