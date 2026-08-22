@@ -51,6 +51,24 @@ describe("customer account discoverability", () => {
     const forms = source("components", "public", "account-auth-forms.tsx");
     expect(forms).toContain("window.location.assign(data.redirectTo)");
   });
+
+  it("keeps account creation visible on the primary login screen", () => {
+    const login = source("app", "account", "login", "page.tsx");
+    expect(login).toContain("إنشاء حساب عميل جديد");
+    expect(login).toContain("الدخول بكلمة المرور");
+    expect(login).toContain("showRegisterLink={false}");
+  });
+
+  it("does not expose the salon owner's private login contacts on the public join page", () => {
+    const joinPage = source("app", "join", "page.tsx");
+    const panel = source("components", "public", "join-organization-panel.tsx");
+    expect(joinPage).not.toContain('role: "OWNER"');
+    expect(joinPage).not.toContain("controllerEmail");
+    expect(joinPage).not.toContain("controllerPhone");
+    expect(panel).not.toContain("controllerEmail");
+    expect(panel).not.toContain("controllerPhone");
+    expect(panel).toContain("مزوّدًا تقنيًا للخدمة");
+  });
 });
 
 describe("customer portal polish", () => {
@@ -66,6 +84,12 @@ describe("customer portal polish", () => {
     for (const [path, title] of pages) {
       expect(source(...path)).toContain(`title: "${title}"`);
     }
+  });
+
+  it("gives the customer portal a branded active-membership header", () => {
+    const layout = source("app", "my", "[token]", "layout.tsx");
+    expect(layout).toContain("<BrandLogo");
+    expect(layout).toContain("عضوية فعّالة");
   });
 
   it("shows exact Riyadh times and honest scheduled/current/expired campaign states", () => {

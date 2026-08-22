@@ -11,6 +11,7 @@ import { safeFetch } from "@/lib/http/safe-fetch";
 export default function BarberLoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPin, setShowPin] = useState(false);
   // الزر معطّل حتى الترطيب: ضغطة مبكرة كانت تُرسل النموذج بـ GET فينتهي رمز
   // الدخول في شريط العنوان وسجلات الخادم.
   const hydrated = useHydrated();
@@ -83,6 +84,9 @@ export default function BarberLoginPage() {
             <h1 className="relative mt-10 text-3xl font-bold leading-tight tracking-tight">
               دخول <span className="text-gold-sheen">الحلاق</span>
             </h1>
+            <p className="relative mt-2 text-sm font-semibold leading-6 text-white/70">
+              استخدم رقمك المسجّل والرمز الذي سلّمه لك مدير الصالون.
+            </p>
           </div>
           <form onSubmit={submit} className="space-y-4 px-5 py-6">
             {organizations.length > 0 ? (
@@ -123,16 +127,27 @@ export default function BarberLoginPage() {
             </label>
             <label className="block text-sm font-bold">
               رمز الدخول
-              <input
-                name="pin"
-                type="password"
-                required
-                minLength={8}
-                maxLength={64}
-                autoComplete="current-password"
-                placeholder="8 خانات على الأقل"
-                className="barber-field mt-2 h-14 text-center text-xl"
-              />
+              <div className="relative mt-2">
+                <input
+                  name="pin"
+                  type={showPin ? "text" : "password"}
+                  required
+                  minLength={8}
+                  maxLength={64}
+                  autoComplete="current-password"
+                  placeholder="8 خانات على الأقل"
+                  className="barber-field h-14 px-20 text-center text-xl"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPin((visible) => !visible)}
+                  aria-pressed={showPin}
+                  aria-label={showPin ? "إخفاء رمز الدخول" : "إظهار رمز الدخول"}
+                  className="absolute left-2 top-1/2 z-10 min-h-10 -translate-y-1/2 rounded-lg px-3 text-xs font-bold text-salon-forest transition hover:bg-salon-mist"
+                >
+                  {showPin ? "إخفاء" : "إظهار"}
+                </button>
+              </div>
             </label>
             {error ? <p className="rounded-xl border border-red-100 bg-red-50 px-3 py-3 text-sm font-semibold text-red-700">{error}</p> : null}
             <button
@@ -143,6 +158,9 @@ export default function BarberLoginPage() {
             >
               {loading ? "جاري الدخول..." : hydrated ? "دخول" : "جاري التحضير..."}
             </button>
+            <p className="text-center text-xs font-semibold leading-5 text-salon-charcoal/65">
+              نسيت رمز الدخول؟ اطلب من مدير الصالون إنشاء رمز جديد لك.
+            </p>
           </form>
         </div>
       </section>

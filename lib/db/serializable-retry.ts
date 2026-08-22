@@ -16,13 +16,25 @@ import { logger } from "@/lib/logger";
 const BASE_DELAY_MS = 25;
 /** سقف التأخير: أسوأ انتظار تراكمي ~1.6 ثانية، لا دقيقة تُعلَّق فيها الشاشة. */
 const MAX_DELAY_MS = 400;
+/**
+ * مهلة Prisma الافتراضية لانتظار اتصال معاملة تفاعلية ثانيتان فقط. تحت دفعة
+ * فتح الدوام قد تنتظر المعاملة الثانية انتهاء الأولى الصحيحة فتسقط بـP2028
+ * قبل أن تبدأ، مع أن نافذة الطلب ما زالت سليمة. نوسّع الانتظار لا زمن تنفيذ
+ * جسم المعاملة؛ فلا نعيد تصنيف P2028 كتعارض ولا نخفي عطل قاعدة حقيقيًا.
+ */
+const TRANSACTION_MAX_WAIT_MS = 10_000;
+const TRANSACTION_TIMEOUT_MS = 20_000;
 
 export const SERIALIZABLE_MAX_ATTEMPTS = 8;
 
 type SerializableCapable = {
   $transaction: <T>(
     fn: (tx: Prisma.TransactionClient) => Promise<T>,
-    options: { isolationLevel: Prisma.TransactionIsolationLevel },
+    options: {
+      isolationLevel: Prisma.TransactionIsolationLevel;
+      maxWait?: number;
+      timeout?: number;
+    },
   ) => Promise<T>;
 };
 
@@ -55,6 +67,8 @@ export async function runSerializable<T>(
     try {
       return await prisma.$transaction(callback, {
         isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        maxWait: TRANSACTION_MAX_WAIT_MS,
+        timeout: TRANSACTION_TIMEOUT_MS,
       });
     } catch (error) {
       if (!isSerializationConflict(error)) throw error;

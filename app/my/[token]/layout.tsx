@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
+import { BrandLogo } from "@/components/brand-logo";
 import { getPortalIdentity } from "@/lib/customers/portal-view";
 import { PortalTabs } from "@/components/public/portal-tabs";
 
@@ -58,13 +59,20 @@ export default async function PortalLayout({
     <div className="min-h-screen overflow-x-hidden bg-salon-mist">
       {/* حشوة سفلية تتجاوز شريط التبويب ومنطقة الأمان معًا. */}
       <main className="mx-auto min-w-0 max-w-3xl px-4 pt-6 pb-[calc(6rem+env(safe-area-inset-bottom))]">
-        <header className="mb-4 flex items-baseline justify-between gap-3">
-          <div className="min-w-0">
-            <p className="lux-eyebrow text-salon-charcoal/55">{identity.brandName}</p>
-            <h1 className="mt-0.5 truncate text-xl font-bold text-salon-ink">
-              أهلًا {identity.customer.name}
-            </h1>
+        <header className="mb-5 flex items-center justify-between gap-3 rounded-2xl border border-white/80 bg-white/75 p-3.5 shadow-[var(--shadow-sm)] backdrop-blur">
+          <div className="flex min-w-0 items-center gap-3">
+            <BrandLogo className="h-11 w-11 shrink-0 rounded-xl ring-1 ring-salon-line/80" priority />
+            <div className="min-w-0">
+              <p className="lux-eyebrow truncate text-salon-charcoal/55">{identity.brandName}</p>
+              <h1 className="mt-0.5 truncate text-lg font-bold text-salon-ink sm:text-xl">
+                أهلًا {identity.customer.name}
+              </h1>
+            </div>
           </div>
+          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[10px] font-black text-emerald-800 sm:text-[11px]">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
+            عضوية فعّالة
+          </span>
         </header>
 
         {children}

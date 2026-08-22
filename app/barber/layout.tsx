@@ -71,7 +71,10 @@ export default async function BarberLayout({ children }: { children: React.React
 
   return (
     <>
-      <script nonce={nonce} dangerouslySetInnerHTML={{ __html: CAPTURE_INSTALL_PROMPT }} />
+      {/* المتصفح يخفي قيمة nonce عند قراءة DOM لأسباب أمنية؛ لذلك يراها React
+          فارغة أثناء الترطيب رغم وصولها صحيحة في HTML. التحذير متوقّع لهذا
+          العنصر وحده ولا يعني اختلاف المحتوى أو تعطّل سياسة الحماية. */}
+      <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: CAPTURE_INSTALL_PROMPT }} />
       {children}
       <BarberPwa />
       {/* تأكيدات ما بعد إعادة التحميل — فتح جلسة الصندوق وإنهاؤها خصوصًا. */}
