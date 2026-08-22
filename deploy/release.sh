@@ -35,6 +35,7 @@ BACKUP="$BACKUPS_DIR/tanal-before-$SHA-$STAMP.dump"
 CANDIDATE_IMAGE="tanal-web:candidate-$SHA"
 ROLLBACK_IMAGE="tanal-web:rollback-$SHA"
 CURRENT_IMAGE_ID="$(docker inspect --format '{{.Image}}' "$WEB_CONTAINER")"
+BUILD_NETWORK="$(docker inspect --format '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' "$POSTGRES_CONTAINER" | head -1)"
 BUILD_CONTAINER="tanal-build-${SHA:0:12}"
 SWAPPED=0
 ACTIVATED=0
@@ -96,6 +97,7 @@ echo "preparing immutable release $SHA"
 tar -xzf "$TARBALL" -C "$STAGE"
 [[ -f "$STAGE/Dockerfile" ]] || { echo "release Dockerfile missing" >&2; exit 2; }
 printf '%s\n' "$SHA" > "$STAGE/.release-sha"
+[[ -n "$BUILD_NETWORK" ]] || { echo "PostgreSQL build network not found" >&2; exit 2; }
 
 echo "compiling the candidate in an ephemeral container"
 (
@@ -105,6 +107,13 @@ echo "compiling the candidate in an ephemeral container"
   # strips those quotes; Docker's --env-file parser would keep them literally.
   . "$BUILD_ENV_FILE"
   set +a
+  [[ -n "${DATABASE_URL:-}" ]] || { echo "build DATABASE_URL missing" >&2; exit 2; }
+  DATABASE_URL="${DATABASE_URL//127.0.0.1:15432/postgres:5432}"
+  DATABASE_URL="${DATABASE_URL//localhost:15432/postgres:5432}"
+  if [[ -n "${REDIS_URL:-}" ]]; then
+    REDIS_URL="${REDIS_URL//127.0.0.1:16379/redis:6379}"
+    REDIS_URL="${REDIS_URL//localhost:16379/redis:6379}"
+  fi
 
   BUILD_ENV_ARGS=()
   while IFS= read -r key; do
@@ -116,7 +125,7 @@ echo "compiling the candidate in an ephemeral container"
 
   docker run --detach --rm \
     --name "$BUILD_CONTAINER" \
-    --network host \
+    --network bridge \
     "${BUILD_ENV_ARGS[@]}" \
     --env NODE_ENV=development \
     --env NEXT_TELEMETRY_DISABLED=1 \
@@ -124,6 +133,7 @@ echo "compiling the candidate in an ephemeral container"
     --workdir /app \
     "$CURRENT_IMAGE_ID" \
     sleep infinity >/dev/null
+  docker network connect "$BUILD_NETWORK" "$BUILD_CONTAINER"
   docker exec "$BUILD_CONTAINER" sh -ceu '
       export NODE_ENV=development
       npm ci --include=dev --no-audit --no-fund

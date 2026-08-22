@@ -111,7 +111,8 @@ describe("إعداد النشر", () => {
     expect(release).toContain('. "$BUILD_ENV_FILE"');
     expect(release).toContain('BUILD_ENV_ARGS+=(--env "$key")');
     expect(release).not.toContain('--env-file "$BUILD_ENV_FILE"');
-    expect(release).toContain("--network host");
+    expect(release).toContain('DATABASE_URL//127.0.0.1:15432/postgres:5432');
+    expect(release).toContain('docker network connect "$BUILD_NETWORK" "$BUILD_CONTAINER"');
     expect(release).toContain("npm run prisma:generate");
     expect(release).toContain("npm run build");
     expect(dockerfile).not.toContain("tanal.env");
