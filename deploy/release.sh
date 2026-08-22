@@ -36,10 +36,13 @@ CANDIDATE_IMAGE="tanal-web:candidate-$SHA"
 ROLLBACK_IMAGE="tanal-web:rollback-$SHA"
 CURRENT_IMAGE_ID="$(docker inspect --format '{{.Image}}' "$WEB_CONTAINER")"
 BUILD_NETWORK="$(docker inspect --format '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' "$POSTGRES_CONTAINER" | head -1)"
+BUILD_CONTAINER="tanal-build-${SHA:0:12}"
 SWAPPED=0
 ACTIVATED=0
 
 cleanup() {
+  set +e
+  docker rm -f "$BUILD_CONTAINER" >/dev/null 2>&1
   rm -f -- "$BACKUP_TMP" "$TARBALL" "$0"
 }
 
@@ -98,6 +101,7 @@ printf '%s\n' "$SHA" > "$STAGE/.release-sha"
 
 echo "compiling the candidate in an ephemeral container"
 (
+  trap - ERR
   set -a
   # The root-owned file is shell-compatible and may quote values. Sourcing it
   # strips those quotes; Docker's --env-file parser would keep them literally.
@@ -112,23 +116,25 @@ echo "compiling the candidate in an ephemeral container"
       "$BUILD_ENV_FILE"
   )
 
-  docker run --rm \
-    --network "$BUILD_NETWORK" \
+  docker run --detach --rm \
+    --name "$BUILD_CONTAINER" \
+    --network bridge \
     "${BUILD_ENV_ARGS[@]}" \
     --env NODE_ENV=development \
     --env NEXT_TELEMETRY_DISABLED=1 \
     --volume "$STAGE:/app" \
     --workdir /app \
-    node:22-bookworm-slim \
-    sh -ceu '
+    "$CURRENT_IMAGE_ID" \
+    sleep infinity >/dev/null
+  docker network connect "$BUILD_NETWORK" "$BUILD_CONTAINER"
+  docker exec "$BUILD_CONTAINER" sh -ceu '
       export NODE_ENV=development
-      apt-get update >/dev/null
-      apt-get install -y --no-install-recommends openssl >/dev/null
       npm ci --include=dev --no-audit --no-fund
       npm run prisma:generate
       export NODE_ENV=production
       npm run build
     '
+  docker rm -f "$BUILD_CONTAINER" >/dev/null
 )
 
 echo "building candidate image while the current release stays online"
