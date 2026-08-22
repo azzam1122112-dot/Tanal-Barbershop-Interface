@@ -30,6 +30,7 @@ docker inspect "$POSTGRES_CONTAINER" "$WEB_CONTAINER" >/dev/null
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 STAGE="$RELEASES_DIR/staging-$SHA"
 PREVIOUS="$RELEASES_DIR/app-before-$SHA-$STAMP"
+FAILED="$RELEASES_DIR/failed-$SHA-$STAMP"
 BACKUP_TMP="$BACKUPS_DIR/.tanal-before-$SHA-$STAMP.dump.tmp"
 BACKUP="$BACKUPS_DIR/tanal-before-$SHA-$STAMP.dump"
 CANDIDATE_IMAGE="tanal-web:candidate-$SHA"
@@ -57,7 +58,7 @@ rollback() {
   fi
 
   if [[ "$SWAPPED" -eq 1 && -d "$PREVIOUS" ]]; then
-    rm -rf -- "$APP_DIR"
+    [[ -e "$FAILED" ]] || mv -- "$APP_DIR" "$FAILED"
     mv -- "$PREVIOUS" "$APP_DIR"
   fi
 
@@ -174,10 +175,10 @@ for _ in $(seq 1 36); do
   if curl --fail --silent --show-error --max-time 5 "$HEALTH_URL" >/dev/null; then
     RUNNING_IMAGE_ID="$(docker inspect --format '{{.Image}}' "$WEB_CONTAINER")"
     CANDIDATE_IMAGE_ID="$(docker image inspect --format '{{.Id}}' "$CANDIDATE_IMAGE")"
-    [[ "$RUNNING_IMAGE_ID" == "$CANDIDATE_IMAGE_ID" ]] || {
+    if [[ "$RUNNING_IMAGE_ID" != "$CANDIDATE_IMAGE_ID" ]]; then
       echo "healthy container is not running the requested image" >&2
-      exit 1
-    }
+      rollback "$LINENO"
+    fi
     echo "TANAL release $SHA is healthy; backup: $BACKUP"
     exit 0
   fi
@@ -185,4 +186,4 @@ for _ in $(seq 1 36); do
 done
 
 echo "new TANAL container did not become healthy" >&2
-exit 1
+rollback "$LINENO"

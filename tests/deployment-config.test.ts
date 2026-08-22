@@ -104,6 +104,7 @@ describe("إعداد النشر", () => {
   it("يبني إصدار Docker معزولًا ثم ينسخ البيانات ويبدّل مع استرجاع وفحص صحة", () => {
     const release = readFileSync(join(process.cwd(), "deploy", "release.sh"), "utf8");
     const dockerfile = readFileSync(join(process.cwd(), "Dockerfile"), "utf8");
+    const dockerignore = readFileSync(join(process.cwd(), ".dockerignore"), "utf8");
     const buildPosition = release.indexOf("npm run build");
     const backupPosition = release.indexOf("pg_dump --format=custom");
     const switchPosition = release.indexOf('mv -- "$APP_DIR" "$PREVIOUS"');
@@ -117,10 +118,13 @@ describe("إعداد النشر", () => {
     expect(release).toContain("npm run build");
     expect(dockerfile).not.toContain("tanal.env");
     expect(dockerfile).not.toContain("tanal_env_build");
+    expect(dockerignore).not.toMatch(/^node_modules$/m);
+    expect(dockerignore).not.toMatch(/^\.next$/m);
     expect(dockerfile).toContain("npm run prisma:deploy");
     expect(release).toContain("tanal-web:candidate-$SHA");
     expect(release).toContain("tanal-web:rollback-$SHA");
     expect(release).toContain("restoring the previous release");
+    expect(release).toContain('mv -- "$APP_DIR" "$FAILED"');
     expect(release).toContain("/api/health/readiness");
     expect(buildPosition).toBeGreaterThan(-1);
     expect(backupPosition).toBeGreaterThan(buildPosition);
